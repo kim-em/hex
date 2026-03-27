@@ -20,11 +20,11 @@ irreducibility testing, lattice basis reduction, and related tools.
    what we need (modular exponentiation, extended GCD, etc.).
 
 4. **Swappable polynomial representations.** A `PolyOps` typeclass defines
-   operations; `LawfulPolyOps` states the ring axioms plus `BEq`
-   correctness (`a == b ↔ ∀ i, coeff a i = coeff b i`). Concrete
-   implementations decide whether to normalize eagerly or lazily — that's
-   an implementation strategy, not part of the interface. The default is
-   dense `Array`-backed with eager normalization (no trailing zeros).
+   operations including `dropZeros : P → P` (normalize to canonical form).
+   `LawfulPolyOps` states the ring axioms and that `dropZeros` is
+   idempotent, preserves coefficients, and gives extensionality on the
+   subtype `{ p : P // dropZeros p = p }`. The default representation is
+   dense `Array`-backed. Subtypes throughout, never quotients.
 
 5. **Lean algorithms from the start.** All algorithms are implemented and
    run in Lean natively. No external CAS in the loop. Certificate
@@ -224,6 +224,7 @@ class PolyOps (P : Type*) (R : outParam Type*) extends
   degree : P → Nat
   coeff : P → Nat → R
   leadingCoeff : P → R
+  dropZeros : P → P
   divMod : P → P → P × P
   eval : P → R → R
   ofCoeffs : Array R → P
@@ -241,8 +242,11 @@ class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
   -- Coefficient semantics
   coeff_add : ∀ (a b : P) (i : Nat), coeff (a + b) i = coeff a i + coeff b i
   coeff_mul : ...  -- convolution formula
-  -- BEq correctness
-  beq_iff : ∀ a b : P, (a == b) = true ↔ ∀ i, coeff a i = coeff b i
+  -- dropZeros: normalization to canonical form
+  dropZeros_idem : ∀ p, dropZeros (dropZeros p) = dropZeros p
+  dropZeros_coeff : ∀ p i, coeff (dropZeros p) i = coeff p i
+  dropZeros_ext : ∀ p q, dropZeros p = p → dropZeros q = q →
+      (∀ i, coeff p i = coeff q i) → p = q
   -- Division
   divMod_spec : ∀ a b : P, let (q, r) := divMod a b; q * b + r = a
   -- Evaluation is a ring homomorphism
@@ -252,11 +256,26 @@ class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
   eval_mul : ∀ p q x, eval (p * q) x = eval p x * eval q x
 ```
 
-`BEq` correctness is the key: two polynomials compare equal iff they have
-the same coefficients. Concrete implementations can achieve this by
-normalizing eagerly (strip trailing zeros on every operation) or lazily
-(compare coefficient-by-coefficient). The choice is an implementation
-detail, not visible in the typeclass.
+**`dropZeros` is the canonical form function.** For dense representations,
+it strips trailing zeros. For sparse representations, it removes entries
+with zero coefficients. `dropZeros_ext` gives extensionality on the
+subtype `{ p : P // dropZeros p = p }` — two canonical-form polynomials
+with the same coefficients are propositionally equal.
+
+**The subtype `CanonicalPoly P := { p : P // dropZeros p = p }`** is where
+the `≃+*` lives. In the verification library:
+
+```lean
+def CanonicalPoly (P : Type*) [PolyOps P R] := { p : P // dropZeros p = p }
+
+-- The verification library proves:
+def equiv [LawfulPolyOps P R] : CanonicalPoly P ≃+* Polynomial R
+```
+
+Eagerly-normalizing implementations (like `DensePoly`) satisfy
+`dropZeros = id`, so `CanonicalPoly (DensePoly R) ≃ DensePoly R` and
+the subtype wrapper is trivial. Lazy implementations pay the cost of
+normalization only when they need propositional equality.
 
 **Dense representation:**
 ```lean
@@ -304,23 +323,24 @@ structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
 Using `ExtHashMap` (not `HashMap`) gives extensionality lemmas — two
 `ExtHashPoly` values are equal iff they have the same key-value pairs.
 
-**Normalization strategy:** `DensePoly` normalizes eagerly (no trailing
-zeros), so structural equality = `BEq`. Implementations that prefer lazy
-normalization provide `BEq` via coefficient-wise comparison instead. This
-is a per-implementation decision, not part of the typeclass contract.
+**Normalization:** `DensePoly` normalizes eagerly, so `dropZeros = id`
+and `CanonicalPoly (DensePoly R) ≃ DensePoly R` trivially. Sparse
+representations may defer normalization, paying the cost only when
+propositional equality is needed (via `dropZeros`).
 
 ---
 
 ### lean-poly-verification (depends on lean-poly + Mathlib)
 
-Proves `DensePoly R ≃+* Polynomial R` and that `DensePoly` satisfies
-`LawfulPolyOps`. The `≃+*` is the payoff of `LawfulPolyOps`:
+Proves `LawfulPolyOps` for `DensePoly R` and constructs the ring
+equivalence. Since `DensePoly` normalizes eagerly, `dropZeros = id`
+and `CanonicalPoly (DensePoly R)` is trivially `DensePoly R`:
 
 ```lean
-def equiv [CommRing R] [DecidableEq R] : DensePoly R ≃+* Polynomial R
-
--- LawfulPolyOps gives ring equivalence
 instance [CommRing R] [DecidableEq R] : LawfulPolyOps (DensePoly R) R := ...
+
+-- dropZeros is id for DensePoly, so CanonicalPoly is trivial
+def equiv [CommRing R] [DecidableEq R] : DensePoly R ≃+* Polynomial R
 ```
 
 Also proves GCD/ExtGCD correspondence with Mathlib's `Polynomial.gcd`.
@@ -772,10 +792,10 @@ same key-value pairs. No iteration order issues.
 
 ### The typeclasses
 
-`PolyOps` for operations, `LawfulPolyOps` for ring axioms + `BEq`
-correctness. Algorithms are written against `PolyOps`. In the verification
-library, `LawfulPolyOps` gives the ring equivalence `P ≃+* Polynomial R`.
-Concrete implementations choose their own normalization strategy.
+`PolyOps` for operations (including `dropZeros`), `LawfulPolyOps` for
+ring axioms + `dropZeros` properties. The verification library proves
+`CanonicalPoly P ≃+* Polynomial R` where
+`CanonicalPoly P := { p : P // dropZeros p = p }`.
 
 ---
 
