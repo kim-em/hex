@@ -19,11 +19,12 @@ irreducibility testing, lattice basis reduction, and related tools.
    New GMP `@[extern]` primitives where Lean's runtime doesn't yet expose
    what we need (modular exponentiation, extended GCD, etc.).
 
-4. **Swappable polynomial representations.** A `PolyOps` typeclass lets
-   algorithms work over any representation (dense, sparse sorted, sparse
-   `ExtHashMap`-backed). A `LawfulPolyOps` class states the axioms. But
-   the default — and the one everything is tested and proved against
-   first — is dense `Array`-backed.
+4. **Swappable polynomial representations.** A `PolyOps` typeclass defines
+   operations; `LawfulPolyOps` states the ring axioms plus `BEq`
+   correctness (`a == b ↔ ∀ i, coeff a i = coeff b i`). Concrete
+   implementations decide whether to normalize eagerly or lazily — that's
+   an implementation strategy, not part of the interface. The default is
+   dense `Array`-backed with eager normalization (no trailing zeros).
 
 5. **Lean algorithms from the start.** All algorithms are implemented and
    run in Lean natively. No external CAS in the loop. Certificate
@@ -216,14 +217,10 @@ default dense representation.
 
 **Typeclass interface:**
 ```lean
-class PolyOps (P : Type*) (R : outParam Type*) where
-  zero : P
-  one : P
+class PolyOps (P : Type*) (R : outParam Type*) extends
+    Add P, Mul P, Neg P, Zero P, One P, BEq P where
   X : P
   C : R → P
-  add : P → P → P
-  neg : P → P
-  mul : P → P → P
   degree : P → Nat
   coeff : P → Nat → R
   leadingCoeff : P → R
@@ -233,24 +230,33 @@ class PolyOps (P : Type*) (R : outParam Type*) where
   toCoeffs : P → Array R
 
 class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
-  add_comm : ∀ a b : P, add a b = add b a
-  add_assoc : ∀ a b c : P, add (add a b) c = add a (add b c)
-  mul_comm : ∀ a b : P, mul a b = mul b a
-  mul_assoc : ∀ a b c : P, mul (mul a b) c = mul a (mul b c)
-  add_zero : ∀ a : P, add a zero = a
-  mul_one : ∀ a : P, mul a one = a
-  left_distrib : ∀ a b c : P, mul a (add b c) = add (mul a b) (mul a c)
-  coeff_add : ∀ (a b : P) (i : Nat), coeff (add a b) i = coeff a i + coeff b i
-  coeff_mul : ∀ (a b : P) (i : Nat), coeff (mul a b) i = ...  -- convolution
-  degree_add : ...
-  degree_mul : ...
-  divMod_spec : ∀ a b : P, let (q, r) := divMod a b; add (mul q b) r = a
+  -- Ring axioms
+  add_comm : ∀ a b : P, a + b = b + a
+  add_assoc : ∀ a b c : P, a + b + c = a + (b + c)
+  mul_comm : ∀ a b : P, a * b = b * a
+  mul_assoc : ∀ a b c : P, a * b * c = a * (b * c)
+  add_zero : ∀ a : P, a + 0 = a
+  mul_one : ∀ a : P, a * 1 = a
+  left_distrib : ∀ a b c : P, a * (b + c) = a * b + a * c
+  -- Coefficient semantics
+  coeff_add : ∀ (a b : P) (i : Nat), coeff (a + b) i = coeff a i + coeff b i
+  coeff_mul : ...  -- convolution formula
+  -- BEq correctness
+  beq_iff : ∀ a b : P, (a == b) = true ↔ ∀ i, coeff a i = coeff b i
+  -- Division
+  divMod_spec : ∀ a b : P, let (q, r) := divMod a b; q * b + r = a
+  -- Evaluation is a ring homomorphism
   eval_C : ∀ r x, eval (C r) x = r
   eval_X : ∀ x, eval X x = x
-  eval_add : ∀ p q x, eval (add p q) x = eval p x + eval q x
-  eval_mul : ∀ p q x, eval (mul p q) x = eval p x * eval q x
-  ext : ∀ p q : P, (∀ i, coeff p i = coeff q i) → p = q
+  eval_add : ∀ p q x, eval (p + q) x = eval p x + eval q x
+  eval_mul : ∀ p q x, eval (p * q) x = eval p x * eval q x
 ```
+
+`BEq` correctness is the key: two polynomials compare equal iff they have
+the same coefficients. Concrete implementations can achieve this by
+normalizing eagerly (strip trailing zeros on every operation) or lazily
+(compare coefficient-by-coefficient). The choice is an implementation
+detail, not visible in the typeclass.
 
 **Dense representation:**
 ```lean
@@ -298,9 +304,10 @@ structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
 Using `ExtHashMap` (not `HashMap`) gives extensionality lemmas — two
 `ExtHashPoly` values are equal iff they have the same key-value pairs.
 
-**Zero-value wrapper pattern:** For intermediate computation, use a raw
-representation allowing zeros (no normalization overhead). Normalize on
-output. This gives fast internals with clean equality on results.
+**Normalization strategy:** `DensePoly` normalizes eagerly (no trailing
+zeros), so structural equality = `BEq`. Implementations that prefer lazy
+normalization provide `BEq` via coefficient-wise comparison instead. This
+is a per-implementation decision, not part of the typeclass contract.
 
 ---
 
@@ -765,14 +772,10 @@ same key-value pairs. No iteration order issues.
 
 ### The typeclasses
 
-`PolyOps` for operations, `LawfulPolyOps` for axioms. Algorithms are
-written against `PolyOps`. In the verification library, `LawfulPolyOps`
-gives the ring equivalence `P ≃+* Polynomial R`.
-
-### Zero-value wrapper pattern
-
-For intermediate computation, use raw representation allowing zeros (no
-normalization overhead). Normalize on output for clean equality.
+`PolyOps` for operations, `LawfulPolyOps` for ring axioms + `BEq`
+correctness. Algorithms are written against `PolyOps`. In the verification
+library, `LawfulPolyOps` gives the ring equivalence `P ≃+* Polynomial R`.
+Concrete implementations choose their own normalization strategy.
 
 ---
 
@@ -846,14 +849,14 @@ APIs stabilize.
 
 ## Conformance testing
 
-Every computational library is tested against FLINT via C FFI:
+Every computational library is tested against reference implementations:
 
-1. Generate random polynomials
-2. Compute GCD/factorization/LLL reduction in both Lean and FLINT
-3. Compare results
+1. Generate random inputs (polynomials, lattice bases, etc.)
+2. Compute results in both Lean and a reference (FLINT via FFI, SageMath,
+   fpLLL) and compare
+3. For polynomial factoring, cross-check factorizations against FLINT
+   and verify certificates produced by the Lean algorithms
 
-For LLL, also compare against `fpLLL` (the reference C implementation).
-
-For polynomial factoring, generate certificates in Lean (via
-lean-berlekamp), validate them, and cross-check the factorization
-against FLINT.
+SageMath and FLINT are used for **testing**, not for algorithms — the
+distinction is that all computation runs in Lean, and external tools
+only serve as an independent oracle for conformance checking.
