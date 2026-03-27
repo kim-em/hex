@@ -243,6 +243,8 @@ class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
   -- Coefficient semantics
   coeff_add : ∀ (a b : P) (i : Nat), coeff (a + b) i = coeff a i + coeff b i
   coeff_mul : ...  -- convolution formula
+  -- BEq correctness: == agrees with coefficient equality
+  beq_iff : ∀ a b : P, (a == b) = true ↔ ∀ i, coeff a i = coeff b i
   -- dropZeros: normalization to canonical form
   dropZeros_idem : ∀ p, dropZeros (dropZeros p) = dropZeros p
   dropZeros_coeff : ∀ p i, coeff (dropZeros p) i = coeff p i
