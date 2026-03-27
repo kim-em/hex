@@ -104,11 +104,13 @@ to the Lean runtime.
 
        lean-conway           lean-gfq-ring       lean-gfq-field
        (Conway polynomial    (GF(q) as a ring,   (GF(q) as a field,
-        database)             quotient by any      requires
-                              polynomial)          irreducibility)
-            |                     |                    |
-       lean-poly-fp          lean-poly-fp         lean-berlekamp
-                                                  + lean-gfq-ring
+        database)             quotient by any      any irreducible poly)
+                              polynomial)              |
+            |                     |              lean-gfq-ring
+       lean-poly-fp          lean-poly-fp        + lean-berlekamp
+                                                       |
+                                              GFq p n (convenience):
+                                              lean-gfq-field + lean-conway
 ```
 
 **Verification libraries** (depend on computational lib + Mathlib):
@@ -498,22 +500,30 @@ lean-gfq-field's job.
 ### lean-gfq-field (GF(q) as a field, depends on lean-gfq-ring + lean-berlekamp)
 
 Extends `lean-gfq-ring` with field operations when the modulus is
-irreducible.
+irreducible. Takes any irreducible polynomial as parameter — not tied
+to Conway polynomials.
 
 **Contents:**
-- `GFq p n` — the field `GF(p^n)`, constructed as
-  `PolyQuotient p (conwayPoly p n)` with an irreducibility proof
+- `FiniteField p f (hirr : Irreducible f)` — the field `F_p[x]/(f)`,
+  where `f` is any irreducible polynomial over `F_p`
 - Multiplicative inverse via extended GCD in `F_p[x]`
-- `Lean.Grind.Field` instance (when irreducibility is proved)
-- Field with `p^n` elements, characteristic `p`
-- `IsCharP (GFq p n) p`
+- `Lean.Grind.Field` instance
+- `IsCharP (FiniteField p f hirr) p`
 
-The irreducibility proof comes from lean-berlekamp (either via the
-algorithm or via a certificate for the Conway polynomial).
+The irreducibility proof `hirr` comes from lean-berlekamp (either via
+the algorithm or via a certificate).
+
+- **Non-Conway models:** Use `FiniteField` directly with any irreducible
+  polynomial. E.g., AES uses `x^8 + x^4 + x^3 + x + 1` over `F_2`,
+  which is not the Conway polynomial for `GF(2^8)`.
+- **Conway models:** `lean-conway` provides a canonical choice. The
+  convenience definition `GFq p n := FiniteField p (conwayPoly p n) hirr`
+  lives in a thin wrapper depending on both `lean-gfq-field` and
+  `lean-conway`.
 
 **Key properties:**
 - `inv a * a = 1` for `a ≠ 0`
-- `Fintype (GFq p n)` with `card = p^n`
+- `Fintype (FiniteField p f hirr)` with `card = p ^ f.degree`
 - Frobenius automorphism: `frob(a) = a^p`
 
 ---
