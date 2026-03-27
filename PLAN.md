@@ -56,7 +56,8 @@ What we get for free and what we need to build.
 - Extended GCD / Bezout coefficients — completely absent
 - Modular exponentiation — absent, and GMP's `mpz_powm` not exposed
 - Modular inverse — absent, `mpz_invert` not exposed
-- Primality testing — absent, `mpz_probab_prime_p` not exposed
+- Primality testing — absent (not needed for this project; Berlekamp-
+  Zassenhaus only needs small known primes)
 - Polynomial types — none (only internal `grind` polynomials)
 - Matrix types — none
 - Finite field types / `ZMod` — absent (only `Fin n`)
@@ -65,7 +66,6 @@ What we get for free and what we need to build.
 - `mpz_powm` — modular exponentiation
 - `mpz_gcdext` — extended GCD with Bezout coefficients
 - `mpz_invert` — modular inverse
-- `mpz_probab_prime_p` — probabilistic primality testing
 
 These would live in `lean-gmp-extras` or be proposed as upstream additions
 to the Lean runtime.
@@ -143,7 +143,7 @@ Core integer arithmetic that everything else builds on.
 - Mignotte bound computation (coefficient bounds for polynomial factors)
 - Cauchy root bound
 - GMP FFI extras: `@[extern]` wrappers for `mpz_powm`, `mpz_gcdext`,
-  `mpz_invert`, `mpz_probab_prime_p`
+  `mpz_invert`
 - Pure Lean implementations of the same for the proof target
 
 **Key properties:**
