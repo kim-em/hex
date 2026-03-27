@@ -153,8 +153,9 @@ Core integer arithmetic that everything else builds on.
 - GMP FFI agrees with pure Lean implementation
 
 **Note:** `Nat.gcd` already exists with GMP-backed `mpz_gcd`. We build on
-it for extended GCD. The pure Lean `extGcd` is the proof target; the GMP
-`mpz_gcdext` is the fast path with an equivalence proof.
+it for extended GCD. The pure Lean `extGcd` is the logical definition used
+in proofs; the GMP `@[extern]` for `mpz_gcdext` replaces it at runtime,
+trusted in the same way as every other `@[extern]` in Lean.
 
 ---
 
