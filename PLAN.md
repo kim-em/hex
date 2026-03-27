@@ -6,27 +6,29 @@ irreducibility testing, lattice basis reduction, and related tools.
 
 ## Design principles
 
-1. **Many small libraries**, not one monolith. Each bullet in the overview is
-   its own Lake package with its own repo.
+1. **Many small libraries**, each its own Lake package in its own repo.
 
 2. **No Mathlib in the computational core.** Every library that computes
-   something is Mathlib-free. Separate bridge libraries depend on both the
-   computational library and Mathlib to provide the verification layer
-   (proving the computation corresponds to the mathematical specification).
+   something is Mathlib-free. Separate `-verification` libraries depend on
+   both the computational library and Mathlib to prove correspondence with
+   Mathlib's mathematical definitions.
 
 3. **Performant by default.** Dense array-backed representations, `UInt64`
    coefficients for `F_p`, Barrett/Montgomery reduction for modular
    arithmetic. FFI to FLINT as an optional fast path where it matters.
+   New GMP `@[extern]` primitives where Lean's runtime doesn't yet expose
+   what we need (modular exponentiation, extended GCD, etc.).
 
-4. **Swappable polynomial representations.** A typeclass interface lets
+4. **Swappable polynomial representations.** A `PolyOps` typeclass lets
    algorithms work over any representation (dense, sparse sorted, sparse
-   hashmap). But the default — and the one everything is tested and proved
-   against first — is dense `Array`-backed.
+   `ExtHashMap`-backed). A `LawfulPolyOps` class states the axioms. But
+   the default — and the one everything is tested and proved against
+   first — is dense `Array`-backed.
 
-5. **Certificate-based verification where possible.** For irreducibility:
-   SageMath generates a certificate, Lean validates it. The certificate
-   checker is small and fully verified. The algorithm that *finds* the
-   certificate is verified separately (and more ambitiously).
+5. **Lean algorithms from the start.** All algorithms are implemented and
+   run in Lean natively. No external CAS in the loop. Certificate
+   structures exist for compact proof witnesses, but the algorithms that
+   generate and check certificates are both in Lean.
 
 6. **Clear DAG structure.** Libraries can be developed in parallel. LLL has
    no dependency on polynomial arithmetic. Hensel lifting is independent of
@@ -34,51 +36,95 @@ irreducibility testing, lattice basis reduction, and related tools.
 
 ---
 
+## Lean 4 stdlib inventory (v4.28.0)
+
+What we get for free and what we need to build.
+
+**Available:**
+- `Nat.gcd` / `Int.gcd` — GMP-backed via `@[extern "lean_nat_gcd"]`
+- `Nat.Coprime` — `gcd m n = 1`, decidable, with lemmas
+- `Nat.lcm` / `Int.lcm`
+- `Rat` — proper rational field with `Lean.Grind.Field` instance
+- `Vector α n` — `Array α` with size proof, rich API (~19 files)
+- `Fin n` — modular arithmetic with `Lean.Grind.CommRing` and `IsCharP`
+- `BitVec w` — `Fin (2^w)`, extensive API, `bv_decide` support
+- `Std.HashMap` / `Std.ExtHashMap` — the latter has extensionality
+- `Lean.Grind.{Semiring, Ring, CommSemiring, CommRing, Field}` hierarchy
+
+**Not available (we build):**
+- Extended GCD / Bezout coefficients — completely absent
+- Modular exponentiation — absent, and GMP's `mpz_powm` not exposed
+- Modular inverse — absent, `mpz_invert` not exposed
+- Primality testing — absent, `mpz_probab_prime_p` not exposed
+- Polynomial types — none (only internal `grind` polynomials)
+- Matrix types — none
+- Finite field types / `ZMod` — absent (only `Fin n`)
+
+**GMP primitives to expose (via `@[extern]` FFI, ideally upstreamed):**
+- `mpz_powm` — modular exponentiation
+- `mpz_gcdext` — extended GCD with Bezout coefficients
+- `mpz_invert` — modular inverse
+- `mpz_probab_prime_p` — probabilistic primality testing
+
+These would live in `lean-gmp-extras` or be proposed as upstream additions
+to the Lean runtime.
+
+---
+
 ## Library DAG
 
 ```
-                    lean-berlekamp-zassenhaus
-                   (complete Z[x] factoring)
-                  /            |            \
-                 /             |             \
-    lean-berlekamp    lean-hensel    lean-lll
-    (F_p factoring)   (lifting)     (lattice reduction)
-         |                |              |
-         |                |              |
-    lean-poly-fp     lean-poly-z    lean-lattice
-    (poly over F_p)  (poly over Z)  (integer vectors/matrices)
-         |                |              |
-         +-------+--------+              |
-                 |                        |
-            lean-poly                     |
-            (poly interface +             |
-             dense repr)                  |
-                 |                        |
-            lean-mod-arith           lean-matrix
-            (modular arithmetic)     (dense integer matrices)
-                 |                        |
-                 +----------+-------------+
-                            |
-                       lean-arith
-                       (UInt64/Int arithmetic,
-                        Barrett reduction,
-                        extended GCD for integers)
+                       lean-berlekamp-zassenhaus
+                      (complete Z[x] factoring)
+                     /            |            \
+                    /             |             \
+       lean-berlekamp    lean-hensel    lean-lll
+       (F_p factoring)   (lifting)     (lattice reduction)
+            |                |              |
+       lean-poly-fp     lean-poly-z    lean-matrix
+       (poly over F_p)  (poly over Z)  (Vector of Vectors)
+            |                |              |
+            +-------+--------+              |
+                    |                       |
+               lean-poly                    |
+               (poly interface +            |
+                dense repr)                 |
+                    |                       |
+               lean-mod-arith               |
+               (modular arithmetic)         |
+                    |                       |
+                    +----------+------------+
+                               |
+                          lean-arith
+                          (extended GCD, Barrett,
+                           GMP extras)
+
+  Additional libraries (independent branches):
+
+       lean-conway           lean-gfq-ring       lean-gfq-field
+       (Conway polynomial    (GF(q) as a ring,   (GF(q) as a field,
+        database)             quotient by any      requires
+                              polynomial)          irreducibility)
+            |                     |                    |
+       lean-poly-fp          lean-poly-fp         lean-berlekamp
+                                                  + lean-gfq-ring
 ```
 
-**Bridge libraries** (depend on Mathlib + computational library):
+**Verification libraries** (depend on computational lib + Mathlib):
 
 ```
-    lean-berlekamp-zassenhaus-mathlib
-    lean-berlekamp-mathlib
-    lean-hensel-mathlib
-    lean-lll-mathlib
-    lean-poly-mathlib          (proves dense repr ≅ Polynomial R)
-    lean-mod-arith-mathlib     (proves ZMod64 ≅ ZMod p)
+    lean-berlekamp-zassenhaus-verification
+    lean-berlekamp-verification
+    lean-hensel-verification
+    lean-lll-verification
+    lean-poly-verification     (proves DensePoly R ≅ Polynomial R,
+                                LawfulPolyOps gives ≃+*)
+    lean-mod-arith-verification (proves ZMod64 p ≅ ZMod p)
+    lean-gfq-verification     (proves GFq p n ≅ GaloisField p n)
 ```
 
-Each bridge library proves that the computational library's operations
-correspond to the Mathlib-defined mathematical objects. Theorems live in
-the bridge; algorithms live in the core.
+Each verification library proves that the computational library's
+operations correspond to Mathlib-defined mathematical objects.
 
 ---
 
@@ -89,40 +135,45 @@ the bridge; algorithms live in the core.
 Core integer arithmetic that everything else builds on.
 
 **Contents:**
-- `UInt64` extended GCD
+- Extended GCD for `Nat`, `Int`, and `UInt64`
 - Barrett reduction for modular multiplication (precomputed inverse)
 - Montgomery multiplication (for sustained modular arithmetic)
-- `Int` extended GCD
+- Modular exponentiation by squaring
 - Mignotte bound computation (coefficient bounds for polynomial factors)
 - Cauchy root bound
+- GMP FFI extras: `@[extern]` wrappers for `mpz_powm`, `mpz_gcdext`,
+  `mpz_invert`, `mpz_probab_prime_p`
+- Pure Lean implementations of the same for the proof target
 
 **Key properties:**
-- `extGcd a b = (g, s, t)` implies `s * a + t * b = g` and `g = gcd a b`
-- Barrett reduction: `barrettMul a b p pinv = (a * b) % p`
-- These are characterizing — they describe the *what*, not the *how*
+- `extGcd a b = (g, s, t) → s * a + t * b = g ∧ g = gcd a b`
+- `barrettMul a b p pinv = (a * b) % p`
+- `powMod a n p = a ^ n % p`
+- GMP FFI agrees with pure Lean implementation
 
-**No Mathlib needed.** Everything is `Nat`, `Int`, `UInt64`.
+**Note:** `Nat.gcd` already exists with GMP-backed `mpz_gcd`. We build on
+it for extended GCD. The pure Lean `extGcd` is the proof target; the GMP
+`mpz_gcdext` is the fast path with an equivalence proof.
 
 ---
 
-### lean-matrix (foundation, no dependencies beyond lean-arith)
+### lean-matrix (foundation, depends on lean-arith)
 
-Dense integer matrices and vectors.
+Dense matrices as `Vector (Vector R m) n`.
 
 **Contents:**
-- `Matrix n m Int` as `Array (Array Int)` with dimension proofs
-- `Vector n Int` as `Array Int` with size proof
-- Matrix-vector multiplication
-- Dot product, norm squared
-- Determinant (for lattice volume)
-- Row operations (swap, add multiple of one row to another)
+- `Matrix R n m` := `Vector (Vector R m) n` (uses stdlib `Vector`)
+- Matrix-vector multiplication, matrix-matrix multiplication
+- Dot product, norm squared (for `R = Int` and `R = Rat`)
+- Determinant (Leibniz formula or Bareiss for integer matrices)
+- Row operations (swap, scale, add multiple of one row to another)
+- Row echelon form, rank, nullspace
+- Generic over the coefficient type `R`
 
 **Key properties:**
 - Row operations preserve determinant (up to sign)
 - `det (rowSwap M i j) = -det M`
-- Dot product is bilinear
-
-**No Mathlib needed.** Pure array operations with `Int`.
+- Nullspace correctness: `∀ v ∈ nullspace M, M * v = 0`
 
 ---
 
@@ -131,33 +182,30 @@ Dense integer matrices and vectors.
 Arithmetic in `Z/nZ` with `UInt64`-backed coefficients.
 
 **Contents:**
-- `ZMod64 (p : Nat)` — a `UInt64` with proof `val < p`
+- `ZMod64 (p : Nat)` — a `UInt64` with proof `val.toNat < p`
 - Addition, subtraction, multiplication with Barrett/Montgomery reduction
 - Inversion via extended GCD (for prime moduli)
 - Exponentiation by squaring
-- `ZMod64` instances: `Add`, `Mul`, `Neg`, `Inv`, `BEq`, `DecidableEq`
+- `Lean.Grind.CommRing (ZMod64 p)` instance and `IsCharP (ZMod64 p) p`
 
 **Key properties:**
-- Ring axioms: `a * (b + c) = a * b + a * c`, etc.
-- `inv a * a = 1` when `gcd a p = 1`
-- `pow a (p-1) = 1` when `p` is prime (Fermat's little theorem — but
-  proved computationally, not via Mathlib's abstract algebra)
+- Ring axioms proved directly from the modular arithmetic definitions
+- `inv a * a = 1` when `Nat.Coprime a.val p`
+- Fermat's little theorem: `pow a (p-1) = 1` when `p` is prime and
+  `a ≠ 0` — proved from the ring structure (the multiplicative group
+  of a finite integral domain has order `p-1`)
 
-**No Mathlib needed.** The ring axioms can be proved directly from the
-modular arithmetic definitions.
+**Note:** `Fin n` already has `Lean.Grind.CommRing` and `IsCharP`. We
+build `ZMod64` for performance (Barrett reduction instead of naive modular
+arithmetic) and for cleaner API (explicit prime parameter, field operations).
 
 ---
 
-### lean-mod-arith-mathlib (bridge, depends on lean-mod-arith + Mathlib)
+### lean-mod-arith-verification (depends on lean-mod-arith + Mathlib)
 
-Proves `ZMod64 p ≅ ZMod p` as rings. This means any theorem proved about
-`ZMod p` in Mathlib applies to `ZMod64 p`, and any computation done with
-`ZMod64 p` is known to be correct in the mathematical sense.
-
-**Key theorem:**
-```lean
-def equiv : ZMod64 p ≃+* ZMod p
-```
+Proves `ZMod64 p ≃+* ZMod p`. This means any Mathlib theorem about
+`ZMod p` transfers to `ZMod64 p`, and any computation with `ZMod64 p`
+is known correct in the mathematical sense.
 
 ---
 
@@ -183,6 +231,25 @@ class PolyOps (P : Type*) (R : outParam Type*) where
   eval : P → R → R
   ofCoeffs : Array R → P
   toCoeffs : P → Array R
+
+class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
+  add_comm : ∀ a b : P, add a b = add b a
+  add_assoc : ∀ a b c : P, add (add a b) c = add a (add b c)
+  mul_comm : ∀ a b : P, mul a b = mul b a
+  mul_assoc : ∀ a b c : P, mul (mul a b) c = mul a (mul b c)
+  add_zero : ∀ a : P, add a zero = a
+  mul_one : ∀ a : P, mul a one = a
+  left_distrib : ∀ a b c : P, mul a (add b c) = add (mul a b) (mul a c)
+  coeff_add : ∀ (a b : P) (i : Nat), coeff (add a b) i = coeff a i + coeff b i
+  coeff_mul : ∀ (a b : P) (i : Nat), coeff (mul a b) i = ...  -- convolution
+  degree_add : ...
+  degree_mul : ...
+  divMod_spec : ∀ a b : P, let (q, r) := divMod a b; add (mul q b) r = a
+  eval_C : ∀ r x, eval (C r) x = r
+  eval_X : ∀ x, eval X x = x
+  eval_add : ∀ p q x, eval (add p q) x = eval p x + eval q x
+  eval_mul : ∀ p q x, eval (mul p q) x = eval p x * eval q x
+  ext : ∀ p q : P, (∀ i, coeff p i = coeff q i) → p = q
 ```
 
 **Dense representation:**
@@ -195,7 +262,7 @@ structure DensePoly (R : Type*) [Zero R] [DecidableEq R] where
 The normalization invariant (no trailing zeros) ensures structural equality
 = semantic equality. Every operation maintains this invariant.
 
-**Operations implemented:**
+**Operations:**
 - Addition, subtraction, multiplication (schoolbook, Karatsuba for large degree)
 - Division with remainder (for monic divisors; general division over fields)
 - Polynomial GCD (Euclidean algorithm)
@@ -208,50 +275,48 @@ The normalization invariant (no trailing zeros) ensures structural equality
 - `gcd f g` divides both `f` and `g`
 - Every common divisor of `f` and `g` divides `gcd f g`
 - Bezout: `∃ a b, a * f + b * g = gcd f g`
-- These are characterizing properties, not tautological
 
-**Representations (Phase 2, optional):**
+**Alternative representations (Phase 2):**
 
 Sparse sorted array:
 ```lean
 structure SparsePoly (R : Type*) [Zero R] [DecidableEq R] where
   terms : Array (Nat × R)
-  sorted : terms.toList.Pairwise (fun a b => a.1 < b.1)
-  nonzero : ∀ t ∈ terms.toList, t.2 ≠ 0
+  sorted : ∀ i j, i < j → i < terms.size → j < terms.size →
+           (terms[i]).1 < (terms[j]).1
+  nonzero : ∀ i, i < terms.size → (terms[i]).2 ≠ 0
 ```
 
-Sparse hashmap (for exploration, not primary):
+Sparse `ExtHashMap`-backed (with extensional equality):
 ```lean
-structure HashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat] where
-  terms : HashMap Nat R
-  nonzero : ∀ k v, terms.find? k = some v → v ≠ 0
+structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
+    [EquivBEq Nat] [LawfulHashable Nat] where
+  map : ExtHashMap Nat R
+  nonzero : ∀ k v, map.find? k = some v → v ≠ 0
 ```
 
-The wrapper-without-zeros pattern: a raw representation that allows zeros
-(for efficient intermediate computation) and a normalized wrapper that
-strips them (for equality and storage). Operations work on the raw type
-internally and normalize on output.
+Using `ExtHashMap` (not `HashMap`) gives extensionality lemmas — two
+`ExtHashPoly` values are equal iff they have the same key-value pairs.
 
-**No Mathlib needed.**
+**Zero-value wrapper pattern:** For intermediate computation, use a raw
+representation allowing zeros (no normalization overhead). Normalize on
+output. This gives fast internals with clean equality on results.
 
 ---
 
-### lean-poly-mathlib (bridge, depends on lean-poly + Mathlib)
+### lean-poly-verification (depends on lean-poly + Mathlib)
 
-Proves `DensePoly R ≅ Polynomial R` as rings (where `Polynomial R` is
-Mathlib's `AddMonoidAlgebra R ℕ` backed by `Finsupp`).
+Proves `DensePoly R ≃+* Polynomial R` and that `DensePoly` satisfies
+`LawfulPolyOps`. The `≃+*` is the payoff of `LawfulPolyOps`:
 
-**Key theorems:**
 ```lean
-def equiv : DensePoly R ≃+* Polynomial R
+def equiv [CommRing R] [DecidableEq R] : DensePoly R ≃+* Polynomial R
 
-theorem gcd_spec (f g : DensePoly R) [Field R] :
-    equiv (DensePoly.gcd f g) = Polynomial.gcd (equiv f) (equiv g)
-
-theorem extGcd_bezout (f g : DensePoly R) [Field R] :
-    let (a, b, d) := DensePoly.extGcd f g
-    equiv a * equiv f + equiv b * equiv g = equiv d
+-- LawfulPolyOps gives ring equivalence
+instance [CommRing R] [DecidableEq R] : LawfulPolyOps (DensePoly R) R := ...
 ```
+
+Also proves GCD/ExtGCD correspondence with Mathlib's `Polynomial.gcd`.
 
 ---
 
@@ -268,20 +333,17 @@ Specialized polynomial arithmetic over `Z/pZ` using `UInt64` coefficients.
 
 **Key properties:**
 - Frobenius endomorphism: `frob(a + b) = frob(a) + frob(b)`
-- Square-free decomposition: the output factors are pairwise coprime, their
-  product equals the input, and each factor is square-free
-
-**No Mathlib needed.** The modular arithmetic is from lean-mod-arith.
+- Square-free decomposition: output factors are pairwise coprime, their
+  product equals the input, each factor is square-free
 
 For `GF(2)` specifically, consider a packed bitwise representation:
 ```lean
 structure GF2Poly where
   words : Array UInt64
   degree : Nat
-  -- bit at position `degree` is 1 (unless zero polynomial)
 ```
-Addition = XOR, multiplication uses carry-less multiply. This is a
-64x speedup for `F_2` polynomials, important for coding theory.
+Addition = XOR, multiplication uses carry-less multiply. 64x speedup
+for `F_2` polynomials, important for coding theory.
 
 ---
 
@@ -292,8 +354,7 @@ Specialized polynomial arithmetic over `Z`.
 **Contents:**
 - `ZPoly` = `DensePoly Int`
 - Content and primitive part: `f = content(f) * primitivePart(f)`
-- Gauss's lemma (computational version): the product of primitive
-  polynomials is primitive
+- Gauss's lemma: the product of primitive polynomials is primitive
 - Mignotte bound: coefficient bound for factors of `f`
 - Reduction modulo p: `ZPoly → FpPoly p`
 
@@ -303,79 +364,133 @@ Specialized polynomial arithmetic over `Z`.
 - Mignotte bound is valid: any factor of `f` has coefficients bounded by
   the computed bound
 
-**No Mathlib needed** for the computations. Gauss's lemma can be proved
-from first principles (it's essentially about GCD of integers).
-
 ---
 
-### lean-berlekamp (factoring over F_p, depends on lean-poly-fp)
+### lean-berlekamp (factoring over F_p, depends on lean-poly-fp + lean-matrix)
 
 Berlekamp's algorithm and Rabin's irreducibility test for polynomials
 over finite fields.
 
 **Contents:**
-- **Berlekamp matrix construction**: compute `Q_f`, the matrix of the
-  Frobenius map `h ↦ h^p mod f` in the basis `{1, x, ..., x^{n-1}}`
-- **Berlekamp kernel**: nullspace of `Q_f - I`
+- **Berlekamp matrix**: compute `Q_f`, the matrix of the Frobenius map
+  `h ↦ h^p mod f` in the basis `{1, x, ..., x^{n-1}}`
+- **Berlekamp kernel**: nullspace of `Q_f - I` (from lean-matrix)
 - **Irreducibility test**: `f` is irreducible iff `rank(Q_f - I) = n - 1`
 - **Factoring**: elements of the kernel split `f` via `gcd(f, h - c)`
-  for `c ∈ F_p`
 - **Rabin's test**: `f` is irreducible iff `f | X^(p^n) - X` and
-  `gcd(f, X^(p^(n/d)) - X) = 1` for each maximal proper divisor `d` of `n`
+  `gcd(f, X^(p^(n/d)) - X) = 1` for each maximal proper divisor `d | n`
 - **Distinct-degree factorization**: separate factors by degree
 
-**Certificate mode:**
-Given a polynomial `f` over `F_p`, produce an `IrreducibilityCertificate`:
+**Certificate structures** (generated and checked in Lean):
 ```lean
 structure IrreducibilityCertificate (p n : Nat) where
   -- Square-and-multiply witnesses for X^(p^k) mod f
   powChain : Array (FpPoly p)
   -- Bezout coefficients for coprimality at each maximal divisor
   bezout : Array (FpPoly p × FpPoly p)
-  -- Proof obligations (all decidable):
-  -- powChain validates the square-and-multiply computation
-  -- bezout witnesses prove gcd(f, X^(p^(n/d)) - X) = 1
 ```
 
-The certificate checker is tiny and fully verified. SageMath generates
-certificates; Lean validates them. This gives verified irreducibility
-results immediately, before the full algorithm is proved correct.
+The certificate checker is tiny and fully verified. The algorithm that
+*generates* certificates is also in Lean — Berlekamp's algorithm produces
+the factorization, from which certificates are extracted.
 
 **Key properties (characterizing):**
 
-Rabin's test:
+Rabin's theorem:
 ```lean
 theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
-    rabinTest f = true ↔
-    Irreducible f
+    rabinTest f = true ↔ Irreducible f
 ```
 
-Berlekamp:
+Berlekamp's theorem:
 ```lean
 theorem berlekamp_complete (f : FpPoly p) (hf : squareFree f) :
     (berlekampFactor f).prod = f ∧
     ∀ g ∈ berlekampFactor f, Irreducible g
 ```
 
-**No Mathlib needed** for the algorithm. The bridge library connects
-`Irreducible` in the computational sense to Mathlib's `Irreducible`.
+---
+
+### lean-berlekamp-verification (depends on lean-berlekamp + Mathlib)
+
+Connects the computational `Irreducible` to Mathlib's `Irreducible`
+in `Polynomial (ZMod p)`. The payoff: a `Decidable` instance for
+`Irreducible` on `Polynomial (ZMod p)`, backed by a verified algorithm.
+
+```lean
+instance [Fact (Nat.Prime p)] : DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)
+```
 
 ---
 
-### lean-berlekamp-mathlib (bridge)
+### lean-conway (Conway polynomial database, depends on lean-poly-fp)
 
-Connects the computational `Irreducible` (no proper factorization exists
-in the `FpPoly` type) to Mathlib's `Irreducible` in `Polynomial (ZMod p)`.
+A database of Conway polynomials — canonical irreducible polynomials
+`C(p, n)` for each prime `p` and degree `n`, satisfying compatibility
+conditions across degree divisors.
 
-**Key theorem:**
-```lean
-theorem berlekamp_irreducible_iff (f : FpPoly p) :
-    Berlekamp.Irreducible f ↔
-    _root_.Irreducible (lean-poly-mathlib.equiv f : Polynomial (ZMod p))
-```
+**Contents:**
+- Hardcoded database of Conway polynomials for commonly used `(p, n)` pairs
+  (sourced from Frank Lübeck's tables)
+- Lookup: `conwayPoly (p n : Nat) : Option (FpPoly p)`
+- On-demand computation via Berlekamp for pairs not in the database
+- Conway compatibility condition: if `m | n`, then `C(p, n) mod C(p, m)`
+  generates `GF(p^m)` as a subfield of `GF(p^n)`
 
-This is the payoff: a `Decidable` instance for `Irreducible` on
-`Polynomial (ZMod p)`, backed by a verified algorithm.
+**Key properties:**
+- Each `conwayPoly p n` is irreducible (checked against lean-berlekamp)
+- Conway compatibility: divisor relationships are satisfied
+
+---
+
+### lean-gfq-ring (GF(q) as a ring, depends on lean-poly-fp)
+
+Quotient ring `F_p[x] / (f)` for an arbitrary polynomial `f` over `F_p`.
+
+**Contents:**
+- `PolyQuotient p f` — elements of `F_p[x] / (f)`, represented as
+  polynomials of degree < deg(f)
+- Ring operations: addition, multiplication (multiply then reduce mod f),
+  negation
+- `Lean.Grind.CommRing` instance
+
+This does NOT require `f` to be irreducible — the quotient is always a
+ring. When `f` is irreducible, the quotient is a field, but that's
+lean-gfq-field's job.
+
+**Key properties:**
+- Ring axioms
+- `reduce (a * b) = reduce a * reduce b` (well-definedness of quotient)
+- Canonical representative: degree < deg(f)
+
+---
+
+### lean-gfq-field (GF(q) as a field, depends on lean-gfq-ring + lean-berlekamp)
+
+Extends `lean-gfq-ring` with field operations when the modulus is
+irreducible.
+
+**Contents:**
+- `GFq p n` — the field `GF(p^n)`, constructed as
+  `PolyQuotient p (conwayPoly p n)` with an irreducibility proof
+- Multiplicative inverse via extended GCD in `F_p[x]`
+- `Lean.Grind.Field` instance (when irreducibility is proved)
+- Field with `p^n` elements, characteristic `p`
+- `IsCharP (GFq p n) p`
+
+The irreducibility proof comes from lean-berlekamp (either via the
+algorithm or via a certificate for the Conway polynomial).
+
+**Key properties:**
+- `inv a * a = 1` for `a ≠ 0`
+- `Fintype (GFq p n)` with `card = p^n`
+- Frobenius automorphism: `frob(a) = a^p`
+
+---
+
+### lean-gfq-verification (depends on lean-gfq-field + Mathlib)
+
+Proves `GFq p n ≃+* GaloisField p n` (Mathlib's Galois field).
 
 ---
 
@@ -385,37 +500,25 @@ Lifts a factorization of `f mod p` to a factorization of `f mod p^k`.
 
 **Contents:**
 - **Linear Hensel lifting**: from `mod p^k` to `mod p^(k+1)`
-  - Given `f ≡ g * h (mod p^k)` with `gcd(g,h) = 1 mod p`
-  - Compute `e = (f - g*h) / p^k`
-  - Distribute `e` between `g` and `h` using Bezout cofactors
-  - Produce `g', h'` with `f ≡ g' * h' (mod p^(k+1))`
 - **Quadratic Hensel lifting**: from `mod p^k` to `mod p^(2k)` (doubling)
-  - Same idea but lifts the Bezout cofactors simultaneously
-  - `log₂(k)` steps instead of `k-1`
 - **Multifactor lifting**: binary factor tree approach
-  - Build a balanced tree of partial products
-  - Apply binary lifting at each internal node
-- **Mignotte bound**: compute the required `k` such that `p^k` exceeds
-  the coefficient bound for any true factor
+- **Mignotte bound**: compute the required lifting height `k`
 
 **Key properties:**
 ```lean
--- Correctness
 theorem hensel_correct (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
     g' * h' ≡ f [MOD p^(k+1)]
 
--- Extension
 theorem hensel_extends (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
     g' ≡ g [MOD p^k] ∧ h' ≡ h [MOD p^k]
 
--- Degree preservation
 theorem hensel_degree (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
     g'.degree = g.degree ∧ h'.degree = h.degree
 
--- Uniqueness (the deep theorem)
+-- The deep theorem
 theorem hensel_unique (f g h g' h' : ZPoly) (p k : Nat) :
     g.leadingCoeff = 1 →
     g * h ≡ f [MOD p^k] → g' * h' ≡ f [MOD p^k] →
@@ -426,9 +529,6 @@ theorem hensel_unique (f g h g' h' : ZPoly) (p k : Nat) :
 
 **Strategy**: Start with linear lifting (simpler invariant, easier to
 verify). Add quadratic as an optimization proved equivalent via uniqueness.
-This mirrors the Isabelle approach.
-
-**No Mathlib needed.** Modular arithmetic on `Int` polynomials.
 
 ---
 
@@ -463,142 +563,97 @@ while k ≤ n:
 
 **Termination proof:**
 - Potential function: `D = ∏ᵢ |b*ᵢ|^{2(n-i)}`
-- D is a positive integer (since basis vectors are in Z^m)
-- Each swap decreases D by factor ≥ δ
-- Size reduction does not change D
-- Therefore: at most `n(n-1)/2 · log(B) / log(1/δ)` swaps, where B =
-  max input vector norm squared. This is the polynomial running time bound.
+- D is a positive integer (integer lattice)
+- Each swap decreases D by factor ≥ δ; size reduction doesn't change D
+- At most `n(n-1)/2 · log(B) / log(1/δ)` swaps (polynomial bound)
 
 **d-representation** (the Isabelle approach, avoids rationals):
-Instead of storing μ_{i,j} as rationals, store `d_{i+1} · μ_{i,j}` where
-`d_i = det(Gram matrix of first i vectors)`. All d_i are positive integers.
-All operations become integer-only. No GCD, no fraction normalization.
-This is what makes LLL performant in a proof assistant.
+Store `d_{i+1} · μ_{i,j}` where `d_i = det(Gram matrix of first i vectors)`.
+All positive integers. No GCD, no fraction normalization.
 
 **Key properties (all characterizing):**
-
 ```lean
--- Lattice preservation
 theorem lll_same_lattice (b : Basis) (δ : Rat) :
     lattice (lll b δ) = lattice b
 
--- LLL-reducedness
 theorem lll_reduced (b : Basis) (δ : Rat) :
     isLLLReduced (lll b δ) δ
 
--- Short vector guarantee
-theorem lll_short_vector (b : Basis) (δ : Rat) (v : Vector) :
+theorem lll_short_vector (b : Basis) (δ : Rat) (v : LatVector) :
     v ∈ lattice b → v ≠ 0 →
     ‖(lll b δ).head‖² ≤ α^(n-1) * ‖v‖²
   where α := 1 / (δ - 1/4)
 
--- Polynomial swap count
 theorem lll_swap_bound (b : Basis) (δ : Rat) :
     swapCount (lll b δ) ≤ n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
 ```
 
-The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`,
-where λ₁ is the shortest vector in the lattice. This is a mathematical
-theorem, not a tautology.
+The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`.
 
-**No Mathlib needed** for the algorithm or the basic properties.
-Lean's built-in `Int` and `Rat` suffice.
+Uses stdlib `Rat` for the specification; d-representation `Int` for
+computation.
 
 ---
 
-### lean-lll-mathlib (bridge)
+### lean-lll-verification (depends on lean-lll + Mathlib)
 
-Connects `lean-lll` to Mathlib's linear algebra. Proves:
-- The lattice in the computational sense corresponds to a `Submodule ℤ`
-- The GSO corresponds to Mathlib's `gramSchmidt`
-- The short vector bound holds with respect to Mathlib's `norm`
+Connects lean-lll to Mathlib's linear algebra:
+- Lattice corresponds to a `Submodule ℤ`
+- GSO corresponds to Mathlib's `gramSchmidt`
+- Short vector bound holds with respect to Mathlib's `norm`
 
 ---
 
-### lean-berlekamp-zassenhaus (the capstone, depends on lean-berlekamp + lean-hensel + lean-lll)
+### lean-berlekamp-zassenhaus (the capstone)
+
+Depends on lean-berlekamp + lean-hensel + lean-lll.
 
 Complete polynomial-time factoring of univariate polynomials over Z.
 
 **Pipeline:**
 1. `f` → `squareFreePart(f)` (Yun's algorithm, from lean-poly-z)
-2. `squareFreePart(f)` → choose prime `p` not dividing `disc(f)`
+2. Choose prime `p` not dividing `disc(f)`, with `f mod p` square-free
 3. `f mod p` → irreducible factors `g₁, ..., gᵣ mod p` (lean-berlekamp)
-4. Hensel lift `g₁, ..., gᵣ` to `mod p^k` for Mignotte-bounded `k` (lean-hensel)
+4. Hensel lift to `mod p^k` for Mignotte-bounded `k` (lean-hensel)
 5. Recombine subsets of lifted factors to find true `Z[x]` factors
 6. Step 5 uses LLL for polynomial-time recombination (lean-lll)
 
-**Without LLL** (Phase 1): exponential-time recombination (try all
-subsets). Still correct, just slow for high-degree polynomials with
-many factors mod p. This is the "Berlekamp-Zassenhaus" algorithm.
+**Without LLL** (Phase 1): exponential-time subset recombination. Still
+correct, just slow for high-degree polynomials with many factors mod p.
 
-**With LLL** (Phase 2): polynomial-time recombination. The lattice is
-constructed from Hensel-lifted factors and the Mignotte bound. Short
+**With LLL** (Phase 2): polynomial-time recombination. Short lattice
 vectors correspond to true factors.
 
 **Key properties:**
 ```lean
--- Correctness: output factors multiply to input
 theorem factor_product (f : ZPoly) :
     (factor f).prod = f
 
--- Irreducibility: each output factor is irreducible
 theorem factor_irreducible (f : ZPoly) :
     ∀ g ∈ factor f, Irreducible g
 
--- Completeness: the factorization is unique (up to order and units)
 theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
     gs.prod = f → hs.prod = f →
     (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
     gs ~ hs  -- multiset equality up to associates
 ```
 
-**Certificate mode for Z[x] irreducibility:**
+**Certificate structures for Z[x] irreducibility:**
 ```lean
 structure ZPolyIrreducibilityCertificate where
-  -- Primes used for modular factoring
   primes : Array Nat
-  -- For each prime: factor degrees
   factorDegrees : Array (Array Nat)
-  -- For each factor: irreducibility certificate over F_p
-  factorCerts : Array (Array (IrreducibilityCertificate ...))
+  factorCerts : Array (Array IrreducibilityCertificate)
   -- Degree analysis: intersection of subset sums = {0, deg(f)}
-```
 
-Alternatively, an LPFW (Large Prime Factor Witness) certificate:
-```lean
 structure LPFWCertificate where
-  evalPoint : Int           -- m such that |f(m)| has a large prime factor
-  prime : Nat               -- the large prime P dividing |f(m)|
-  quotient : Nat            -- |f(m)| / P
-  cauchyBound : Rat         -- root bound ρ
-  degreeBound : Nat         -- d from degree analysis
+  evalPoint : Int
+  prime : Nat
+  quotient : Nat
+  cauchyBound : Rat
+  degreeBound : Nat
   -- Verification: P is prime, f(m) = ±quotient * P, quotient < (|m| - ρ)^d
 ```
-
----
-
-### Practical applications
-
-**Cryptographic field construction:**
-To build `GF(2^128)` for AES, you need an irreducible polynomial of
-degree 128 over `F_2`. With lean-berlekamp + certificate mode, you can
-produce a Lean proof that `x^128 + x^7 + x^2 + x + 1` is irreducible
-over `F_2`.
-
-**Coding theory:**
-Reed-Solomon and BCH codes need irreducible polynomials over finite
-fields. The generator polynomial must divide `x^n - 1` over `F_q`.
-Verified factoring provides certified generator polynomials.
-
-**Number theory:**
-Computing rings of integers requires factoring polynomials over Z and
-testing irreducibility. This is what the Baanen et al. project needs
-(and currently delegates to SageMath with unverified certificates).
-
-**Cryptanalysis:**
-LLL is the core tool for lattice-based attacks (Coppersmith's method
-for RSA, knapsack attacks). A verified LLL gives confidence in
-attack results.
 
 ---
 
@@ -607,14 +662,13 @@ attack results.
 ```
 Phase 0 (all parallel, no dependencies between them):
   ├── lean-arith
-  ├── lean-matrix
   └── (lean-poly can start with inline arith)
 
 Phase 1 (each depends only on Phase 0):
   ├── lean-mod-arith          (← lean-arith)
   ├── lean-poly               (← lean-arith)
-  ├── lean-lll                (← lean-matrix)
-  └── lean-lattice            (← lean-matrix)
+  ├── lean-matrix             (← lean-arith)
+  └── lean-lll                (← lean-matrix)
 
 Phase 2 (each depends on Phase 1):
   ├── lean-poly-fp            (← lean-poly + lean-mod-arith)
@@ -622,65 +676,53 @@ Phase 2 (each depends on Phase 1):
   └── lean-lll is complete    (independent)
 
 Phase 3 (each depends on Phase 2):
-  ├── lean-berlekamp          (← lean-poly-fp)
-  └── lean-hensel             (← lean-poly-fp + lean-poly-z)
+  ├── lean-berlekamp          (← lean-poly-fp + lean-matrix)
+  ├── lean-hensel             (← lean-poly-fp + lean-poly-z)
+  ├── lean-conway             (← lean-poly-fp)
+  └── lean-gfq-ring           (← lean-poly-fp)
 
-Phase 4 (the capstone):
+Phase 4:
+  ├── lean-gfq-field          (← lean-gfq-ring + lean-berlekamp)
   └── lean-berlekamp-zassenhaus (← lean-berlekamp + lean-hensel + lean-lll)
 
-Bridge libraries (can start whenever their computational lib is ready):
-  ├── lean-mod-arith-mathlib  (← lean-mod-arith + Mathlib, Phase 1+)
-  ├── lean-poly-mathlib       (← lean-poly + Mathlib, Phase 1+)
-  ├── lean-berlekamp-mathlib  (← lean-berlekamp + Mathlib, Phase 3+)
-  ├── lean-hensel-mathlib     (← lean-hensel + Mathlib, Phase 3+)
-  └── lean-lll-mathlib        (← lean-lll + Mathlib, Phase 1+)
+Verification libraries (can start whenever their core lib is ready):
+  ├── lean-mod-arith-verification  (Phase 1+)
+  ├── lean-poly-verification       (Phase 1+)
+  ├── lean-berlekamp-verification  (Phase 3+)
+  ├── lean-hensel-verification     (Phase 3+)
+  ├── lean-lll-verification        (Phase 1+)
+  └── lean-gfq-verification       (Phase 4+)
 ```
 
 **Key insight:** LLL is completely independent of the polynomial pipeline.
 It can be developed from day one in parallel with everything else. The
-only point of contact is at the very top (Berlekamp-Zassenhaus), where LLL
-is used for polynomial-time factor recombination.
+only point of contact is at the very top (Berlekamp-Zassenhaus).
 
 ---
 
-## Session estimates
+## Milestones
 
-| Library | Sessions | Dependencies | Parallel? |
-|---------|----------|--------------|-----------|
-| lean-arith | 3-5 | None | Yes |
-| lean-matrix | 3-5 | None | Yes |
-| lean-mod-arith | 3-5 | lean-arith | Yes (with lean-poly) |
-| lean-poly | 5-8 | lean-arith | Yes (with lean-mod-arith) |
-| lean-lll | 8-12 | lean-matrix | Yes (with everything) |
-| lean-poly-fp | 3-5 | lean-poly, lean-mod-arith | — |
-| lean-poly-z | 3-5 | lean-poly | Yes (with lean-poly-fp) |
-| lean-berlekamp | 5-8 | lean-poly-fp | — |
-| lean-hensel | 5-8 | lean-poly-fp, lean-poly-z | Yes (with lean-berlekamp) |
-| lean-berlekamp-zassenhaus | 5-8 | lean-berlekamp, lean-hensel, lean-lll | — |
-| Bridge libraries (total) | 10-15 | Various + Mathlib | Yes (each independent) |
+**M1:** lean-arith + lean-poly + lean-mod-arith working. Polynomial
+arithmetic over Z and F_p. GCD, extended GCD, division. Conformance-
+tested against FLINT via FFI.
 
-**Total: ~55-85 sessions.**
+**M2 (parallel with M1):** lean-matrix + lean-lll working. LLL reduces
+lattice bases with verified short vector guarantee.
 
-### Milestones
+**M3 (after M1):** lean-berlekamp working. Factor polynomials over F_p,
+test irreducibility. Certificate generation and checking, all in Lean.
 
-**M1 (~15 sessions):** lean-arith + lean-poly + lean-mod-arith working.
-Can do polynomial arithmetic over Z and F_p. GCD, extended GCD, division.
-Conformance-tested against SageMath.
+**M4 (after M1):** lean-hensel working. Lift factorizations from F_p
+to Z/p^kZ.
 
-**M2 (~25 sessions, parallel with M1):** lean-matrix + lean-lll working.
-LLL reduces lattice bases with verified short vector guarantee.
+**M5 (after M3):** lean-conway + lean-gfq-ring + lean-gfq-field working.
+Finite field arithmetic with verified field structure.
 
-**M3 (~15 sessions after M1):** lean-berlekamp working. Can factor
-polynomials over F_p and test irreducibility. Certificate mode operational.
+**M6 (after M2+M3+M4):** lean-berlekamp-zassenhaus. Complete verified
+polynomial factoring over Z.
 
-**M4 (~10 sessions after M1):** lean-hensel working. Can lift factorizations
-from F_p to Z/p^kZ.
-
-**M5 (~8 sessions after M2+M3+M4):** lean-berlekamp-zassenhaus. Complete
-verified polynomial factoring over Z.
-
-**M6 (ongoing):** Bridge libraries connecting to Mathlib. `Decidable`
-instance for `Irreducible` on `Polynomial (ZMod p)`.
+**M7 (ongoing):** Verification libraries connecting to Mathlib.
+`Decidable` instance for `Irreducible` on `Polynomial (ZMod p)`.
 
 ---
 
@@ -694,9 +736,9 @@ structure DensePoly (R : Type*) [Zero R] [DecidableEq R] where
   normalized : coeffs.size = 0 ∨ coeffs.back! ≠ 0
 ```
 
-- Index = degree, `coeffs[i]` is the coefficient of `x^i`
+- Index = degree, `coeffs[i]` is coefficient of `x^i`
 - Normalization invariant: no trailing zeros
-- Structural equality = semantic equality (critical for proofs)
+- Structural equality = semantic equality
 - O(1) degree, O(1) coefficient access
 
 ### Secondary: Sparse sorted (Array of pairs)
@@ -709,111 +751,109 @@ structure SparsePoly (R : Type*) [Zero R] [DecidableEq R] where
   nonzero : ∀ i, i < terms.size → (terms[i]).2 ≠ 0
 ```
 
-### Tertiary: Sparse hashmap
+### Tertiary: Sparse ExtHashMap-backed
 
 ```lean
-structure HashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat] where
-  map : HashMap Nat R
-  -- No extensional equality without conversion to sorted form
+structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
+    [EquivBEq Nat] [LawfulHashable Nat] where
+  map : ExtHashMap Nat R
+  nonzero : ∀ k v, map.find? k = some v → v ≠ 0
 ```
 
-### The typeclass
+`ExtHashMap` provides extensionality: two maps are equal iff they have the
+same key-value pairs. No iteration order issues.
 
-```lean
-class PolyRepr (P : Type*) (R : outParam Type*) extends
-    Add P, Mul P, Neg P, Zero P, One P, BEq P where
-  degree : P → Nat
-  coeff : P → Nat → R
-  ofCoeffs : Array R → P
-  -- Extensionality: two polynomials are equal iff all coefficients agree
-  ext : ∀ p q : P, (∀ i, coeff p i = coeff q i) → p = q
-```
+### The typeclasses
 
-Algorithms are written against `PolyRepr`. Concrete instances are provided
-for `DensePoly`, `SparsePoly`, `HashPoly`. Performance-critical code can
-specialize to `DensePoly` with `@[specialize]`.
+`PolyOps` for operations, `LawfulPolyOps` for axioms. Algorithms are
+written against `PolyOps`. In the verification library, `LawfulPolyOps`
+gives the ring equivalence `P ≃+* Polynomial R`.
 
 ### Zero-value wrapper pattern
 
-For internal computation, allow zeros (faster, no normalization overhead):
+For intermediate computation, use raw representation allowing zeros (no
+normalization overhead). Normalize on output for clean equality.
 
-```lean
-structure RawDensePoly (R : Type*) where
-  coeffs : Array R
-  -- No normalization invariant. Fast for intermediate computation.
-```
+---
 
-Normalize on output:
+## Practical applications
 
-```lean
-def RawDensePoly.normalize [Zero R] [DecidableEq R]
-    (p : RawDensePoly R) : DensePoly R :=
-  let coeffs := p.coeffs.popWhile (· == 0)
-  ⟨coeffs, ...⟩
-```
+**Cryptographic field construction:** To build `GF(2^128)` for AES, you
+need an irreducible polynomial of degree 128 over `F_2`. With
+lean-berlekamp, produce a Lean proof that it's irreducible.
 
-This gives the best of both worlds: fast intermediate arithmetic (no
-trailing-zero checks on every operation) with clean equality on final
-results.
+**Coding theory:** Reed-Solomon and BCH codes need irreducible polynomials
+over finite fields. Verified factoring provides certified generator
+polynomials.
+
+**Number theory:** Computing rings of integers requires factoring
+polynomials over Z. The Baanen et al. project currently delegates to
+SageMath with unverified certificates — this replaces that dependency.
+
+**Cryptanalysis:** LLL is the core tool for lattice-based attacks. A
+verified LLL gives confidence in attack results.
 
 ---
 
 ## Prior art
 
-**Isabelle/HOL** (the gold standard): The Innsbruck group (Thiemann,
-Divasón, Joosten, Yamada) verified the entire Berlekamp-Zassenhaus + LLL
-pipeline. Degree-500 polynomials factor at 2.5x Mathematica speed. ~44K
-lines of Isabelle across multiple AFP entries.
+**Isabelle/HOL** (the gold standard): The Innsbruck group verified the
+entire Berlekamp-Zassenhaus + LLL pipeline. Degree-500 polynomials factor
+at 2.5x Mathematica speed. ~44K lines across multiple AFP entries.
 
 **Baanen et al. (Lean 4)**: Certificate-based irreducibility checking for
 the rings-of-integers project. Uses `decide`/`native_decide` on list-based
 polynomials. Works but doesn't scale beyond small degrees.
 
 **CoqEAL (Coq)**: Verified Karatsuba, Strassen, Bareiss, Smith normal form.
-Refinement-based approach (abstract spec → concrete implementation).
+Refinement-based approach.
 
 **FLINT (C)**: The performance target. Dense `nmod_poly` and `fmpz_poly`
-with Barrett reduction, Karatsuba, Kronecker segmentation, NTT. Not
-verified but extremely well-tested.
+with Barrett reduction, Karatsuba, NTT. Not verified.
 
 ---
 
 ## What verification buys you
 
-For standalone crypto primitive verification, the honest answer is "not
-much beyond what HACL* already provides." But computational algebra is
-different:
-
-1. **Results depend on algorithms being correct.** If SageMath says
-   `x^128 + x^7 + x^2 + x + 1` is irreducible over `F_2`, how do you
-   know? You trust SageMath. With verified certificates, you trust the
-   Lean kernel.
+1. **Results depend on algorithms being correct.** CAS systems have bugs
+   in polynomial factoring. A verified implementation provides independent
+   confirmation that a polynomial is (or isn't) irreducible.
 
 2. **The properties are characterizing.** Rabin's theorem, the Lovász
-   condition, Hensel uniqueness — these are mathematical theorems that
-   say something meaningful independent of implementation.
+   condition, Hensel uniqueness — mathematical theorems that say something
+   meaningful independent of implementation.
 
-3. **CAS bugs exist.** SageMath, Mathematica, and Maple have all had
-   bugs in polynomial factoring. A verified implementation provides
-   independent confirmation.
-
-4. **Bridge to formal mathematics.** The Mathlib bridge libraries give
+3. **Bridge to formal mathematics.** The verification libraries give
    `Decidable` instances for `Irreducible`, enabling computation inside
-   formal proofs. This unlocks constructive algebra in Lean: instead of
-   "there exists an irreducible polynomial" you get "here is one, and
-   here is a proof."
+   formal proofs. Instead of "there exists an irreducible polynomial" you
+   get "here is one, and here is a proof."
+
+## Repository structure
+
+Separate repos per library, with each repo containing a single Lake
+package. This gives clean dependency management and allows independent
+versioning. The cost is cross-repo development friction, but:
+
+- Lake handles git dependencies natively
+- Each library is small enough to stabilize independently
+- Verification libraries can track Mathlib's toolchain independently
+  of the computational libraries
+- Contributors can work on lean-lll without pulling lean-poly
+
+For the initial bootstrapping phase, a single monorepo with multiple
+Lake packages is acceptable, splitting into separate repos once the
+APIs stabilize.
 
 ## Conformance testing
 
-Every computational library is tested against SageMath:
+Every computational library is tested against FLINT via C FFI:
 
-1. Generate random polynomials in SageMath
-2. Compute GCD/factorization/LLL reduction in SageMath
-3. Run the same computation in Lean
-4. Compare results
+1. Generate random polynomials
+2. Compute GCD/factorization/LLL reduction in both Lean and FLINT
+3. Compare results
 
 For LLL, also compare against `fpLLL` (the reference C implementation).
 
-For polynomial factoring, generate certificates in SageMath and validate
-in Lean (the certificate checker is the primary deliverable before full
-algorithm verification).
+For polynomial factoring, generate certificates in Lean (via
+lean-berlekamp), validate them, and cross-check the factorization
+against FLINT.
