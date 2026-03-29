@@ -14,8 +14,8 @@ irreducibility testing, lattice basis reduction, and related tools.
    Mathlib's mathematical definitions.
 
 3. **Performant by default.** Dense array-backed representations, `UInt64`
-   coefficients for `F_p`, Barrett/Montgomery reduction for modular
-   arithmetic. FFI to FLINT as an optional fast path where it matters.
+  coefficients for `F_p`, Barrett/Montgomery reduction for modular
+  arithmetic. FFI to FLINT as an optional fast path where it matters.
    New GMP `@[extern]` primitives where Lean's runtime doesn't yet expose
    what we need (modular exponentiation, extended GCD, etc.).
 
@@ -144,19 +144,133 @@ operations correspond to Mathlib-defined mathematical objects.
 Core integer arithmetic that everything else builds on.
 
 **Contents:**
+
 - Extended GCD for `Nat`, `Int`, and `UInt64`
-- Barrett reduction for modular multiplication (precomputed inverse)
-- Montgomery multiplication (for sustained modular arithmetic)
-- Modular exponentiation by squaring
+- Barrett and Montgomery reduction for `UInt64` modular arithmetic
+  (see below)
+- Modular exponentiation by squaring (using Montgomery internally)
 - GMP FFI extras: `@[extern]` wrappers for `mpz_powm`, `mpz_gcdext`,
-  `mpz_invert`
+  `mpz_invert` — for big-integer operations where values exceed 64 bits
 - Pure Lean implementations of the same for the proof target
 
-**Key properties:**
-- `extGcd a b = (g, s, t) → s * a + t * b = g ∧ g = gcd a b`
-- `barrettMul a b p pinv = (a * b) % p`
-- `powMod a n p = a ^ n % p`
-- GMP FFI agrees with pure Lean implementation
+**Barrett reduction** — fast single modular multiplication on `UInt64`.
+Precompute an approximate reciprocal of the modulus, then reduce via
+multiply + shift instead of division.
+
+```lean
+structure BarrettCtx (p : UInt64) where
+  p_pos : p > 0
+  pinv : UInt64
+  pinv_eq : pinv = .ofNat (2 ^ 64 / p.toNat)
+
+def BarrettCtx.mk (p : UInt64) (hp : p > 0) : BarrettCtx p
+def BarrettCtx.mulMod (ctx : BarrettCtx p) (a b : UInt64) : UInt64
+```
+
+Key properties:
+```lean
+theorem BarrettCtx.mulMod_lt (ctx : BarrettCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    ctx.mulMod a b < p
+
+theorem BarrettCtx.toNat_mulMod (ctx : BarrettCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    (ctx.mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat
+
+theorem BarrettCtx.mulMod_eq (ctx : BarrettCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    ctx.mulMod a b = .mk ⟨(a.toNat * b.toNat) % p.toNat, by omega⟩
+```
+
+**Montgomery reduction** — optimized for sustained modular arithmetic
+(sequences of multiplications with the same modulus, e.g. exponentiation
+by squaring, polynomial evaluation over F_p).
+
+Values are stored in Montgomery form: `a` is represented as `a * R mod p`
+where `R = 2^64`. Reduction uses the low bits of the product (a mask)
+instead of division.
+
+```lean
+structure MontCtx (p : UInt64) where
+  p_odd : p % 2 = 1
+  p' : UInt64
+  p'_eq : (p'.toNat * p.toNat) % 2 ^ 64 = 2 ^ 64 - 1
+  r2 : UInt64
+  r2_eq : r2.toNat = (2 ^ 64 * 2 ^ 64) % p.toNat
+
+def MontCtx.mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p
+def MontCtx.toMont (ctx : MontCtx p) (a : UInt64) : UInt64
+def MontCtx.fromMont (ctx : MontCtx p) (a : UInt64) : UInt64
+def MontCtx.mulMont (ctx : MontCtx p) (a b : UInt64) : UInt64
+```
+
+Key properties:
+```lean
+theorem MontCtx.fromMont_toMont (ctx : MontCtx p) (a : UInt64)
+    (ha : a < p) :
+    ctx.fromMont (ctx.toMont a) = a
+
+theorem MontCtx.toNat_mulMont (ctx : MontCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
+      (a.toNat * b.toNat) % p.toNat
+
+theorem MontCtx.mulMont_eq (ctx : MontCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b)) =
+      .mk ⟨(a.toNat * b.toNat) % p.toNat, by omega⟩
+```
+
+**When to use which:** Barrett for one-off or few modular operations.
+Montgomery for hot loops (exponentiation, Frobenius map, polynomial
+multiplication over F_p) where the conversion overhead is amortized.
+
+**Extended GCD:**
+```lean
+def extGcd (a b : Nat) : Nat × Int × Int
+
+theorem extGcd_fst (a b : Nat) : (extGcd a b).1 = Nat.gcd a b
+
+theorem extGcd_bezout (a b : Nat) :
+    let (g, s, t) := extGcd a b
+    s * a + t * b = g
+```
+Also for `Int` and `UInt64` variants.
+
+**Modular exponentiation:**
+```lean
+def powMod (a n p : Nat) : Nat  -- uses Montgomery internally
+
+theorem powMod_eq (a n p : Nat) (hp : p > 0) :
+    powMod a n p = a ^ n % p
+```
+
+**Binomial coefficients and Fermat's little theorem:**
+
+`Nat.choose` is in Mathlib, not Init, so we define it here
+(standard recursive definition). We prove the key lemma and FLT:
+```lean
+theorem Nat.choose_prime_dvd (hp : Nat.Prime p) (hk : 0 < k) (hk' : k < p) :
+    p ∣ Nat.choose p k
+
+theorem Nat.add_pow_prime_mod (hp : Nat.Prime p) (a b : Nat) :
+    (a + b) ^ p % p = (a ^ p + b ^ p) % p
+
+theorem Nat.pow_prime_mod (hp : Nat.Prime p) (a : Nat) :
+    a ^ p % p = a % p
+```
+Proof: `choose_prime_dvd` by Euclid's lemma (since `k! * C(p,k)` has
+factor `p` but `gcd(p, k!) = 1`). `add_pow_prime_mod` follows
+(all middle binomial terms vanish mod p). `pow_prime_mod` by induction
+on `a`: base `0^p = 0`, step uses `add_pow_prime_mod` with `b = 1`.
+
+**Euclid's lemma:**
+```lean
+theorem Nat.Prime.dvd_mul (hp : Nat.Prime p) (h : p ∣ a * b) :
+    p ∣ a ∨ p ∣ b
+```
+Proof via extended GCD: if `p ∤ a` then `gcd(a, p) = 1`, Bezout gives
+`s * a + t * p = 1`, multiply by `b`, since `p ∣ a * b` conclude `p ∣ b`.
 
 **Note:** `Nat.gcd` already exists with GMP-backed `mpz_gcd`. We build on
 it for extended GCD. The pure Lean `extGcd` is the logical definition used
@@ -305,17 +419,23 @@ Arithmetic in `Z/nZ` with `UInt64`-backed coefficients.
 
 **Contents:**
 - `ZMod64 (p : Nat)` — a `UInt64` with proof `val.toNat < p`
-- Addition, subtraction, multiplication with Barrett/Montgomery reduction
+- Addition, subtraction, multiplication (using Barrett/Montgomery from
+  lean-arith for the `UInt64` modular operations)
 - Inversion via extended GCD (for prime moduli)
 - Exponentiation by squaring
 - `Lean.Grind.CommRing (ZMod64 p)` instance and `IsCharP (ZMod64 p) p`
 
 **Key properties:**
-- Ring axioms proved directly from the modular arithmetic definitions
-- `inv a * a = 1` when `Nat.Coprime a.val p`
-- Fermat's little theorem: `pow a (p-1) = 1` when `p` is prime and
-  `a ≠ 0` — proved from the ring structure (the multiplicative group
-  of a finite integral domain has order `p-1`)
+- Ring axioms proved directly from the modular arithmetic definitions.
+  Associativity and distributivity of multiplication reduce to
+  `Nat.mod` properties via Barrett/Montgomery correctness from
+  lean-arith.
+- `inv a * a = 1` when `Nat.Coprime a.val p` — via extended GCD
+  from lean-arith: `s * a + t * p = 1` gives `s mod p` as the inverse.
+- No zero divisors for prime `p`: `a * b = 0 → a = 0 ∨ b = 0` — via
+  Euclid's lemma from lean-arith.
+- Fermat's little theorem: `a ^ p = a` — lifts directly from
+  `Nat.pow_prime_mod` in lean-arith.
 
 **Note:** `Fin n` already has `Lean.Grind.CommRing` and `IsCharP`. We
 build `ZMod64` for performance (Barrett reduction instead of naive modular
