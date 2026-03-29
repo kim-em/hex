@@ -966,42 +966,60 @@ Also connects to Mathlib's `Polynomial ℤ` and provides
 
 ---
 
-## Dependency DAG (for parallel development)
+## Development phases
 
-```
-Phase 0 (all parallel, no dependencies between them):
-  ├── lean-arith
-  ├── lean-poly               (no dependencies)
-  └── lean-matrix             (no dependencies)
+Development has three kinds of work: **`def` implementations**,
+**`theorem` statements** (with `sorry` proofs), and **`theorem` proofs**
+(filling in the `sorry`s). The first two must follow the DAG; the
+third is fully parallelizable.
 
-Phase 1 (each depends only on Phase 0):
-  ├── lean-mod-arith          (← lean-arith)
-  └── lean-lll                (← lean-matrix)
+**`def` implementations and `theorem` statements** must follow the
+DAG — both need their transitively referenced `def`s to already have
+implementations. `theorem` proofs can be `sorry` at this stage.
 
-Phase 2 (each depends on Phase 1):
-  ├── lean-poly-fp            (← lean-poly + lean-mod-arith)
-  ├── lean-poly-z             (← lean-poly)
-  └── lean-lll is complete    (independent)
+**`theorem` proofs** are fully parallelizable. A proof can begin as
+soon as the theorem is stated and all transitively referenced `def`s
+have implementations. Proofs in different libraries — or even within
+the same library — have no ordering constraints.
 
-Phase 3 (each depends on Phase 2):
-  ├── lean-berlekamp          (← lean-poly-fp + lean-matrix)
-  ├── lean-hensel             (← lean-poly-fp + lean-poly-z)
-  ├── lean-conway             (← lean-poly-fp)
-  └── lean-gfq-ring           (← lean-poly-fp)
+### Implementation dependencies
 
-Phase 4:
-  ├── lean-gfq-field          (← lean-gfq-ring + lean-berlekamp)
-  └── lean-berlekamp-zassenhaus (← lean-berlekamp + lean-hensel + lean-lll)
+Each library with its immediate dependencies:
 
-Mathlib bridge libraries (can start whenever their core lib is ready):
-  ├── lean-mod-arith-mathlib       (Phase 1+)
-  ├── lean-poly-mathlib            (Phase 1+)
-  ├── lean-matrix-mathlib          (Phase 0+)
-  ├── lean-berlekamp-mathlib       (Phase 3+)
-  ├── lean-hensel-mathlib          (Phase 3+)
-  ├── lean-lll-mathlib             (Phase 1+)
-  └── lean-gfq-mathlib             (Phase 4+)
-```
+- **lean-arith** — (none)
+- **lean-poly** — (none)
+- **lean-matrix** — (none)
+- **lean-mod-arith** — lean-arith
+- **lean-lll** — lean-matrix
+- **lean-poly-fp** — lean-poly, lean-mod-arith
+- **lean-poly-z** — lean-poly
+- **lean-berlekamp** — lean-poly-fp, lean-matrix
+- **lean-hensel** — lean-poly-fp, lean-poly-z
+- **lean-conway** — lean-poly-fp
+- **lean-gfq-ring** — lean-poly-fp
+- **lean-gfq-field** — lean-gfq-ring, lean-berlekamp
+- **lean-gfq** — lean-gfq-field, lean-conway
+- **lean-berlekamp-zassenhaus** — lean-berlekamp, lean-hensel, lean-lll
+
+Mathlib bridge libraries (each also depends on Mathlib):
+
+- **lean-mod-arith-mathlib** — lean-mod-arith
+- **lean-poly-mathlib** — lean-poly
+- **lean-poly-z-mathlib** — lean-poly-z
+- **lean-matrix-mathlib** — lean-matrix
+- **lean-lll-mathlib** — lean-lll
+- **lean-berlekamp-mathlib** — lean-berlekamp
+- **lean-hensel-mathlib** — lean-hensel
+- **lean-gfq-mathlib** — lean-gfq
+- **lean-berlekamp-zassenhaus-mathlib** — lean-berlekamp-zassenhaus, lean-poly-z-mathlib
+
+### Proof work
+
+Proof work is fully parallelizable. A `sorry`d theorem can be proved
+as soon as its transitively referenced `def`s have implementations.
+This means proof work on lean-arith, lean-poly, and lean-matrix can
+start immediately and proceed in parallel with implementation work on
+later libraries.
 
 **Key insight:** LLL is completely independent of the polynomial pipeline.
 It can be developed from day one in parallel with everything else. The
