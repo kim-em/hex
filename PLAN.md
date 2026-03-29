@@ -9,7 +9,7 @@ irreducibility testing, lattice basis reduction, and related tools.
 1. **Many small libraries**, each its own Lake package in its own repo.
 
 2. **No Mathlib in the computational core.** Every library that computes
-   something is Mathlib-free. Separate `-verification` libraries depend on
+   something is Mathlib-free. Separate `-mathlib` libraries depend on
    both the computational library and Mathlib to prove correspondence with
    Mathlib's mathematical definitions.
 
@@ -34,6 +34,10 @@ irreducibility testing, lattice basis reduction, and related tools.
 6. **Clear DAG structure.** Libraries can be developed in parallel. LLL has
    no dependency on polynomial arithmetic. Hensel lifting is independent of
    LLL. Everything meets at the top (Berlekamp-Zassenhaus).
+
+7. **`ComputationalAlgebra` namespace.** All definitions live under
+   `ComputationalAlgebra` to avoid collisions with Mathlib's root-namespace
+   types (`Matrix`, `Polynomial`, etc.).
 
 ---
 
@@ -113,20 +117,22 @@ to the Lean runtime.
                                               lean-gfq-field + lean-conway
 ```
 
-**Verification libraries** (depend on computational lib + Mathlib):
+**Mathlib bridge libraries** (depend on computational lib + Mathlib):
 
 ```
-    lean-berlekamp-zassenhaus-verification
-    lean-berlekamp-verification
-    lean-hensel-verification
-    lean-lll-verification
-    lean-poly-verification     (proves DensePoly R ≅ Polynomial R,
+    lean-berlekamp-zassenhaus-mathlib
+    lean-berlekamp-mathlib
+    lean-hensel-mathlib
+    lean-lll-mathlib
+    lean-matrix-mathlib         (proves Matrix R n m ops agree with
+                                Mathlib's Matrix, determinants agree)
+    lean-poly-mathlib           (proves DensePoly R ≅ Polynomial R,
                                 LawfulPolyOps gives ≃+*)
-    lean-mod-arith-verification (proves ZMod64 p ≅ ZMod p)
-    lean-gfq-verification     (proves GFq p n ≅ GaloisField p n)
+    lean-mod-arith-mathlib      (proves ZMod64 p ≅ ZMod p)
+    lean-gfq-mathlib            (proves GFq p n ≅ GaloisField p n)
 ```
 
-Each verification library proves that the computational library's
+Each `-mathlib` library proves that the computational library's
 operations correspond to Mathlib-defined mathematical objects.
 
 ---
@@ -142,8 +148,6 @@ Core integer arithmetic that everything else builds on.
 - Barrett reduction for modular multiplication (precomputed inverse)
 - Montgomery multiplication (for sustained modular arithmetic)
 - Modular exponentiation by squaring
-- Mignotte bound computation (coefficient bounds for polynomial factors)
-- Cauchy root bound
 - GMP FFI extras: `@[extern]` wrappers for `mpz_powm`, `mpz_gcdext`,
   `mpz_invert`
 - Pure Lean implementations of the same for the proof target
@@ -169,15 +173,129 @@ Dense matrices as `Vector (Vector R m) n`.
 - `Matrix R n m` := `Vector (Vector R m) n` (uses stdlib `Vector`)
 - Matrix-vector multiplication, matrix-matrix multiplication
 - Dot product, norm squared (for `R = Int` and `R = Rat`)
-- Determinant (Leibniz formula or Bareiss for integer matrices)
 - Row operations (swap, scale, add multiple of one row to another)
-- Row echelon form, rank, nullspace
+- Row reduction. Two variants:
+
+  **Over fields (F_p, Rat): reduced row echelon form (RREF).**
+  Standard Gaussian elimination with back-substitution. Each pivot is
+  1 (scale the row), all entries above and below each pivot are 0.
+  The result is unique.
+
+  **Over Int: Hermite normal form (HNF).**
+  (Not on the critical path — nothing downstream requires it,
+  so only implement once other things are done.)
+  Upper triangular with positive pivots, entries above each pivot in
+  `[0, pivot)`. Uses extended GCD to create pivots without division:
+  given entries `a`, `b` in the same column, compute `(g, s, t)` with
+  `s * a + t * b = g`, then apply the 2×2 row transformation
+  `[[s, t], [-b/g, a/g]]` to zero out `b` and replace `a` with `g`.
+  Reduce entries above each pivot modulo the pivot. The result is
+  unique.
+
+  Both return:
+  ```lean
+  structure RowEchelon (R : Type) (n m : Nat) where
+    rank : Nat
+    echelon : Matrix R n m
+    transform : Matrix R n n       -- P such that P * M = echelon
+    pivotCols : Vector (Fin m) rank -- which columns contain pivots
+  ```
+  This is pure data — no proofs bundled in. Correctness conditions are
+  theorems about the results produced by `rref` and `hnf`.
+
+  Shared theorems:
+  - `transform * M = echelon`
+  - `∃ u, det transform * u = 1` (transform is invertible)
+  - `rank ≤ n` and `rank ≤ m`
+  - `pivotCols` is strictly increasing
+  - Entries below each pivot are zero
+
+  RREF-specific:
+  - Each pivot is `1`
+  - Entries above each pivot are `0`
+
+  HNF-specific:
+  - Each pivot is positive
+  - Entries above each pivot are in `[0, pivot)`
+  - Corollary: `det transform = 1 ∨ det transform = -1`
+- Span: `span : Array (Vector R m) → Set (Vector R m)`, the set of all
+  linear combinations.
+  `spanCoeffs : (vs : Array (Vector R m)) → Vector R m → Option (Vector R vs.size)`
+  solves for the coefficients (row reduce with `vs` as columns), and
+  `decSpan` is the `Decidable` instance for `v ∈ span vs` built on
+  top of it.
+- Nullspace: returns `Array (Vector R m)` — a basis for the kernel of
+  `M`. Read off from echelon form: each free variable gives one basis
+  vector. Full characterization:
+  - Soundness: `∀ v ∈ nullspace M, M * v = 0`
+  - Completeness: `M * v = 0 → v ∈ span (nullspace M)`
+  - Rank-nullity: `(nullspace M).size + rank M = m`
+  - Independence: the nullspace vectors are linearly independent
+    (immediate from the echelon structure — each has a 1 in a distinct
+    free-variable position).
 - Generic over the coefficient type `R`
 
+**Determinant — definition and computation:**
+
+Define `det` via the Leibniz formula (sum over permutations), over any
+`CommRing`.
+
+For computation, provide the Bareiss algorithm (fraction-free Gaussian
+elimination) over `Int`. The Bareiss recurrence at step k is:
+```
+a_{ij}^{(k)} = (a_{kk}^{(k-1)} · a_{ij}^{(k-1)} - a_{ik}^{(k-1)} · a_{kj}^{(k-1)}) / a_{k-1,k-1}^{(k-2)}
+```
+where `/` is `Int.div` — the division is always exact (no remainder).
+
+**Note:** Bareiss generalizes to any integral domain given a data-carrying
+exact division operation (`ediv : α → α → α` with
+`b ∣ a → ediv a b * b = a`) and no zero divisors
+(`a * b = 0 → a = 0 ∨ b = 0`). We don't need this generality — only
+`Int` determinants are used downstream (LLL Gram matrices).
+
+**Proof that `bareiss M = det M`:** Via row operations, not Sylvester's
+identity. Each Bareiss step is equivalent to: scale rows below the pivot,
+subtract the appropriate multiple, then divide out the accumulated extra
+factor. The row operation lemmas (proved directly from Leibniz) track
+`det` through each step, and the scaling factors telescope due to the
+division by the previous pivot.
+
+Sylvester's identity (Desnanot-Jacobi) is worth providing anyway — it's
+a useful result in its own right and gives an alternative, more algebraic
+proof path: show by induction that Bareiss step k computes the leading
+k×k minor `det(M[1..k, 1..k])`, with Sylvester's identity as the
+inductive step.
+
 **Key properties:**
-- Row operations preserve determinant (up to sign)
-- `det (rowSwap M i j) = -det M`
-- Nullspace correctness: `∀ v ∈ nullspace M, M * v = 0`
+- `det_one : det 1 = 1`
+- `det_rowSwap : i ≠ j → det (rowSwap M i j) = -det M`
+- `det_rowScale : det (rowScale M i c) = c * det M`
+- `det_rowAdd : i ≠ j → det (rowAdd M i j c) = det M`
+- `bareiss_eq_det : bareiss M = det M`
+- `spanCoeffs_sound : spanCoeffs vs v = some c → v = ∑ i, c[i] • vs[i]`
+- `spanCoeffs_complete : v ∈ span vs → (spanCoeffs vs v).isSome`
+- Nullspace soundness: `∀ v ∈ nullspace M, M * v = 0`
+- Nullspace completeness: `M * v = 0 → v ∈ span (nullspace M)`
+- Rank-nullity: `(nullspace M).size + rank M = m`
+- Sylvester's identity (relating minors of a matrix)
+
+---
+
+### lean-matrix-mathlib (depends on lean-matrix + Mathlib)
+
+Proves that our `Matrix R n m` is ring-equivalent to Mathlib's
+`Matrix (Fin n) (Fin m) R`, and that the determinants agree.
+
+```lean
+def matrixEquiv : ComputationalAlgebra.Matrix R n m ≃ Matrix (Fin n) (Fin m) R
+
+theorem det_eq [CommRing R] [Fintype (Fin n)] (M : Matrix R n n) :
+    ComputationalAlgebra.det M = Matrix.det (matrixEquiv M)
+```
+
+This means Mathlib theorems about determinants (Cramer's rule,
+Cayley-Hamilton, etc.) transfer to our matrices, and our computations
+(Bareiss, row echelon form) are known correct in the mathematical sense.
 
 ---
 
@@ -205,7 +323,7 @@ arithmetic) and for cleaner API (explicit prime parameter, field operations).
 
 ---
 
-### lean-mod-arith-verification (depends on lean-mod-arith + Mathlib)
+### lean-mod-arith-mathlib (depends on lean-mod-arith + Mathlib)
 
 Proves `ZMod64 p ≃+* ZMod p`. This means any Mathlib theorem about
 `ZMod p` transfers to `ZMod64 p`, and any computation with `ZMod64 p`
@@ -268,12 +386,12 @@ subtype `{ p : P // dropZeros p = p }` — two canonical-form polynomials
 with the same coefficients are propositionally equal.
 
 **The subtype `CanonicalPoly P := { p : P // dropZeros p = p }`** is where
-the `≃+*` lives. In the verification library:
+the `≃+*` lives. In the `-mathlib` bridge library:
 
 ```lean
 def CanonicalPoly (P : Type*) [PolyOps P R] := { p : P // dropZeros p = p }
 
--- The verification library proves:
+-- The -mathlib bridge library proves:
 def equiv [LawfulPolyOps P R] : CanonicalPoly P ≃+* Polynomial R
 ```
 
@@ -335,7 +453,7 @@ propositional equality is needed (via `dropZeros`).
 
 ---
 
-### lean-poly-verification (depends on lean-poly + Mathlib)
+### lean-poly-mathlib (depends on lean-poly + Mathlib)
 
 Proves `LawfulPolyOps` for `DensePoly R` and constructs the ring
 equivalence. Since `DensePoly` normalizes eagerly, `dropZeros = id`
@@ -387,14 +505,16 @@ Specialized polynomial arithmetic over `Z`.
 - `ZPoly` = `DensePoly Int`
 - Content and primitive part: `f = content(f) * primitivePart(f)`
 - Gauss's lemma: the product of primitive polynomials is primitive
-- Mignotte bound: coefficient bound for factors of `f`
+- Mignotte bound computation: `|gⱼ| ≤ C(k,j) · ‖f‖₂` for any degree-k
+  factor `g | f` in `Z[x]`. The computation is just binomial coefficients
+  and the 2-norm of `f`'s coefficients. The proof that the bound is valid
+  requires complex analysis (Mahler measure, Landau's inequality) and
+  lives in `lean-poly-z-mathlib`.
 - Reduction modulo p: `ZPoly → FpPoly p`
 
 **Key properties:**
 - `content(f * g) = content(f) * content(g)` (Gauss)
 - `primitivePart(f)` is primitive (content = 1)
-- Mignotte bound is valid: any factor of `f` has coefficients bounded by
-  the computed bound
 
 ---
 
@@ -443,7 +563,7 @@ theorem berlekamp_complete (f : FpPoly p) (hf : squareFree f) :
 
 ---
 
-### lean-berlekamp-verification (depends on lean-berlekamp + Mathlib)
+### lean-berlekamp-mathlib (depends on lean-berlekamp + Mathlib)
 
 Connects the computational `Irreducible` to Mathlib's `Irreducible`
 in `Polynomial (ZMod p)`. The payoff: a `Decidable` instance for
@@ -528,7 +648,7 @@ the algorithm or via a certificate).
 
 ---
 
-### lean-gfq-verification (depends on lean-gfq-field + Mathlib)
+### lean-gfq-mathlib (depends on lean-gfq-field + Mathlib)
 
 Proves `GFq p n ≃+* GaloisField p n` (Mathlib's Galois field).
 
@@ -635,7 +755,7 @@ computation.
 
 ---
 
-### lean-lll-verification (depends on lean-lll + Mathlib)
+### lean-lll-mathlib (depends on lean-lll + Mathlib)
 
 Connects lean-lll to Mathlib's linear algebra:
 - Lattice corresponds to a `Submodule ℤ`
@@ -664,19 +784,18 @@ correct, just slow for high-degree polynomials with many factors mod p.
 **With LLL** (Phase 2): polynomial-time recombination. Short lattice
 vectors correspond to true factors.
 
-**Key properties:**
+**Conditional correctness (proved in this library, no Mathlib):**
+
+The algorithm's correctness is proved conditionally on the coefficient
+bound being valid. The key conditional theorem:
 ```lean
-theorem factor_product (f : ZPoly) :
-    (factor f).prod = f
-
-theorem factor_irreducible (f : ZPoly) :
-    ∀ g ∈ factor f, Irreducible g
-
-theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
-    gs.prod = f → hs.prod = f →
-    (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
-    gs ~ hs  -- multiset equality up to associates
+theorem factor_product_of_bound (f : ZPoly) (B : Nat)
+    (hB : ∀ g : ZPoly, g ∣ f → ∀ i, |g.coeff i| ≤ B) :
+    (factor f B).prod = f
 ```
+This keeps the heavy algorithmic verification Mathlib-free. The only
+piece that needs Mathlib is proving that the Mignotte bound is valid
+(which requires the Fundamental Theorem of Algebra).
 
 **Certificate structures for Z[x] irreducibility:**
 ```lean
@@ -685,15 +804,30 @@ structure ZPolyIrreducibilityCertificate where
   factorDegrees : Array (Array Nat)
   factorCerts : Array (Array IrreducibilityCertificate)
   -- Degree analysis: intersection of subset sums = {0, deg(f)}
-
-structure LPFWCertificate where
-  evalPoint : Int
-  prime : Nat
-  quotient : Nat
-  cauchyBound : Rat
-  degreeBound : Nat
-  -- Verification: P is prime, f(m) = ±quotient * P, quotient < (|m| - ρ)^d
 ```
+
+---
+
+### lean-berlekamp-zassenhaus-mathlib (depends on lean-berlekamp-zassenhaus + Mathlib)
+
+Proves the Mignotte bound is valid (via FTA, Mahler measure, Landau's
+inequality from Mathlib) and instantiates the conditional correctness
+theorems to get unconditional results:
+```lean
+theorem factor_product (f : ZPoly) :
+    (factor f (mignotteBound f)).prod = f
+
+theorem factor_irreducible (f : ZPoly) :
+    ∀ g ∈ factor f (mignotteBound f), Irreducible g
+
+theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
+    gs.prod = f → hs.prod = f →
+    (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
+    gs ~ hs  -- multiset equality up to associates
+```
+
+Also connects to Mathlib's `Polynomial ℤ` and provides
+`Decidable (Irreducible f)` for `f : Polynomial ℤ`.
 
 ---
 
@@ -725,13 +859,14 @@ Phase 4:
   ├── lean-gfq-field          (← lean-gfq-ring + lean-berlekamp)
   └── lean-berlekamp-zassenhaus (← lean-berlekamp + lean-hensel + lean-lll)
 
-Verification libraries (can start whenever their core lib is ready):
-  ├── lean-mod-arith-verification  (Phase 1+)
-  ├── lean-poly-verification       (Phase 1+)
-  ├── lean-berlekamp-verification  (Phase 3+)
-  ├── lean-hensel-verification     (Phase 3+)
-  ├── lean-lll-verification        (Phase 1+)
-  └── lean-gfq-verification       (Phase 4+)
+Mathlib bridge libraries (can start whenever their core lib is ready):
+  ├── lean-mod-arith-mathlib       (Phase 1+)
+  ├── lean-poly-mathlib            (Phase 1+)
+  ├── lean-matrix-mathlib          (Phase 1+)
+  ├── lean-berlekamp-mathlib       (Phase 3+)
+  ├── lean-hensel-mathlib          (Phase 3+)
+  ├── lean-lll-mathlib             (Phase 1+)
+  └── lean-gfq-mathlib             (Phase 4+)
 ```
 
 **Key insight:** LLL is completely independent of the polynomial pipeline.
@@ -761,7 +896,7 @@ Finite field arithmetic with verified field structure.
 **M6 (after M2+M3+M4):** lean-berlekamp-zassenhaus. Complete verified
 polynomial factoring over Z.
 
-**M7 (ongoing):** Verification libraries connecting to Mathlib.
+**M7 (ongoing):** Mathlib bridge libraries.
 `Decidable` instance for `Irreducible` on `Polynomial (ZMod p)`.
 
 ---
@@ -806,7 +941,7 @@ same key-value pairs. No iteration order issues.
 ### The typeclasses
 
 `PolyOps` for operations (including `dropZeros`), `LawfulPolyOps` for
-ring axioms + `dropZeros` properties. The verification library proves
+ring axioms + `dropZeros` properties. The `-mathlib` bridge library proves
 `CanonicalPoly P ≃+* Polynomial R` where
 `CanonicalPoly P := { p : P // dropZeros p = p }`.
 
@@ -849,7 +984,7 @@ with Barrett reduction, Karatsuba, NTT. Not verified.
 
 ---
 
-## What verification buys you
+## What the Mathlib bridge buys you
 
 1. **Results depend on algorithms being correct.** CAS systems have bugs
    in polynomial factoring. A verified implementation provides independent
@@ -859,7 +994,7 @@ with Barrett reduction, Karatsuba, NTT. Not verified.
    condition, Hensel uniqueness — mathematical theorems that say something
    meaningful independent of implementation.
 
-3. **Bridge to formal mathematics.** The verification libraries give
+3. **Bridge to formal mathematics.** The `-mathlib` libraries give
    `Decidable` instances for `Irreducible`, enabling computation inside
    formal proofs. Instead of "there exists an irreducible polynomial" you
    get "here is one, and here is a proof."
@@ -872,7 +1007,7 @@ versioning. The cost is cross-repo development friction, but:
 
 - Lake handles git dependencies natively
 - Each library is small enough to stabilize independently
-- Verification libraries can track Mathlib's toolchain independently
+- Mathlib bridge libraries can track Mathlib's toolchain independently
   of the computational libraries
 - Contributors can work on lean-lll without pulling lean-poly
 
