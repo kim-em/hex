@@ -76,64 +76,62 @@ to the Lean runtime.
 
 ---
 
+## Libraries
+
+- **lean-arith** — extended GCD, Barrett/Montgomery reduction, binomial coefficients, Fermat's little theorem
+- **lean-poly** — polynomial typeclass interface + dense `Array`-backed representation
+- **lean-matrix** — dense matrices as `Vector (Vector R m) n`, RREF, Bareiss determinant, span, nullspace
+- **lean-mod-arith** — `ZMod64 p`: `UInt64`-backed arithmetic in `Z/pZ`
+- **lean-poly-fp** — polynomials over `F_p`, Frobenius map, square-free decomposition
+- **lean-poly-z** — polynomials over `Z`, content/primitive part, Mignotte bound
+- **lean-berlekamp** — Berlekamp factoring and Rabin irreducibility test over `F_p`
+- **lean-hensel** — Hensel lifting from `mod p` to `mod p^k`
+- **lean-lll** — LLL lattice basis reduction
+- **lean-berlekamp-zassenhaus** — complete factoring of `Z[x]`
+- **lean-conway** — Conway polynomial database
+- **lean-gfq-ring** — quotient ring `F_p[x]/(f)`
+- **lean-gfq-field** — field structure when `f` is irreducible
+- **lean-gfq** — convenience wrapper: `GFq p n` using Conway polynomials
+
 ## Library DAG
 
-```
-                       lean-berlekamp-zassenhaus
-                      (complete Z[x] factoring)
-                     /            |            \
-                    /             |             \
-       lean-berlekamp    lean-hensel    lean-lll
-       (F_p factoring)   (lifting)     (lattice reduction)
-            |                |              |
-       lean-poly-fp     lean-poly-z    lean-matrix
-       (poly over F_p)  (poly over Z)  (Vector of Vectors)
-            |                |              |
-            +-------+--------+              |
-                    |                       |
-               lean-poly                    |
-               (poly interface +            |
-                dense repr)                 |
-                    |                       |
-               lean-mod-arith               |
-               (modular arithmetic)         |
-                    |                       |
-                    +----------+------------+
-                               |
-                          lean-arith
-                          (extended GCD, Barrett,
-                           GMP extras)
-
-  Additional libraries (independent branches):
-
-       lean-conway           lean-gfq-ring       lean-gfq-field
-       (Conway polynomial    (GF(q) as a ring,   (GF(q) as a field,
-        database)             quotient by any      any irreducible poly)
-                              polynomial)              |
-            |                     |              lean-gfq-ring
-       lean-poly-fp          lean-poly-fp        + lean-berlekamp
-                                                       |
-                                              GFq p n (convenience):
-                                              lean-gfq-field + lean-conway
-```
-
-**Mathlib bridge libraries** (depend on computational lib + Mathlib):
+Three independent roots: lean-poly, lean-arith, lean-matrix.
 
 ```
-    lean-berlekamp-zassenhaus-mathlib
-    lean-berlekamp-mathlib
-    lean-hensel-mathlib
-    lean-lll-mathlib
-    lean-matrix-mathlib         (proves Matrix R n m ops agree with
-                                Mathlib's Matrix, determinants agree)
-    lean-poly-mathlib           (proves DensePoly R ≅ Polynomial R,
-                                LawfulPolyOps gives ≃+*)
-    lean-mod-arith-mathlib      (proves ZMod64 p ≅ ZMod p)
-    lean-gfq-mathlib            (proves GFq p n ≅ GaloisField p n)
+      lean-poly     lean-arith      lean-matrix
+       /     \          |            /       \
+      /       \     lean-mod-arith  /    lean-lll
+     /         \       /           /         /
+lean-poly-z  lean-poly-fp         /         /
+     \        /       \          /         / 
+     lean-hensel      lean-berlekamp      /
+               \        |                /
+                lean-berlekamp-zassenhaus
 ```
 
-Each `-mathlib` library proves that the computational library's
-operations correspond to Mathlib-defined mathematical objects.
+Additional libraries (finite field construction):
+```
+  lean-poly-fp      lean-berlekamp
+    /    \                |
+   /  lean-gfq-ring       |
+  |          \           /
+lean-conway  lean-gfq-field
+       \        /
+        lean-gfq
+```
+
+**Mathlib bridge libraries** (each depends on a computational lib + Mathlib,
+proving correspondence with Mathlib's mathematical definitions):
+
+- **lean-mod-arith-mathlib** — `ZMod64 p ≃+* ZMod p`
+- **lean-poly-mathlib** — `DensePoly R ≃+* Polynomial R` via `LawfulPolyOps`
+- **lean-matrix-mathlib** — matrix equivalence, `det` agreement, rank = `Matrix.rank`, nullspace = `LinearMap.ker`, row ops = transvections
+- **lean-poly-z-mathlib** — proves Mignotte bound valid (via FTA, Mahler measure, Landau's inequality)
+- **lean-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
+- **lean-hensel-mathlib** — Hensel lifting corresponds to Mathlib's `Polynomial` factoring
+- **lean-lll-mathlib** — lattice = `Submodule ℤ`, GSO = `gramSchmidt`, short vector bound
+- **lean-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
+- **lean-berlekamp-zassenhaus-mathlib** — proves Mignotte bound (via FTA), unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
 ---
 
@@ -248,7 +246,8 @@ theorem powMod_eq (a n p : Nat) (hp : p > 0) :
 **Binomial coefficients and Fermat's little theorem:**
 
 `Nat.choose` is in Mathlib, not Init, so we define it here
-(standard recursive definition). We prove the key lemma and FLT:
+(standard recursive definition). We prove the key lemma and Fermat's
+little theorem:
 ```lean
 theorem Nat.choose_prime_dvd (hp : Nat.Prime p) (hk : 0 < k) (hk' : k < p) :
     p ∣ Nat.choose p k
@@ -279,7 +278,7 @@ trusted in the same way as every other `@[extern]` in Lean.
 
 ---
 
-### lean-matrix (foundation, depends on lean-arith)
+### lean-matrix (foundation, no dependencies)
 
 Dense matrices as `Vector (Vector R m) n`.
 
@@ -288,71 +287,67 @@ Dense matrices as `Vector (Vector R m) n`.
 - Matrix-vector multiplication, matrix-matrix multiplication
 - Dot product, norm squared (for `R = Int` and `R = Rat`)
 - Row operations (swap, scale, add multiple of one row to another)
-- Row reduction. Two variants:
+- Row reduction (RREF over fields) and span/nullspace machinery:
 
-  **Over fields (F_p, Rat): reduced row echelon form (RREF).**
-  Standard Gaussian elimination with back-substitution. Each pivot is
-  1 (scale the row), all entries above and below each pivot are 0.
-  The result is unique.
-
-  **Over Int: Hermite normal form (HNF).**
-  (Not on the critical path — nothing downstream requires it,
-  so only implement once other things are done.)
-  Upper triangular with positive pivots, entries above each pivot in
-  `[0, pivot)`. Uses extended GCD to create pivots without division:
-  given entries `a`, `b` in the same column, compute `(g, s, t)` with
-  `s * a + t * b = g`, then apply the 2×2 row transformation
-  `[[s, t], [-b/g, a/g]]` to zero out `b` and replace `a` with `g`.
-  Reduce entries above each pivot modulo the pivot. The result is
-  unique.
-
-  Both return:
   ```lean
-  structure RowEchelon (R : Type) (n m : Nat) where
+  /-- Pure data: the result of row-reducing a matrix. -/
+  structure RowEchelonData (R : Type) (n m : Nat) where
     rank : Nat
     echelon : Matrix R n m
-    transform : Matrix R n n       -- P such that P * M = echelon
-    pivotCols : Vector (Fin m) rank -- which columns contain pivots
+    transform : Matrix R n n
+    pivotCols : Vector (Fin m) rank
+
+  /-- Shared conditions for any echelon form (RREF or HNF). -/
+  structure IsEchelonForm (M : Matrix R n m) (D : RowEchelonData R n m) : Prop where
+    transform_mul : D.transform * M = D.echelon
+    transform_inv : ∃ u, det D.transform * u = 1
+    rank_le_n : D.rank ≤ n
+    rank_le_m : D.rank ≤ m
+    pivotCols_sorted : ∀ i j, i < j → D.pivotCols[i] < D.pivotCols[j]
+    below_pivot_zero : ...  -- entries below each pivot are zero
+
+  /-- RREF-specific: pivots are 1, everything above is 0. -/
+  structure IsRREF (M : Matrix R n m) (D : RowEchelonData R n m)
+      extends IsEchelonForm M D : Prop where
+    pivot_one : ...         -- each pivot is 1
+    above_pivot_zero : ...  -- entries above each pivot are 0
+
+  def rref (M : Matrix R n m) : RowEchelonData R n m
+  theorem rref_isRREF (M : Matrix R n m) : IsRREF M (rref M)
   ```
-  This is pure data — no proofs bundled in. Correctness conditions are
-  theorems about the results produced by `rref` and `hnf`.
 
-  Shared theorems:
-  - `transform * M = echelon`
-  - `∃ u, det transform * u = 1` (transform is invertible)
-  - `rank ≤ n` and `rank ≤ m`
-  - `pivotCols` is strictly increasing
-  - Entries below each pivot are zero
+  **Span via echelon form.** Given an `IsEchelonForm`, solve for
+  coefficients or test membership. Works for both RREF and HNF.
 
-  RREF-specific:
-  - Each pivot is `1`
-  - Entries above each pivot are `0`
+  ```lean
+  def IsEchelonForm.spanCoeffs (F : IsEchelonForm M D)
+      (v : Vector R m) : Option (Vector R n)
+  def IsEchelonForm.spanContains (F : IsEchelonForm M D)
+      (v : Vector R m) : Bool
 
-  HNF-specific:
-  - Each pivot is positive
-  - Entries above each pivot are in `[0, pivot)`
-  - Corollary: `det transform = 1 ∨ det transform = -1`
-- Span: `span : Array (Vector R m) → Set (Vector R m)`, the set of all
-  linear combinations.
-  `spanCoeffs : (vs : Array (Vector R m)) → Vector R m → Option (Vector R vs.size)`
-  solves for the coefficients (row reduce with `vs` as columns), and
-  `decSpan` is the `Decidable` instance for `v ∈ span vs` built on
-  top of it.
-- Nullspace: returns `Array (Vector R m)` — a basis for the kernel of
-  `M`. Read off from echelon form: each free variable gives one basis
-  vector. Full characterization:
-  - Soundness: `∀ v ∈ nullspace M, M * v = 0`
-  - Completeness: `M * v = 0 → v ∈ span (nullspace M)`
-  - Rank-nullity: `(nullspace M).size + rank M = m`
-  - Independence: the nullspace vectors are linearly independent
-    (immediate from the echelon structure — each has a 1 in a distinct
-    free-variable position).
+  /-- Convenience: compute RREF internally. -/
+  def Matrix.spanCoeffs (M : Matrix R n m) (v : Vector R m) :
+      Option (Vector R n)
+  def Matrix.spanContains (M : Matrix R n m) (v : Vector R m) : Bool
+  ```
+
+  **Nullspace** via echelon form. Each free variable gives one basis
+  vector.
+
+  ```lean
+  def IsEchelonForm.nullspace (F : IsEchelonForm M D) :
+      Array (Vector R m)
+
+  /-- Convenience wrapper. -/
+  def Matrix.nullspace (M : Matrix R n m) : Array (Vector R m)
+  ```
+
 - Generic over the coefficient type `R`
 
 **Determinant — definition and computation:**
 
 Define `det` via the Leibniz formula (sum over permutations), over any
-`CommRing`.
+`Ring`. (Theorems about `det` will require `CommRing`.)
 
 For computation, provide the Bareiss algorithm (fraction-free Gaussian
 elimination) over `Int`. The Bareiss recurrence at step k is:
@@ -361,24 +356,12 @@ a_{ij}^{(k)} = (a_{kk}^{(k-1)} · a_{ij}^{(k-1)} - a_{ik}^{(k-1)} · a_{kj}^{(k-
 ```
 where `/` is `Int.div` — the division is always exact (no remainder).
 
-**Note:** Bareiss generalizes to any integral domain given a data-carrying
-exact division operation (`ediv : α → α → α` with
-`b ∣ a → ediv a b * b = a`) and no zero divisors
-(`a * b = 0 → a = 0 ∨ b = 0`). We don't need this generality — only
-`Int` determinants are used downstream (LLL Gram matrices).
-
-**Proof that `bareiss M = det M`:** Via row operations, not Sylvester's
-identity. Each Bareiss step is equivalent to: scale rows below the pivot,
+**Proof that `bareiss M = det M`:** Via row operations. Each Bareiss
+step is equivalent to: scale rows below the pivot,
 subtract the appropriate multiple, then divide out the accumulated extra
 factor. The row operation lemmas (proved directly from Leibniz) track
 `det` through each step, and the scaling factors telescope due to the
 division by the previous pivot.
-
-Sylvester's identity (Desnanot-Jacobi) is worth providing anyway — it's
-a useful result in its own right and gives an alternative, more algebraic
-proof path: show by induction that Bareiss step k computes the leading
-k×k minor `det(M[1..k, 1..k])`, with Sylvester's identity as the
-inductive step.
 
 **Key properties:**
 - `det_one : det 1 = 1`
@@ -386,30 +369,62 @@ inductive step.
 - `det_rowScale : det (rowScale M i c) = c * det M`
 - `det_rowAdd : i ≠ j → det (rowAdd M i j c) = det M`
 - `bareiss_eq_det : bareiss M = det M`
-- `spanCoeffs_sound : spanCoeffs vs v = some c → v = ∑ i, c[i] • vs[i]`
-- `spanCoeffs_complete : v ∈ span vs → (spanCoeffs vs v).isSome`
-- Nullspace soundness: `∀ v ∈ nullspace M, M * v = 0`
-- Nullspace completeness: `M * v = 0 → v ∈ span (nullspace M)`
-- Rank-nullity: `(nullspace M).size + rank M = m`
-- Sylvester's identity (relating minors of a matrix)
+- `spanCoeffs_sound : E.spanCoeffs v = some c → M * c = v`
+- `spanCoeffs_complete : (∃ c, M * c = v) → (E.spanCoeffs v).isSome`
+- `spanContains_iff : E.spanContains v = true ↔ ∃ c, M * c = v`
+- Nullspace soundness: `∀ v ∈ E.nullspace, M * v = 0`
+- Nullspace completeness: `M * v = 0 → E.nullspace.toMatrix.spanContains v`
+- Rank-nullity: `E.nullspace.size + D.rank = m`
 
 ---
 
 ### lean-matrix-mathlib (depends on lean-matrix + Mathlib)
 
-Proves that our `Matrix R n m` is ring-equivalent to Mathlib's
-`Matrix (Fin n) (Fin m) R`, and that the determinants agree.
+Proves that our matrix type and operations correspond to Mathlib's
+abstract linear algebra.
 
+Mathlib has no RREF, but does have `Matrix.transvection` (elementary
+row operations), `TransvectionStruct`, and a `Pivot` namespace that
+reduces matrices to diagonal form via transvections. Mathlib's rank,
+kernel, and span are noncomputable (cardinals, infima over submodules).
+This bridge connects our computable versions to those definitions.
+
+**Matrix equivalence:**
 ```lean
-def matrixEquiv : ComputationalAlgebra.Matrix R n m ≃ Matrix (Fin n) (Fin m) R
+def matrixEquiv :
+    ComputationalAlgebra.Matrix R n m ≃ Matrix (Fin n) (Fin m) R
+```
 
-theorem det_eq [CommRing R] [Fintype (Fin n)] (M : Matrix R n n) :
+**Row operations correspond to Mathlib transvections:**
+Our `rowAdd M i j c` is left-multiplication by
+`Matrix.transvection i j c`. Our `rowSwap` and `rowScale` correspond
+to Mathlib's `Equiv.swap` and diagonal matrices.
+
+**Determinant:**
+```lean
+theorem det_eq (M : ComputationalAlgebra.Matrix R n n) :
     ComputationalAlgebra.det M = Matrix.det (matrixEquiv M)
 ```
 
-This means Mathlib theorems about determinants (Cramer's rule,
-Cayley-Hamilton, etc.) transfer to our matrices, and our computations
-(Bareiss, row echelon form) are known correct in the mathematical sense.
+**Rank:** Our `RowEchelonData.rank` (computed via RREF) agrees with
+Mathlib's `Matrix.rank` (noncomputable, defined as
+`finrank R (LinearMap.range M.mulVecLin)`).
+```lean
+theorem rank_eq (M : ComputationalAlgebra.Matrix R n m)
+    (D : RowEchelonData R n m) (E : IsEchelonForm M D) :
+    D.rank = Matrix.rank (matrixEquiv M)
+```
+
+**Nullspace:** Our computed nullspace basis spans the same submodule
+as `LinearMap.ker (Matrix.mulVecLin (matrixEquiv M))`.
+
+**Span:** Our `IsEchelonForm.spanContains` agrees with membership in
+`Submodule.span R (Set.range M.row)`.
+
+This means Mathlib theorems (Cramer's rule, Cayley-Hamilton,
+rank-nullity, `diagonal_transvection_induction`) transfer to our
+matrices, and our computations give computable witnesses for
+Mathlib's noncomputable definitions.
 
 ---
 
@@ -451,7 +466,7 @@ is known correct in the mathematical sense.
 
 ---
 
-### lean-poly (polynomial interface + dense representation, depends on lean-arith)
+### lean-poly (polynomial interface + dense representation, no dependencies)
 
 The core polynomial library. Defines both the typeclass interface and the
 default dense representation.
@@ -956,12 +971,11 @@ Also connects to Mathlib's `Polynomial ℤ` and provides
 ```
 Phase 0 (all parallel, no dependencies between them):
   ├── lean-arith
-  └── (lean-poly can start with inline arith)
+  ├── lean-poly               (no dependencies)
+  └── lean-matrix             (no dependencies)
 
 Phase 1 (each depends only on Phase 0):
   ├── lean-mod-arith          (← lean-arith)
-  ├── lean-poly               (← lean-arith)
-  ├── lean-matrix             (← lean-arith)
   └── lean-lll                (← lean-matrix)
 
 Phase 2 (each depends on Phase 1):
@@ -982,7 +996,7 @@ Phase 4:
 Mathlib bridge libraries (can start whenever their core lib is ready):
   ├── lean-mod-arith-mathlib       (Phase 1+)
   ├── lean-poly-mathlib            (Phase 1+)
-  ├── lean-matrix-mathlib          (Phase 1+)
+  ├── lean-matrix-mathlib          (Phase 0+)
   ├── lean-berlekamp-mathlib       (Phase 3+)
   ├── lean-hensel-mathlib          (Phase 3+)
   ├── lean-lll-mathlib             (Phase 1+)
@@ -1148,3 +1162,47 @@ Every computational library is tested against reference implementations:
 SageMath and FLINT are used for **testing**, not for algorithms — the
 distinction is that all computation runs in Lean, and external tools
 only serve as an independent oracle for conformance checking.
+
+---
+
+## Further work
+
+Items not on the critical path for Berlekamp-Zassenhaus, but worth
+doing once the core is stable.
+
+**Hermite normal form.** Row reduction over `Int`: upper triangular
+with positive pivots, entries above each pivot in `[0, pivot)`. Uses
+extended GCD to create pivots without division: given entries `a`, `b`
+in the same column, compute `(g, s, t)` with `s * a + t * b = g`,
+then apply the 2×2 row transformation `[[s, t], [-b/g, a/g]]` to
+zero out `b` and replace `a` with `g`. Reduce entries above each pivot
+modulo the pivot. The result is unique. Returns `RowEchelonData`; an
+`IsHNF` Prop-valued structure extending `IsEchelonForm` (parallel to
+`IsRREF`) certifies correctness, with HNF-specific fields:
+- Each pivot is positive
+- Entries above each pivot are in `[0, pivot)`
+- `det transform = 1 ∨ det transform = -1`
+
+HNF requires extended GCD, which lives in lean-arith. Since
+lean-matrix currently has no dependencies, HNF would either need:
+extended GCD upstreamed into Lean 4 stdlib, a new dependency
+lean-matrix → lean-arith, or a separate library (e.g.
+`lean-matrix-hermite` depending on both lean-matrix and lean-arith).
+
+**Smith normal form.** Diagonal form obtained by both row and column
+operations over a principal ideal domain. The diagonal entries satisfy
+`d₁ | d₂ | ⋯ | dᵣ` (divisibility chain). Useful for computing the
+structure of finitely generated abelian groups and solving integer
+linear systems. Like HNF, requires extended GCD and is not needed for
+Berlekamp-Zassenhaus.
+
+**Sylvester's identity (lean-matrix).** The Desnanot-Jacobi identity
+relating minors of a matrix. A useful result in its own right, and
+gives an alternative proof that `bareiss M = det M`: show by induction
+that Bareiss step k computes the leading k×k minor
+`det(M[1..k, 1..k])`, with Sylvester's identity as the inductive step.
+
+**Generic Bareiss over integral domains (lean-matrix).** Generalize
+Bareiss from `Int` to any integral domain with a data-carrying exact
+division operation (`ediv : α → α → α` with `b ∣ a → ediv a b * b = a`)
+and no zero divisors (`a * b = 0 → a = 0 ∨ b = 0`).
