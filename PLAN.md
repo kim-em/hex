@@ -855,6 +855,26 @@ theorem hensel_degree_fst (f g h : ZPoly) (p k : Nat) :
 
 theorem hensel_degree_snd (f g h : ZPoly) (p k : Nat) :
     (henselLift f g h p k).2.degree = h.degree
+
+-- The deep theorem: uniqueness of Hensel lifting.
+-- polyCongruent f g p k means (f - g).allCoeffs (· % p^k = 0).
+theorem hensel_unique_fst (f g h g' h' : ZPoly) (p k : Nat) :
+    g.leadingCoeff = 1 →
+    polyCongruent (g * h) f (p^k) →
+    polyCongruent (g' * h') f (p^k) →
+    polyCongruent g g' p →
+    polyCongruent h h' p →
+    polyCoprimeModP g h p →
+    g = g'
+
+theorem hensel_unique_snd (f g h g' h' : ZPoly) (p k : Nat) :
+    g.leadingCoeff = 1 →
+    polyCongruent (g * h) f (p^k) →
+    polyCongruent (g' * h') f (p^k) →
+    polyCongruent g g' p →
+    polyCongruent h h' p →
+    polyCoprimeModP g h p →
+    h = h'
 ```
 
 **Strategy**: Start with linear lifting (simpler invariant, easier to
