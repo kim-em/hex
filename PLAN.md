@@ -840,23 +840,21 @@ Lifts a factorization of `f mod p` to a factorization of `f mod p^k`.
 ```lean
 theorem hensel_correct (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
-    g' * h' ≡ f [MOD p^(k+1)]
+    (g' * h' - f).allCoeffs (· % p^(k+1) = 0)
 
-theorem hensel_extends (f g h : ZPoly) (p k : Nat) :
-    let (g', h') := henselLift f g h p k
-    g' ≡ g [MOD p^k] ∧ h' ≡ h [MOD p^k]
+theorem hensel_extends_fst (f g h : ZPoly) (p k : Nat) :
+    let (g', _) := henselLift f g h p k
+    (g' - g).allCoeffs (· % p^k = 0)
 
-theorem hensel_degree (f g h : ZPoly) (p k : Nat) :
-    let (g', h') := henselLift f g h p k
-    g'.degree = g.degree ∧ h'.degree = h.degree
+theorem hensel_extends_snd (f g h : ZPoly) (p k : Nat) :
+    let (_, h') := henselLift f g h p k
+    (h' - h).allCoeffs (· % p^k = 0)
 
--- The deep theorem
-theorem hensel_unique (f g h g' h' : ZPoly) (p k : Nat) :
-    g.leadingCoeff = 1 →
-    g * h ≡ f [MOD p^k] → g' * h' ≡ f [MOD p^k] →
-    g ≡ g' [MOD p] → h ≡ h' [MOD p] →
-    coprime_mod g h p →
-    g = g' ∧ h = h'
+theorem hensel_degree_fst (f g h : ZPoly) (p k : Nat) :
+    (henselLift f g h p k).1.degree = g.degree
+
+theorem hensel_degree_snd (f g h : ZPoly) (p k : Nat) :
+    (henselLift f g h p k).2.degree = h.degree
 ```
 
 **Strategy**: Start with linear lifting (simpler invariant, easier to
