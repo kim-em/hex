@@ -108,21 +108,21 @@ Three independent roots: lean-poly, lean-arith, lean-matrix.
       /       \     lean-mod-arith  /    lean-lll
      /         \       /           /         /
 lean-poly-z  lean-poly-fp         /         /
-     \        /       \          /         / 
-     lean-hensel      lean-berlekamp      /
-               \        |                /
-                lean-berlekamp-zassenhaus
+     \        /       |          /         /
+     lean-hensel  lean-gfq-ring /         /
+               \       |       /         /
+                \  lean-berlekamp       /
+                 \      |              /
+                  lean-berlekamp-zassenhaus
 ```
 
 Additional libraries (finite field construction):
 ```
-  lean-poly-fp        lean-berlekamp
-       |              /      |
-  lean-gfq-ring      /   lean-conway
-          \         /       /
-        lean-gfq-field     /
-                 \        /
-                  lean-gfq
+        lean-berlekamp
+         /          \
+  lean-gfq-field  lean-conway
+         \          /
+          lean-gfq
 ```
 
 **Mathlib bridge libraries** (each depends on a computational lib + Mathlib,
@@ -131,12 +131,12 @@ proving correspondence with Mathlib's mathematical definitions):
 - **lean-mod-arith-mathlib** — `ZMod64 p ≃+* ZMod p`
 - **lean-poly-mathlib** — `DensePoly R ≃+* Polynomial R` via `LawfulPolyOps`
 - **lean-matrix-mathlib** — matrix equivalence, `det` agreement, rank = `Matrix.rank`, nullspace = `LinearMap.ker`, row ops = transvections
-- **lean-poly-z-mathlib** — proves Mignotte bound valid (via FTA, Mahler measure, Landau's inequality)
+- **lean-poly-z-mathlib** — `DensePoly Int ≃+* Polynomial ℤ`, Mignotte bound (via Mathlib's Mahler measure)
 - **lean-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
 - **lean-hensel-mathlib** — Hensel lifting corresponds to Mathlib's `Polynomial` factoring
 - **lean-lll-mathlib** — lattice = `Submodule ℤ`, GSO = `gramSchmidt`, short vector bound
 - **lean-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
-- **lean-berlekamp-zassenhaus-mathlib** — proves Mignotte bound (via FTA), unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
+- **lean-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
 ---
 
@@ -564,6 +564,25 @@ The normalization invariant (no trailing zeros) ensures structural equality
 - Every common divisor of `f` and `g` divides `gcd f g`
 - Bezout: `∃ a b, a * f + b * g = gcd f g`
 
+**Existential CRT for polynomials** (corollary of Bezout):
+
+```lean
+def polyCRT [PolyOps P R] (a b u v s t : P) : P :=
+  u * t * b + v * s * a
+
+theorem polyCRT_mod_fst [LawfulPolyOps P R] (a b u v s t : P)
+    (hbez : s * a + t * b = 1) :
+    (polyCRT a b u v s t) % a = u % a
+
+theorem polyCRT_mod_snd [LawfulPolyOps P R] (a b u v s t : P)
+    (hbez : s * a + t * b = 1) :
+    (polyCRT a b u v s t) % b = v % b
+```
+
+Given coprime `a, b` with Bezout coefficients `s, t`, constructs `h`
+with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by lean-berlekamp
+(steps 2, 3, 5) and potentially lean-hensel and lean-gfq-ring.
+
 **Alternative representations (Phase 2):**
 
 Sparse sorted array:
@@ -655,7 +674,6 @@ Specialized polynomial arithmetic over `Z`.
 - Mignotte bound computation: `|gⱼ| ≤ C(k,j) · ‖f‖₂` for any degree-k
   factor `g | f` in `Z[x]`. The computation is just binomial coefficients
   and the 2-norm of `f`'s coefficients. The proof that the bound is valid
-  requires complex analysis (Mahler measure, Landau's inequality) and
   lives in `lean-poly-z-mathlib`.
 - Reduction modulo p: `ZPoly → FpPoly p`
 
@@ -665,7 +683,85 @@ Specialized polynomial arithmetic over `Z`.
 
 ---
 
-### lean-berlekamp (factoring over F_p, depends on lean-poly-fp + lean-matrix)
+### lean-poly-z-mathlib (depends on lean-poly-z + Mathlib)
+
+Proves `DensePoly Int ≃+* Polynomial ℤ` and the Mignotte bound.
+
+**Mignotte bound — proof strategy using existing Mathlib results:**
+
+Mathlib already has the heavy analysis. The key results (all in
+`Mathlib.Analysis.Polynomial.MahlerMeasure`, by Fabrizio Barroero):
+
+1. **Mahler measure definition and root-product formula:**
+   `mahlerMeasure_eq_leadingCoeff_mul_prod_roots`:
+   `M(p) = ‖leadingCoeff‖ * ∏ max(1, ‖αᵢ‖)`
+
+2. **Multiplicativity:** `mahlerMeasure_mul`:
+   `M(p * q) = M(p) * M(q)`
+
+3. **Coefficient bound:** `norm_coeff_le_choose_mul_mahlerMeasure`:
+   `‖p.coeff n‖ ≤ C(deg p, n) * M(p)`
+
+4. **Landau-type bounds:**
+   - `mahlerMeasure_le_sum_norm_coeff`: `M(p) ≤ ‖p‖₁`
+   - `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`:
+     `M(p) ≤ √(deg+1) * ‖p‖_∞`
+   - The classical `M(p) ≤ ‖p‖₂` is not stated separately but is an
+     intermediate step in the proof of the sqrt bound (via Parseval
+     from `Mathlib.Analysis.Polynomial.Fourier`).
+
+The Mignotte bound proof is then short glue:
+
+```lean
+theorem mignotte_bound (f g : Polynomial ℤ) (hg : g ∣ f) (j : ℕ) :
+    |(g.coeff j : ℤ)| ≤ Nat.choose g.natDegree j * ‖f‖₂
+```
+
+Proof outline:
+- Map `f`, `g` to `Polynomial ℂ` via `Polynomial.map (Int.castRingHom ℂ)`.
+- `g ∣ f` gives `f = g * h`, so `M(f) = M(g) * M(h)` by
+  `mahlerMeasure_mul`.
+- `M(h) ≥ 1` for nonzero integer polynomials: the leading coefficient
+  has `‖leadingCoeff‖ ≥ 1` (it's a nonzero integer), and
+  `one_le_prod_max_one_norm_roots` gives `∏ max(1, ‖αᵢ‖) ≥ 1`.
+  So `M(h) = ‖lc‖ * ∏ max(1, ‖αᵢ‖) ≥ 1`, hence `M(g) ≤ M(f)`.
+- `norm_coeff_le_choose_mul_mahlerMeasure` gives
+  `‖g.coeff j‖ ≤ C(deg g, j) * M(g) ≤ C(deg g, j) * M(f)`.
+- `M(f) ≤ ‖f‖₂` by Parseval + Jensen (extractable from the proof of
+  `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`, or proved
+  directly via `sum_sq_norm_coeff_eq_circleAverage`).
+
+The proof is short glue, mostly coercion bookkeeping between
+`ℤ[X]` and `ℂ[X]`.
+
+**Open Mathlib PR:** https://github.com/leanprover-community/mathlib4/pull/33463
+("Mahler Measure for other rings", Kevin Wilson, open since Jan 2026)
+extends the Mahler measure definition beyond `ℂ[X]`. If this lands,
+the `ℤ → ℂ` coercion step becomes cleaner.
+
+**Candidates for upstreaming to Mathlib:**
+
+The following results are natural additions to Mathlib's Mahler measure
+library and should be contributed independently of this project:
+
+- `mahlerMeasure_le_l2norm`: the classical Landau inequality
+  `M(p) ≤ ‖p‖₂ := √(∑ ‖coeff i‖²)`, currently only an intermediate
+  step inside the proof of `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`.
+  Extracting it as a standalone theorem is straightforward.
+- `one_le_mahlerMeasure_of_intPoly`: `M(p) ≥ 1` for nonzero integer
+  polynomials (leading coeff has norm ≥ 1, root product ≥ 1).
+- `mahlerMeasure_dvd_le`: `g ∣ f → M(g) ≤ M(f)` for integer
+  polynomials. Immediate from multiplicativity + the above.
+- The Mignotte bound itself: `‖g.coeff j‖ ≤ C(deg g, j) * M(f)`
+  when `g ∣ f` over ℤ. This is a one-line corollary but would be a
+  useful named result.
+
+These are all small PRs that complete the Mahler measure story for
+the most common use case (integer polynomials).
+
+---
+
+### lean-berlekamp (factoring over F_p, depends on lean-poly-fp + lean-matrix + lean-gfq-ring)
 
 Berlekamp's algorithm and Rabin's irreducibility test for polynomials
 over finite fields.
@@ -693,7 +789,96 @@ The certificate checker is tiny and fully verified. The algorithm that
 *generates* certificates is also in Lean — Berlekamp's algorithm produces
 the factorization, from which certificates are extracted.
 
-**Key properties (characterizing):**
+**Proof strategy:**
+
+The key theorems are:
+```lean
+theorem prod_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
+    (berlekampFactor f).prod = f
+
+theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
+    ∀ g ∈ berlekampFactor f, Irreducible g
+```
+
+`prod_berlekampFactor` is straightforward — a loop invariant: each GCD
+step preserves `factors.prod * remaining = f`.
+
+`irreducible_of_mem_berlekampFactor` is the hard theorem. The proof
+proceeds by contrapositive: if `g` is reducible, we construct a
+nonconstant Berlekamp kernel element, which means the algorithm would
+have split `g` further.
+
+**Step 1. `X^p - X = ∏_{c ∈ F_p} (X - c)` over F_p.**
+From Fermat's little theorem (already in `lean-arith`): every `c ∈ F_p`
+is a root of `X^p - X`, there are `p` of them, and `deg(X^p - X) = p`,
+so the factorization follows by leading coefficient comparison.
+
+**Step 2. Reducible squarefree polynomials have nonconstant kernel
+elements.**
+If `g` is reducible, write `g = a * b` with `a, b` nontrivial. Since
+`g` is squarefree, `gcd(a, b) = 1`. By `polyCRT` (from `lean-poly`),
+find `h` with `h ≡ 0 (mod a)` and `h ≡ 1 (mod b)`, reduced mod `g`.
+Then:
+- `a | h`, so `a | h^p - h` (since `0^p - 0 = 0`)
+- `b | h - 1`, so `b | h^p - h` (since `1^p - 1 = 0`)
+- `gcd(a, b) = 1`, so `g = a * b | h^p - h`
+
+And `h` is nonconstant mod `g`: `h ≡ 0 (mod a)` but `h ≡ 1 (mod b)`.
+
+Note: this does NOT require factoring `g` into irreducibles — any
+nontrivial coprime splitting works.
+
+**Step 3. Nonconstant kernel elements produce nontrivial GCD splits.**
+If `g` is squarefree and `g | h^p - h` with `h` nonconstant mod `g`:
+by step 1, `h^p - h = ∏_{c ∈ F_p} (h - c)`, so
+`g | ∏_{c ∈ F_p} (h - c)`. The factors `(h - c)` are pairwise coprime
+(they differ by nonzero constants). Each irreducible factor of `g`
+divides exactly one `(h - c)`, so `g = ∏_{c ∈ F_p} gcd(g, h - c)`
+(using `g` squarefree). Since `h` is nonconstant, the irreducible
+factors of `g` distribute among at least two values of `c`, so
+`gcd(g, h - c)` is nontrivial for some `c`.
+
+**Step 4. Kernel of `f` surjects onto kernel of `g | f`.**
+If `g | f` with `gcd(g, f/g) = 1` (which holds since `f` is
+squarefree), then for any `h` with `g | h^p - h`, `polyCRT` gives
+`h'` with `h' ≡ h (mod g)` and `h' ≡ 0 (mod f/g)`. Then
+`g | h'^p - h'` and `(f/g) | h'^p - h'`, so `f | h'^p - h'`.
+The element `h' mod f` is in the Berlekamp kernel of `f` and maps to
+`h mod g` under reduction.
+
+**Step 5. Completeness.**
+The algorithm computes a basis `{h₁, …, hₖ}` of the Berlekamp kernel
+of `f` (nullspace of `Q_f - I`), then for each `h_i` and each
+`c ∈ F_p`, splits current factors via `gcd(factor, h_i - c)`.
+
+After processing all basis elements, every output factor `g` has the
+property that each `h_i` is constant mod `g`. This is because: when
+`h_i` was processed, either `g` itself was in the factor list and
+wasn't split by `h_i` (so `g | h_i - c₀` for some `c₀`), or an
+ancestor `g' ⊇ g` was present with `g' | h_i - c₀`, giving
+`g | h_i - c₀` too.
+
+Since every basis element is constant on `g`, and the basis spans the
+kernel of `f`, the image of the kernel of `f` under reduction mod `g`
+consists only of constants. By surjectivity (step 4), the kernel of `g`
+itself consists only of constants. If `g` were reducible, step 2 would
+give a nonconstant kernel element — contradiction. So `g` is
+irreducible.
+
+**Note on representatives.** CRT-constructed polynomials may have
+degree `≥ deg(f)`. Reduce mod `f` (or mod `g`). Kernel membership is
+preserved: `f | h^p - h` iff `f | (h mod f)^p - (h mod f)`. GCD
+computations are preserved: `gcd(g, h - c) = gcd(g, (h mod g) - c)`.
+
+The proof uses only concrete polynomial arithmetic: GCD, Bezout,
+modular reduction, pairwise coprimality. No quotient ring machinery,
+no abstract algebra. Everything is proved in `lean-berlekamp` without
+Mathlib.
+
+**`lean-berlekamp-mathlib` bridge:** ring equivalence
+`FpPoly p ≃+* Polynomial (ZMod p)`, correspondence between the two
+definitions of `Irreducible`, yielding
+`DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)`.
 
 Rabin's theorem:
 ```lean
@@ -701,12 +886,17 @@ theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
     rabinTest f = true ↔ Irreducible f
 ```
 
-Berlekamp's theorem:
-```lean
-theorem berlekamp_complete (f : FpPoly p) (hf : squareFree f) :
-    (berlekampFactor f).prod = f ∧
-    ∀ g ∈ berlekampFactor f, Irreducible g
-```
+**References:**
+- Berlekamp, "Factoring Polynomials Over Large Finite Fields,"
+  *Math. Comp.* 24(111), 1970, pp. 713-735 (freely available from AMS)
+- Shoup, *A Computational Introduction to Number Theory and Algebra*,
+  2nd ed. (2009), chs. 20-21 (free PDF at `shoup.net/ntb/`)
+- Knuth, *TAOCP* Vol. 2, section 4.6.2
+- Isabelle AFP entry "Berlekamp_Zassenhaus"
+  (Divason-Joosten-Thiemann-Yamada, 2016; JAR 2019). They prove the
+  full CRT ring isomorphism and dim(B) = number of factors; we avoid
+  that entirely via the contrapositive argument. Browsable at
+  `isa-afp.org/entries/Berlekamp_Zassenhaus.html`.
 
 ---
 
@@ -722,7 +912,7 @@ instance [Fact (Nat.Prime p)] : DecidablePred (Irreducible · : Polynomial (ZMod
 
 ---
 
-### lean-conway (Conway polynomial database, depends on lean-poly-fp + lean-berlekamp)
+### lean-conway (Conway polynomial database, depends on lean-berlekamp)
 
 Conway polynomials are canonical irreducible polynomials `C(p, n)` for
 each prime `p` and degree `n`, satisfying compatibility conditions
@@ -786,7 +976,7 @@ lean-gfq-field's job.
 
 ---
 
-### lean-gfq-field (GF(q) as a field, depends on lean-gfq-ring + lean-berlekamp)
+### lean-gfq-field (GF(q) as a field, depends on lean-berlekamp)
 
 Extends `lean-gfq-ring` with field operations when the modulus is
 irreducible. Takes any irreducible polynomial as parameter — not tied
@@ -830,6 +1020,10 @@ For non-Conway models (e.g. AES's `x^8 + x^4 + x^3 + x + 1`), use
 ### lean-gfq-mathlib (depends on lean-gfq + Mathlib)
 
 Proves `GFq p n ≃+* GaloisField p n` (Mathlib's Galois field).
+Proof strategy: apply `FiniteField.ringEquivOfCardEq` from Mathlib,
+which just needs `Fintype.card (GFq p n) = Fintype.card (GaloisField p n)`.
+Both sides equal `p ^ n` — Mathlib has `GaloisField.card` and we need
+`card_finiteField` from lean-gfq-field.
 
 ---
 
@@ -903,12 +1097,12 @@ in parallel from day one.
 Input:  basis b_1, ..., b_n ∈ Z^m, parameter δ ∈ (1/4, 1]
 Output: LLL-reduced basis for the same lattice
 
-Maintain GSO: b*_i and μ_{i,j} = ⟨b_i, b*_j⟩ / ⟨b*_j, b*_j⟩
+Maintain GSO: gso_i and μ_{i,j} = ⟨b_i, gso_j⟩ / ⟨gso_j, gso_j⟩
 
 k := 2
 while k ≤ n:
   Size-reduce b_k: for j = k-1 downto 1, subtract round(μ_{k,j}) * b_j
-  If Lovász condition holds (|b*_k|² ≥ (δ - μ²_{k,k-1}) · |b*_{k-1}|²):
+  If Lovász condition holds (‖gso_k‖² ≥ (δ - μ²_{k,k-1}) · ‖gso_{k-1}‖²):
     k := k + 1
   Else:
     swap b_k and b_{k-1}, update GSO
@@ -916,7 +1110,7 @@ while k ≤ n:
 ```
 
 **Termination proof:**
-- Potential function: `D = ∏ᵢ |b*ᵢ|^{2(n-i)}`
+- Potential function: `D = ∏ᵢ ‖gso_i‖^{2(n-i)}`
 - D is a positive integer (integer lattice)
 - Each swap decreases D by factor ≥ δ; size reduction doesn't change D
 - At most `n(n-1)/2 · log(B) / log(1/δ)` swaps (polynomial bound)
@@ -925,27 +1119,59 @@ while k ≤ n:
 Store `d_{i+1} · μ_{i,j}` where `d_i = det(Gram matrix of first i vectors)`.
 All positive integers. No GCD, no fraction normalization.
 
-**Key properties (all characterizing):**
+**Key properties (all characterizing).** All theorems require
+`hδ : 1/4 < δ`, `hδ' : δ ≤ 1`, and `hli : b.LinearIndependent`.
 ```lean
-theorem lll_same_lattice (b : Basis) (δ : Rat) :
-    lattice (lll b δ) = lattice b
+theorem lll_same_lattice (b : Basis n m) (δ : Rat) ... :
+    lattice (lll b δ ...) = lattice b
 
-theorem lll_reduced (b : Basis) (δ : Rat) :
-    isLLLReduced (lll b δ) δ
+theorem lll_reduced (b : Basis n m) (δ : Rat) ... :
+    isLLLReduced (lll b δ ...) δ
 
-theorem lll_short_vector (b : Basis) (δ : Rat) (v : LatVector) :
+theorem lll_short_vector (b : Basis n m) (δ : Rat) ...
+    (v : LatVector m) :
     v ∈ lattice b → v ≠ 0 →
-    ‖(lll b δ).head‖² ≤ α^(n-1) * ‖v‖²
+    ‖(lll b δ ...).head‖² ≤ α^(n-1) * ‖v‖²
   where α := 1 / (δ - 1/4)
 
-theorem lll_swap_bound (b : Basis) (δ : Rat) :
-    swapCount (lll b δ) ≤ n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
+theorem lll_swap_bound (b : Basis n m) (δ : Rat) ... :
+    swapCount (lll b δ ...) ≤
+      n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
 ```
 
 The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`.
 
 Uses stdlib `Rat` for the specification; d-representation `Int` for
 computation.
+
+**Proof strategy (research completed 2026-03-30):** See PROOFS.md
+Section 2 for the complete analysis. Summary:
+
+- **Two-layer architecture.** Layer 1 (specification): define LLL and
+  prove the short vector bound using `Rat`-valued Gram-Schmidt.
+  Layer 2 (implementation): the d-representation algorithm using only
+  `Int`. A step-refinement lemma connects the layers — each step of
+  the integer algorithm mirrors the corresponding rational step under
+  an explicit state relation `dmu_{i,j} = d_{j+1} * μ_{i,j}`.
+- **Gram-Schmidt API** lives inside `lean-lll` (files
+  `GramSchmidt.lean`, `GramSchmidtUpdate.lean`, `GramSchmidtInt.lean`),
+  not a separate library.
+- **Highest-risk areas:** swap update formulas (algebraic verification
+  + exact division proofs), rounding agreement at ±1/2 boundary
+  between the two layers.
+
+**Prior art:** Isabelle AFP formalization (Bottesch, Divasón, Haslbeck,
+Joosten, Thiemann, Yamada; ITP 2018, JAR 2020), ~14,800 lines across
+14 modules.
+
+**References:**
+- Von zur Gathen & Gerhard, *Modern Computer Algebra*, 3rd ed., 2013,
+  ch. 16 (primary reference)
+- Cohen, *A Course in Computational Algebraic Number Theory*, 1993,
+  section 2.6 (integral LLL algorithm)
+- Bottesch et al., "Formalizing the LLL Basis Reduction Algorithm and
+  the LLL Factorization Algorithm in Isabelle/HOL," *J. Automated
+  Reasoning* 64, 2020, pp. 1-42
 
 ---
 
@@ -1002,11 +1228,12 @@ structure ZPolyIrreducibilityCertificate where
 
 ---
 
-### lean-berlekamp-zassenhaus-mathlib (depends on lean-berlekamp-zassenhaus + Mathlib)
+### lean-berlekamp-zassenhaus-mathlib (depends on lean-berlekamp-zassenhaus + lean-poly-z-mathlib)
 
-Proves the Mignotte bound is valid (via FTA, Mahler measure, Landau's
-inequality from Mathlib) and instantiates the conditional correctness
-theorems to get unconditional results:
+Instantiates the conditional correctness theorems from
+lean-berlekamp-zassenhaus (which take an abstract coefficient bound)
+with the Mignotte bound from lean-poly-z-mathlib, giving unconditional
+results:
 ```lean
 theorem factor_product (f : ZPoly) :
     (factor f (mignotteBound f)).prod = f
@@ -1022,6 +1249,10 @@ theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
 
 Also connects to Mathlib's `Polynomial ℤ` and provides
 `Decidable (Irreducible f)` for `f : Polynomial ℤ`.
+
+This library is thin — the hard work is split between
+lean-berlekamp-zassenhaus (algorithmic correctness, Mathlib-free) and
+lean-poly-z-mathlib (the Mignotte bound).
 
 ---
 
@@ -1052,11 +1283,11 @@ Each library with its immediate dependencies:
 - **lean-lll** — lean-matrix
 - **lean-poly-fp** — lean-poly, lean-mod-arith
 - **lean-poly-z** — lean-poly
-- **lean-berlekamp** — lean-poly-fp, lean-matrix
+- **lean-berlekamp** — lean-poly-fp, lean-matrix, lean-gfq-ring
 - **lean-hensel** — lean-poly-fp, lean-poly-z
-- **lean-conway** — lean-poly-fp, lean-berlekamp
+- **lean-conway** — lean-berlekamp
 - **lean-gfq-ring** — lean-poly-fp
-- **lean-gfq-field** — lean-gfq-ring, lean-berlekamp
+- **lean-gfq-field** — lean-berlekamp
 - **lean-gfq** — lean-gfq-field, lean-conway
 - **lean-berlekamp-zassenhaus** — lean-berlekamp, lean-hensel, lean-lll
 
@@ -1064,7 +1295,7 @@ Mathlib bridge libraries (each also depends on Mathlib):
 
 - **lean-mod-arith-mathlib** — lean-mod-arith
 - **lean-poly-mathlib** — lean-poly
-- **lean-poly-z-mathlib** — lean-poly-z
+- **lean-poly-z-mathlib** — lean-poly-z, lean-poly-mathlib
 - **lean-matrix-mathlib** — lean-matrix
 - **lean-lll-mathlib** — lean-lll
 - **lean-berlekamp-mathlib** — lean-berlekamp
