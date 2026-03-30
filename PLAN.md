@@ -2,22 +2,27 @@
 
 A collection of cooperating Lean 4 libraries providing performant, verified
 algorithms for computational algebra: polynomial arithmetic, factoring,
-irreducibility testing, lattice basis reduction, and related tools.
+irreducibility testing, finite field construction, lattice basis reduction,
+and related tools.
 
 ## Design principles
 
 1. **Many small libraries**, each its own Lake package in its own repo.
 
 2. **No Mathlib in the computational core.** Every library that computes
-   something is Mathlib-free. Separate `-mathlib` libraries depend on
-   both the computational library and Mathlib to prove correspondence with
-   Mathlib's mathematical definitions.
+   something is Mathlib-free. Where full correctness requires results
+   from analysis (e.g. the Mignotte bound), the computational
+   library proves conditional correctness and the corresponding
+   `-mathlib` library discharges the hypothesis. The `-mathlib`
+   libraries also prove correspondence with Mathlib's mathematical
+   definitions (e.g. `ZMod64 p ≃+* ZMod p`).
 
 3. **Performant by default.** Dense array-backed representations, `UInt64`
-  coefficients for `F_p`, Barrett/Montgomery reduction for modular
-  arithmetic. FFI to FLINT as an optional fast path where it matters.
-   New GMP `@[extern]` primitives where Lean's runtime doesn't yet expose
-   what we need (modular exponentiation, extended GCD, etc.).
+   coefficients for `F_p`, Barrett/Montgomery reduction for modular
+   arithmetic. New GMP `@[extern]` primitives where Lean's runtime
+   doesn't yet expose what we need (modular exponentiation, extended
+   GCD, etc.). FLINT is used for conformance testing, not as a runtime
+   dependency.
 
 4. **Swappable polynomial representations.** A `PolyOps` typeclass defines
    operations including `dropZeros : P → P` (normalize to canonical form).
@@ -111,13 +116,13 @@ lean-poly-z  lean-poly-fp         /         /
 
 Additional libraries (finite field construction):
 ```
-  lean-poly-fp      lean-berlekamp
-    /    \                |
-   /  lean-gfq-ring       |
-  |          \           /
-lean-conway  lean-gfq-field
-       \        /
-        lean-gfq
+  lean-poly-fp        lean-berlekamp
+       |              /      |
+  lean-gfq-ring      /   lean-conway
+          \         /       /
+        lean-gfq-field     /
+                 \        /
+                  lean-gfq
 ```
 
 **Mathlib bridge libraries** (each depends on a computational lib + Mathlib,
@@ -710,23 +715,45 @@ instance [Fact (Nat.Prime p)] : DecidablePred (Irreducible · : Polynomial (ZMod
 
 ---
 
-### lean-conway (Conway polynomial database, depends on lean-poly-fp)
+### lean-conway (Conway polynomial database, depends on lean-poly-fp + lean-berlekamp)
 
-A database of Conway polynomials — canonical irreducible polynomials
-`C(p, n)` for each prime `p` and degree `n`, satisfying compatibility
-conditions across degree divisors.
+Conway polynomials are canonical irreducible polynomials `C(p, n)` for
+each prime `p` and degree `n`, satisfying compatibility conditions
+across degree divisors: if `m | n`, then the image of a root of
+`C(p, n)` under the norm map `GF(p^n) → GF(p^m)` is a root of
+`C(p, m)`. This ensures that embeddings `GF(p^m) ↪ GF(p^n)` are
+coherent.
 
-**Contents:**
-- Hardcoded database of Conway polynomials for commonly used `(p, n)` pairs
-  (sourced from Frank Lübeck's tables)
-- Lookup: `conwayPoly (p n : Nat) : Option (FpPoly p)`
-- On-demand computation via Berlekamp for pairs not in the database
-- Conway compatibility condition: if `m | n`, then `C(p, n) mod C(p, m)`
-  generates `GF(p^m)` as a subfield of `GF(p^n)`
+**Two sources of Conway polynomials:**
 
-**Key properties:**
-- Each `conwayPoly p n` is irreducible (checked against lean-berlekamp)
-- Conway compatibility: divisor relationships are satisfied
+1. **Hardcoded database** — commonly used `(p, n)` pairs, sourced from
+   Frank Lübeck's tables. Each entry comes with a Lean-checked
+   irreducibility certificate (from lean-berlekamp) and a proof of
+   compatibility with all divisor-degree entries already in the database.
+
+2. **On-demand computation** — for `(p, n)` pairs not in the database,
+   search for the lexicographically smallest monic irreducible polynomial
+   of degree `n` over `F_p` satisfying the compatibility condition with
+   all `C(p, m)` for `m | n`. This uses lean-berlekamp for irreducibility
+   testing. The result is deterministic (the definition of Conway
+   polynomial specifies "lexicographically smallest").
+
+**API:**
+```lean
+def conwayPoly (p n : Nat) : FpPoly p
+
+theorem conwayPoly_irreducible (p n : Nat) : Irreducible (conwayPoly p n)
+theorem conwayPoly_compat (p m n : Nat) (h : m ∣ n) : ...
+```
+
+`conwayPoly` always returns a result (falling back to on-demand
+computation). For small `(p, n)` it hits the hardcoded table; for
+larger values it computes. The caller doesn't need to know which path
+was taken.
+
+**lean-gfq** then defines `GFq p n := FiniteField p (conwayPoly p n)
+(conwayPoly_irreducible p n)`. When a user asks for `GF(p^n)`, the
+Conway polynomial is chosen automatically.
 
 ---
 
@@ -766,15 +793,10 @@ to Conway polynomials.
 - `IsCharP (FiniteField p f hirr) p`
 
 The irreducibility proof `hirr` comes from lean-berlekamp (either via
-the algorithm or via a certificate).
-
-- **Non-Conway models:** Use `FiniteField` directly with any irreducible
-  polynomial. E.g., AES uses `x^8 + x^4 + x^3 + x + 1` over `F_2`,
-  which is not the Conway polynomial for `GF(2^8)`.
-- **Conway models:** `lean-conway` provides a canonical choice. The
-  convenience definition `GFq p n := FiniteField p (conwayPoly p n) hirr`
-  lives in a thin wrapper depending on both `lean-gfq-field` and
-  `lean-conway`.
+the algorithm or via a certificate). This type is not tied to Conway
+polynomials — any irreducible polynomial works (e.g. AES uses
+`x^8 + x^4 + x^3 + x + 1` over `F_2`). For a canonical choice, see
+lean-gfq.
 
 **Key properties:**
 - `inv a * a = 1` for `a ≠ 0`
@@ -783,7 +805,22 @@ the algorithm or via a certificate).
 
 ---
 
-### lean-gfq-mathlib (depends on lean-gfq-field + Mathlib)
+### lean-gfq (convenience wrapper, depends on lean-gfq-field + lean-conway)
+
+Thin wrapper providing `GFq p n` — the canonical finite field with
+`p^n` elements, using the Conway polynomial as the irreducible modulus.
+
+```lean
+def GFq (p n : Nat) := FiniteField p (conwayPoly p n) (conwayPoly_irreducible p n)
+```
+
+The user writes `GFq 2 8` and gets `GF(2^8)` with no further choices.
+For non-Conway models (e.g. AES's `x^8 + x^4 + x^3 + x + 1`), use
+`FiniteField` directly from lean-gfq-field.
+
+---
+
+### lean-gfq-mathlib (depends on lean-gfq + Mathlib)
 
 Proves `GFq p n ≃+* GaloisField p n` (Mathlib's Galois field).
 
@@ -995,7 +1032,7 @@ Each library with its immediate dependencies:
 - **lean-poly-z** — lean-poly
 - **lean-berlekamp** — lean-poly-fp, lean-matrix
 - **lean-hensel** — lean-poly-fp, lean-poly-z
-- **lean-conway** — lean-poly-fp
+- **lean-conway** — lean-poly-fp, lean-berlekamp
 - **lean-gfq-ring** — lean-poly-fp
 - **lean-gfq-field** — lean-gfq-ring, lean-berlekamp
 - **lean-gfq** — lean-gfq-field, lean-conway
@@ -1013,43 +1050,8 @@ Mathlib bridge libraries (each also depends on Mathlib):
 - **lean-gfq-mathlib** — lean-gfq
 - **lean-berlekamp-zassenhaus-mathlib** — lean-berlekamp-zassenhaus, lean-poly-z-mathlib
 
-### Proof work
-
-Proof work is fully parallelizable. A `sorry`d theorem can be proved
-as soon as its transitively referenced `def`s have implementations.
-This means proof work on lean-arith, lean-poly, and lean-matrix can
-start immediately and proceed in parallel with implementation work on
-later libraries.
-
-**Key insight:** LLL is completely independent of the polynomial pipeline.
-It can be developed from day one in parallel with everything else. The
-only point of contact is at the very top (Berlekamp-Zassenhaus).
-
----
-
-## Milestones
-
-**M1:** lean-arith + lean-poly + lean-mod-arith working. Polynomial
-arithmetic over Z and F_p. GCD, extended GCD, division. Conformance-
-tested against FLINT via FFI.
-
-**M2 (parallel with M1):** lean-matrix + lean-lll working. LLL reduces
-lattice bases with verified short vector guarantee.
-
-**M3 (after M1):** lean-berlekamp working. Factor polynomials over F_p,
-test irreducibility. Certificate generation and checking, all in Lean.
-
-**M4 (after M1):** lean-hensel working. Lift factorizations from F_p
-to Z/p^kZ.
-
-**M5 (after M3):** lean-conway + lean-gfq-ring + lean-gfq-field working.
-Finite field arithmetic with verified field structure.
-
-**M6 (after M2+M3+M4):** lean-berlekamp-zassenhaus. Complete verified
-polynomial factoring over Z.
-
-**M7 (ongoing):** Mathlib bridge libraries.
-`Decidable` instance for `Irreducible` on `Polynomial (ZMod p)`.
+LLL is completely independent of the polynomial pipeline. The only
+point of contact is at the very top (Berlekamp-Zassenhaus).
 
 ---
 
@@ -1135,21 +1137,6 @@ Refinement-based approach.
 with Barrett reduction, Karatsuba, NTT. Not verified.
 
 ---
-
-## What the Mathlib bridge buys you
-
-1. **Results depend on algorithms being correct.** CAS systems have bugs
-   in polynomial factoring. A verified implementation provides independent
-   confirmation that a polynomial is (or isn't) irreducible.
-
-2. **The properties are characterizing.** Rabin's theorem, the Lovász
-   condition, Hensel uniqueness — mathematical theorems that say something
-   meaningful independent of implementation.
-
-3. **Bridge to formal mathematics.** The `-mathlib` libraries give
-   `Decidable` instances for `Irreducible`, enabling computation inside
-   formal proofs. Instead of "there exists an irreducible polynomial" you
-   get "here is one, and here is a proof."
 
 ## Repository structure
 
