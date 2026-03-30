@@ -643,6 +643,13 @@ Specialized polynomial arithmetic over `Z`.
 
 **Contents:**
 - `ZPoly` = `DensePoly Int`
+- Polynomial congruence:
+  ```lean
+  def ZPoly.congr (f g : ZPoly) (m : Nat) : Prop :=
+      ∀ i, (f.coeff i - g.coeff i) % m = 0
+
+  def ZPoly.coprimeModP (f g : ZPoly) (p : Nat) : Prop := ...
+  ```
 - Content and primitive part: `f = content(f) * primitivePart(f)`
 - Gauss's lemma: the product of primitive polynomials is primitive
 - Mignotte bound computation: `|gⱼ| ≤ C(k,j) · ‖f‖₂` for any degree-k
@@ -840,15 +847,13 @@ Lifts a factorization of `f mod p` to a factorization of `f mod p^k`.
 ```lean
 theorem hensel_correct (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
-    (g' * h' - f).allCoeffs (· % p^(k+1) = 0)
+    (g' * h').congr f (p^(k+1))
 
 theorem hensel_extends_fst (f g h : ZPoly) (p k : Nat) :
-    let (g', _) := henselLift f g h p k
-    (g' - g).allCoeffs (· % p^k = 0)
+    (henselLift f g h p k).1.congr g (p^k)
 
 theorem hensel_extends_snd (f g h : ZPoly) (p k : Nat) :
-    let (_, h') := henselLift f g h p k
-    (h' - h).allCoeffs (· % p^k = 0)
+    (henselLift f g h p k).2.congr h (p^k)
 
 theorem hensel_degree_fst (f g h : ZPoly) (p k : Nat) :
     (henselLift f g h p k).1.degree = g.degree
@@ -857,23 +862,22 @@ theorem hensel_degree_snd (f g h : ZPoly) (p k : Nat) :
     (henselLift f g h p k).2.degree = h.degree
 
 -- The deep theorem: uniqueness of Hensel lifting.
--- polyCongruent f g p k means (f - g).allCoeffs (· % p^k = 0).
 theorem hensel_unique_fst (f g h g' h' : ZPoly) (p k : Nat) :
     g.leadingCoeff = 1 →
-    polyCongruent (g * h) f (p^k) →
-    polyCongruent (g' * h') f (p^k) →
-    polyCongruent g g' p →
-    polyCongruent h h' p →
-    polyCoprimeModP g h p →
+    (g * h).congr f (p^k) →
+    (g' * h').congr f (p^k) →
+    g.congr g' p →
+    h.congr h' p →
+    g.coprimeModP h p →
     g = g'
 
 theorem hensel_unique_snd (f g h g' h' : ZPoly) (p k : Nat) :
     g.leadingCoeff = 1 →
-    polyCongruent (g * h) f (p^k) →
-    polyCongruent (g' * h') f (p^k) →
-    polyCongruent g g' p →
-    polyCongruent h h' p →
-    polyCoprimeModP g h p →
+    (g * h).congr f (p^k) →
+    (g' * h').congr f (p^k) →
+    g.congr g' p →
+    h.congr h' p →
+    g.coprimeModP h p →
     h = h'
 ```
 
