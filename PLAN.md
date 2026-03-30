@@ -142,7 +142,7 @@ proving correspondence with Mathlib's mathematical definitions):
 
 ## Library descriptions
 
-### lean-arith (foundation, no dependencies)
+### lean-arith (no dependencies)
 
 Core integer arithmetic that everything else builds on.
 
