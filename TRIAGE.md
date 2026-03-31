@@ -33,93 +33,104 @@ for the d-representation denominators to be nonzero.
 
 #### 2a. Definitions
 
-**Gram-Schmidt orthogonalization.** Given a basis b_1, ..., b_n of
-a lattice L in R^m, define orthogonal vectors gso_1, ..., gso_n and
-coefficients mu_{i,j} by:
+All indices are 0-based throughout (matching Lean and the Isabelle
+formalization).
 
-    gso_1 = b_1
+**Gram-Schmidt orthogonalization.** Given a basis b_0, ..., b_{n-1}
+of a lattice L in Z^m, define orthogonal vectors gso_0, ..., gso_{n-1}
+and coefficients mu_{i,j} by:
+
+    gso_0 = b_0
     mu_{i,j} = <b_i, gso_j> / <gso_j, gso_j>     for j < i
-    gso_i = b_i - sum_{j=1}^{i-1} mu_{i,j} * gso_j
+    gso_i = b_i - sum_{j=0}^{i-1} mu_{i,j} * gso_j
 
 Key property: gso_i is the projection of b_i onto the orthogonal
-complement of span(b_1, ..., b_{i-1}). Size reduction does not
+complement of span(b_0, ..., b_{i-1}). Size reduction does not
 change the gso vectors (only column operations b_k <- b_k + c*b_j
 with j < k are performed, which leave the Gram-Schmidt vectors
 invariant).
-
-**delta-LLL-reduced.** A basis b_1, ..., b_n is delta-LLL-reduced
-(for delta in (1/4, 1]) if it satisfies two conditions:
-
-1. **Size-reduced:** |mu_{i,j}| <= 1/2 for all 1 <= j < i <= n.
-
-2. **Lovasz condition:** For all 1 <= i < n:
-       delta * ||gso_i||^2 <= ||gso_{i+1}||^2 + mu_{i+1,i}^2 * ||gso_i||^2
-
-   Equivalently: (delta - mu_{i+1,i}^2) * ||gso_i||^2 <= ||gso_{i+1}||^2
 
 **Gram determinants (d-values).** Define d_0 = 1 and for k >= 1:
 
     d_k = det(G_k)
 
-where G_k is the k x k Gram matrix of the first k basis vectors,
-i.e., (G_k)_{i,j} = <b_i, b_j> for 1 <= i, j <= k. Equivalently:
+where G_k is the k x k Gram matrix of b_0, ..., b_{k-1},
+i.e., (G_k)_{i,j} = <b_i, b_j> for 0 <= i, j < k. For integer
+lattices, d_k is always a positive integer (determinant of a
+positive-definite integer Gram matrix).
 
-    d_k = prod_{j=1}^{k} ||gso_j||^2      (product of squared GS norms)
+**Theorem (GS norms = ratio of consecutive Gram determinants).**
+By induction on the Gram-Schmidt recurrence:
+
+    d_k = prod_{j=0}^{k-1} ||gso_j||^2
+
+*Proof sketch.* The Gram matrix G_k factors as L D L^T where L is
+lower-unitriangular with L_{i,j} = mu_{i,j} and D = diag(||gso_j||^2).
+So det(G_k) = prod ||gso_j||^2.
 
 This gives the crucial identity:
 
-    ||gso_k||^2 = d_k / d_{k-1}
+    ||gso_k||^2 = d_{k+1} / d_k
 
-For integer lattices, d_k is always a positive integer (determinant
-of a positive-definite integer Gram matrix).
+**delta-LLL-reduced.** A basis b_0, ..., b_{n-1} is delta-LLL-reduced
+(for delta in (1/4, 1]) if it satisfies two conditions:
 
-**Indexing note for the d-representation (Section 2d).** When we
-implement the d-representation following the Isabelle formalization
-(0-indexed basis f_0, ..., f_{m-1}), the GS vector g_k has
-||g_k||^2 = d_{k+1}/d_k, and the scaled mu is dmu_{i,j} = d_{j+1} * mu_{i,j}.
-In the 1-indexed convention of this section, ||gso_k||^2 = d_k/d_{k-1}
-and dmu_{i,j} = d_j * mu_{i,j}. The Lovász condition d-formula
-is the same either way. Section 2d uses the 0-indexed (Isabelle)
-convention.
+1. **Size-reduced:** |mu_{i,j}| <= 1/2 for all 0 <= j < i < n.
+
+2. **Lovasz condition:** For all 0 <= i < n-1:
+       delta * ||gso_i||^2 <= ||gso_{i+1}||^2 + mu_{i+1,i}^2 * ||gso_i||^2
+
+   Equivalently: (delta - mu_{i+1,i}^2) * ||gso_i||^2 <= ||gso_{i+1}||^2
 
 ---
 
 #### 2b. The LLL algorithm and its loop invariant
 
-**Algorithm** (input: integer basis b_1, ..., b_n; parameter delta):
+**Algorithm:**
 
-    Compute GS orthogonalization (gso_i, mu_{i,j})
-    k <- 2
-    while k <= n:
-      -- SIZE REDUCE b_k against b_{k-1}, ..., b_1:
-      for j = k-1 downto 1:
-        if |mu_{k,j}| > 1/2:
-          b_k <- b_k - round(mu_{k,j}) * b_j
-          update mu values  (gso_i unchanged)
-      -- CHECK LOVASZ CONDITION:
-      if (delta - mu_{k,k-1}^2) * ||gso_{k-1}||^2 <= ||gso_k||^2:
-        k <- k + 1
-      else:
-        swap b_k and b_{k-1}
-        update GS orthogonalization
-        k <- max(k-1, 2)
-    return b_1, ..., b_n
+```lean
+/-- Round to nearest integer (ties round up). -/
+def Rat.round (q : Rat) : Int := (q + 1/2).floor
+-- Key property: |q - q.round| ≤ 1/2 (from floor_le and lt_floor_add_one)
+-- In the d-representation (Section 2d), round(dmu / d) is computed as
+-- pure integer arithmetic: Int.fdiv (2 * dmu + d) (2 * d), since d > 0.
+
+def lll (b : Matrix Int n m) (δ : Rat) : Matrix Int n m :=
+  let (gso, mu) := gramSchmidt b
+  let k := 1
+  loop:
+    if k = n then return b
+    -- Size-reduce b[k] against b[k-1], ..., b[0]
+    for j in [k-1, k-2, ..., 0] do
+      if |mu[k][j]| > 1/2 then
+        let r : Int := mu[k][j].round
+        b[k] := b[k] - r • b[j]
+        -- update mu values; gso unchanged
+    -- Check Lovász condition
+    if (δ - mu[k][k-1]^2) * gso[k-1].normSq ≤ gso[k].normSq then
+      k := k + 1
+    else
+      swap b[k] b[k-1]
+      -- update gso, mu
+      k := max (k - 1) 1
+```
 
 **Loop invariant.** At the top of the while loop with current index k:
 
-(I1) b_1, ..., b_n is a basis of the same lattice L as the input.
-(I2) gso_1, ..., gso_n and mu_{i,j} are the correct Gram-Schmidt
+(I1) b_0, ..., b_{n-1} is a basis of the same lattice L as the input.
+(I2) gso_0, ..., gso_{n-1} and mu_{i,j} are the correct Gram-Schmidt
      orthogonalization of the current basis.
 (I3) **Size-reduced below k:** |mu_{i,j}| <= 1/2 for all j < i < k.
-(I4) **Lovasz condition below k:** for all 1 <= i < k-1,
+(I4) **Lovasz condition below k:** for all 0 <= i < k-1,
      (delta - mu_{i+1,i}^2) * ||gso_i||^2 <= ||gso_{i+1}||^2.
-(I5) 2 <= k <= n+1.
+(I5) 1 <= k <= n.
 
-Together, (I3) and (I4) say: the first k-1 vectors form a
+Together, (I3) and (I4) say: the first k vectors form a
 delta-LLL-reduced basis of the sublattice they span.
 
-**Size-reduction sub-invariant.** The inner loop `for j = k-1 downto
-1` has its own invariant, parameterized by the current column j.
+**Size-reduction sub-invariant.** The inner loop
+`for j in [k-1, k-2, ..., 0]` has its own invariant, parameterized
+by the current column j.
 After processing column j (and before processing j-1), the following
 hold in addition to (I1)-(I5):
 
@@ -128,7 +139,7 @@ hold in addition to (I1)-(I5):
 (SR3) All gso_i vectors are unchanged (size reduction preserves GS).
 (SR4) The lattice is unchanged (integer column operations).
 
-At entry (j = k-1), (SR1) is vacuous. At exit (j = 0), (SR1) gives
+At entry (j = k-1), (SR1) is vacuous. At exit (j < 0), (SR1) gives
 |mu_{k,l}| <= 1/2 for all l < k, establishing (I3) for the new k.
 
 The Isabelle formalization handles this via an `upw` ("update needed")
@@ -177,26 +188,24 @@ Set alpha = 1 / (delta - 1/4). Then:
 
 By telescoping (induction on the gap):
 
-    ||gso_1||^2 <= alpha^{i-1} * ||gso_i||^2     for all 1 <= i <= n
-
-In particular: ||b_1||^2 = ||gso_1||^2 <= alpha^{n-1} * ||gso_n||^2.
+    ||gso_0||^2 <= alpha^i * ||gso_i||^2     for all 0 <= i < n
 
 More usefully:
 
-    ||gso_1||^2 <= alpha^{n-1} * min_{1 <= i <= n} ||gso_i||^2
+    ||gso_0||^2 <= alpha^{n-1} * min_{0 <= i < n} ||gso_i||^2
 
 **Step 2: Lower bound lemma.** For any nonzero lattice vector
 v in L, we have:
 
-    ||v||^2 >= min_{1 <= i <= n} ||gso_i||^2
+    ||v||^2 >= min_{0 <= i < n} ||gso_i||^2
 
-*Proof.* Write v = sum_{i=1}^{n} a_i * b_i with a_i in Z (not all
+*Proof.* Write v = sum_{i=0}^{n-1} a_i * b_i with a_i in Z (not all
 zero). Let k be the largest index with a_k != 0. Expand in the
 GS basis:
 
-    v = sum_{i=1}^{k} a_i * b_i
-      = sum_{i=1}^{k} a_i * (gso_i + sum_{j<i} mu_{i,j} * gso_j)
-      = sum_{i=1}^{k} c_i * gso_i
+    v = sum_{i=0}^{k} a_i * b_i
+      = sum_{i=0}^{k} a_i * (gso_i + sum_{j<i} mu_{i,j} * gso_j)
+      = sum_{i=0}^{k} c_i * gso_i
 
 for some real coefficients c_i, where crucially c_k = a_k (because
 b_k = gso_k + sum_{j<k} mu_{k,j} * gso_j, and no later b_i contributes
@@ -204,25 +213,25 @@ to the gso_k component). Since a_k is a nonzero integer, |c_k| >= 1.
 
 By orthogonality of the gso_i:
 
-    ||v||^2 = sum_{i=1}^{k} c_i^2 * ||gso_i||^2
+    ||v||^2 = sum_{i=0}^{k} c_i^2 * ||gso_i||^2
             >= c_k^2 * ||gso_k||^2
             >= ||gso_k||^2
-            >= min_{1 <= i <= n} ||gso_i||^2     QED
+            >= min_{0 <= i < n} ||gso_i||^2     QED
 
 **Step 3: Combining.** For any nonzero v in L:
 
-    ||b_1||^2 = ||gso_1||^2              (b_1 = gso_1 by definition)
+    ||b_0||^2 = ||gso_0||^2              (b_0 = gso_0 by definition)
               <= alpha^{n-1} * min_i ||gso_i||^2    (Step 1)
               <= alpha^{n-1} * ||v||^2             (Step 2)
 
 This gives the main theorem:
 
-    ||b_1||^2 <= alpha^{n-1} * ||v||^2
+    ||b_0||^2 <= alpha^{n-1} * ||v||^2
 
 for any nonzero lattice vector v, where alpha = 1/(delta - 1/4).
 
 For the standard choice delta = 3/4, alpha = 2, and we get
-||b_1|| <= 2^{(n-1)/2} * lambda_1(L).
+||b_0|| <= 2^{(n-1)/2} * lambda_1(L).
 
 ---
 
@@ -246,10 +255,10 @@ for our Lean formalization.
 Lemma 16.7): dmu_{i,j} = d_{j+1} * mu_{i,j} can be expressed as
 a (j+1) x (j+1) determinant of a matrix of inner products:
 
-    dmu_{i,j} = det | <b_1,b_1>  ...  <b_1,b_j>   <b_1,b_i> |
-                    | <b_2,b_1>  ...  <b_2,b_j>   <b_2,b_i> |
+    dmu_{i,j} = det | <b_0,b_0>  ...  <b_0,b_j>   <b_0,b_i> |
+                    | <b_1,b_0>  ...  <b_1,b_j>   <b_1,b_i> |
                     |   ...      ...    ...          ...     |
-                    | <b_{j+1},b_1> ... <b_{j+1},b_j> <b_{j+1},b_i> |
+                    | <b_j,b_0>  ...  <b_j,b_j>   <b_j,b_i> |
 
 Since the b_l are integer vectors, all inner products are integers,
 so this determinant is an integer. (The formula follows from expanding
@@ -265,7 +274,7 @@ need d_{j+1} * mu_{i,j} = (d_{j+1}/d_j) * (integer) to be an integer.
 This requires showing d_j | d_{j+1} * (the Cramer numerator), which
 follows from the determinant formula above.
 
-**The algorithm stores only:** b_1, ..., b_n (integer vectors),
+**The algorithm stores only:** b_0, ..., b_{n-1} (integer vectors),
 d_0, d_1, ..., d_n (positive integers), and dmu_{i,j} (integers).
 
 **Lovasz condition in d-representation.** The condition
@@ -297,8 +306,10 @@ So the Lovasz condition in d-representation is:
 integers when delta is rational and we clear denominators.
 
 **Size reduction in d-representation.** When |mu_{k,j}| > 1/2,
-i.e., |dmu_{k,j}| > d_{j+1}/2, we compute r = round(mu_{k,j})
-= round(dmu_{k,j} / d_{j+1}) and set b_k <- b_k - r * b_j. The
+i.e., |dmu_{k,j}| > d_{j+1}/2, we compute
+`r = Int.fdiv (2 * dmu_{k,j} + d_{j+1}) (2 * d_{j+1})`
+(= `round(dmu_{k,j} / d_{j+1})` = `round(mu_{k,j})`)
+and set b_k <- b_k - r * b_j. The
 dmu values update as:
 
     dmu_{k,l} <- dmu_{k,l} - r * dmu_{j,l}    for l < j
@@ -354,10 +365,10 @@ of sub-lattices are always integers.
 
 This is the product of the first n-1 Gram determinants. Equivalently:
 
-    D = prod_{k=1}^{n-1} ||gso_k||^{2(n-k)}
+    D = prod_{k=0}^{n-2} ||gso_k||^{2(n-1-k)}
 
-(since d_i = prod_{j=1}^{i} ||gso_j||^2, each ||gso_k||^2 appears in
-d_i for i = k, k+1, ..., n-1, contributing exponent n-k to the
+(since d_i = prod_{j=0}^{i-1} ||gso_j||^2, each ||gso_k||^2 appears in
+d_i for i = k+1, k+2, ..., n-1, contributing exponent n-1-k to the
 product). Since each d_i is a positive integer for integer lattices,
 D is a positive integer, so D >= 1.
 
@@ -393,7 +404,7 @@ This is polynomial in n and the bit-size of the input.
 **Lean formalization strategy for termination:** Use well-founded
 recursion on the pair (D, n - k), lexicographically ordered. Each
 iteration either decreases D (swap) or increases k (advance), and
-k is bounded by n+1. The Isabelle formalization uses a combined
+k is bounded by n. The Isabelle formalization uses a combined
 measure `LLL_measure i fs = 2 * logD fs + m - i` that decreases
 on every iteration.
 
@@ -419,7 +430,7 @@ values `μ_{i,j}` and `gso_i` are computed as `Rat`-valued expressions
 from the integer basis, not stored or updated incrementally.
 
 **Layer 2: Implementation (d-representation).** The executable
-algorithm, storing only integer vectors `b_1, ..., b_n`, positive
+algorithm, storing only integer vectors `b_0, ..., b_{n-1}`, positive
 integers `d_0, ..., d_n`, and integers `dmu_{i,j}`. All arithmetic
 is integer; no fractions, no GCD normalization.
 
@@ -514,7 +525,7 @@ theorem lll_swap_bound (b : Matrix Int n m) (δ : Rat)
 ```
 
 See Section 2e above for the
-full termination argument. The potential function D = prod_{i=1}^{n-1} d_i
+full termination argument. The potential function D = prod_{i=1}^{n-1} d_i (d-values are 1-indexed by size, not by basis vector)
 is a positive integer that decreases by a factor < delta on each swap
 and is unchanged by size reduction. The bound follows from D >= 1 and
 D_initial <= (max ||b_i||^2)^{n(n-1)/2}.
