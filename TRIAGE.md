@@ -452,9 +452,8 @@ enabling this is:
 
     round(dmu_{i,j} / d_{j+1}) = round(μ_{i,j})
 
-which ensures that rounding decisions agree between the two layers.
-This requires pinning down rounding semantics at the ±1/2 boundary
-identically on both sides (e.g., round-half-away-from-zero).
+This holds trivially since `dmu_{i,j} / d_{j+1} = μ_{i,j}` as
+rationals, so the same `Rat.round` function produces the same result.
 
 Since both layers take identical steps on identical bases, the output
 bases are identical. The short vector bound, proved for the rational
@@ -482,9 +481,8 @@ that our `gso` corresponds to Mathlib's `gramSchmidt`.
   `d`, and `dmu` change under a swap (Section 2d) are the most
   error-prone part. Each formula must be verified algebraically and
   the exact division proofs must be discharged.
-- **Rounding agreement.** The round(dmu/d) = round(μ) lemma requires
-  care at the ±1/2 boundary. If the two layers use different rounding
-  conventions, the bisimulation breaks.
+- **Rounding agreement.** Trivial since `dmu/d = μ` as rationals and
+  both layers use the same `Rat.round` function.
 - **Exact division under swap.** Proving that
   `(d_{k+1} * d_{k-1} + dmu_{k,k-1}^2) / d_k` and the dmu update
   divisions are exact requires the determinant-based integrality
