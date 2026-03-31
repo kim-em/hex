@@ -95,25 +95,62 @@ def Rat.round (q : Rat) : Int := (q + 1/2).floor
 -- In the d-representation (Section 2d), round(dmu / d) is computed as
 -- pure integer arithmetic: Int.fdiv (2 * dmu + d) (2 * d), since d > 0.
 
-def lll (b : Matrix Int n m) (δ : Rat) : Matrix Int n m :=
-  let (gso, mu) := gramSchmidt b
-  let k := 1
-  loop:
-    if k = n then return b
-    -- Size-reduce b[k] against b[k-1], ..., b[0]
-    for j in [k-1, k-2, ..., 0] do
-      if |mu[k][j]| > 1/2 then
-        let r : Int := mu[k][j].round
-        b[k] := b[k] - r • b[j]
-        -- update mu values; gso unchanged
-    -- Check Lovász condition
-    if (δ - mu[k][k-1]^2) * gso[k-1].normSq ≤ gso[k].normSq then
-      k := k + 1
+/-- Specification-layer LLL state. Carries cached GS data alongside
+    the basis so steps update incrementally rather than recomputing. -/
+structure LLLState (n m : Nat) where
+  b : Matrix Int n m
+  mu : Matrix Rat n n          -- mu[i][j] for j < i (lower triangular)
+  d : Vector Nat (n + 1)       -- Gram determinants d_0, ..., d_n
+  mu_eq : ∀ i j, j < i → mu[i][j] = gramSchmidtMu b i j
+  d_eq : ∀ i, d[i] = gramDet b i
+
+def LLLState.potential (s : LLLState n m) : Nat :=
+  s.d[1:n].foldl (· * ·) 1    -- d_1 * d_2 * ... * d_{n-1}
+  -- TODO: check if Vector.prod exists in stdlib; use it if so
+
+/-- Size-reduce b[k] against b[k-1], ..., b[0].
+    Updates b and mu; d unchanged (GS vectors unchanged by size reduction). -/
+def LLLState.sizeReduce (s : LLLState n m) (k : Nat) : LLLState n m := sorry
+-- For j = k-1 downto 0: if |mu[k][j]| > 1/2,
+--   let r := mu[k][j].round
+--   b[k] := b[k] - r • b[j]
+--   mu[k][l] := mu[k][l] - r * mu[j][l]  for l < j
+--   mu[k][j] := mu[k][j] - r
+
+/-- Swap b[k] and b[k-1], update mu and d. -/
+def LLLState.swapStep (s : LLLState n m) (k : Nat) : LLLState n m := sorry
+-- Explicit update formulas for mu and d (see Section 2d).
+
+def lllAux (s : LLLState n m) (k : Nat) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hind : s.b.independent)
+    (hk : 1 ≤ k) (hkn : k ≤ n) : Matrix Int n m :=
+  if h : k = n then s.b
+  else
+    let s := s.sizeReduce k
+    -- Check Lovász condition (using d-values, no division):
+    if s.d[k + 1] * s.d[k - 1] + ... ≥ ... then  -- see Section 2d
+      -- Lovász holds: advance
+      lllAux s (k + 1) δ hδ hδ' ‹_› (by omega) (by omega)
     else
-      swap b[k] b[k-1]
-      -- update gso, mu
-      k := max (k - 1) 1
+      -- Lovász fails: swap and decrement
+      let s := s.swapStep k
+      lllAux s (max (k - 1) 1) δ hδ hδ' ‹_› (by omega) (by omega)
+termination_by (s.potential, n - k)
+-- Termination uses only mu_eq, d_eq, and correctness of sizeReduce/swapStep.
+-- No loop invariants (size-reduced, Lovász below k) needed.
+-- Advance: sizeReduce preserves d (GS vectors unchanged), so potential
+--   unchanged; n - k decreases.
+-- Swap: the failing Lovász condition (read from d and mu via d_eq/mu_eq)
+--   gives d[k]^new < δ * d[k] < d[k]; potential strictly decreases.
+
+def lll (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hind : b.independent) : Matrix Int n m :=
+  lllAux ⟨b, gramSchmidtMu b, gramDetVec b, sorry, sorry⟩ 1 δ hδ hδ' hind (by omega) (by omega)
 ```
+
+The swap bound `potential_initial ≤ (maxNormSq b)^{n*(n-1)/2}` follows
+from `d_k ≤ (maxNormSq b)^k` (each row of the Gram matrix has entries
+≤ maxNormSq b, so the determinant is bounded by the product of row norms).
 
 **Loop invariant.** At the top of the while loop with current index k:
 
@@ -302,8 +339,7 @@ So the Lovasz condition in d-representation is:
 
     d_{k+1} * d_{k-1} + dmu_{k,k-1}^2 >= delta * d_k^2
 
-(negated for the swap trigger: swap when this fails). Both sides are
-integers when delta is rational and we clear denominators.
+(negated for the swap trigger: swap when this fails). 
 
 **Size reduction in d-representation.** When |mu_{k,j}| > 1/2,
 i.e., |dmu_{k,j}| > d_{j+1}/2, we compute
@@ -511,31 +547,6 @@ validating this two-layer architecture.
   (L^2 algorithm; not needed for our formalization but relevant context)
 
 ---
-
-### 3. LLL termination (`lll_swap_bound`)
-
-```lean
-theorem lll_swap_bound (b : Matrix Int n m) (δ : Rat)
-    (hδ : 1/4 < δ) (hδ' : δ ≤ 1)
-    (hli : b.independent) :
-    swapCount (lll b δ hδ hδ' hli) ≤
-      n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
-```
-
-See Section 2e above for the
-full termination argument. The potential function D = prod_{i=1}^{n-1} d_i (d-values are 1-indexed by size, not by basis vector)
-is a positive integer that decreases by a factor < delta on each swap
-and is unchanged by size reduction. The bound follows from D >= 1 and
-D_initial <= (max ||b_i||^2)^{n(n-1)/2}.
-
-Closely coupled with the short vector bound -- the same invariant
-machinery serves both. In practice these are proved together.
-
-**Lean formalization:** Use well-founded recursion on the measure
-`2 * logD + (n - k)` (following the Isabelle approach). Each loop
-iteration either decreases logD (swap) or increases k (advance),
-and both components are bounded. The `Nat.lt_wfRel` or a custom
-`WellFoundedRelation` instance provides the recursion principle.
 
 ---
 

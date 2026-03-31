@@ -1144,9 +1144,9 @@ theorem lll_short_vector (b : Matrix Int n m) (δ : Rat) ...
     (lll b δ ...).row 0 |>.normSq ≤ α^(n-1) * v.normSq
   where α := 1 / (δ - 1/4)
 
-theorem lll_swap_bound (b : Matrix Int n m) (δ : Rat) ... :
-    swapCount (lll b δ ...) ≤
-      n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
+-- Termination: well-founded recursion on (potential b, n - k).
+-- The number of swap steps is bounded by the initial potential,
+-- which satisfies potential b ≤ (maxNormSq b) ^ (n * (n-1) / 2).
 ```
 
 The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`.
