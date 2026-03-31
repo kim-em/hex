@@ -580,8 +580,8 @@ theorem polyCRT_mod_snd [LawfulPolyOps P R] (a b u v s t : P)
 ```
 
 Given coprime `a, b` with Bezout coefficients `s, t`, constructs `h`
-with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by lean-berlekamp
-(steps 2, 3, 5) and potentially lean-hensel and lean-gfq-ring.
+with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by lean-hensel,
+lean-gfq-ring, and lean-berlekamp-mathlib (Berlekamp correctness proof).
 
 **Alternative representations (Phase 2):**
 
@@ -789,24 +789,76 @@ The certificate checker is tiny and fully verified. The algorithm that
 *generates* certificates is also in Lean — Berlekamp's algorithm produces
 the factorization, from which certificates are extracted.
 
-**Proof strategy:**
+**Proof split (computational vs correctness):**
 
-The key theorems are:
+`lean-berlekamp` proves the computational invariant (no Mathlib):
 ```lean
 theorem prod_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
     (berlekampFactor f).prod = f
-
-theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
-    ∀ g ∈ berlekampFactor f, Irreducible g
 ```
 
-`prod_berlekampFactor` is straightforward — a loop invariant: each GCD
-step preserves `factors.prod * remaining = f`.
+This is a loop invariant: each GCD step preserves
+`factors.prod * remaining = f`. Uses lean-poly's division/GCD
+correctness (`d ∣ g → d * (g / d) = g`).
 
-`irreducible_of_mem_berlekampFactor` is the hard theorem. The proof
-proceeds by contrapositive: if `g` is reducible, we construct a
-nonconstant Berlekamp kernel element, which means the algorithm would
-have split `g` further.
+The deeper correctness theorems live in `lean-berlekamp-mathlib`:
+```lean
+theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
+    ∀ g ∈ berlekampFactor f, Irreducible g
+
+theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
+    rabinTest f = true ↔ Irreducible f
+```
+
+These require Euclidean domain theory (coprime divisibility,
+irreducible ⟹ prime, factor theorem) — all available from Mathlib
+via the ring equivalence `FpPoly p ≃+* Polynomial (ZMod p)`. See
+lean-berlekamp-mathlib below for the proof strategy.
+
+**References:**
+- Berlekamp, "Factoring Polynomials Over Large Finite Fields,"
+  *Math. Comp.* 24(111), 1970, pp. 713-735 (freely available from AMS)
+- Shoup, *A Computational Introduction to Number Theory and Algebra*,
+  2nd ed. (2009), chs. 20-21 (free PDF at `shoup.net/ntb/`)
+- Knuth, *TAOCP* Vol. 2, section 4.6.2
+- Isabelle AFP entry "Berlekamp_Zassenhaus"
+  (Divason-Joosten-Thiemann-Yamada, 2016; JAR 2019). Browsable at
+  `isa-afp.org/entries/Berlekamp_Zassenhaus.html`.
+
+---
+
+### lean-berlekamp-mathlib (depends on lean-berlekamp + lean-poly-mathlib + lean-mod-arith-mathlib + Mathlib)
+
+Proves the full correctness of Berlekamp's algorithm and Rabin's test
+by transferring to `Polynomial (ZMod p)` and using Mathlib's Euclidean
+domain theory.
+
+**Key theorems:**
+```lean
+theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
+    ∀ g ∈ berlekampFactor f, Irreducible g
+
+theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
+    rabinTest f = true ↔ Irreducible f
+
+instance [Fact (Nat.Prime p)] : DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)
+```
+
+**Proof strategy for `irreducible_of_mem_berlekampFactor`:**
+
+The proof proceeds by contrapositive: if `g` is reducible, we
+construct a nonconstant Berlekamp kernel element, which means the
+algorithm would have split `g` further.
+
+The proof works through the ring equivalence
+`FpPoly p ≃+* Polynomial (ZMod p)` (from lean-poly-mathlib +
+lean-mod-arith-mathlib). Steps 1-3 use Euclidean domain theory
+that Mathlib provides for `Polynomial (ZMod p)`:
+
+- `Polynomial.dvd_iff_isRoot` (factor theorem)
+- `IsCoprime.mul_dvd` (coprime divisibility)
+- `Irreducible.prime` (irreducible ⟹ prime in UFD)
+- `ZMod.pow_card` (Fermat's little theorem for `ZMod p`)
 
 **Step 1. `X^p - X = ∏_{c ∈ F_p} (X - c)` over F_p.**
 From Fermat's little theorem (already in `lean-arith`): every `c ∈ F_p`
@@ -865,50 +917,17 @@ itself consists only of constants. If `g` were reducible, step 2 would
 give a nonconstant kernel element — contradiction. So `g` is
 irreducible.
 
-**Note on representatives.** CRT-constructed polynomials may have
-degree `≥ deg(f)`. Reduce mod `f` (or mod `g`). Kernel membership is
-preserved: `f | h^p - h` iff `f | (h mod f)^p - (h mod f)`. GCD
-computations are preserved: `gcd(g, h - c) = gcd(g, (h mod g) - c)`.
+**Note on representatives.** The `polyCRT` construction builds
+`h = u · t · b + v · s · a`, which can have degree up to
+`deg(a) + deg(b) - 1`, exceeding `deg(f)` or `deg(g)`. All
+operations should use `h mod f` (or `h mod g`) as the representative.
+This is safe because kernel membership depends only on the residue
+class: `f | h^p - h` iff `f | (h mod f)^p - (h mod f)`, and GCD
+computations respect reduction: `gcd(g, h - c) = gcd(g, (h mod g) - c)`.
 
-The proof uses only concrete polynomial arithmetic: GCD, Bezout,
-modular reduction, pairwise coprimality. No quotient ring machinery,
-no abstract algebra. Everything is proved in `lean-berlekamp` without
-Mathlib.
-
-**`lean-berlekamp-mathlib` bridge:** ring equivalence
-`FpPoly p ≃+* Polynomial (ZMod p)`, correspondence between the two
-definitions of `Irreducible`, yielding
-`DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)`.
-
-Rabin's theorem:
-```lean
-theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
-    rabinTest f = true ↔ Irreducible f
-```
-
-**References:**
-- Berlekamp, "Factoring Polynomials Over Large Finite Fields,"
-  *Math. Comp.* 24(111), 1970, pp. 713-735 (freely available from AMS)
-- Shoup, *A Computational Introduction to Number Theory and Algebra*,
-  2nd ed. (2009), chs. 20-21 (free PDF at `shoup.net/ntb/`)
-- Knuth, *TAOCP* Vol. 2, section 4.6.2
-- Isabelle AFP entry "Berlekamp_Zassenhaus"
-  (Divason-Joosten-Thiemann-Yamada, 2016; JAR 2019). They prove the
-  full CRT ring isomorphism and dim(B) = number of factors; we avoid
-  that entirely via the contrapositive argument. Browsable at
-  `isa-afp.org/entries/Berlekamp_Zassenhaus.html`.
-
----
-
-### lean-berlekamp-mathlib (depends on lean-berlekamp + Mathlib)
-
-Connects the computational `Irreducible` to Mathlib's `Irreducible`
-in `Polynomial (ZMod p)`. The payoff: a `Decidable` instance for
-`Irreducible` on `Polynomial (ZMod p)`, backed by a verified algorithm.
-
-```lean
-instance [Fact (Nat.Prime p)] : DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)
-```
+**Rabin's test** additionally requires finite field theory (also in
+Mathlib): quotient by irreducible is a field, `|GF(p^n)| = p^n`,
+Lagrange's theorem on the multiplicative group.
 
 ---
 
@@ -1092,73 +1111,50 @@ in parallel from day one.
 - Size reduction (ensure |μ_{i,j}| ≤ 1/2)
 - Lovász condition check and basis swap
 
-**The algorithm:**
-```
-Input:  basis b_1, ..., b_n ∈ Z^m, parameter δ ∈ (1/4, 1]
-Output: LLL-reduced basis for the same lattice
-
-Maintain GSO: gso_i and μ_{i,j} = ⟨b_i, gso_j⟩ / ⟨gso_j, gso_j⟩
-
-k := 2
-while k ≤ n:
-  Size-reduce b_k: for j = k-1 downto 1, subtract round(μ_{k,j}) * b_j
-  If Lovász condition holds (‖gso_k‖² ≥ (δ - μ²_{k,k-1}) · ‖gso_{k-1}‖²):
-    k := k + 1
-  Else:
-    swap b_k and b_{k-1}, update GSO
-    k := max(k-1, 2)
-```
-
-**Termination proof:**
-- Potential function: `D = ∏ᵢ ‖gso_i‖^{2(n-i)}`
-- D is a positive integer (integer lattice)
-- Each swap decreases D by factor ≥ δ; size reduction doesn't change D
-- At most `n(n-1)/2 · log(B) / log(1/δ)` swaps (polynomial bound)
-
-**d-representation** (the Isabelle approach, avoids rationals):
-Store `d_{i+1} · μ_{i,j}` where `d_i = det(Gram matrix of first i vectors)`.
-All positive integers. No GCD, no fraction normalization.
-
-**Key properties (all characterizing).** All theorems require
-`hδ : 1/4 < δ`, `hδ' : δ ≤ 1`, and `hli : b.LinearIndependent`.
+**Definitions:**
 ```lean
-theorem lll_same_lattice (b : Basis n m) (δ : Rat) ... :
-    lattice (lll b δ ...) = lattice b
+/-- v is in the integer lattice spanned by the rows of b. -/
+def Matrix.memLattice (b : Matrix Int n m) (v : Vector Int m) : Prop :=
+    ∃ c : Vector Int n, b.mulVec c = v
 
-theorem lll_reduced (b : Basis n m) (δ : Rat) ... :
+/-- The rows of b are linearly independent (all Gram determinants positive). -/
+def Matrix.independent (b : Matrix Int n m) : Prop :=
+    ∀ k : Fin n, 0 < det (b.gramMatrix.submatrix k)
+
+/-- Squared L2 norm of an integer vector. -/
+def Vector.normSq (v : Vector Int m) : Int := v.dotProduct v
+```
+
+`dotProduct`, `normSq`, and `gramMatrix` live in lean-matrix.
+`memLattice`, `independent`, and `isLLLReduced` live in lean-lll.
+
+**Key properties.** All theorems require
+`hδ : 1/4 < δ`, `hδ' : δ ≤ 1`, and `hli : b.independent` (all Gram
+determinants `det(Gₖ) > 0`, defined concretely via Bareiss).
+```lean
+theorem lll_same_lattice (b : Matrix Int n m) (δ : Rat) ... :
+    (lll b δ ...).memLattice v ↔ b.memLattice v
+
+theorem lll_reduced (b : Matrix Int n m) (δ : Rat) ... :
     isLLLReduced (lll b δ ...) δ
 
-theorem lll_short_vector (b : Basis n m) (δ : Rat) ...
-    (v : LatVector m) :
-    v ∈ lattice b → v ≠ 0 →
-    ‖(lll b δ ...).head‖² ≤ α^(n-1) * ‖v‖²
+theorem lll_short_vector (b : Matrix Int n m) (δ : Rat) ...
+    (v : Vector Int m) :
+    b.memLattice v → v ≠ 0 →
+    (lll b δ ...).row 0 |>.normSq ≤ α^(n-1) * v.normSq
   where α := 1 / (δ - 1/4)
 
-theorem lll_swap_bound (b : Basis n m) (δ : Rat) ... :
+theorem lll_swap_bound (b : Matrix Int n m) (δ : Rat) ... :
     swapCount (lll b δ ...) ≤
       n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
 ```
 
 The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`.
 
-Uses stdlib `Rat` for the specification; d-representation `Int` for
-computation.
-
-**Proof strategy (research completed 2026-03-30):** See PROOFS.md
-Section 2 for the complete analysis. Summary:
-
-- **Two-layer architecture.** Layer 1 (specification): define LLL and
-  prove the short vector bound using `Rat`-valued Gram-Schmidt.
-  Layer 2 (implementation): the d-representation algorithm using only
-  `Int`. A step-refinement lemma connects the layers — each step of
-  the integer algorithm mirrors the corresponding rational step under
-  an explicit state relation `dmu_{i,j} = d_{j+1} * μ_{i,j}`.
-- **Gram-Schmidt API** lives inside `lean-lll` (files
-  `GramSchmidt.lean`, `GramSchmidtUpdate.lean`, `GramSchmidtInt.lean`),
-  not a separate library.
-- **Highest-risk areas:** swap update formulas (algebraic verification
-  + exact division proofs), rounding agreement at ±1/2 boundary
-  between the two layers.
+**Proof strategy:** See TRIAGE.md
+§2 for the complete analysis (algorithm, loop invariant, short vector
+bound, d-representation, termination, two-layer formalization
+architecture).
 
 **Prior art:** Isabelle AFP formalization (Bottesch, Divasón, Haslbeck,
 Joosten, Thiemann, Yamada; ITP 2018, JAR 2020), ~14,800 lines across

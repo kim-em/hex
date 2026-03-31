@@ -1,144 +1,33 @@
-# Proof Difficulty Analysis
+# Proof Triage
 
-An analysis of the hardest theorems in the lean-algebra project, ranked by
-formalization difficulty. This document will be refined as we research
-proof strategies, and findings will be incorporated back into PLAN.md.
+Scratch space for researching proof strategies. Once a proof is
+understood and vetted, it gets incorporated into PLAN.md (under the
+relevant library section) and deleted from here.
 
 ---
 
 ## Tier 1: Major Theorems
 
-### 1. Berlekamp's theorem (`prod_berlekampFactor` / `irreducible_of_mem_berlekampFactor`)
-
-```lean
-theorem prod_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
-    (berlekampFactor f).prod = f
-
-theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
-    ∀ g ∈ berlekampFactor f, Irreducible g
-```
-
-#### `prod_berlekampFactor`
-
-Loop invariant: each GCD step preserves `factors.prod * remaining = f`.
-Needs `gcd(f,g) | f` and exact division. No abstract algebra.
-
-#### `irreducible_of_mem_berlekampFactor`
-
-This is the hard theorem.
-
-**Step 1. `X^p - X = ∏_{c ∈ F_p} (X - c)` over F_p.**
-From Fermat's little theorem (already in `lean-arith`): every `c ∈ F_p`
-is a root of `X^p - X`, there are `p` of them, and `deg(X^p - X) = p`,
-so the factorization follows by leading coefficient comparison.
-
-**Step 2. Reducible squarefree polynomials have nonconstant kernel
-elements.**
-If `g` is reducible, write `g = a * b` with `a, b` nontrivial. Since
-`g` is squarefree, `gcd(a, b) = 1`. By `polyCRT` (from `lean-poly`),
-find `h` with `h ≡ 0 (mod a)` and `h ≡ 1 (mod b)`, reduced mod `g`.
-Then:
-- `a | h`, so `a | h^p - h` (since `0^p - 0 = 0`)
-- `b | h - 1`, so `b | h^p - h` (since `1^p - 1 = 0`)
-- `gcd(a, b) = 1`, so `g = a * b | h^p - h`
-
-And `h` is nonconstant mod `g`: `h ≡ 0 (mod a)` but `h ≡ 1 (mod b)`.
-
-Note: this does NOT require factoring `g` into irreducibles — any
-nontrivial coprime splitting works.
-
-**Step 3. Nonconstant kernel elements produce nontrivial GCD splits.**
-If `g` is squarefree and `g | h^p - h` with `h` nonconstant mod `g`:
-by step 1, `h^p - h = ∏_{c ∈ F_p} (h - c)`, so
-`g | ∏_{c ∈ F_p} (h - c)`. The factors `(h - c)` are pairwise coprime
-(they differ by nonzero constants). Each irreducible factor of `g`
-divides exactly one `(h - c)`, so `g = ∏_{c ∈ F_p} gcd(g, h - c)`
-(using `g` squarefree). Since `h` is nonconstant, the irreducible
-factors of `g` distribute among at least two values of `c`, so
-`gcd(g, h - c)` is nontrivial for some `c`.
-
-**Step 4. Kernel of `f` surjects onto kernel of `g | f`.**
-If `g | f` with `gcd(g, f/g) = 1` (which holds since `f` is
-squarefree), then for any `h` with `g | h^p - h`, `polyCRT` gives
-`h'` with `h' ≡ h (mod g)` and `h' ≡ 0 (mod f/g)`. Then
-`g | h'^p - h'` and `(f/g) | h'^p - h'`, so `f | h'^p - h'`.
-The element `h' mod f` is in the Berlekamp kernel of `f` and maps to
-`h mod g` under reduction.
-
-**Step 5. Completeness.**
-The algorithm computes a basis `{h₁, …, hₖ}` of the Berlekamp kernel
-of `f` (nullspace of `Q_f - I`), then for each `h_i` and each
-`c ∈ F_p`, splits current factors via `gcd(factor, h_i - c)`.
-
-After processing all basis elements, every output factor `g` has the
-property that each `h_i` is constant mod `g`. This is because: when
-`h_i` was processed, either `g` itself was in the factor list and
-wasn't split by `h_i` (so `g | h_i - c₀` for some `c₀`), or an
-ancestor `g' ⊇ g` was present with `g' | h_i - c₀`, giving
-`g | h_i - c₀` too.
-
-Since every basis element is constant on `g`, and the basis spans the
-kernel of `f`, the image of the kernel of `f` under reduction mod `g`
-consists only of constants. By surjectivity (step 4), the kernel of `g`
-itself consists only of constants. If `g` were reducible, step 2 would
-give a nonconstant kernel element — contradiction. So `g` is
-irreducible.
-
-**Note on representatives.** CRT-constructed polynomials may have
-degree `≥ deg(f)`. Reduce mod `f` (or mod `g`). Kernel membership is
-preserved: `f | h^p - h` iff `f | (h mod f)^p - (h mod f)`. GCD
-computations are preserved: `gcd(g, h - c) = gcd(g, (h mod g) - c)`.
-
-**Mathlib question.** The proof uses only concrete polynomial
-arithmetic: GCD, Bezout, modular reduction, pairwise coprimality.
-No quotient ring machinery, no abstract algebra. The plan is to prove
-everything in `lean-berlekamp` without Mathlib.
-
-**`lean-berlekamp-mathlib` bridge:** ring equivalence
-`FpPoly p ≃+* Polynomial (ZMod p)`, correspondence between the two
-definitions of `Irreducible`, yielding
-`DecidablePred (Irreducible · : Polynomial (ZMod p) → Prop)`.
-
-**Prior art:** Isabelle AFP entry "Berlekamp_Zassenhaus"
-(Divasón–Joosten–Thiemann–Yamada, 2016; JAR 2019). Core file
-`Berlekamp_Type_Based.thy`. They prove the full CRT ring isomorphism
-and dim(B) = number of factors; we avoid that entirely via the
-contrapositive argument. Browsable at
-`isa-afp.org/entries/Berlekamp_Zassenhaus.html`.
-
-**References:**
-- Berlekamp, "Factoring Polynomials Over Large Finite Fields,"
-  *Math. Comp.* 24(111), 1970, pp. 713–735 (freely available from AMS)
-- Shoup, *A Computational Introduction to Number Theory and Algebra*,
-  2nd ed. (2009), chs. 20–21 (free PDF at `shoup.net/ntb/`)
-- Knuth, *TAOCP* Vol. 2, §4.6.2 (the Isabelle proof follows Knuth's
-  "Equation 10/13/14" numbering)
-
----
-
 ### 2. LLL short vector bound (`lll_short_vector`)
 
 ```lean
-theorem lll_short_vector (b : Basis n m) (δ : Rat)
+theorem lll_short_vector (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1)
-    (hli : b.LinearIndependent)
-    (v : LatVector m) :
-    v ∈ lattice b → v ≠ 0 →
-    ‖(lll b δ hδ hδ' hli).head‖² ≤ α^(n-1) * ‖v‖²
+    (hli : b.independent)
+    (v : Vector Int m) :
+    b.memLattice v → v ≠ 0 →
+    (lll b δ hδ hδ' hli).row 0 |>.normSq ≤ α^(n-1) * v.normSq
   where α := 1 / (δ - 1/4)
 ```
 
 **Hypotheses.** `δ ∈ (1/4, 1]` is required: `δ > 1/4` so that
 `α = 1/(δ - 1/4)` is well-defined and positive; `δ ≤ 1` for
-termination (each swap decreases the potential by factor `≥ δ < 1`).
+termination (each swap decreases the potential by a factor of at
+most `δ`, and since `δ < 1` the potential strictly decreases).
 Linear independence of the input basis ensures all Gram determinants
 `d_k > 0`, which is needed for the GS orthogonalization to exist and
 for the d-representation denominators to be nonzero.
 
-**Research completed (2026-03-30).** The mathematical proof is now
-fully understood. What follows is a textbook-level exposition of the
-loop invariant, the short vector bound proof, the d-representation,
-and the formalization strategy.
 
 ---
 
@@ -617,14 +506,14 @@ validating this two-layer architecture.
 ### 3. LLL termination (`lll_swap_bound`)
 
 ```lean
-theorem lll_swap_bound (b : Basis n m) (δ : Rat)
+theorem lll_swap_bound (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1)
-    (hli : b.LinearIndependent) :
+    (hli : b.independent) :
     swapCount (lll b δ hδ hδ' hli) ≤
       n * (n-1) / 2 * log₂(maxNormSq b) / log₂(1/δ)
 ```
 
-**Research completed (2026-03-30).** See Section 2e above for the
+See Section 2e above for the
 full termination argument. The potential function D = prod_{i=1}^{n-1} d_i
 is a positive integer that decreases by a factor < delta on each swap
 and is unchanged by size reduction. The bound follows from D >= 1 and
@@ -678,13 +567,10 @@ Then `d | n` (subfield containment), so `d ≤ n/q` for some prime
 5. If `g` is irreducible of degree `d` and `g | X^(p^n) - X`,
    then `d | n`
 
-**Where this lives.** Steps 1–3 are concrete (no abstract algebra
-beyond "finite integral domain is a field") and could live in
-`lean-berlekamp` using `lean-gfq-ring`/`lean-gfq-field`. Steps 4–5
-are more naturally in `lean-gfq-field` or `lean-berlekamp-mathlib`.
-An alternative: state Rabin's test as a computational black box in
-`lean-berlekamp` and prove both directions in `lean-berlekamp-mathlib`
-where Mathlib provides the finite field theory.
+**Where this lives.** Rabin's test is implemented in `lean-berlekamp`
+(computational black box). Both directions of the correctness proof
+live in `lean-berlekamp-mathlib`, where Mathlib provides all the
+finite field theory (steps 1-5 above).
 
 ---
 
