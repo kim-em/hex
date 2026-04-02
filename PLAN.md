@@ -1105,8 +1105,8 @@ verify). Add quadratic as an optimization proved equivalent via uniqueness.
 in parallel from day one.
 
 **Contents:**
-- Classical LLL algorithm with exact rational arithmetic
-- Integer-only variant (d-representation, avoids explicit rationals)
+- LLL algorithm using the d-representation (all integer arithmetic,
+  no rationals stored; rational GS quantities as `noncomputable` projections)
 - Gram-Schmidt orthogonalization (exact, not floating-point)
 - Size reduction (ensure |μ_{i,j}| ≤ 1/2)
 - Lovász condition check and basis swap
@@ -1153,8 +1153,7 @@ The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · 
 
 **Proof strategy:** See TRIAGE.md
 §2 for the complete analysis (algorithm, loop invariant, short vector
-bound, d-representation, termination, two-layer formalization
-architecture).
+bound, d-representation integrality proofs, and termination).
 
 **Prior art:** Isabelle AFP formalization (Bottesch, Divasón, Haslbeck,
 Joosten, Thiemann, Yamada; ITP 2018, JAR 2020), ~14,800 lines across
