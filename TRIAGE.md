@@ -24,7 +24,7 @@ where `l2norm f := Real.sqrt (∑ i in f.support, (f.coeff i : ℝ) ^ 2)`.
 An integer-facing corollary can extract `|g.coeff j| ≤ ⌊...⌋₊` if
 needed by downstream code.
 
-**Mathlib API (all now merged).**
+**Mathlib API.**
 https://github.com/leanprover-community/mathlib4/pull/37349 added:
 
 - `mahlerMeasure_le_sqrt_sum_sq_norm_coeff` (Landau's inequality)
@@ -32,8 +32,8 @@ https://github.com/leanprover-community/mathlib4/pull/37349 added:
 - `norm_coeff_le_choose_mul_mahlerMeasure_of_one_le_mahlerMeasure`
   (Mignotte bound)
 
-The earlier Mahler measure library (`Mathlib.Analysis.Polynomial.MahlerMeasure`,
-by Fabrizio Barroero, merged Sep–Nov 2025) provides:
+The Mahler measure library (`Mathlib.Analysis.Polynomial.MahlerMeasure`)
+provides:
 
 - `mahlerMeasure_mul`: `M(p * q) = M(p) * M(q)`
 - `norm_coeff_le_choose_mul_mahlerMeasure`: `‖p.coeff n‖ ≤ C(deg, n) * M(p)`
