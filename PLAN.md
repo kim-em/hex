@@ -1,4 +1,4 @@
-# lean-algebra — Verified Computational Algebra in Lean 4
+# hex — Verified Computational Algebra in Lean 4
 
 A collection of cooperating Lean 4 libraries providing performant, verified
 algorithms for computational algebra: polynomial arithmetic, factoring,
@@ -76,73 +76,75 @@ What we get for free and what we need to build.
 - `mpz_gcdext` — extended GCD with Bezout coefficients
 - `mpz_invert` — modular inverse
 
-These would live in `lean-gmp-extras` or be proposed as upstream additions
+These would live in `hex-gmp-extras` or be proposed as upstream additions
 to the Lean runtime.
 
 ---
 
 ## Libraries
 
-- **lean-arith** — extended GCD, Barrett/Montgomery reduction, binomial coefficients, Fermat's little theorem
-- **lean-poly** — polynomial typeclass interface + dense `Array`-backed representation
-- **lean-matrix** — dense matrices as `Vector (Vector R m) n`, RREF, Bareiss determinant, span, nullspace
-- **lean-mod-arith** — `ZMod64 p`: `UInt64`-backed arithmetic in `Z/pZ`
-- **lean-poly-fp** — polynomials over `F_p`, Frobenius map, square-free decomposition
-- **lean-poly-z** — polynomials over `Z`, content/primitive part, Mignotte bound
-- **lean-berlekamp** — Berlekamp factoring and Rabin irreducibility test over `F_p`
-- **lean-hensel** — Hensel lifting from `mod p` to `mod p^k`
-- **lean-lll** — LLL lattice basis reduction
-- **lean-berlekamp-zassenhaus** — complete factoring of `Z[x]`
-- **lean-conway** — Conway polynomial database
-- **lean-gfq-ring** — quotient ring `F_p[x]/(f)`
-- **lean-gfq-field** — field structure when `f` is irreducible
-- **lean-gfq** — convenience wrapper: `GFq p n` using Conway polynomials
+- **hex-arith** — extended GCD, Barrett/Montgomery reduction, binomial coefficients, Fermat's little theorem
+- **hex-poly** — polynomial typeclass interface + dense `Array`-backed representation
+- **hex-matrix** — dense matrices as `Vector (Vector R m) n`, RREF, Bareiss determinant, span, nullspace
+- **hex-gram-schmidt** — Gram-Schmidt orthogonalization, GS coefficients, Gram determinants, update formulas under row operations
+- **hex-mod-arith** — `ZMod64 p`: `UInt64`-backed arithmetic in `Z/pZ`
+- **hex-poly-fp** — polynomials over `F_p`, Frobenius map, square-free decomposition
+- **hex-poly-z** — polynomials over `Z`, content/primitive part, Mignotte bound
+- **hex-berlekamp** — Berlekamp factoring and Rabin irreducibility test over `F_p`
+- **hex-hensel** — Hensel lifting from `mod p` to `mod p^k`
+- **hex-lll** — LLL lattice basis reduction
+- **hex-berlekamp-zassenhaus** — complete factoring of `Z[x]`
+- **hex-conway** — Conway polynomial database
+- **hex-gfq-ring** — quotient ring `F_p[x]/(f)`
+- **hex-gfq-field** — field structure when `f` is irreducible
+- **hex-gfq** — convenience wrapper: `GFq p n` using Conway polynomials
 
 ## Library DAG
 
-Three independent roots: lean-poly, lean-arith, lean-matrix.
+Three independent roots: hex-poly, hex-arith, hex-matrix.
 
 ```
-      lean-poly     lean-arith      lean-matrix
+      hex-poly     hex-arith      hex-matrix
        /     \          |            /       \
-      /       \     lean-mod-arith  /    lean-lll
-     /         \       /           /         /
-lean-poly-z  lean-poly-fp         /         /
+      /       \     hex-mod-arith  /  hex-gram-schmidt
+     /         \       /           /         |
+hex-poly-z  hex-poly-fp         /       hex-lll
      \        /       |          /         /
-     lean-hensel  lean-gfq-ring /         /
+     hex-hensel  hex-gfq-ring /         /
                \       |       /         /
-                \  lean-berlekamp       /
+                \  hex-berlekamp       /
                  \      |              /
-                  lean-berlekamp-zassenhaus
+                  hex-berlekamp-zassenhaus
 ```
 
 Additional libraries (finite field construction):
 ```
-        lean-berlekamp
+        hex-berlekamp
          /          \
-  lean-gfq-field  lean-conway
+  hex-gfq-field  hex-conway
          \          /
-          lean-gfq
+          hex-gfq
 ```
 
 **Mathlib bridge libraries** (each depends on a computational lib + Mathlib,
 proving correspondence with Mathlib's mathematical definitions):
 
-- **lean-mod-arith-mathlib** — `ZMod64 p ≃+* ZMod p`
-- **lean-poly-mathlib** — `DensePoly R ≃+* Polynomial R` via `LawfulPolyOps`
-- **lean-matrix-mathlib** — matrix equivalence, `det` agreement, rank = `Matrix.rank`, nullspace = `LinearMap.ker`, row ops = transvections
-- **lean-poly-z-mathlib** — `DensePoly Int ≃+* Polynomial ℤ`, Mignotte bound (via Mathlib's Mahler measure)
-- **lean-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
-- **lean-hensel-mathlib** — Hensel lifting corresponds to Mathlib's `Polynomial` factoring
-- **lean-lll-mathlib** — lattice = `Submodule ℤ`, GSO = `gramSchmidt`, short vector bound
-- **lean-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
-- **lean-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
+- **hex-mod-arith-mathlib** — `ZMod64 p ≃+* ZMod p`
+- **hex-poly-mathlib** — `DensePoly R ≃+* Polynomial R` via `LawfulPolyOps`
+- **hex-matrix-mathlib** — matrix equivalence, `det` agreement, rank = `Matrix.rank`, nullspace = `LinearMap.ker`, row ops = transvections
+- **hex-gram-schmidt-mathlib** — `GramSchmidt.Int.basis` = Mathlib's `gramSchmidt`
+- **hex-poly-z-mathlib** — `DensePoly Int ≃+* Polynomial ℤ`, Mignotte bound (via Mathlib's Mahler measure)
+- **hex-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
+- **hex-hensel-mathlib** — Hensel lifting corresponds to Mathlib's `Polynomial` factoring
+- **hex-lll-mathlib** — lattice = `Submodule ℤ`, short vector bound
+- **hex-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
+- **hex-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
 ---
 
 ## Library descriptions
 
-### lean-arith (no dependencies)
+### hex-arith (no dependencies)
 
 Core integer arithmetic that everything else builds on.
 
@@ -283,7 +285,7 @@ trusted in the same way as every other `@[extern]` in Lean.
 
 ---
 
-### lean-matrix (foundation, no dependencies)
+### hex-matrix (foundation, no dependencies)
 
 Dense matrices as `Vector (Vector R m) n`.
 
@@ -383,7 +385,7 @@ division by the previous pivot.
 
 ---
 
-### lean-matrix-mathlib (depends on lean-matrix + Mathlib)
+### hex-matrix-mathlib (depends on hex-matrix + Mathlib)
 
 Proves that our matrix type and operations correspond to Mathlib's
 abstract linear algebra.
@@ -433,14 +435,14 @@ Mathlib's noncomputable definitions.
 
 ---
 
-### lean-mod-arith (modular arithmetic, depends on lean-arith)
+### hex-mod-arith (modular arithmetic, depends on hex-arith)
 
 Arithmetic in `Z/nZ` with `UInt64`-backed coefficients.
 
 **Contents:**
 - `ZMod64 (p : Nat)` — a `UInt64` with proof `val.toNat < p`
 - Addition, subtraction, multiplication (using Barrett/Montgomery from
-  lean-arith for the `UInt64` modular operations)
+  hex-arith for the `UInt64` modular operations)
 - Inversion via extended GCD (for prime moduli)
 - Exponentiation by squaring
 - `Lean.Grind.CommRing (ZMod64 p)` instance and `IsCharP (ZMod64 p) p`
@@ -449,13 +451,13 @@ Arithmetic in `Z/nZ` with `UInt64`-backed coefficients.
 - Ring axioms proved directly from the modular arithmetic definitions.
   Associativity and distributivity of multiplication reduce to
   `Nat.mod` properties via Barrett/Montgomery correctness from
-  lean-arith.
+  hex-arith.
 - `inv a * a = 1` when `Nat.Coprime a.val p` — via extended GCD
-  from lean-arith: `s * a + t * p = 1` gives `s mod p` as the inverse.
+  from hex-arith: `s * a + t * p = 1` gives `s mod p` as the inverse.
 - No zero divisors for prime `p`: `a * b = 0 → a = 0 ∨ b = 0` — via
-  Euclid's lemma from lean-arith.
+  Euclid's lemma from hex-arith.
 - Fermat's little theorem: `a ^ p = a` — lifts directly from
-  `Nat.pow_prime_mod` in lean-arith.
+  `Nat.pow_prime_mod` in hex-arith.
 
 **Note:** `Fin n` already has `Lean.Grind.CommRing` and `IsCharP`. We
 build `ZMod64` for performance (Barrett reduction instead of naive modular
@@ -463,7 +465,7 @@ arithmetic) and for cleaner API (explicit prime parameter, field operations).
 
 ---
 
-### lean-mod-arith-mathlib (depends on lean-mod-arith + Mathlib)
+### hex-mod-arith-mathlib (depends on hex-mod-arith + Mathlib)
 
 Proves `ZMod64 p ≃+* ZMod p`. This means any Mathlib theorem about
 `ZMod p` transfers to `ZMod64 p`, and any computation with `ZMod64 p`
@@ -471,7 +473,7 @@ is known correct in the mathematical sense.
 
 ---
 
-### lean-poly (polynomial interface + dense representation, no dependencies)
+### hex-poly (polynomial interface + dense representation, no dependencies)
 
 The core polynomial library. Defines both the typeclass interface and the
 default dense representation.
@@ -580,8 +582,8 @@ theorem polyCRT_mod_snd [LawfulPolyOps P R] (a b u v s t : P)
 ```
 
 Given coprime `a, b` with Bezout coefficients `s, t`, constructs `h`
-with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by lean-hensel,
-lean-gfq-ring, and lean-berlekamp-mathlib (Berlekamp correctness proof).
+with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by hex-hensel,
+hex-gfq-ring, and hex-berlekamp-mathlib (Berlekamp correctness proof).
 
 **Alternative representations (Phase 2):**
 
@@ -612,7 +614,7 @@ propositional equality is needed (via `dropZeros`).
 
 ---
 
-### lean-poly-mathlib (depends on lean-poly + Mathlib)
+### hex-poly-mathlib (depends on hex-poly + Mathlib)
 
 Proves `LawfulPolyOps` for `DensePoly R` and constructs the ring
 equivalence. Since `DensePoly` normalizes eagerly, `dropZeros = id`
@@ -629,7 +631,7 @@ Also proves GCD/ExtGCD correspondence with Mathlib's `Polynomial.gcd`.
 
 ---
 
-### lean-poly-fp (polynomials over F_p, depends on lean-poly + lean-mod-arith)
+### hex-poly-fp (polynomials over F_p, depends on hex-poly + hex-mod-arith)
 
 Specialized polynomial arithmetic over `Z/pZ` using `UInt64` coefficients.
 
@@ -656,7 +658,7 @@ for `F_2` polynomials, important for coding theory.
 
 ---
 
-### lean-poly-z (polynomials over Z, depends on lean-poly)
+### hex-poly-z (polynomials over Z, depends on hex-poly)
 
 Specialized polynomial arithmetic over `Z`.
 
@@ -674,7 +676,7 @@ Specialized polynomial arithmetic over `Z`.
 - Mignotte bound computation: `|gⱼ| ≤ C(k,j) · ‖f‖₂` for any degree-k
   factor `g | f` in `Z[x]`. The computation is just binomial coefficients
   and the 2-norm of `f`'s coefficients. The proof that the bound is valid
-  lives in `lean-poly-z-mathlib`.
+  lives in `hex-poly-z-mathlib`.
 - Reduction modulo p: `ZPoly → FpPoly p`
 
 **Key properties:**
@@ -683,7 +685,7 @@ Specialized polynomial arithmetic over `Z`.
 
 ---
 
-### lean-poly-z-mathlib (depends on lean-poly-z + Mathlib)
+### hex-poly-z-mathlib (depends on hex-poly-z + Mathlib)
 
 Proves `DensePoly Int ≃+* Polynomial ℤ` and the Mignotte bound.
 
@@ -761,7 +763,7 @@ the most common use case (integer polynomials).
 
 ---
 
-### lean-berlekamp (factoring over F_p, depends on lean-poly-fp + lean-matrix + lean-gfq-ring)
+### hex-berlekamp (factoring over F_p, depends on hex-poly-fp + hex-matrix + hex-gfq-ring)
 
 Berlekamp's algorithm and Rabin's irreducibility test for polynomials
 over finite fields.
@@ -769,7 +771,7 @@ over finite fields.
 **Contents:**
 - **Berlekamp matrix**: compute `Q_f`, the matrix of the Frobenius map
   `h ↦ h^p mod f` in the basis `{1, x, ..., x^{n-1}}`
-- **Berlekamp kernel**: nullspace of `Q_f - I` (from lean-matrix)
+- **Berlekamp kernel**: nullspace of `Q_f - I` (from hex-matrix)
 - **Irreducibility test**: `f` is irreducible iff `rank(Q_f - I) = n - 1`
 - **Factoring**: elements of the kernel split `f` via `gcd(f, h - c)`
 - **Rabin's test**: `f` is irreducible iff `f | X^(p^n) - X` and
@@ -791,17 +793,17 @@ the factorization, from which certificates are extracted.
 
 **Proof split (computational vs correctness):**
 
-`lean-berlekamp` proves the computational invariant (no Mathlib):
+`hex-berlekamp` proves the computational invariant (no Mathlib):
 ```lean
 theorem prod_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
     (berlekampFactor f).prod = f
 ```
 
 This is a loop invariant: each GCD step preserves
-`factors.prod * remaining = f`. Uses lean-poly's division/GCD
+`factors.prod * remaining = f`. Uses hex-poly's division/GCD
 correctness (`d ∣ g → d * (g / d) = g`).
 
-The deeper correctness theorems live in `lean-berlekamp-mathlib`:
+The deeper correctness theorems live in `hex-berlekamp-mathlib`:
 ```lean
 theorem irreducible_of_mem_berlekampFactor (f : FpPoly p) (hf : squareFree f) :
     ∀ g ∈ berlekampFactor f, Irreducible g
@@ -813,7 +815,7 @@ theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
 These require Euclidean domain theory (coprime divisibility,
 irreducible ⟹ prime, factor theorem) — all available from Mathlib
 via the ring equivalence `FpPoly p ≃+* Polynomial (ZMod p)`. See
-lean-berlekamp-mathlib below for the proof strategy.
+hex-berlekamp-mathlib below for the proof strategy.
 
 **References:**
 - Berlekamp, "Factoring Polynomials Over Large Finite Fields,"
@@ -827,7 +829,7 @@ lean-berlekamp-mathlib below for the proof strategy.
 
 ---
 
-### lean-berlekamp-mathlib (depends on lean-berlekamp + lean-poly-mathlib + lean-mod-arith-mathlib + Mathlib)
+### hex-berlekamp-mathlib (depends on hex-berlekamp + hex-poly-mathlib + hex-mod-arith-mathlib + Mathlib)
 
 Proves the full correctness of Berlekamp's algorithm and Rabin's test
 by transferring to `Polynomial (ZMod p)` and using Mathlib's Euclidean
@@ -851,8 +853,8 @@ construct a nonconstant Berlekamp kernel element, which means the
 algorithm would have split `g` further.
 
 The proof works through the ring equivalence
-`FpPoly p ≃+* Polynomial (ZMod p)` (from lean-poly-mathlib +
-lean-mod-arith-mathlib). Steps 1-3 use Euclidean domain theory
+`FpPoly p ≃+* Polynomial (ZMod p)` (from hex-poly-mathlib +
+hex-mod-arith-mathlib). Steps 1-3 use Euclidean domain theory
 that Mathlib provides for `Polynomial (ZMod p)`:
 
 - `Polynomial.dvd_iff_isRoot` (factor theorem)
@@ -861,14 +863,14 @@ that Mathlib provides for `Polynomial (ZMod p)`:
 - `ZMod.pow_card` (Fermat's little theorem for `ZMod p`)
 
 **Step 1. `X^p - X = ∏_{c ∈ F_p} (X - c)` over F_p.**
-From Fermat's little theorem (already in `lean-arith`): every `c ∈ F_p`
+From Fermat's little theorem (already in `hex-arith`): every `c ∈ F_p`
 is a root of `X^p - X`, there are `p` of them, and `deg(X^p - X) = p`,
 so the factorization follows by leading coefficient comparison.
 
 **Step 2. Reducible squarefree polynomials have nonconstant kernel
 elements.**
 If `g` is reducible, write `g = a * b` with `a, b` nontrivial. Since
-`g` is squarefree, `gcd(a, b) = 1`. By `polyCRT` (from `lean-poly`),
+`g` is squarefree, `gcd(a, b) = 1`. By `polyCRT` (from `hex-poly`),
 find `h` with `h ≡ 0 (mod a)` and `h ≡ 1 (mod b)`, reduced mod `g`.
 Then:
 - `a | h`, so `a | h^p - h` (since `0^p - 0 = 0`)
@@ -931,7 +933,7 @@ Lagrange's theorem on the multiplicative group.
 
 ---
 
-### lean-conway (Conway polynomial database, depends on lean-berlekamp)
+### hex-conway (Conway polynomial database, depends on hex-berlekamp)
 
 Conway polynomials are canonical irreducible polynomials `C(p, n)` for
 each prime `p` and degree `n`, satisfying compatibility conditions
@@ -944,13 +946,13 @@ coherent.
 
 1. **Hardcoded database** — commonly used `(p, n)` pairs, sourced from
    Frank Lübeck's tables. Each entry comes with a Lean-checked
-   irreducibility certificate (from lean-berlekamp) and a proof of
+   irreducibility certificate (from hex-berlekamp) and a proof of
    compatibility with all divisor-degree entries already in the database.
 
 2. **On-demand computation** — for `(p, n)` pairs not in the database,
    search for the lexicographically smallest monic irreducible polynomial
    of degree `n` over `F_p` satisfying the compatibility condition with
-   all `C(p, m)` for `m | n`. This uses lean-berlekamp for irreducibility
+   all `C(p, m)` for `m | n`. This uses hex-berlekamp for irreducibility
    testing. The result is deterministic (the definition of Conway
    polynomial specifies "lexicographically smallest").
 
@@ -967,13 +969,13 @@ computation). For small `(p, n)` it hits the hardcoded table; for
 larger values it computes. The caller doesn't need to know which path
 was taken.
 
-**lean-gfq** then defines `GFq p n := FiniteField p (conwayPoly p n)
+**hex-gfq** then defines `GFq p n := FiniteField p (conwayPoly p n)
 (conwayPoly_irreducible p n)`. When a user asks for `GF(p^n)`, the
 Conway polynomial is chosen automatically.
 
 ---
 
-### lean-gfq-ring (GF(q) as a ring, depends on lean-poly-fp)
+### hex-gfq-ring (GF(q) as a ring, depends on hex-poly-fp)
 
 Quotient ring `F_p[x] / (f)` for an arbitrary polynomial `f` over `F_p`.
 
@@ -986,7 +988,7 @@ Quotient ring `F_p[x] / (f)` for an arbitrary polynomial `f` over `F_p`.
 
 This does NOT require `f` to be irreducible — the quotient is always a
 ring. When `f` is irreducible, the quotient is a field, but that's
-lean-gfq-field's job.
+hex-gfq-field's job.
 
 **Key properties:**
 - Ring axioms
@@ -995,9 +997,9 @@ lean-gfq-field's job.
 
 ---
 
-### lean-gfq-field (GF(q) as a field, depends on lean-berlekamp)
+### hex-gfq-field (GF(q) as a field, depends on hex-berlekamp)
 
-Extends `lean-gfq-ring` with field operations when the modulus is
+Extends `hex-gfq-ring` with field operations when the modulus is
 irreducible. Takes any irreducible polynomial as parameter — not tied
 to Conway polynomials.
 
@@ -1008,11 +1010,11 @@ to Conway polynomials.
 - `Lean.Grind.Field` instance
 - `IsCharP (FiniteField p f hirr) p`
 
-The irreducibility proof `hirr` comes from lean-berlekamp (either via
+The irreducibility proof `hirr` comes from hex-berlekamp (either via
 the algorithm or via a certificate). This type is not tied to Conway
 polynomials — any irreducible polynomial works (e.g. AES uses
 `x^8 + x^4 + x^3 + x + 1` over `F_2`). For a canonical choice, see
-lean-gfq.
+hex-gfq.
 
 **Key properties:**
 - `inv a * a = 1` for `a ≠ 0`
@@ -1021,7 +1023,7 @@ lean-gfq.
 
 ---
 
-### lean-gfq (convenience wrapper, depends on lean-gfq-field + lean-conway)
+### hex-gfq (convenience wrapper, depends on hex-gfq-field + hex-conway)
 
 Thin wrapper providing `GFq p n` — the canonical finite field with
 `p^n` elements, using the Conway polynomial as the irreducible modulus.
@@ -1032,21 +1034,21 @@ def GFq (p n : Nat) := FiniteField p (conwayPoly p n) (conwayPoly_irreducible p 
 
 The user writes `GFq 2 8` and gets `GF(2^8)` with no further choices.
 For non-Conway models (e.g. AES's `x^8 + x^4 + x^3 + x + 1`), use
-`FiniteField` directly from lean-gfq-field.
+`FiniteField` directly from hex-gfq-field.
 
 ---
 
-### lean-gfq-mathlib (depends on lean-gfq + Mathlib)
+### hex-gfq-mathlib (depends on hex-gfq + Mathlib)
 
 Proves `GFq p n ≃+* GaloisField p n` (Mathlib's Galois field).
 Proof strategy: apply `FiniteField.ringEquivOfCardEq` from Mathlib,
 which just needs `Fintype.card (GFq p n) = Fintype.card (GaloisField p n)`.
 Both sides equal `p ^ n` — Mathlib has `GaloisField.card` and we need
-`card_finiteField` from lean-gfq-field.
+`card_finiteField` from hex-gfq-field.
 
 ---
 
-### lean-hensel (Hensel lifting, depends on lean-poly-fp + lean-poly-z)
+### hex-hensel (Hensel lifting, depends on hex-poly-fp + hex-poly-z)
 
 Lifts a factorization of `f mod p` to a factorization of `f mod p^k`.
 
@@ -1099,7 +1101,136 @@ verify). Add quadratic as an optimization proved equivalent via uniqueness.
 
 ---
 
-### lean-lll (LLL lattice basis reduction, depends on lean-matrix)
+### hex-gram-schmidt (Gram-Schmidt orthogonalization, depends on hex-matrix)
+
+Gram-Schmidt orthogonalization for integer and rational matrices.
+Provides the GS orthogonal basis, coefficient matrix, Gram determinants,
+and update formulas under row operations. Used by hex-lll but logically
+independent of LLL.
+
+**Design:**
+- Two sub-namespaces: `GramSchmidt.Int` (integer input matrices) and
+  `GramSchmidt.Rat` (rational input matrices).
+- Functions return matrices, not indexed single-entry functions:
+  `basis b` returns a `Matrix Rat n m` (all GS vectors at once),
+  `coeffs b` returns a `Matrix Rat n n` (lower-unitriangular).
+- `Nat` indices with explicit bounds hypotheses, not `Fin`.
+- `basis` and `coeffs` are `noncomputable` (rational division); they
+  exist for the proof layer. `gramDet` and `scaledCoeffs` are computable.
+
+**API:**
+
+```lean
+namespace ComputationalAlgebra.GramSchmidt.Int
+
+/-- The Gram-Schmidt orthogonal basis. Row i is the projection of b.row i
+    onto the orthogonal complement of span(b.row 0, ..., b.row (i-1)). -/
+noncomputable def basis (b : Matrix Int n m) : Matrix Rat n m
+
+/-- The Gram-Schmidt coefficients. Lower-unitriangular: entry (i,j) is
+    ⟨b_i, gso_j⟩ / ⟨gso_j, gso_j⟩ for j < i, 1 on diagonal, 0 above. -/
+noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n
+
+/-- The k-th Gram determinant: det of the k×k leading Gram submatrix.
+    gramDet b 0 = 1 by convention. Returns Nat (always a positive integer
+    for independent bases; an internal helper computes the Int determinant
+    and the public API wraps via .toNat). -/
+def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat
+
+/-- All Gram determinants as a vector. -/
+def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1)
+
+/-- Scaled GS coefficients (the ν-values): entry (i,j) = d_{j+1} * μ_{i,j}
+    for j < i. Always integers (integrality lemma). -/
+def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n
+
+end ComputationalAlgebra.GramSchmidt.Int
+
+namespace ComputationalAlgebra.GramSchmidt.Rat
+
+noncomputable def basis (b : Matrix Rat n m) : Matrix Rat n m
+noncomputable def coeffs (b : Matrix Rat n m) : Matrix Rat n n
+def gramDet (b : Matrix Rat n m) (k : Nat) (hk : k ≤ n) : Rat
+
+end ComputationalAlgebra.GramSchmidt.Rat
+```
+
+**Key properties** (stated for `GramSchmidt.Int`; `Rat` analogous):
+```lean
+theorem basis_zero (b : Matrix Int n m) (hn : 0 < n) :
+    (basis b).row 0 = (b.row 0).map Int.cast
+
+theorem basis_orthogonal (b : Matrix Int n m)
+    (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
+    ((basis b).row i).dotProduct ((basis b).row j) = 0
+
+theorem basis_decomposition (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    (b.row i).map Int.cast =
+      (basis b).row i +
+      Finset.sum (Finset.range i) fun j =>
+        (coeffs b)[i][j] • (basis b).row j
+
+theorem coeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    (coeffs b)[i][i] = 1
+
+theorem coeffs_upper (b : Matrix Int n m)
+    (i j : Nat) (hi : i < n) (hj : j < n) (hij : j > i) :
+    (coeffs b)[i][j] = 0
+
+theorem basis_span (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    -- span(basis b 0, ..., basis b i) = span(b 0, ..., b i)
+    sorry
+
+theorem gramDet_eq_prod_normSq (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k ≤ n) :
+    (gramDet b k hk : Rat) =
+      Finset.prod (Finset.range k) fun j =>
+        ((basis b).row j).dotProduct ((basis b).row j)
+
+theorem gramDet_pos (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k ≤ n) (hk' : 0 < k) :
+    0 < gramDet b k hk
+
+theorem basis_normSq (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k < n) :
+    ((basis b).row k).dotProduct ((basis b).row k) =
+      (gramDet b (k + 1) (by omega) : Rat) / (gramDet b k (by omega) : Rat)
+
+theorem scaledCoeffs_eq (b : Matrix Int n m)
+    (i j : Nat) (hi : i < n) (hj : j < i) :
+    (scaledCoeffs b)[i][j] =
+      gramDet b (j + 1) (by omega) * (coeffs b)[i][j]
+
+theorem normSq_latticeVec_ge_min_basis_normSq
+    (b : Matrix Int n m) (hli : b.independent)
+    (v : Vector Int m) (hv : b.memLattice v) (hv' : v ≠ 0) :
+    ∃ i, i < n ∧
+      ((basis b).row i).dotProduct ((basis b).row i) ≤
+        (v.dotProduct v : Rat)
+```
+
+**Update formulas under row operations:**
+- Size reduction (`b_k ← b_k - r * b_j`, `j < k`): GS basis unchanged,
+  coefficients update as `coeffs[k][j] ← coeffs[k][j] - r`.
+- Swap (`b_k ↔ b_{k-1}`): explicit formulas for new basis, coefficients,
+  and Gram determinants (see TRIAGE.md §2b, §2d for the full formulas).
+
+**File organization:**
+- `GramSchmidt.lean` — definitions, orthogonality, span, decomposition,
+  lower bound lemma
+- `GramSchmidtUpdate.lean` — how GS quantities change under size
+  reduction (unchanged) and swap (explicit update formulas)
+- `GramSchmidtInt.lean` — `scaledCoeffs`, integrality, `gramDetVec`,
+  exact division under swap
+
+Mathlib's `gramSchmidt` works over inner product spaces and does not
+track coefficients or update formulas, so it cannot be used in the
+computational core. The `hex-gram-schmidt-mathlib` bridge proves
+that `GramSchmidt.Int.basis` corresponds to Mathlib's `gramSchmidt`.
+
+---
+
+### hex-lll (LLL lattice basis reduction, depends on hex-gram-schmidt)
 
 **Completely independent of the polynomial libraries.** Can be developed
 in parallel from day one.
@@ -1107,8 +1238,7 @@ in parallel from day one.
 **Contents:**
 - LLL algorithm using the d-representation (all integer arithmetic,
   no rationals stored; rational GS quantities as `noncomputable` projections)
-- Gram-Schmidt orthogonalization (exact, not floating-point)
-- Size reduction (ensure |μ_{i,j}| ≤ 1/2)
+- Size reduction (ensure |coeffs[i][j]| ≤ 1/2)
 - Lovász condition check and basis swap
 
 **Definitions:**
@@ -1125,8 +1255,8 @@ def Matrix.independent (b : Matrix Int n m) : Prop :=
 def Vector.normSq (v : Vector Int m) : Int := v.dotProduct v
 ```
 
-`dotProduct`, `normSq`, and `gramMatrix` live in lean-matrix.
-`memLattice`, `independent`, and `isLLLReduced` live in lean-lll.
+`dotProduct`, `normSq`, and `gramMatrix` live in hex-matrix.
+`memLattice`, `independent`, and `isLLLReduced` live in hex-lll.
 
 **Key properties.** All theorems require
 `hδ : 1/4 < δ`, `hδ' : δ ≤ 1`, and `hli : b.independent` (all Gram
@@ -1151,9 +1281,8 @@ theorem lll_short_vector (b : Matrix Int n m) (δ : Rat) ...
 
 The short vector guarantee with `δ = 3/4` gives `‖b₁‖ ≤ 2^{(n-1)/2} · λ₁`.
 
-**Proof strategy:** See TRIAGE.md
-§2 for the complete analysis (algorithm, loop invariant, short vector
-bound, d-representation integrality proofs, and termination).
+**Proof strategy:** See TRIAGE.md §2 for the LLL algorithm, loop
+invariant, integrality proofs, and termination analysis.
 
 **Prior art:** Isabelle AFP formalization (Bottesch, Divasón, Haslbeck,
 Joosten, Thiemann, Yamada; ITP 2018, JAR 2020), ~14,800 lines across
@@ -1170,28 +1299,36 @@ Joosten, Thiemann, Yamada; ITP 2018, JAR 2020), ~14,800 lines across
 
 ---
 
-### lean-lll-mathlib (depends on lean-lll + Mathlib)
+### hex-gram-schmidt-mathlib (depends on hex-gram-schmidt + Mathlib)
 
-Connects lean-lll to Mathlib's linear algebra:
+Proves that `GramSchmidt.Int.basis` corresponds to Mathlib's
+`gramSchmidt`. Mathlib's version works over inner product spaces and
+returns a family of vectors; ours returns a `Matrix Rat n m`. The
+bridge proves they agree on each row.
+
+---
+
+### hex-lll-mathlib (depends on hex-lll + Mathlib)
+
+Connects hex-lll to Mathlib's linear algebra:
 - Lattice corresponds to a `Submodule ℤ`
-- GSO corresponds to Mathlib's `gramSchmidt`
 - Short vector bound holds with respect to Mathlib's `norm`
 
 ---
 
-### lean-berlekamp-zassenhaus (the capstone)
+### hex-berlekamp-zassenhaus (the capstone)
 
-Depends on lean-berlekamp + lean-hensel + lean-lll.
+Depends on hex-berlekamp + hex-hensel + hex-lll.
 
 Complete polynomial-time factoring of univariate polynomials over Z.
 
 **Pipeline:**
-1. `f` → `squareFreePart(f)` (Yun's algorithm, from lean-poly-z)
+1. `f` → `squareFreePart(f)` (Yun's algorithm, from hex-poly-z)
 2. Choose prime `p` not dividing `disc(f)`, with `f mod p` square-free
-3. `f mod p` → irreducible factors `g₁, ..., gᵣ mod p` (lean-berlekamp)
-4. Hensel lift to `mod p^k` for Mignotte-bounded `k` (lean-hensel)
+3. `f mod p` → irreducible factors `g₁, ..., gᵣ mod p` (hex-berlekamp)
+4. Hensel lift to `mod p^k` for Mignotte-bounded `k` (hex-hensel)
 5. Recombine subsets of lifted factors to find true `Z[x]` factors
-6. Step 5 uses LLL for polynomial-time recombination (lean-lll)
+6. Step 5 uses LLL for polynomial-time recombination (hex-lll)
 
 **Without LLL** (Phase 1): exponential-time subset recombination. Still
 correct, just slow for high-degree polynomials with many factors mod p.
@@ -1223,11 +1360,11 @@ structure ZPolyIrreducibilityCertificate where
 
 ---
 
-### lean-berlekamp-zassenhaus-mathlib (depends on lean-berlekamp-zassenhaus + lean-poly-z-mathlib)
+### hex-berlekamp-zassenhaus-mathlib (depends on hex-berlekamp-zassenhaus + hex-poly-z-mathlib)
 
 Instantiates the conditional correctness theorems from
-lean-berlekamp-zassenhaus (which take an abstract coefficient bound)
-with the Mignotte bound from lean-poly-z-mathlib, giving unconditional
+hex-berlekamp-zassenhaus (which take an abstract coefficient bound)
+with the Mignotte bound from hex-poly-z-mathlib, giving unconditional
 results:
 ```lean
 theorem factor_product (f : ZPoly) :
@@ -1246,8 +1383,8 @@ Also connects to Mathlib's `Polynomial ℤ` and provides
 `Decidable (Irreducible f)` for `f : Polynomial ℤ`.
 
 This library is thin — the hard work is split between
-lean-berlekamp-zassenhaus (algorithmic correctness, Mathlib-free) and
-lean-poly-z-mathlib (the Mignotte bound).
+hex-berlekamp-zassenhaus (algorithmic correctness, Mathlib-free) and
+hex-poly-z-mathlib (the Mignotte bound).
 
 ---
 
@@ -1271,32 +1408,34 @@ the same library — have no ordering constraints.
 
 Each library with its immediate dependencies:
 
-- **lean-arith** — (none)
-- **lean-poly** — (none)
-- **lean-matrix** — (none)
-- **lean-mod-arith** — lean-arith
-- **lean-lll** — lean-matrix
-- **lean-poly-fp** — lean-poly, lean-mod-arith
-- **lean-poly-z** — lean-poly
-- **lean-berlekamp** — lean-poly-fp, lean-matrix, lean-gfq-ring
-- **lean-hensel** — lean-poly-fp, lean-poly-z
-- **lean-conway** — lean-berlekamp
-- **lean-gfq-ring** — lean-poly-fp
-- **lean-gfq-field** — lean-berlekamp
-- **lean-gfq** — lean-gfq-field, lean-conway
-- **lean-berlekamp-zassenhaus** — lean-berlekamp, lean-hensel, lean-lll
+- **hex-arith** — (none)
+- **hex-poly** — (none)
+- **hex-matrix** — (none)
+- **hex-mod-arith** — hex-arith
+- **hex-gram-schmidt** — hex-matrix
+- **hex-lll** — hex-gram-schmidt
+- **hex-poly-fp** — hex-poly, hex-mod-arith
+- **hex-poly-z** — hex-poly
+- **hex-berlekamp** — hex-poly-fp, hex-matrix, hex-gfq-ring
+- **hex-hensel** — hex-poly-fp, hex-poly-z
+- **hex-conway** — hex-berlekamp
+- **hex-gfq-ring** — hex-poly-fp
+- **hex-gfq-field** — hex-berlekamp
+- **hex-gfq** — hex-gfq-field, hex-conway
+- **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel, hex-lll
 
 Mathlib bridge libraries (each also depends on Mathlib):
 
-- **lean-mod-arith-mathlib** — lean-mod-arith
-- **lean-poly-mathlib** — lean-poly
-- **lean-poly-z-mathlib** — lean-poly-z, lean-poly-mathlib
-- **lean-matrix-mathlib** — lean-matrix
-- **lean-lll-mathlib** — lean-lll
-- **lean-berlekamp-mathlib** — lean-berlekamp
-- **lean-hensel-mathlib** — lean-hensel
-- **lean-gfq-mathlib** — lean-gfq
-- **lean-berlekamp-zassenhaus-mathlib** — lean-berlekamp-zassenhaus, lean-poly-z-mathlib
+- **hex-mod-arith-mathlib** — hex-mod-arith
+- **hex-poly-mathlib** — hex-poly
+- **hex-poly-z-mathlib** — hex-poly-z, hex-poly-mathlib
+- **hex-matrix-mathlib** — hex-matrix
+- **hex-gram-schmidt-mathlib** — hex-gram-schmidt
+- **hex-lll-mathlib** — hex-lll
+- **hex-berlekamp-mathlib** — hex-berlekamp
+- **hex-hensel-mathlib** — hex-hensel
+- **hex-gfq-mathlib** — hex-gfq
+- **hex-berlekamp-zassenhaus-mathlib** — hex-berlekamp-zassenhaus, hex-poly-z-mathlib
 
 LLL is completely independent of the polynomial pipeline. The only
 point of contact is at the very top (Berlekamp-Zassenhaus).
@@ -1353,7 +1492,7 @@ ring axioms + `dropZeros` properties. The `-mathlib` bridge library proves
 
 **Cryptographic field construction:** To build `GF(2^128)` for AES, you
 need an irreducible polynomial of degree 128 over `F_2`. With
-lean-berlekamp, produce a Lean proof that it's irreducible.
+hex-berlekamp, produce a Lean proof that it's irreducible.
 
 **Coding theory:** Reed-Solomon and BCH codes need irreducible polynomials
 over finite fields. Verified factoring provides certified generator
@@ -1396,7 +1535,7 @@ versioning. The cost is cross-repo development friction, but:
 - Each library is small enough to stabilize independently
 - Mathlib bridge libraries can track Mathlib's toolchain independently
   of the computational libraries
-- Contributors can work on lean-lll without pulling lean-poly
+- Contributors can work on hex-lll without pulling hex-poly
 
 For the initial bootstrapping phase, a single monorepo with multiple
 Lake packages is acceptable, splitting into separate repos once the
@@ -1436,11 +1575,11 @@ modulo the pivot. The result is unique. Returns `RowEchelonData`; an
 - Entries above each pivot are in `[0, pivot)`
 - `det transform = 1 ∨ det transform = -1`
 
-HNF requires extended GCD, which lives in lean-arith. Since
-lean-matrix currently has no dependencies, HNF would either need:
+HNF requires extended GCD, which lives in hex-arith. Since
+hex-matrix currently has no dependencies, HNF would either need:
 extended GCD upstreamed into Lean 4 stdlib, a new dependency
-lean-matrix → lean-arith, or a separate library (e.g.
-`lean-matrix-hermite` depending on both lean-matrix and lean-arith).
+hex-matrix → hex-arith, or a separate library (e.g.
+`hex-matrix-hermite` depending on both hex-matrix and hex-arith).
 
 **Smith normal form.** Diagonal form obtained by both row and column
 operations over a principal ideal domain. The diagonal entries satisfy
@@ -1449,13 +1588,13 @@ structure of finitely generated abelian groups and solving integer
 linear systems. Like HNF, requires extended GCD and is not needed for
 Berlekamp-Zassenhaus.
 
-**Sylvester's identity (lean-matrix).** The Desnanot-Jacobi identity
+**Sylvester's identity (hex-matrix).** The Desnanot-Jacobi identity
 relating minors of a matrix. A useful result in its own right, and
 gives an alternative proof that `bareiss M = det M`: show by induction
 that Bareiss step k computes the leading k×k minor
 `det(M[1..k, 1..k])`, with Sylvester's identity as the inductive step.
 
-**Generic Bareiss over integral domains (lean-matrix).** Generalize
+**Generic Bareiss over integral domains (hex-matrix).** Generalize
 Bareiss from `Int` to any integral domain with a data-carrying exact
 division operation (`ediv : α → α → α` with `b ∣ a → ediv a b * b = a`)
 and no zero divisors (`a * b = 0 → a = 0 ∨ b = 0`).

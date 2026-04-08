@@ -23,11 +23,11 @@ theorem lll_short_vector (b : Matrix Int n m) (δ : Rat)
 **Hypotheses.** `δ ∈ (1/4, 1]` is required: `δ > 1/4` so that
 `α = 1/(δ - 1/4)` is well-defined and positive; `δ ≤ 1` for
 termination (the Lovász failure condition is strict, so each swap
-gives `d_k^{new} < δ · d_k ≤ d_k`, strictly decreasing the potential
-even at `δ = 1`).
+gives `gramDet[k]^{new} < δ · gramDet[k] ≤ gramDet[k]`, strictly
+decreasing the potential even at `δ = 1`).
 Linear independence of the input basis ensures all Gram determinants
-`d_k > 0`, which is needed for the GS orthogonalization to exist and
-for the d-representation denominators to be nonzero.
+`gramDet[k] > 0`, which is needed for the GS orthogonalization to
+exist and for the d-representation denominators to be nonzero.
 
 
 ---
@@ -38,57 +38,61 @@ All indices are 0-based throughout (matching Lean and the Isabelle
 formalization).
 
 **Gram-Schmidt orthogonalization.** Given a basis b_0, ..., b_{n-1}
-of a lattice L in Z^m, define orthogonal vectors gso_0, ..., gso_{n-1}
-and coefficients μ_{i,j} by:
+of a lattice L in Z^m, define orthogonal vectors basis[0], ...,
+basis[n-1] (traditionally gso_0, ..., gso_{n-1}) and coefficients
+coeffs[i][j] (traditionally μ_{i,j}) by:
 
-    gso_0 = b_0
-    μ_{i,j} = <b_i, gso_j> / <gso_j, gso_j>     for j < i
-    gso_i = b_i - sum_{j=0}^{i-1} μ_{i,j} * gso_j
+    basis[0] = b_0
+    coeffs[i][j] = <b_i, basis[j]> / <basis[j], basis[j]>     for j < i
+    basis[i] = b_i - sum_{j=0}^{i-1} coeffs[i][j] * basis[j]
 
-Key property: gso_i is the projection of b_i onto the orthogonal
+Key property: basis[i] is the projection of b_i onto the orthogonal
 complement of span(b_0, ..., b_{i-1}). Size reduction does not
-change the gso vectors (only column operations b_k <- b_k + c*b_j
+change the basis vectors (only column operations b_k <- b_k + c*b_j
 with j < k are performed, which leave the Gram-Schmidt vectors
 invariant).
 
-**Gram determinants (d-values).** Define d_0 = 1 and for k >= 1:
+**Gram determinants.** Define gramDet[0] = 1 (traditionally d_0 = 1)
+and for k >= 1:
 
-    d_k = det(G_k)
+    gramDet[k] = det(G_k)
 
 where G_k is the k x k Gram matrix of b_0, ..., b_{k-1},
 i.e., (G_k)_{i,j} = <b_i, b_j> for 0 <= i, j < k. For integer
-lattices, d_k is always a positive integer (determinant of a
+lattices, gramDet[k] is always a positive integer (determinant of a
 positive-definite integer Gram matrix).
 
 **Theorem (GS norms = ratio of consecutive Gram determinants).**
 By induction on the Gram-Schmidt recurrence:
 
-    d_k = prod_{j=0}^{k-1} ||gso_j||^2
+    gramDet[k] = prod_{j=0}^{k-1} ||basis[j]||^2
 
 *Proof sketch.* The Gram matrix G_k factors as L D L^T where L is
-lower-unitriangular with L_{i,j} = μ_{i,j} and D = diag(||gso_j||^2).
-So det(G_k) = prod ||gso_j||^2.
+lower-unitriangular with L_{i,j} = coeffs[i][j] and
+D = diag(||basis[j]||^2). So det(G_k) = prod ||basis[j]||^2.
 
 This gives the crucial identity:
 
-    ||gso_k||^2 = d_{k+1} / d_k
+    ||basis[k]||^2 = gramDet[k+1] / gramDet[k]
 
-**Scaled GS coefficients (ν-values).** Define:
+**Scaled GS coefficients.** Define scaledCoeffs[i][j] (traditionally
+ν_{i,j}):
 
-    ν_{i,j} = d_{j+1} * μ_{i,j}     for j < i
+    scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j]     for j < i
 
 These are always integers (see Section 2d for the proof). The
-algorithm works entirely with ν and d, never computing μ directly.
+algorithm works entirely with scaledCoeffs and gramDet, never
+computing coeffs directly.
 
 **delta-LLL-reduced.** A basis b_0, ..., b_{n-1} is delta-LLL-reduced
 (for delta in (1/4, 1]) if it satisfies two conditions:
 
-1. **Size-reduced:** |μ_{i,j}| <= 1/2 for all 0 <= j < i < n.
+1. **Size-reduced:** |coeffs[i][j]| <= 1/2 for all 0 <= j < i < n.
 
 2. **Lovász condition:** For all 0 <= i < n-1:
-       delta * ||gso_i||^2 <= ||gso_{i+1}||^2 + μ_{i+1,i}^2 * ||gso_i||^2
+       delta * ||basis[i]||^2 <= ||basis[i+1]||^2 + coeffs[i+1][i]^2 * ||basis[i]||^2
 
-   Equivalently: (delta - μ_{i+1,i}^2) * ||gso_i||^2 <= ||gso_{i+1}||^2
+   Equivalently: (delta - coeffs[i+1][i]^2) * ||basis[i]||^2 <= ||basis[i+1]||^2
 
 ---
 
@@ -96,51 +100,43 @@ algorithm works entirely with ν and d, never computing μ directly.
 
 **Algorithm.** The algorithm operates on a single integer state:
 basis vectors, Gram determinants, and scaled GS coefficients. The
-rational GS quantities (μ, gso norms) are never stored or computed
+rational GS quantities (coeffs, basis norms) are never stored or computed
 at runtime — they exist only as `noncomputable` projections for
 use in proofs.
 
 ```lean
-/-- Round to nearest integer (ties round up). -/
-def Rat.round (q : Rat) : Int := (q + 1/2).floor
--- Key property: |q - q.round| ≤ 1/2 (from floor_le and lt_floor_add_one)
--- In the ν-representation, round(ν / d) is computed as pure integer
--- arithmetic: Int.fdiv (2 * ν + d) (2 * d), since d > 0.
-
 /-- LLL state. All fields are integers; no rationals stored. -/
 structure LLLState (n m : Nat) where
   b : Matrix Int n m            -- basis vectors
-  ν : Matrix Int n n            -- ν[i][j] = d[j+1] * μ_{i,j} for j < i
+  ν : Matrix Int n n            -- ν[i][j] = d[j+1] * coeffs[i][j] for j < i
   d : Vector Nat (n + 1)        -- Gram determinants d_0, ..., d_n
-  ν_eq : ∀ i j, j < i → ν[i][j] = d[j + 1] * gramSchmidtMu b i j
-  d_eq : ∀ i, d[i] = gramDet b i
+  ν_eq : ∀ i j, j < i → ν[i][j] = d[j + 1] * (GramSchmidt.Int.coeffs b)[i][j]
+  d_eq : ∀ i, d[i] = GramSchmidt.Int.gramDet b i ‹_›
 
-/-- Recover rational GS coefficients from integer state.
+/-- Recover a single rational GS coefficient from the integer state.
     Marked noncomputable: exists only for the proof layer. -/
-noncomputable def LLLState.μ (s : LLLState n m) (i j : Nat) : Rat :=
+noncomputable def LLLState.gramSchmidtCoeff (s : LLLState n m) (i j : Nat) : Rat :=
   s.ν[i][j] / s.d[j + 1]
 
+-- Use https://github.com/leanprover/lean4/pull/13200 when available.
 def LLLState.potential (s : LLLState n m) : Nat :=
   s.d[1:n].foldl (· * ·) 1    -- d_1 * d_2 * ... * d_{n-1}
 ```
 
 **Size reduction.** Size-reduce b[k] against b[k-1], ..., b[0].
-Updates b and ν; d is unchanged (GS vectors are unchanged by size
+Updates b and ν; d is unchanged (basis is unchanged by size
 reduction).
 
 ```lean
 def LLLState.sizeReduce (s : LLLState n m) (k : Nat) : LLLState n m := sorry
 ```
 
-For j = k-1 downto 0: if |ν[k][j]| > d[j+1] / 2 (i.e., |μ_{k,j}| > 1/2):
+For j = k-1 downto 0: if |ν[k][j]| > d[j+1] / 2 (i.e., |coeffs[k][j]| > 1/2):
 
     r := Int.fdiv (2 * ν[k][j] + d[j+1]) (2 * d[j+1])
     b[k] := b[k] - r * b[j]
     ν[k][l] := ν[k][l] - r * ν[j][l]    for l < j
     ν[k][j] := ν[k][j] - r * d[j+1]
-
-The rounding formula `Int.fdiv (2 * ν + d) (2 * d)` computes
-`round(ν / d)` = `round(μ)` as pure integer arithmetic, since d > 0.
 
 **Swap step.** Swap b[k] and b[k-1], updating ν and d.
 
@@ -202,25 +198,26 @@ termination_by (s.potential, n - k)
 
 def lll (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hind : b.independent) : Matrix Int n m :=
-  lllAux ⟨b, initNu b, gramDetVec b, sorry, sorry⟩ 1 δ hδ hδ' hind (by omega) (by omega)
+  lllAux ⟨b, GramSchmidt.Int.scaledCoeffs b, GramSchmidt.Int.gramDetVec b, sorry, sorry⟩
+    1 δ hδ hδ' hind (by omega) (by omega)
 ```
 
 The swap bound `potential_initial ≤ (maxNormSq b)^{n*(n-1)/2}` follows
-from `d_k ≤ (maxNormSq b)^k` (each row of the Gram matrix has entries
+from `gramDet[k] ≤ (maxNormSq b)^k` (each row of the Gram matrix has entries
 ≤ maxNormSq b, so the determinant is bounded by the product of row norms).
 
 **Loop invariant.** At the top of the loop with current index k,
-expressed in terms of the noncomputable projections `s.μ` and the
+expressed in terms of the noncomputable projections `s.gramSchmidtCoeff` and the
 GS vectors (which are mathematical functions of `s.b`, not stored):
 
 (I1) b_0, ..., b_{n-1} is a basis of the same lattice L as the input.
-(I2) gso_0, ..., gso_{n-1} and μ_{i,j} are the correct Gram-Schmidt
-     orthogonalization of the current basis. (This is captured by
-     `s.ν_eq` and `s.d_eq`, which assert that the stored integer
-     values track the mathematical GS quantities.)
-(I3) **Size-reduced below k:** |s.μ i j| <= 1/2 for all j < i < k.
+(I2) basis[0], ..., basis[n-1] and coeffs[i][j] are the correct
+     Gram-Schmidt orthogonalization of the current basis. (This is
+     captured by `s.ν_eq` and `s.d_eq`, which assert that the stored
+     integer values track the mathematical GS quantities.)
+(I3) **Size-reduced below k:** |s.gramSchmidtCoeff i j| <= 1/2 for all j < i < k.
 (I4) **Lovász condition below k:** for all 0 <= i < k-1,
-     (delta - (s.μ (i+1) i)^2) * ||gso_i||^2 <= ||gso_{i+1}||^2.
+     (delta - (s.gramSchmidtCoeff (i+1) i)^2) * ||basis[i]||^2 <= ||basis[i+1]||^2.
 (I5) 1 <= k <= n.
 
 Together, (I3) and (I4) say: the first k vectors form a
@@ -232,21 +229,21 @@ by the current column j.
 After processing column j (and before processing j-1), the following
 hold in addition to (I1)-(I5):
 
-(SR1) |s.μ k l| <= 1/2 for all l with j <= l < k.
-(SR2) s.μ k l is unchanged for l < j.
-(SR3) All gso_i vectors are unchanged (size reduction preserves GS).
+(SR1) |s.gramSchmidtCoeff k l| <= 1/2 for all l with j <= l < k.
+(SR2) s.gramSchmidtCoeff k l is unchanged for l < j.
+(SR3) All basis[i] vectors are unchanged (size reduction preserves GS).
 (SR4) The lattice is unchanged (integer column operations).
 
 At entry (j = k-1), (SR1) is vacuous. At exit (j < 0), (SR1) gives
-|s.μ k l| <= 1/2 for all l < k, establishing (I3) for the new k.
+|s.gramSchmidtCoeff k l| <= 1/2 for all l < k, establishing (I3) for the new k.
 
 **Preservation of the outer invariant:**
 
 - *Size reduction (full inner loop):* Preserves the lattice (I1) and
-  all gso_i (I2) — these follow from (SR3)+(SR4). Establishes
-  |s.μ k j| <= 1/2 for all j < k — this follows from (SR1) at
+  all basis[i] (I2) — these follow from (SR3)+(SR4). Establishes
+  |s.gramSchmidtCoeff k j| <= 1/2 for all j < k — this follows from (SR1) at
   exit. The Lovász conditions for indices < k-1 are unaffected (I4),
-  since only μ values in row k change and the gso_i are unchanged.
+  since only coeffs values in row k change and the basis[i] are unchanged.
 
 - *Advance (k <- k+1):* Only happens when the Lovász condition holds
   at index k-1. Combined with the already-established conditions
@@ -254,7 +251,7 @@ At entry (j = k-1), (SR1) is vacuous. At exit (j < 0), (SR1) gives
   for the new k.
 
 - *Swap (b_k <-> b_{k-1}, k <- max(k-1, 1)):* Preserves the lattice
-  (I1). Changes only gso_{k-1} and gso_k among the GS vectors (I2).
+  (I1). Changes only basis[k-1] and basis[k] among the GS vectors (I2).
   The Lovász conditions for indices < k-2 are unaffected (I4). We
   lose the size-reduction guarantee at the new k (the swapped vector
   may not be size-reduced), so (I3) is only claimed for indices
@@ -268,52 +265,53 @@ At entry (j = k-1), (SR1) is vacuous. At exit (j < 0), (SR1) gives
 The proof has three steps.
 
 **Step 1: Consecutive GS norm bound.** From the Lovász condition
-with the size-reduction guarantee |μ_{i+1,i}| <= 1/2:
+with the size-reduction guarantee |coeffs[i+1][i]| <= 1/2:
 
-    (delta - μ_{i+1,i}^2) * ||gso_i||^2 <= ||gso_{i+1}||^2
-    (delta - 1/4) * ||gso_i||^2 <= ||gso_{i+1}||^2
+    (delta - coeffs[i+1][i]^2) * ||basis[i]||^2 <= ||basis[i+1]||^2
+    (delta - 1/4) * ||basis[i]||^2 <= ||basis[i+1]||^2
 
 Set alpha = 1 / (delta - 1/4). Then:
 
-    ||gso_i||^2 <= alpha * ||gso_{i+1}||^2
+    ||basis[i]||^2 <= alpha * ||basis[i+1]||^2
 
 By telescoping (induction on the gap):
 
-    ||gso_0||^2 <= alpha^i * ||gso_i||^2     for all 0 <= i < n
+    ||basis[0]||^2 <= alpha^i * ||basis[i]||^2     for all 0 <= i < n
 
 More usefully:
 
-    ||gso_0||^2 <= alpha^{n-1} * min_{0 <= i < n} ||gso_i||^2
+    ||basis[0]||^2 <= alpha^{n-1} * min_{0 <= i < n} ||basis[i]||^2
 
 **Step 2: Lower bound lemma.** For any nonzero lattice vector
 v in L, we have:
 
-    ||v||^2 >= min_{0 <= i < n} ||gso_i||^2
+    ||v||^2 >= min_{0 <= i < n} ||basis[i]||^2
 
 *Proof.* Write v = sum_{i=0}^{n-1} a_i * b_i with a_i in Z (not all
 zero). Let k be the largest index with a_k != 0. Expand in the
 GS basis:
 
     v = sum_{i=0}^{k} a_i * b_i
-      = sum_{i=0}^{k} a_i * (gso_i + sum_{j<i} μ_{i,j} * gso_j)
-      = sum_{i=0}^{k} c_i * gso_i
+      = sum_{i=0}^{k} a_i * (basis[i] + sum_{j<i} coeffs[i][j] * basis[j])
+      = sum_{i=0}^{k} c_i * basis[i]
 
 for some real coefficients c_i, where crucially c_k = a_k (because
-b_k = gso_k + sum_{j<k} μ_{k,j} * gso_j, and no later b_i contributes
-to the gso_k component). Since a_k is a nonzero integer, |c_k| >= 1.
+b_k = basis[k] + sum_{j<k} coeffs[k][j] * basis[j], and no later
+b_i contributes to the basis[k] component). Since a_k is a nonzero
+integer, |c_k| >= 1.
 
-By orthogonality of the gso_i:
+By orthogonality of the basis[i]:
 
-    ||v||^2 = sum_{i=0}^{k} c_i^2 * ||gso_i||^2
-            >= c_k^2 * ||gso_k||^2
-            >= ||gso_k||^2
-            >= min_{0 <= i < n} ||gso_i||^2     QED
+    ||v||^2 = sum_{i=0}^{k} c_i^2 * ||basis[i]||^2
+            >= c_k^2 * ||basis[k]||^2
+            >= ||basis[k]||^2
+            >= min_{0 <= i < n} ||basis[i]||^2     QED
 
 **Step 3: Combining.** For any nonzero v in L:
 
-    ||b_0||^2 = ||gso_0||^2              (b_0 = gso_0 by definition)
-              <= alpha^{n-1} * min_i ||gso_i||^2    (Step 1)
-              <= alpha^{n-1} * ||v||^2             (Step 2)
+    ||b_0||^2 = ||basis[0]||^2              (b_0 = basis[0] by definition)
+              <= alpha^{n-1} * min_i ||basis[i]||^2    (Step 1)
+              <= alpha^{n-1} * ||v||^2                 (Step 2)
 
 This gives the main theorem:
 
@@ -331,82 +329,101 @@ For the standard choice delta = 3/4, alpha = 2, and we get
 This section provides the proofs that the integer update formulas
 used in Section 2b are correct and that all divisions are exact.
 
-**Integrality of ν_{i,j}.** (Von zur Gathen & Gerhard, Lemma 16.7.)
-ν_{i,j} = d_{j+1} * μ_{i,j} can be expressed as a (j+1) × (j+1)
-determinant of a matrix of inner products:
+**Integrality of scaledCoeffs[i][j].** (Von zur Gathen & Gerhard,
+Lemma 16.7.) scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j] can be
+expressed as a (j+1) × (j+1) determinant of a matrix of inner products:
 
-    ν_{i,j} = det | <b_0,b_0>  ...  <b_0,b_j>   <b_0,b_i> |
-                  | <b_1,b_0>  ...  <b_1,b_j>   <b_1,b_i> |
-                  |   ...      ...    ...          ...     |
-                  | <b_j,b_0>  ...  <b_j,b_j>   <b_j,b_i> |
+    scaledCoeffs[i][j] = det | <b_0,b_0>  ...  <b_0,b_j>   <b_0,b_i> |
+                              | <b_1,b_0>  ...  <b_1,b_j>   <b_1,b_i> |
+                              |   ...      ...    ...          ...     |
+                              | <b_j,b_0>  ...  <b_j,b_j>   <b_j,b_i> |
 
 Since the b_l are integer vectors, all inner products are integers,
 so this determinant is an integer. (The formula follows from expanding
-the Gram-Schmidt recurrence and using the cofactor expansion of d_{j+1}
-along the last column.) This is the fundamental integrality lemma of
-the d-representation.
+the Gram-Schmidt recurrence and using the cofactor expansion of
+gramDet[j+1] along the last column.) This is the fundamental
+integrality lemma of the d-representation.
 
 Alternatively: by Cramer's rule on the system G_j * x = g (where
-g is the column of inner products with b_i), μ_{i,j} has the form
-(integer determinant) / d_j. Therefore d_j * μ_{i,j} is an integer.
-Since d_{j+1} = d_j * ||gso_j||^2 and ||gso_j||^2 = d_{j+1}/d_j, we
-need d_{j+1} * μ_{i,j} = (d_{j+1}/d_j) * (integer) to be an integer.
-This requires showing d_j | d_{j+1} * (the Cramer numerator), which
-follows from the determinant formula above.
+g is the column of inner products with b_i), coeffs[i][j] has the
+form (integer determinant) / gramDet[j]. Therefore
+gramDet[j] * coeffs[i][j] is an integer. Since
+gramDet[j+1] = gramDet[j] * ||basis[j]||^2 and
+||basis[j]||^2 = gramDet[j+1]/gramDet[j], we need
+gramDet[j+1] * coeffs[i][j] = (gramDet[j+1]/gramDet[j]) * (integer)
+to be an integer. This requires showing
+gramDet[j] | gramDet[j+1] * (the Cramer numerator), which follows
+from the determinant formula above.
 
 **Derivation of the integer Lovász condition.** The rational Lovász
 condition rearranged (following Cohen, section 2.6.3):
 
-    ||gso_k||^2 + μ_{k,k-1}^2 * ||gso_{k-1}||^2 >= delta * ||gso_{k-1}||^2
+    ||basis[k]||^2 + coeffs[k][k-1]^2 * ||basis[k-1]||^2 >= delta * ||basis[k-1]||^2
 
-Substitute ||gso_i||^2 = d_{i+1}/d_i and μ_{k,k-1} = ν_{k,k-1}/d_k:
+Substitute ||basis[i]||^2 = gramDet[i+1]/gramDet[i] and
+coeffs[k][k-1] = scaledCoeffs[k][k-1]/gramDet[k]:
 
-    d_{k+1}/d_k + (ν_{k,k-1}/d_k)^2 * (d_k/d_{k-1}) >= delta * (d_k/d_{k-1})
+    gramDet[k+1]/gramDet[k] + (scaledCoeffs[k][k-1]/gramDet[k])^2 * (gramDet[k]/gramDet[k-1])
+        >= delta * (gramDet[k]/gramDet[k-1])
 
-Multiply through by d_k * d_{k-1} (both positive):
+Multiply through by gramDet[k] * gramDet[k-1] (both positive):
 
-    d_{k+1} * d_{k-1} + ν_{k,k-1}^2 >= delta * d_k^2
+    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 >= delta * gramDet[k]^2
 
 So the Lovász condition in integer form is:
 
-    d_{k+1} * d_{k-1} + ν_{k,k-1}^2 >= delta * d_k^2
+    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 >= delta * gramDet[k]^2
 
 (Negated for the swap trigger: swap when this fails.)
 
 **Correctness of size-reduction updates.** The rational size-reduction
-step sets μ_{k,j} <- μ_{k,j} - r (and μ_{k,l} <- μ_{k,l} - r * μ_{j,l}
-for l < j). Multiplying through by d_{j+1} (resp. d_{l+1}) gives
-the ν update formulas:
+step sets coeffs[k][j] <- coeffs[k][j] - r (and
+coeffs[k][l] <- coeffs[k][l] - r * coeffs[j][l] for l < j).
+Multiplying through by gramDet[j+1] (resp. gramDet[l+1]) gives
+the scaledCoeffs update formulas:
 
-    ν_{k,l} <- ν_{k,l} - r * ν_{j,l}    for l < j
-    ν_{k,j} <- ν_{k,j} - r * d_{j+1}
+    scaledCoeffs[k][l] <- scaledCoeffs[k][l] - r * scaledCoeffs[j][l]    for l < j
+    scaledCoeffs[k][j] <- scaledCoeffs[k][j] - r * gramDet[j+1]
 
-The d values are unchanged because size reduction preserves GS vectors.
-The rounding value r = round(μ_{k,j}) = round(ν_{k,j} / d_{j+1}) is
-computed as `Int.fdiv (2 * ν_{k,j} + d_{j+1}) (2 * d_{j+1})`, which
-is pure integer arithmetic since d_{j+1} > 0.
+The gramDet values are unchanged because size reduction preserves the
+GS basis.
+
+**Rounding.** Define:
+
+```lean
+/-- Round to nearest integer (ties round up). -/
+def Rat.round (q : Rat) : Int := (q + 1/2).floor
+-- Key property: |q - q.round| ≤ 1/2 (from floor_le and lt_floor_add_one)
+```
+
+The rounding value r = round(coeffs[k][j]) =
+round(scaledCoeffs[k][j] / gramDet[j+1]) is computed as
+`Int.fdiv (2 * scaledCoeffs[k][j] + gramDet[j+1]) (2 * gramDet[j+1])`,
+which is pure integer arithmetic since gramDet[j+1] > 0.
 
 **Correctness of swap updates.** When swapping b_k and b_{k-1},
-let B = ν_{k,k-1}. The d update:
+let B = scaledCoeffs[k][k-1]. The gramDet update:
 
-    d_k^{new} = (d_{k+1} * d_{k-1} + B^2) / d_k
+    gramDet[k]^{new} = (gramDet[k+1] * gramDet[k-1] + B^2) / gramDet[k]
 
 follows from the determinant identity for the Gram matrix after the
-swap. The ν updates for i > k:
+swap. The scaledCoeffs updates for i > k:
 
-    ν_{i,k-1}^{new} = (ν_{i,k-1} * d_k^{new} + ν_{i,k} * B) / d_k
-    ν_{i,k}^{new}   = (ν_{i,k} * d_{k-1} - ν_{i,k-1} * B) / d_k
+    scaledCoeffs[i][k-1]^{new} = (scaledCoeffs[i][k-1] * gramDet[k]^{new} + scaledCoeffs[i][k] * B) / gramDet[k]
+    scaledCoeffs[i][k]^{new}   = (scaledCoeffs[i][k] * gramDet[k-1] - scaledCoeffs[i][k-1] * B) / gramDet[k]
 
-follow from substituting the definitions ν = d * μ into the rational
-μ update formulas and simplifying. For j < k-1, ν_{k-1,j} and ν_{k,j}
-simply swap.
+follow from substituting the definitions scaledCoeffs = gramDet * coeffs
+into the rational coeffs update formulas and simplifying. For j < k-1,
+scaledCoeffs[k-1][j] and scaledCoeffs[k][j] simply swap.
 
-**Why all divisions are exact.** ν_{i,j} = d_{j+1} * μ_{i,j} and
-the μ values are always expressible as ratios of integer determinants
-with denominator d_{j+1}. After a swap, the new μ values have the
-same property with the new d values. The algebraic identities can
-also be verified directly by substituting the definitions and using
-the fact that Gram determinants of sub-lattices are always integers.
+**Why all divisions are exact.**
+scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j] and the coeffs
+values are always expressible as ratios of integer determinants with
+denominator gramDet[j+1]. After a swap, the new coeffs values have
+the same property with the new gramDet values. The algebraic
+identities can also be verified directly by substituting the
+definitions and using the fact that Gram determinants of sub-lattices
+are always integers.
 
 ---
 
@@ -414,33 +431,35 @@ the fact that Gram determinants of sub-lattices are always integers.
 
 **Potential function.** Define:
 
-    D = prod_{i=1}^{n-1} d_i
+    D = prod_{i=1}^{n-1} gramDet[i]
 
 This is the product of the first n-1 Gram determinants. Equivalently:
 
-    D = prod_{k=0}^{n-2} ||gso_k||^{2(n-1-k)}
+    D = prod_{k=0}^{n-2} ||basis[k]||^{2(n-1-k)}
 
-(since d_i = prod_{j=0}^{i-1} ||gso_j||^2, each ||gso_k||^2 appears in
-d_i for i = k+1, k+2, ..., n-1, contributing exponent n-1-k to the
-product). Since each d_i is a positive integer for integer lattices,
-D is a positive integer, so D >= 1.
+(since gramDet[i] = prod_{j=0}^{i-1} ||basis[j]||^2, each
+||basis[k]||^2 appears in gramDet[i] for i = k+1, k+2, ..., n-1,
+contributing exponent n-1-k to the product). Since each gramDet[i]
+is a positive integer for integer lattices, D is a positive integer,
+so D >= 1.
 
-**Size reduction preserves D.** The GS vectors gso_i are unchanged
-by size reduction, so all d_i (and hence D) are unchanged.
+**Size reduction preserves D.** The GS basis[i] are unchanged
+by size reduction, so all gramDet[i] (and hence D) are unchanged.
 
 **Each swap decreases D.** When b_k and b_{k-1} are swapped with
 the Lovász condition failing:
 
-    d_k^{new} = (d_{k+1} * d_{k-1} + ν_{k,k-1}^2) / d_k
+    gramDet[k]^{new} = (gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2) / gramDet[k]
 
 The Lovász condition fails, meaning:
 
-    d_{k+1} * d_{k-1} + ν_{k,k-1}^2 < delta * d_k^2
+    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 < delta * gramDet[k]^2
 
-So d_k^{new} < delta * d_k. Since only d_k changes among the d_i
-values, and d_k appears exactly once in the product D:
+So gramDet[k]^{new} < delta * gramDet[k]. Since only gramDet[k]
+changes among the gramDet values, and gramDet[k] appears exactly
+once in the product D:
 
-    D^{new} = D * (d_k^{new} / d_k) < D * delta
+    D^{new} = D * (gramDet[k]^{new} / gramDet[k]) < D * delta
 
 Since delta < 1, D strictly decreases. Since D >= 1 is a positive
 integer (for integer lattices), the number of swaps is bounded by:
@@ -448,7 +467,7 @@ integer (for integer lattices), the number of swaps is bounded by:
     #swaps <= log_{1/delta}(D_initial)
 
 More precisely, using D_initial <= (max_i ||b_i||^2)^{n(n-1)/2}
-(since d_i <= (max ||b_j||^2)^i and the product has n-1 terms):
+(since gramDet[i] <= (max ||b_j||^2)^i and the product has n-1 terms):
 
     #swaps <= n(n-1)/2 * log(max_i ||b_i||^2) / log(1/delta)
 
@@ -468,8 +487,9 @@ ITP 2018, JAR 2020), which uses a two-layer bisimulation between a
 rational specification and an integer implementation, we use a
 single-state design. The `LLLState` stores only integers (b, ν, d).
 The rational GS quantities are recovered via `noncomputable`
-projections (`LLLState.μ`, and similarly for `||gso_k||^2 =
-d_{k+1} / d_k`), which exist only for the proof layer.
+projections (`LLLState.gramSchmidtCoeff`, and similarly for
+`||basis[k]||^2 = gramDet[k+1] / gramDet[k]`), which exist only for
+the proof layer.
 
 The key advantage: no bisimulation proof is needed. There is one
 state, one algorithm, and the correctness proofs unfold the
@@ -487,35 +507,20 @@ to leak into the executable code.
    rational form.
 3. The short vector bound (Section 2c) is proved purely in terms of
    mathematical GS properties. Termination (Section 2e) uses the
-   integer state directly (the potential is a product of d-values,
+   integer state directly (the potential is a product of gramDet values,
    and the swap decrease follows from the integer Lovász failure).
-
-**Gram-Schmidt API.** The GS machinery lives inside `lean-lll` (not a
-separate library), organized as:
-
-- `GramSchmidt.lean` — definitions of `gso`, `μ`, orthogonality,
-  span preservation, the projection formula, and the norm-minimality
-  lemma (Step 2 of the short vector bound)
-- `GramSchmidtUpdate.lean` — how `gso` and `μ` change under size
-  reduction (unchanged) and swap (explicit update formulas)
-- `GramSchmidtInt.lean` — `gramDet`, `ν`, integrality of `ν`,
-  exact division under swap
-
-Mathlib's `gramSchmidt` works over inner product spaces and does not
-track `μ` coefficients or update formulas, so it cannot be used in the
-computational core. The `lean-lll-mathlib` bridge would later prove
-that our `gso` corresponds to Mathlib's `gramSchmidt`.
 
 **Highest-risk proof areas:**
 
-- **Swap update formulas.** The explicit formulas for how `gso`, `μ`,
-  `d`, and `ν` change under a swap (Sections 2b, 2d) are the most
+- **Swap update formulas.** The explicit formulas for how
+  `GramSchmidt.Int.basis`, `GramSchmidt.Int.coeffs`, `gramDet`, and
+  `scaledCoeffs` change under a swap (Sections 2b, 2d) are the most
   error-prone part. Each formula must be verified algebraically and
   the exact division proofs must be discharged.
 - **Exact division under swap.** Proving that
-  `(d_{k+1} * d_{k-1} + ν_{k,k-1}^2) / d_k` and the ν update
-  divisions are exact requires the determinant-based integrality
-  arguments from Section 2d.
+  `(gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2) / gramDet[k]`
+  and the scaledCoeffs update divisions are exact requires the
+  determinant-based integrality arguments from Section 2d.
 
 **Prior art.** The Isabelle AFP formalization (~14,800 lines across
 14 modules) uses a two-layer bisimulation: `LLL.thy` defines a
@@ -584,9 +589,9 @@ Then `d | n` (subfield containment), so `d ≤ n/q` for some prime
 5. If `g` is irreducible of degree `d` and `g | X^(p^n) - X`,
    then `d | n`
 
-**Where this lives.** Rabin's test is implemented in `lean-berlekamp`
+**Where this lives.** Rabin's test is implemented in `hex-berlekamp`
 (computational black box). Both directions of the correctness proof
-live in `lean-berlekamp-mathlib`, where Mathlib provides all the
+live in `hex-berlekamp-mathlib`, where Mathlib provides all the
 finite field theory (steps 1-5 above).
 
 ---
@@ -623,7 +628,7 @@ result, so quadratic is a valid optimization).
 ### 6. Mignotte bound validity
 
 ```lean
--- In lean-poly-z-mathlib
+-- In hex-poly-z-mathlib
 theorem mignotte_bound (f g : Polynomial ℤ) (hg : g ∣ f) (j : ℕ) :
     |(g.coeff j : ℤ)| ≤ Nat.choose g.natDegree j * ‖f‖₂
 ```
@@ -649,7 +654,7 @@ Landau's inequality (`mahlerMeasure_le_sqrt_sum_sq_norm_coeff`),
 the monotonicity lemma (`le_mahlerMeasure_mul_right`), and the
 Mignotte bound (`norm_coeff_le_choose_mul_mahlerMeasure_of_one_le_mahlerMeasure`)
 to `Mathlib.Analysis.Polynomial.MahlerMeasure`. Once merged, the
-lean-poly-z-mathlib proof reduces to mapping `ℤ[X] → ℂ[X]` and
+hex-poly-z-mathlib proof reduces to mapping `ℤ[X] → ℂ[X]` and
 applying these results.
 
 **Other open Mathlib PR:** https://github.com/leanprover-community/mathlib4/pull/33463
@@ -781,9 +786,9 @@ mod p and use the fact that F_p[x] has no zero divisors.
 ### 13. Ring equivalences (Mathlib bridges)
 
 ```lean
-def equiv : DensePoly R ≃+* Polynomial R          -- lean-poly-mathlib
-def equiv : GFq p n ≃+* GaloisField p n           -- lean-gfq-mathlib
-def equiv : ZMod64 p ≃+* ZMod p                   -- lean-mod-arith-mathlib
+def equiv : DensePoly R ≃+* Polynomial R          -- hex-poly-mathlib
+def equiv : GFq p n ≃+* GaloisField p n           -- hex-gfq-mathlib
+def equiv : ZMod64 p ≃+* ZMod p                   -- hex-mod-arith-mathlib
 ```
 
 These are "glue" theorems — define the map (coefficient-by-coefficient),
@@ -796,16 +801,16 @@ Difficulty depends on how cooperative Mathlib's API is.
 
 | # | Theorem | Library | Blocking? |
 |---|---------|---------|-----------|
-| 1 | `prod_berlekampFactor` / `irreducible_of_mem_berlekampFactor` | lean-berlekamp | Yes (factoring) |
-| 2 | `lll_short_vector` | lean-lll | Yes (poly-time BZ) |
-| 3 | `lll_swap_bound` | lean-lll | Yes (termination) |
-| 4 | `rabin_irreducible` | lean-berlekamp | No (Berlekamp suffices) |
-| 5 | `hensel_unique` | lean-hensel | Yes (quadratic lift) |
-| 6 | Mignotte bound | lean-poly-z-mathlib | Yes (unconditional BZ) |
-| 7 | `bareiss_eq_det` | lean-matrix | No (det not needed for BZ) |
-| 8 | Nullspace completeness | lean-matrix | Yes (Berlekamp kernel) |
-| 9 | Montgomery correctness | lean-arith | Yes (performance) |
-| 10 | `factor_unique` | lean-bz-mathlib | No (correctness suffices) |
-| 11 | Barrett correctness | lean-arith | Yes (performance) |
-| 12 | Gauss's lemma | lean-poly-z | Yes (content machinery) |
+| 1 | `prod_berlekampFactor` / `irreducible_of_mem_berlekampFactor` | hex-berlekamp | Yes (factoring) |
+| 2 | `lll_short_vector` | hex-lll | Yes (poly-time BZ) |
+| 3 | `lll_swap_bound` | hex-lll | Yes (termination) |
+| 4 | `rabin_irreducible` | hex-berlekamp | No (Berlekamp suffices) |
+| 5 | `hensel_unique` | hex-hensel | Yes (quadratic lift) |
+| 6 | Mignotte bound | hex-poly-z-mathlib | Yes (unconditional BZ) |
+| 7 | `bareiss_eq_det` | hex-matrix | No (det not needed for BZ) |
+| 8 | Nullspace completeness | hex-matrix | Yes (Berlekamp kernel) |
+| 9 | Montgomery correctness | hex-arith | Yes (performance) |
+| 10 | `factor_unique` | hex-bz-mathlib | No (correctness suffices) |
+| 11 | Barrett correctness | hex-arith | Yes (performance) |
+| 12 | Gauss's lemma | hex-poly-z | Yes (content machinery) |
 | 13 | Ring equivalences | various -mathlib | No (bridges) |
