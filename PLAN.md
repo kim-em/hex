@@ -137,7 +137,7 @@ proving correspondence with Mathlib's mathematical definitions):
 - **hex-gram-schmidt-mathlib** — `GramSchmidt.Int.basis` = Mathlib's `gramSchmidt`
 - **hex-poly-z-mathlib** — `DensePoly Int ≃+* Polynomial ℤ`, Mignotte bound (via Mathlib's Mahler measure)
 - **hex-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
-- **hex-hensel-mathlib** — Hensel lifting corresponds to Mathlib's `Polynomial` factoring
+- **hex-hensel-mathlib** — Hensel correctness, uniqueness, `coprime_mod_p_lifts`
 - **hex-lll-mathlib** — lattice = `Submodule ℤ`, short vector bound
 - **hex-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
 - **hex-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
@@ -930,9 +930,96 @@ This is safe because kernel membership depends only on the residue
 class: `f | h^p - h` iff `f | (h mod f)^p - (h mod f)`, and GCD
 computations respect reduction: `gcd(g, h - c) = gcd(g, (h mod g) - c)`.
 
-**Rabin's test** additionally requires finite field theory (also in
-Mathlib): quotient by irreducible is a field, `|GF(p^n)| = p^n`,
-Lagrange's theorem on the multiplicative group.
+**Proof strategy for `rabin_irreducible`:**
+
+Unlike Berlekamp's completeness proof (which avoids finite field
+theory entirely), both directions of Rabin's theorem require the
+theory of finite field extensions.
+
+The theorem statement needs `[Fact (Nat.Prime p)]` and `0 < n`.
+
+**(→) test passes ⟹ irreducible.** By contrapositive: assume `f`
+is reducible and both test conditions hold. The first condition
+`f | X^(p^n) - X` is already satisfied, so we derive a contradiction
+from the coprimality checks. Pick an irreducible factor `g | f` with
+degree `d < n`. Then `g | X^(p^n) - X`, so by the degree lemma
+(step 5 below) `d | n`. Since `d < n`, pick a prime `q | n/d`; then
+`q | n` and `d | n/q`. Therefore `g | X^(p^(n/q)) - X`, so
+`g | gcd(f, X^(p^(n/q)) - X)`, meaning the gcd is nontrivial and
+the coprimality check rejects.
+
+Note: `reducible f` alone does not give `d | n` — we need the
+test's divisibility condition `f | X^(p^n) - X` to get
+`g | X^(p^n) - X` first.
+
+**(←) irreducible ⟹ test passes.** Two parts:
+
+- `f | X^(p^n) - X`: the quotient `F_p[x]/(f)` is a field with
+  `p^n` elements. Every element `a` satisfies `a^(p^n) = a` by
+  `FiniteField.pow_card_pow`. So `X^(p^n) - X` vanishes in the
+  quotient, i.e. `f | X^(p^n) - X`.
+
+- `gcd(f, X^(p^(n/q)) - X) = 1` for each prime `q | n`: if the
+  gcd were nontrivial, since `f` is irreducible (hence prime in
+  `(ZMod p)[X]`), we'd have `f | X^(p^(n/q)) - X`. Applying the
+  degree lemma (step 5 below) gives `n | n/q`, impossible for
+  prime `q | n`.
+
+**Finite field theory used** (all in Mathlib; step 5 is
+assembled from (1)+(4)):
+
+1. Irreducible `f` of degree `n` ⟹ `F_p[x]/(f)` is a field.
+   `AdjoinRoot.instField` (`Mathlib.RingTheory.AdjoinRoot`): gives
+   `Field (AdjoinRoot f)` when `[Fact (Irreducible f)]`.
+
+2. `|F_p[x]/(f)| = p^n`.
+   `FiniteField.pow_finrank_eq_natCard`
+   (`Mathlib.FieldTheory.Finite.GaloisField`):
+   `p ^ Module.finrank (ZMod p) k = Nat.card k`.
+   `AdjoinRoot.powerBasis` provides the basis `{1, root, …, root^(n-1)}`
+   and `PowerBasis.dim` gives `finrank = natDegree`.
+
+3. `a^(p^n) = a` for all `a ∈ GF(p^n)`.
+   `FiniteField.pow_card` (`Mathlib.FieldTheory.Finite.Basic`):
+   `a ^ q = a` for any element of a finite field of order `q`.
+   Iterated: `FiniteField.pow_card_pow`.
+
+4. `GF(p^m) ⊆ GF(p^n)` iff `m | n`.
+   `FiniteField.nonempty_algHom_iff_finrank_dvd`
+   (`Mathlib.FieldTheory.Finite.GaloisField`):
+   `Nonempty (K →ₐ[F] L) ↔ Module.finrank F K ∣ Module.finrank F L`.
+
+5. `g` irreducible of degree `d`, `g | X^(p^n) - X` ⟹ `d | n`.
+   Assembled from (1)+(4): the hypothesis `g | X^(p^n) - X` means
+   `X^(p^n) - X` vanishes in `AdjoinRoot g`, so `root g` lies in
+   (the image of) `GF(p^n)`; use `AdjoinRoot.liftAlgHom` to build
+   an embedding `AdjoinRoot g →ₐ[ZMod p] GF(p^n)`. Then (4) gives
+   `Module.finrank (ZMod p) (AdjoinRoot g) ∣ Module.finrank (ZMod p) (GF(p^n))`,
+   which is `d ∣ n`.
+
+**Additional useful Mathlib API:**
+- `GaloisField` = `SplittingField (X ^ p ^ n - X)`, with
+  `GaloisField.card`: `Nat.card (GaloisField p n) = p ^ n`
+- `GaloisField.algEquivGaloisField`: any finite field with `p^n`
+  elements is isomorphic to `GaloisField p n`
+- `FiniteField.roots_X_pow_card_sub_X`: all elements of `K` are
+  roots of `X^|K| - X`
+- `FiniteField.galois_poly_separable`: `X^q - X` is separable
+
+**Local glue lemmas needed** (not one-liners from Mathlib):
+- `AdjoinRoot.mk_eq_zero`: turn `f | P` into `P(root f) = 0` in
+  `AdjoinRoot f`
+- Build `AdjoinRoot g →ₐ[ZMod p] GF(p^n)` from `g | X^(p^n) - X`
+  via `AdjoinRoot.liftAlgHom`
+- `finrank (ZMod p) (AdjoinRoot g) = g.natDegree` from
+  `AdjoinRoot.powerBasis` and `PowerBasis.dim`
+- gcd ↔ divisibility bridge: `gcd(f, P) ≠ 1` plus `Irreducible f`
+  gives `f | P` in `Polynomial (ZMod p)`, via Euclidean-domain / prime API
+- Divisibility arithmetic: from `d | n` and `d < n`, choose a prime
+  `q | n/d` and derive `d | n/q` and `q | n`
+- Computational bridge: `rabinTest f = true` unfolds to the exact
+  divisibility check `f | X^(p^n) - X` plus coprimality of
+  `f` with `X^(p^(n/q)) - X` for each prime `q | n`
 
 ---
 
@@ -1054,53 +1141,158 @@ Both sides equal `p ^ n` — Mathlib has `GaloisField.card` and we need
 ### hex-hensel (Hensel lifting, depends on hex-poly-fp + hex-poly-z)
 
 Lifts a factorization of `f mod p` to a factorization of `f mod p^k`.
+Contains only the lifting algorithms — all correctness proofs live in
+hex-hensel-mathlib.
 
 **Contents:**
 - **Linear Hensel lifting**: from `mod p^k` to `mod p^(k+1)`
 - **Quadratic Hensel lifting**: from `mod p^k` to `mod p^(2k)` (doubling)
 - **Multifactor lifting**: binary factor tree approach
-- **Mignotte bound**: compute the required lifting height `k`
 
-**Key properties:**
+Hex-hensel lifts to a requested precision `k`; the caller (typically
+hex-berlekamp-zassenhaus) computes `k` from the Mignotte bound.
+
+**Linear Hensel lifting algorithm:**
+
+Input: `f, g, h : ZPoly` with `g` monic, `s, t : FpPoly p` with
+`s*g + t*h ≡ 1 mod p`. Precondition (not checked): `g*h ≡ f mod p^k`.
+
+```
+1. e := coeffwise_div (f - g*h) p^k    -- truncating Int.div
+2. (q, r) := divmod(t*e, g) in F_p[x]  -- deg(r) < deg(g)
+3. g' := g + p^k * lift(r)
+4. h' := h + p^k * lift(s*e + q*h mod p)
+```
+
+Correctness: `r*h + g*(s*e + q*h) = (s*g + t*h)*e = e mod p`, so
+`g'*h' ≡ g*h + p^k*e ≡ f mod p^(k+1)`.
+
+Key properties:
+- `s, t` are computed once mod `p` and reused at every step
+- `deg(δg) < deg(g)` from divmod, so `g'` stays monic of same degree
+- `deg(δh) < deg(h)` follows from `deg(e) < deg(f) = deg(g) + deg(h)`
+  (proof in hex-hensel-mathlib)
+- Output coefficients are reduced mod `p^(k+1)`
+
+**Quadratic Hensel lifting algorithm:**
+
+Input: `f, g, h : ZPoly` with `g` monic, `s, t : ZPoly` with
+`s*g + t*h ≡ 1 mod m`. Precondition: `g*h ≡ f mod m`.
+
+Factor update (mod `m²`):
+```
+1. e := f - g*h
+2. (q, r) := divmod(t*e, g) in (Z/m²Z)[x]
+3. g* := g + r mod m²
+4. h* := h + s*e + q*h mod m²
+```
+
+Bezout update — divmod by `g*` (which is monic):
+```
+5. b := s*g* + t*h* - 1
+6. (q, r) := divmod(t*b, g*) in (Z/m²Z)[x]
+7. t* := t - r
+8. s* := s - s*b - q*h*
+```
+
+Correctness: `s**g* + t**h* = 1 - b²`. Since `b ≡ 0 mod m`, we get
+`b² ≡ 0 mod m²`, so `s**g* + t**h* ≡ 1 mod m²`.
+
+Note: divmod by `g*` (not `h*`) because `g*` is monic; `h` may not be.
+Both factor and Bezout coefficients must be lifted together at each
+doubling step (unlike linear lifting which reuses `s, t` mod `p`).
+
+**Strategy**: Start with linear lifting (simpler invariant, easier to
+verify). Add quadratic as an optimization proved equivalent via
+uniqueness (in hex-hensel-mathlib).
+
+---
+
+### hex-hensel-mathlib (depends on hex-hensel + hex-poly-mathlib + Mathlib)
+
+Proves correctness of Hensel lifting algorithms and the uniqueness
+theorem for coprime polynomial factorization lifting.
+
+**Key lemma — coprimality lifts through p^k:**
+```lean
+theorem coprime_mod_p_lifts (g h : Polynomial ℤ) (p : ℕ) (k : ℕ)
+    [Fact (Nat.Prime p)] (hk : 0 < k) :
+    IsCoprime (g.map (Int.castRingHom (ZMod p)))
+              (h.map (Int.castRingHom (ZMod p))) →
+    IsCoprime (g.map (Int.castRingHom (ZMod (p ^ k))))
+              (h.map (Int.castRingHom (ZMod (p ^ k))))
+```
+Proof: choose Bezout coefficients mod `p`, lift their coefficients to
+`ZMod (p^k)` via the surjective reduction map `ZMod (p^k) → ZMod p`.
+The lifted combination equals `1 + p·u`; since `p·u` is nilpotent in
+`ZMod (p^k)` (`(p·u)^k = 0`), the element `1 + p·u` is a unit.
+Multiply the lifted Bezout identity by its inverse.
+
+**Correctness theorems** (transferred from hex-hensel via ring equiv
+`DensePoly Int ≃+* Polynomial ℤ`):
 ```lean
 theorem hensel_correct (f g h : ZPoly) (p k : Nat) :
     let (g', h') := henselLift f g h p k
-    (g' * h').congr f (p^(k+1))
+    (g'.map φ) * (h'.map φ) = f.map φ
+  where φ := Int.castRingHom (ZMod (p ^ (k + 1)))
 
-theorem hensel_extends_fst (f g h : ZPoly) (p k : Nat) :
-    (henselLift f g h p k).1.congr g (p^k)
+theorem hensel_extends (f g h : ZPoly) (p k : Nat) :
+    (henselLift f g h p k).1.map φ = g.map φ
+  where φ := Int.castRingHom (ZMod (p ^ k))
 
-theorem hensel_extends_snd (f g h : ZPoly) (p k : Nat) :
-    (henselLift f g h p k).2.congr h (p^k)
-
-theorem hensel_degree_fst (f g h : ZPoly) (p k : Nat) :
+theorem hensel_degree (f g h : ZPoly) (p k : Nat) :
     (henselLift f g h p k).1.degree = g.degree
-
-theorem hensel_degree_snd (f g h : ZPoly) (p k : Nat) :
-    (henselLift f g h p k).2.degree = h.degree
-
--- The deep theorem: uniqueness of Hensel lifting.
-theorem hensel_unique_fst (f g h g' h' : ZPoly) (p k : Nat) :
-    g.leadingCoeff = 1 →
-    (g * h).congr f (p^k) →
-    (g' * h').congr f (p^k) →
-    g.congr g' p →
-    h.congr h' p →
-    g.coprimeModP h p →
-    g = g'
-
-theorem hensel_unique_snd (f g h g' h' : ZPoly) (p k : Nat) :
-    g.leadingCoeff = 1 →
-    (g * h).congr f (p^k) →
-    (g' * h').congr f (p^k) →
-    g.congr g' p →
-    h.congr h' p →
-    g.coprimeModP h p →
-    h = h'
 ```
 
-**Strategy**: Start with linear lifting (simpler invariant, easier to
-verify). Add quadratic as an optimization proved equivalent via uniqueness.
+**Uniqueness theorem:**
+```lean
+theorem hensel_unique (f g h g' h' : Polynomial ℤ) (p : ℕ) (k : ℕ)
+    [Fact (Nat.Prime p)] (hk : 0 < k)
+    (hg : g.Monic) (hg' : g'.Monic)
+    (hdeg : g.natDegree = g'.natDegree)
+    (hprod : (g.map φₖ) * (h.map φₖ) = f.map φₖ)
+    (hprod' : (g'.map φₖ) * (h'.map φₖ) = f.map φₖ)
+    (hg1 : g.map φ₁ = g'.map φ₁)
+    (hh1 : h.map φ₁ = h'.map φ₁)
+    (hcop : IsCoprime (g.map φ₁) (h.map φ₁)) :
+    g.map φₖ = g'.map φₖ ∧ h.map φₖ = h'.map φₖ
+  where
+    φₖ := Int.castRingHom (ZMod (p ^ k))
+    φ₁ := Int.castRingHom (ZMod p)
+```
+
+**Proof of `hensel_unique`** (induction on `k`):
+- Base `k = 1`: immediate from hypotheses `hg1`, `hh1`.
+- Inductive step: by IH, `g' ≡ g + p^n · A` and `h' ≡ h + p^n · B`
+  mod `p^(n+1)`. Product equality gives `A·h + B·g = 0` in
+  `(ZMod p)[X]`. Since `gcd(g,h) = 1` mod `p`, we get `g | A·h`,
+  hence `g | A`. Monicity of `g` and `g'` with `natDegree g =
+  natDegree g'` gives `natDegree A < natDegree g`, so `A = 0`.
+  Then `B·g = 0` in `(ZMod p)[X]`; since `g` is monic (nonzero) and
+  `(ZMod p)[X]` is a domain, `B = 0`.
+
+Note: `coprime_mod_p_lifts` is NOT needed for the induction step
+(the divisibility argument uses coprimality mod `p`, not mod `p^n`).
+It is needed separately by hex-berlekamp-zassenhaus-mathlib for
+lifting Bezout coefficients.
+
+**Mathlib infrastructure used:**
+- `Polynomial.map` + `map_mul`, `map_sub` (congruences as equalities)
+- `IsCoprime.map` (coprimality through ring homs)
+- `EuclideanDomain` for `Polynomial (ZMod p)` (GCD, Bezout — ZMod p only)
+- `C_dvd_iff_dvd_coeff` (coefficient-wise divisibility)
+- `Monic.map`, `Monic.natDegree_mul` (degree control)
+- `map_divByMonic`, `map_modByMonic` (division commutes with ring homs)
+
+Do NOT use `EuclideanDomain` over `ZMod (p^k)` for `k > 1` — it is
+not a field. Use monic division there.
+
+**Glue lemmas to prove locally:**
+- Coefficient divisibility ↔ equality after `Polynomial.map`
+- Exactness of coefficient-wise `Int.div` (if `p^k ∣ coeff`, then
+  mapping `coeff / p^k` gives the expected quotient mod `p`)
+- Map compatibility for `ZMod (p^(k+1)) → ZMod (p^k) → ZMod p`
+- Nilpotent/unit lemma for `1 + p·u` in `Polynomial (ZMod (p^k))`
 
 ---
 

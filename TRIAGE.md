@@ -8,103 +8,6 @@ relevant library section) and deleted from here.
 
 ## Tier 1: Major Theorems
 
-### 4. Rabin's irreducibility test (`rabin_irreducible`)
-
-```lean
-theorem rabin_irreducible (f : FpPoly p) (hf : f.degree = n) :
-    rabinTest f = true ↔ Irreducible f
-```
-
-Unlike Berlekamp's completeness proof (which avoids finite field
-theory entirely), both directions of Rabin's theorem require the
-theory of finite field extensions.
-
-**(→) test passes ⟹ irreducible.** Contrapositive: if `f` is
-reducible, `f = g * h` with `g` irreducible of degree `d < n`.
-Then `d | n` (subfield containment), so `d ≤ n/q` for some prime
-`q | n`, giving `g | X^(p^(n/q)) - X` and thus
-`gcd(f, X^(p^(n/q)) - X) ≠ 1`.
-
-**(←) irreducible ⟹ test passes.** Two parts:
-- `f | X^(p^n) - X`: in `F_p[x]/(f)` (a field with `p^n` elements),
-  every element satisfies `a^(p^n) = a` by Lagrange's theorem on the
-  multiplicative group. So `f | X^(p^n) - X`.
-- `gcd(f, X^(p^(n/q)) - X) = 1`: if nontrivial, `f` would share a
-  root with `X^(p^(n/q)) - X`, placing it in `GF(p^(n/q))`. But
-  the minimal polynomial of a root of `f` has degree `n`, and
-  `n/q < n` — contradiction.
-
-**Finite field theory needed** (not needed for Berlekamp).
-All five pieces are in Mathlib:
-
-1. Irreducible `f` of degree `n` ⟹ `F_p[x]/(f)` is a field.
-   `AdjoinRoot.instField` (`Mathlib.RingTheory.AdjoinRoot`): gives
-   `Field (AdjoinRoot f)` when `[Fact (Irreducible f)]`.
-
-2. `|F_p[x]/(f)| = p^n`.
-   `pow_finrank_eq_natCard` (`Mathlib.FieldTheory.Finite.GaloisField`):
-   `p ^ Module.finrank (ZMod p) k = Nat.card k`.
-   `AdjoinRoot.powerBasis` provides `{1, root, …, root^(n-1)}`.
-
-3. `a^(p^n) = a` for all `a ∈ GF(p^n)`.
-   `FiniteField.pow_card` (`Mathlib.FieldTheory.Finite.Basic`):
-   `a ^ q = a` for any element of a finite field of order `q`.
-   Iterated: `FiniteField.pow_card_pow`.
-
-4. `GF(p^m) ⊆ GF(p^n)` iff `m | n`.
-   `nonempty_algHom_iff_finrank_dvd`
-   (`Mathlib.FieldTheory.Finite.GaloisField`):
-   `Nonempty (K →ₐ[F] L) ↔ Module.finrank F K ∣ Module.finrank F L`.
-
-5. `g` irreducible of degree `d`, `g | X^(p^n) - X` ⟹ `d | n`.
-   Not a single Mathlib theorem; assembled from (1)+(4): if `g` has a
-   root in `GF(p^n)` then `AdjoinRoot g` (degree `d` over `F_p`)
-   embeds into `GF(p^n)` (degree `n`), so `d | n` by
-   `nonempty_algHom_iff_finrank_dvd`.
-
-Additional useful Mathlib API:
-- `GaloisField` = `SplittingField (X ^ p ^ n - X)`, with
-  `GaloisField.card`: `Nat.card (GaloisField p n) = p ^ n`
-- `algEquivGaloisField`: any finite field with `p^n` elements `≅ GaloisField p n`
-- `roots_X_pow_card_sub_X`: all elements of `K` are roots of `X^|K| - X`
-- `galois_poly_separable`: `X^q - X` is separable
-
-**Where this lives.** Rabin's test is implemented in `hex-berlekamp`
-(computational black box). Both directions of the correctness proof
-live in `hex-berlekamp-mathlib`, where Mathlib provides all the
-finite field theory (steps 1-5 above).
-
----
-
-### 5. Hensel uniqueness (`hensel_unique`)
-
-```lean
-theorem hensel_unique (f g h g' h' : ZPoly) (p k : Nat) :
-    g.leadingCoeff = 1 →
-    g * h ≡ f [MOD p^k] → g' * h' ≡ f [MOD p^k] →
-    g ≡ g' [MOD p] → h ≡ h' [MOD p] →
-    coprime_mod g h p →
-    g = g' ∧ h = h'
-```
-
-**Why it's hard:** Induction on k. The base case (k=1) is immediate.
-The inductive step requires showing that the coprimality condition
-lifts: if g, h are coprime mod p and g*h ≡ f mod p^k, then the
-Bezout coefficients can be adjusted to work mod p^(k+1). The
-leading coefficient condition (g monic) pins down the factorization
-uniquely — without it, you can redistribute units between g and h.
-
-The plan labels this "the deep theorem." It's the key ingredient for
-connecting linear and quadratic Hensel lifting (they produce the same
-result, so quadratic is a valid optimization).
-
-**Research needed:**
-- Exact statement of the coprimality lifting lemma
-- Whether the induction is on k or on the precision doubling steps
-- The Isabelle proof structure for this
-
----
-
 ### 6. Mignotte bound validity
 
 ```lean
@@ -284,8 +187,6 @@ Difficulty depends on how cooperative Mathlib's API is.
 | 1 | `prod_berlekampFactor` / `irreducible_of_mem_berlekampFactor` | hex-berlekamp | Yes (factoring) |
 | 2 | `lll_short_vector` | hex-lll | Yes (poly-time BZ) |
 | 3 | `lll_swap_bound` | hex-lll | Yes (termination) |
-| 4 | `rabin_irreducible` | hex-berlekamp | No (Berlekamp suffices) |
-| 5 | `hensel_unique` | hex-hensel | Yes (quadratic lift) |
 | 6 | Mignotte bound | hex-poly-z-mathlib | Yes (unconditional BZ) |
 | 7 | `bareiss_eq_det` | hex-matrix | No (det not needed for BZ) |
 | 8 | Nullspace completeness | hex-matrix | Yes (Berlekamp kernel) |
