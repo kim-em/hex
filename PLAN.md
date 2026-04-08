@@ -431,7 +431,7 @@ Dense matrices as `Vector (Vector R m) n`.
   /-- Shared conditions for any echelon form (RREF or HNF). -/
   structure IsEchelonForm (M : Matrix R n m) (D : RowEchelonData R n m) : Prop where
     transform_mul : D.transform * M = D.echelon
-    transform_inv : ∃ u, det D.transform * u = 1
+    transform_inv : ∃ Tinv : Matrix R n n, Tinv * D.transform = 1
     rank_le_n : D.rank ≤ n
     rank_le_m : D.rank ≤ m
     pivotCols_sorted : ∀ i j, i < j → D.pivotCols[i] < D.pivotCols[j]
@@ -455,18 +455,24 @@ Dense matrices as `Vector (Vector R m) n`.
   indices; this decomposition is used by both span and nullspace.
 
   ```lean
-  def RowEchelonData.freeCols (D : RowEchelonData R n m) :
+  /-- Sorted complement of pivotCols in Fin m. Requires IsEchelonForm
+      because pivotCols_sorted + rank_le_m guarantee distinct pivots. -/
+  def IsEchelonForm.freeCols (E : IsEchelonForm M D) :
       Vector (Fin m) (m - D.rank)
 
-  theorem RowEchelonData.freeCols_sorted (D : RowEchelonData R n m) :
-      ∀ i j, i < j → D.freeCols[i] < D.freeCols[j]
+  theorem IsEchelonForm.freeCols_sorted (E : IsEchelonForm M D) :
+      ∀ i j, i < j → E.freeCols[i] < E.freeCols[j]
 
   /-- Every column is exclusively a pivot column or a free column. -/
-  theorem RowEchelonData.colPartition (D : RowEchelonData R n m)
+  theorem IsEchelonForm.colPartition (E : IsEchelonForm M D)
       (j : Fin m) :
       (∃ i : Fin D.rank, D.pivotCols[i] = j) ∨
-      (∃ k : Fin (m - D.rank), D.freeCols[k] = j)
-  -- and exclusivity: the two cases are disjoint
+      (∃ k : Fin (m - D.rank), E.freeCols[k] = j)
+
+  theorem IsEchelonForm.colPartition_exclusive (E : IsEchelonForm M D)
+      (j : Fin m) :
+      ¬((∃ i : Fin D.rank, D.pivotCols[i] = j) ∧
+        (∃ k : Fin (m - D.rank), E.freeCols[k] = j))
   ```
 
   **Span via echelon form.** Given an `IsEchelonForm`, solve for
@@ -485,20 +491,24 @@ Dense matrices as `Vector (Vector R m) n`.
   ```
 
   **Nullspace** via RREF. Each free variable gives one basis vector.
-  Requires `[Field R]` because the basis-vector formula depends on
-  RREF properties (pivots are 1, other pivot-column entries are 0).
+  The basis-vector formula uses negation (`[Ring R]`) and the proof
+  of completeness requires RREF (`[Field R]` for computing RREF).
 
   ```lean
-  /-- Basis vector for free column fₖ:
-      bₖ[fₖ] = 1, bₖ[fₗ] = 0 for l ≠ k,
-      bₖ[pᵢ] = -echelon[i][fₖ] for each pivot row i. -/
-  def IsRREF.nullspace (E : IsRREF M D) : Array (Vector R m)
+  /-- Primary definition. Basis vectors as columns of an m × (m - rank) matrix.
+      Column k (for free column fₖ):
+        row fₖ = 1, row fₗ = 0 for l ≠ k,
+        row pᵢ = -echelon[i][fₖ] for each pivot row i. -/
+  def IsRREF.nullspaceMatrix [Ring R] (E : IsRREF M D) :
+      Matrix R m (m - D.rank)
+
+  /-- Individual basis vectors (columns of nullspaceMatrix). -/
+  def IsRREF.nullspace [Ring R] (E : IsRREF M D) :
+      Vector (Vector R m) (m - D.rank)
 
   /-- Convenience: compute RREF internally. -/
-  def Matrix.nullspace [Field R] (M : Matrix R n m) : Array (Vector R m)
-
-  /-- Pack basis vectors as columns: Matrix R m (m - D.rank). -/
-  def IsRREF.nullspaceMatrix (E : IsRREF M D) : Matrix R m (m - D.rank)
+  def Matrix.nullspace [Field R] (M : Matrix R n m) :
+      Vector (Vector R m) (m - rref_rank)
   ```
 
 - Generic over the coefficient type `R`
@@ -532,29 +542,36 @@ division by the previous pivot.
 - `spanCoeffs_sound : E.spanCoeffs v = some c → M * c = v`
 - `spanCoeffs_complete : (∃ c, M * c = v) → (E.spanCoeffs v).isSome`
 - `spanContains_iff : E.spanContains v = true ↔ ∃ c, M * c = v`
-- `freeCols_sorted`, `colPartition` (see column partition above)
+- `transform_mul_inv : ∃ Tinv, D.transform * Tinv = 1` (left inv → right inv for square matrices)
+- `freeCols_sorted`, `colPartition`, `colPartition_exclusive` (see column partition above)
+- `pivotCols_injective`, `freeCols_injective` (from `_sorted`)
+- `pivotCols_disjoint_freeCols` (from `colPartition_exclusive`)
 - Nullspace soundness and completeness (see below)
-- Rank-nullity (see below)
 
 **Nullspace correctness:**
 
 ```lean
-theorem nullspace_sound (E : IsRREF M D) :
-    ∀ v ∈ E.nullspace, M * v = 0
+theorem nullspace_sound [Ring R] (E : IsRREF M D) (k : Fin (m - D.rank)) :
+    M * E.nullspace[k] = 0
 
 theorem nullspace_complete [Field R] (E : IsRREF M D) (v : Vector R m) :
     M * v = 0 → ∃ c : Vector R (m - D.rank), E.nullspaceMatrix * c = v
-
-theorem nullspace_rank (E : IsRREF M D) :
-    E.nullspace.size + D.rank = m
 ```
+
+(`nullspace_rank` is now definitional: `E.nullspace` has type
+`Vector _ (m - D.rank)`, so its length is `m - D.rank` by construction.)
+
+Proof strategy for `nullspace_sound`: verify `D.echelon * bₖ = 0`
+directly from the basis-vector formula and RREF properties, then
+use `transform_inv` to obtain `Tinv` with `Tinv * D.transform = 1`,
+so `M = Tinv * D.echelon` and `M * bₖ = Tinv * (D.echelon * bₖ) = 0`.
 
 Proof strategy for `nullspace_complete`:
 
 1. **Push through transform.** `M * v = 0` implies
    `D.echelon * v = 0` via `transform_mul` and associativity.
 
-2. **Construct witness.** Define `cₖ := v[D.freeCols[k]]` for each
+2. **Construct witness.** Define `cₖ := v[E.freeCols[k]]` for each
    `k : Fin (m - D.rank)`.
 
 3. **Verify entry by entry.** Split `j : Fin m` using `colPartition`:
