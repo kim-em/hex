@@ -1147,77 +1147,74 @@ Specialized polynomial arithmetic over `Z`.
 
 Proves `DensePoly Int ≃+* Polynomial ℤ` and the Mignotte bound.
 
-**Mignotte bound — proof strategy using existing Mathlib results:**
+**Mignotte bound — proof strategy.**
 
-Mathlib already has the heavy analysis. The key results (all in
-`Mathlib.Analysis.Polynomial.MahlerMeasure`, by Fabrizio Barroero):
-
-1. **Mahler measure definition and root-product formula:**
-   `mahlerMeasure_eq_leadingCoeff_mul_prod_roots`:
-   `M(p) = ‖leadingCoeff‖ * ∏ max(1, ‖αᵢ‖)`
-
-2. **Multiplicativity:** `mahlerMeasure_mul`:
-   `M(p * q) = M(p) * M(q)`
-
-3. **Coefficient bound:** `norm_coeff_le_choose_mul_mahlerMeasure`:
-   `‖p.coeff n‖ ≤ C(deg p, n) * M(p)`
-
-4. **Landau-type bounds:**
-   - `mahlerMeasure_le_sum_norm_coeff`: `M(p) ≤ ‖p‖₁`
-   - `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`:
-     `M(p) ≤ √(deg+1) * ‖p‖_∞`
-   - The classical `M(p) ≤ ‖p‖₂` is not stated separately but is an
-     intermediate step in the proof of the sqrt bound (via Parseval
-     from `Mathlib.Analysis.Polynomial.Fourier`).
-
-The Mignotte bound proof is then short glue:
+Statement (needs `hf : f ≠ 0`; false otherwise since every polynomial
+divides 0):
 
 ```lean
-theorem mignotte_bound (f g : Polynomial ℤ) (hg : g ∣ f) (j : ℕ) :
-    |(g.coeff j : ℤ)| ≤ Nat.choose g.natDegree j * ‖f‖₂
+theorem mignotte_bound (f g : Polynomial ℤ) (hf : f ≠ 0) (hg : g ∣ f) (j : ℕ) :
+    (Int.natAbs (g.coeff j) : ℝ) ≤ Nat.choose g.natDegree j * l2norm f
 ```
 
-Proof outline:
-- Map `f`, `g` to `Polynomial ℂ` via `Polynomial.map (Int.castRingHom ℂ)`.
-- `g ∣ f` gives `f = g * h`, so `M(f) = M(g) * M(h)` by
-  `mahlerMeasure_mul`.
-- `M(h) ≥ 1` for nonzero integer polynomials: the leading coefficient
-  has `‖leadingCoeff‖ ≥ 1` (it's a nonzero integer), and
-  `one_le_prod_max_one_norm_roots` gives `∏ max(1, ‖αᵢ‖) ≥ 1`.
-  So `M(h) = ‖lc‖ * ∏ max(1, ‖αᵢ‖) ≥ 1`, hence `M(g) ≤ M(f)`.
-- `norm_coeff_le_choose_mul_mahlerMeasure` gives
-  `‖g.coeff j‖ ≤ C(deg g, j) * M(g) ≤ C(deg g, j) * M(f)`.
-- `M(f) ≤ ‖f‖₂` by Parseval + Jensen (extractable from the proof of
-  `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`, or proved
-  directly via `sum_sq_norm_coeff_eq_circleAverage`).
+where `l2norm f := Real.sqrt (∑ i in f.support, (f.coeff i : ℝ) ^ 2)`.
+The core theorem is over `ℝ` (matching Mathlib's Mahler measure API).
+An integer-facing corollary can extract `|g.coeff j| ≤ ⌊...⌋₊` if
+needed by downstream code.
 
-The proof is short glue, mostly coercion bookkeeping between
-`ℤ[X]` and `ℂ[X]`.
+**Mathlib API.** All heavy analysis is in
+`Mathlib.Analysis.Polynomial.MahlerMeasure`.
+https://github.com/leanprover-community/mathlib4/pull/37349 added:
+
+- `mahlerMeasure_le_sqrt_sum_sq_norm_coeff` (Landau's inequality)
+- `le_mahlerMeasure_mul_right` (monotonicity)
+- `norm_coeff_le_choose_mul_mahlerMeasure_of_one_le_mahlerMeasure`
+  (Mignotte bound)
+
+The earlier Mahler measure library (by Fabrizio Barroero) provides:
+
+- `mahlerMeasure_mul`: `M(p * q) = M(p) * M(q)`
+- `norm_coeff_le_choose_mul_mahlerMeasure`: `‖p.coeff n‖ ≤ C(deg, n) * M(p)`
+- `one_le_prod_max_one_norm_roots`: `∏ max(1, ‖αᵢ‖) ≥ 1`
+
+**Proof outline and glue steps.**
+
+1. **Cast to `ℂ[X]`.** Define `F G H : Polynomial ℂ` via
+   `Polynomial.map (Int.castRingHom ℂ)`. From `hg`, obtain
+   `h : Polynomial ℤ` with `f = g * h`; map to `F = G * H`
+   via `Polynomial.map_mul`.
+
+2. **Nonzero cofactor.** From `hf` and `f = g * h`, since
+   `Polynomial ℤ` is a domain, get `h ≠ 0`. Then `H ≠ 0` by
+   injectivity of `Int.castRingHom ℂ` (via `Polynomial.map_ne_zero_of_injective`
+   or `map_injective`). This gives `1 ≤ H.mahlerMeasure`.
+
+3. **Monotonicity.** Apply `le_mahlerMeasure_mul_right` (or use
+   `mahlerMeasure_mul` + `1 ≤ H.mahlerMeasure`) to get
+   `G.mahlerMeasure ≤ F.mahlerMeasure`.
+
+4. **Coefficient bound.** Apply
+   `norm_coeff_le_choose_mul_mahlerMeasure_of_one_le_mahlerMeasure`
+   to `G` (with `1 ≤ G.mahlerMeasure` from integer polynomial
+   nonzero, or chain through `F`'s bound directly):
+   `‖G.coeff j‖ ≤ C(G.natDegree, j) * F.mahlerMeasure`.
+
+5. **Landau bound.** Apply `mahlerMeasure_le_sqrt_sum_sq_norm_coeff`
+   to bound `F.mahlerMeasure ≤ √(∑ ‖F.coeff i‖²)`.
+
+6. **Transport back to `ℤ`.** Three small lemmas:
+   - **Coefficients:** `G.coeff j = ↑(g.coeff j)` — by
+     `Polynomial.coeff_map`.
+   - **Degree:** `G.natDegree = g.natDegree` — by
+     `Polynomial.natDegree_map_of_injective` (injective cast).
+   - **Norms:** `‖((g.coeff j : ℤ) : ℂ)‖ = |(g.coeff j : ℝ)|` —
+     via `Complex.norm_intCast` or `Complex.norm_ofReal` +
+     `Int.cast_abs`. Similarly the L2 sum over `F`'s coefficients
+     equals `l2norm f` since `‖((f.coeff i : ℤ) : ℂ)‖² = (f.coeff i : ℝ)²`.
 
 **Open Mathlib PR:** https://github.com/leanprover-community/mathlib4/pull/33463
-("Mahler Measure for other rings", Kevin Wilson, open since Jan 2026)
-extends the Mahler measure definition beyond `ℂ[X]`. If this lands,
-the `ℤ → ℂ` coercion step becomes cleaner.
-
-**Candidates for upstreaming to Mathlib:**
-
-The following results are natural additions to Mathlib's Mahler measure
-library and should be contributed independently of this project:
-
-- `mahlerMeasure_le_l2norm`: the classical Landau inequality
-  `M(p) ≤ ‖p‖₂ := √(∑ ‖coeff i‖²)`, currently only an intermediate
-  step inside the proof of `mahlerMeasure_le_sqrt_natDegree_add_one_mul_supNorm`.
-  Extracting it as a standalone theorem is straightforward.
-- `one_le_mahlerMeasure_of_intPoly`: `M(p) ≥ 1` for nonzero integer
-  polynomials (leading coeff has norm ≥ 1, root product ≥ 1).
-- `mahlerMeasure_dvd_le`: `g ∣ f → M(g) ≤ M(f)` for integer
-  polynomials. Immediate from multiplicativity + the above.
-- The Mignotte bound itself: `‖g.coeff j‖ ≤ C(deg g, j) * M(f)`
-  when `g ∣ f` over ℤ. This is a one-line corollary but would be a
-  useful named result.
-
-These are all small PRs that complete the Mahler measure story for
-the most common use case (integer polynomials).
+("Mahler Measure for other rings") extends the Mahler measure definition
+beyond `ℂ[X]`. If this lands, the `ℤ → ℂ` coercion step becomes cleaner.
 
 ---
 
