@@ -90,7 +90,8 @@ to the Lean runtime.
 - **hex-matrix** — dense matrices as `Vector (Vector R m) n`, RREF, Bareiss determinant, span, nullspace
 - **hex-gram-schmidt** — Gram-Schmidt orthogonalization, GS coefficients, Gram determinants, update formulas under row operations
 - **hex-mod-arith** — `ZMod64 p`: `UInt64`-backed arithmetic in `Z/pZ`
-- **hex-poly-fp** — polynomials over `F_p`, Frobenius map, square-free decomposition
+- **hex-poly-fp** — polynomials over `F_p`, Frobenius map, square-free decomposition, lazy reduction for small p
+- **hex-gf2** — packed bitwise polynomials over `F_2` (XOR + CLMUL), `GF(2^n)` elements
 - **hex-poly-z** — polynomials over `Z`, content/primitive part, Mignotte bound
 - **hex-berlekamp** — Berlekamp factoring and Rabin irreducibility test over `F_p`
 - **hex-hensel** — Hensel lifting from `mod p` to `mod p^k`
@@ -119,8 +120,10 @@ hex-poly-z  hex-poly-fp         /       hex-lll
                   hex-berlekamp-zassenhaus
 ```
 
-Additional libraries (finite field construction):
+Additional libraries (finite field construction, GF(2)):
 ```
+hex-poly ── hex-gf2
+
         hex-berlekamp
          /          \
   hex-gfq-field  hex-conway
@@ -139,6 +142,7 @@ proving correspondence with Mathlib's mathematical definitions):
 - **hex-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
 - **hex-hensel-mathlib** — Hensel correctness, uniqueness, `coprime_mod_p_lifts`
 - **hex-lll-mathlib** — lattice = `Submodule ℤ`, short vector bound
+- **hex-gf2-mathlib** — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hirr`
 - **hex-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
 - **hex-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
@@ -160,17 +164,23 @@ Core integer arithmetic that everything else builds on.
   `mpz_invert` — for big-integer operations where values exceed 64 bits
 - Pure Lean implementations of the same for the proof target
 
-**Barrett reduction** — fast single modular multiplication on `UInt64`.
-Precompute an approximate reciprocal of the modulus, then reduce via
-multiply + shift instead of division.
+**Barrett reduction** — fast single modular multiplication on `UInt64`
+for small moduli (`p < 2^32`). Precompute an approximate reciprocal
+of the modulus, then reduce via multiply + shift instead of division.
+
+The restriction `p < 2^32` is essential: it ensures `a * b < p² < 2^64`
+fits in a single `UInt64`, so the approximation `q = mulHi(T, pinv)`
+works with a 64-bit reciprocal. For `p ≥ 2^32`, use Montgomery.
 
 ```lean
 structure BarrettCtx (p : UInt64) where
-  p_pos : p > 0
+  p_gt : p.toNat > 1
+  p_lt : p.toNat < 2^32
   pinv : UInt64
   pinv_eq : pinv = .ofNat (2 ^ 64 / p.toNat)
 
-def BarrettCtx.mk (p : UInt64) (hp : p > 0) : BarrettCtx p
+def BarrettCtx.mk (p : UInt64) (hp : p.toNat > 1) (hlt : p.toNat < 2^32) :
+    BarrettCtx p
 def BarrettCtx.mulMod (ctx : BarrettCtx p) (a b : UInt64) : UInt64
 ```
 
@@ -188,6 +198,103 @@ theorem BarrettCtx.mulMod_eq (ctx : BarrettCtx p) (a b : UInt64)
     (ha : a < p) (hb : b < p) :
     ctx.mulMod a b = .mk ⟨(a.toNat * b.toNat) % p.toNat, by omega⟩
 ```
+
+**Barrett proof organization.** Five layers (three Barrett-specific,
+sharing Layers 1–2 with Montgomery). Simpler than Montgomery because
+there's no domain conversion or inverse computation, and the product
+fits in a single `UInt64`.
+
+*Layer 1 — `HexArith/UInt64/Wide.lean` (shared with Montgomery).*
+128-bit arithmetic: `mulHi`, `addCarry`, `subBorrow`. See Montgomery
+section below.
+
+*Layer 2 — `HexArith/Nat/ModArith.lean` (shared with Montgomery).*
+Nat-level modular lemmas. See Montgomery section below.
+
+*Layer 3 — `HexArith/Barrett/ReduceNat.lean` (pure Nat math).* Barrett
+reduction stated and proved at `Nat` with `R = 2^64`. No `UInt64`:
+
+```lean
+/-- Barrett reduction at the Nat level.
+    Given T = a * b (fits in a single word since p < 2^32),
+    pinv = ⌊R / p⌋:
+    1. q = ⌊T * pinv / R⌋   — approximate quotient T / p
+    2. r = T - q * p          — approximate remainder
+    3. if r ≥ p then r - p    — at most one corrective subtraction -/
+def barrettReduceNat (p pinv T : Nat) : Nat :=
+  let q := T * pinv / R
+  let r := T - q * p
+  if r ≥ p then r - p else r
+```
+
+The key bound: `pinv = ⌊R / p⌋`, so `R/p - 1 < pinv ≤ R/p`.
+
+```lean
+theorem barrettReduceNat_eq_mod (hp : 1 < p) (hpinv : pinv = R / p)
+    (hT : T < R) :
+    barrettReduceNat p pinv T = T % p
+
+theorem barrettReduceNat_lt (hp : 1 < p) (hpinv : pinv = R / p)
+    (hT : T < R) :
+    barrettReduceNat p pinv T < p
+```
+
+Note: the caller provides `T < R` which follows from `a, b < p < 2^32`
+giving `T = a * b < 2^64 = R`.
+
+Proof of `barrettReduceNat_eq_mod`:
+
+1. **Quotient bound.** Let `q_exact = T / p` and `q = T * pinv / R`.
+
+   Upper bound (`q ≤ q_exact`): `pinv = ⌊R/p⌋ ≤ R/p`, so
+   `T * pinv ≤ T * R/p`, hence `q = ⌊T * pinv / R⌋ ≤ T/p`.
+
+   Lower bound (`q ≥ q_exact - 1`): `pinv ≥ R/p - 1`, so
+   `T * pinv ≥ T * (R/p - 1) = T*R/p - T`. Hence
+   `T * pinv / R ≥ T/p - T/R`. Since `T < R`, we get `T/R < 1`,
+   so `q ≥ ⌊T/p - T/R⌋ ≥ T/p - 1 = q_exact - 1`.
+
+2. **Remainder bound.** `r = T - q*p`. Since `q ≤ q_exact`,
+   `r ≥ T mod p ≥ 0`. Since `q ≥ q_exact - 1`,
+   `r ≤ T mod p + p < 2p`. And `2p < 2^33 < R`, so `r` fits
+   in a single `UInt64`.
+
+3. **Conditional subtraction.** If `r ≥ p`, then `r - p = T mod p`.
+   If `r < p`, then `r = T mod p` directly.
+
+*Layer 4 — `HexArith/Barrett/Reduce.lean` (UInt64 bridge).* Executable
+Barrett reduction in `UInt64`, proven equivalent to `barrettReduceNat`.
+Since `p < 2^32`, the product `T = a * b` fits in a single `UInt64`
+(no 128-bit splitting needed):
+
+```lean
+def barrettReduce (ctx : BarrettCtx p) (T : UInt64) : UInt64 :=
+  let q := mulHi T ctx.pinv
+  let r := T - q * p
+  if r ≥ p then r - p else r
+
+theorem toNat_barrettReduce (ctx : BarrettCtx p) (T : UInt64)
+    (hT : T.toNat < p.toNat * p.toNat) :
+    (barrettReduce ctx T).toNat =
+      barrettReduceNat p.toNat ctx.pinv.toNat T.toNat
+```
+
+The bridge is straightforward: `mulHi T pinv` = `T.toNat * pinv.toNat / R`
+by `toNat_mulHi`, and `T - q * p` is safe (no underflow since `q ≤ T/p`
+means `q * p ≤ T`). No high-word reasoning needed.
+
+*Layer 5 — `HexArith/Barrett/Context.lean` (user-facing API).*
+`BarrettCtx.mulMod` defined as `barrettReduce ctx (a * b)`. The product
+`a * b` doesn't overflow because `a < p < 2^32` and `b < p < 2^32`
+give `a.toNat * b.toNat < 2^64`. The three user-facing theorems
+(`mulMod_lt`, `toNat_mulMod`, `mulMod_eq`) follow from
+`toNat_barrettReduce` + `barrettReduceNat_eq_mod`.
+
+**Why Barrett is simpler than Montgomery:** no domain conversion
+(no `toMont`/`fromMont`), no Montgomery inverse computation (no
+Newton iteration), the product fits in a single word, and the Nat-level
+proof is a direct approximation argument rather than a modular-inverse
+congruence.
 
 **Montgomery reduction** — optimized for sustained modular arithmetic
 (sequences of multiplications with the same modulus, e.g. exponentiation
@@ -526,12 +633,34 @@ a_{ij}^{(k)} = (a_{kk}^{(k-1)} · a_{ij}^{(k-1)} - a_{ik}^{(k-1)} · a_{kj}^{(k-
 where `/` is `Int.divExact` (GMP-backed `mpz_divexact`) — the division is
 always exact, and the divisibility proof is carried.
 
-**Proof that `bareiss M = det M`:** Via row operations. Each Bareiss
-step is equivalent to: scale rows below the pivot,
-subtract the appropriate multiple, then divide out the accumulated extra
-factor. The row operation lemmas (proved directly from Leibniz) track
-`det` through each step, and the scaling factors telescope due to the
-division by the previous pivot.
+**Proof that `bareiss M = det M`:** Via the bordered-minor invariant.
+Define `μ(k; i, j) := det M[rows 0..k-1 ∪ {i} | cols 0..k-1 ∪ {j}]`.
+The invariant `a^{(k)}_{ij} = μ(k; i, j)` holds by induction, where
+the induction step is the Desnanot–Jacobi identity:
+```
+μ(k+1; i, j) · μ(k-1; k-1, k-1)
+  = μ(k; k, k) · μ(k; i, j) − μ(k; i, k) · μ(k; k, j)
+```
+for `i, j ≥ k+1`, with `μ(-1; -1, -1) := 1`. At `k = n-1` this
+gives `det M`. Exact division follows: `μ(k+1; i, j)` is an integer
+whenever the previous pivot `μ(k-1; k-1, k-1) ≠ 0`.
+
+Do not reprove Desnanot–Jacobi locally — track
+https://github.com/leanprover-community/mathlib4/pull/37716
+(`Mathlib.LinearAlgebra.Matrix.Determinant.DesnanotJacobi`). If merged,
+import it; otherwise prove locally using Mathlib's `Matrix.adjugate`.
+
+Implementation split:
+1. `bareissNoPivot_eq_det`: under `NonzeroBareissPivots M`, prove via
+   the invariant + Desnanot–Jacobi.
+2. `bareissDet_eq_det`: public API with row pivoting. If pivot search
+   fails at step k, prove `det M = 0`; otherwise compose row swaps
+   into a permutation, apply the no-pivot theorem, use `det_rowSwap`
+   for sign.
+
+The proof lives in hex-matrix-mathlib. Row-operation lemmas
+(`det_rowSwap`, `det_rowScale`, `det_rowAdd`) remain in hex-matrix
+for RREF and pivot sign tracking.
 
 **Key properties:**
 - `det_one : det 1 = 1`
@@ -852,14 +981,137 @@ Specialized polynomial arithmetic over `Z/pZ` using `UInt64` coefficients.
 - Square-free decomposition: output factors are pairwise coprime, their
   product equals the input, each factor is square-free
 
-For `GF(2)` specifically, consider a packed bitwise representation:
+**Lazy reduction for small p.** When `1 < p < 2^32`, the product
+`a * b` of two `ZMod64 p` values fits in a `UInt64` without overflow
+(since `(2^32 - 1)^2 < 2^64`). This means sums of products can be
+accumulated in `UInt64` before reducing mod `p`, as long as the
+accumulator doesn't overflow. For a dot product of length `k`, the
+worst-case accumulator value is `k * (p - 1)^2`, which fits in
+`UInt64` when `k * (p - 1)^2 < 2^64`. For p = 3, that's ~4.6 × 10^18
+terms; for p = 65537, it's ~4.3 × 10^9 terms.
+
+This applies to dot-product-shaped kernels: matrix-vector multiply,
+matrix-matrix multiply, Berlekamp matrix construction. For RREF
+elimination updates that aren't pure dot products, reduce after each
+step or use chunked accumulation.
+
+Implementation: provide a `LazyZMod64` type (or just `UInt64`
+accumulator functions) with:
 ```lean
+def dotModP (p : Nat) (hp : 1 < p) (hpp : p < 2^32)
+    (a b : Vector (ZMod64 p) k)
+    (hk : k * (p - 1)^2 < 2^64) : ZMod64 p
+```
+The proof obligation is just overflow bounds. The correctness theorem
+says `dotModP` equals the naive `∑ aᵢ * bᵢ mod p`. This lives in
+hex-mod-arith (or hex-matrix as a fast path for matrix operations).
+
+For large p (≥ 2^32), each multiplication must reduce immediately
+(or use 128-bit intermediates), so lazy reduction doesn't apply.
+
+---
+
+### hex-gf2 (GF(2) packed arithmetic, depends on hex-poly)
+
+Packed bitwise representation of polynomials over F_2. Addition is
+XOR, multiplication uses carry-less multiply. Substantially faster
+than the generic `FpPoly 2` path (up to 64x for addition-heavy
+workloads). Actual speedups depend on workload; benchmarks comparing
+`GF2Poly` vs `FpPoly 2` for Berlekamp matrix construction and
+polynomial GCD are planned.
+
+**Contents:**
+
+```lean
+/-- Polynomial over F_2, packed into 64-bit words.
+    Bit j of words[i] represents the coefficient of x^(64*i + j). -/
 structure GF2Poly where
   words : Array UInt64
   degree : Nat
+  wf : (words = #[] ∧ degree = 0) ∨
+       (words.back! ≠ 0 ∧ degree < 64 * words.size ∧
+        words[degree / 64]! &&& (1 <<< (degree % 64)) ≠ 0 ∧
+        ∀ i, degree < i → i < 64 * words.size →
+          words[i / 64]! &&& (1 <<< (i % 64)) = 0)
+  -- Zero: words = #[], degree = 0.
+  -- Nonzero: last word nonzero, bit `degree` set, no bits above.
 ```
-Addition = XOR, multiplication uses carry-less multiply. 64x speedup
-for `F_2` polynomials, important for coding theory.
+
+- Addition: word-by-word XOR
+- Multiplication: schoolbook or Karatsuba on 64-bit blocks, where
+  each block multiply uses carry-less multiply via `@[extern]`
+  calling a C wrapper that uses CLMUL on x86 (with compile-time
+  feature detection) and a portable shift-and-XOR fallback on other
+  architectures.
+- Division with remainder (for polynomial GCD, modular reduction)
+- GCD and extended GCD over `GF2Poly`
+- Shift operations (multiply/divide by x^k)
+
+**Key properties:**
+- Ring axioms (char 2 gives `a + a = 0`; mul commutativity from the
+  convolution definition over a commutative coefficient ring)
+- `GF2Poly` is a Euclidean domain (degree function is the norm)
+- Equivalence: `GF2Poly ≃+* FpPoly 2` (unpack/repack, in hex-gf2-mathlib)
+
+**Carry-less multiply.** The `@[extern]` story mirrors hex-arith's
+GMP externals: the pure Lean `clmul` is the logical definition used
+in proofs; the C wrapper replaces it at runtime. Correctness of the
+extern is trusted (same as `mpz_gcd`, `mpz_mul`, etc.).
+
+The pure Lean fallback (also used as the logical definition):
+```
+def clmul (a b : UInt64) : UInt64 × UInt64 :=
+  -- 64 iterations of: if bit i of b is set, XOR a << i into
+  -- 128-bit accumulator (hi, lo). Must handle shift-past-64
+  -- correctly by splitting into high/low word contributions.
+```
+Slower than hardware CLMUL but avoids the per-operation Barrett
+overhead of the generic `ZMod64 2` path.
+
+**GF(2^n) elements.** Elements of `GF(2^n)` are polynomials of degree
+< n over F_2, reduced modulo an irreducible of degree n. Two cases:
+
+1. **n < 64**: a single `UInt64` suffices. The irreducible modulus
+   `x^n + (lower terms)` is stored as `irr : UInt64` containing only
+   the lower n coefficients (the leading `x^n` term is implicit).
+   Addition is XOR, multiplication is CLMUL followed by reduction
+   mod the irreducible (a few XORs with precomputed masks). This
+   gives `GF(2^8)` for AES, `GF(2^16)` for coding theory, etc.
+   (n = 64 excluded because reduction requires `1 <<< n` which is
+   undefined for `UInt64` shift-by-64; use `GF2nPoly` for n ≥ 64.)
+
+2. **n ≥ 64**: use `GF2Poly` with modular reduction after each
+   multiply. `GF(2^64)`, `GF(2^128)` for GCM/GHASH, `GF(2^256)`
+   for some post-quantum schemes.
+
+```lean
+/-- GF(2^n) packed into a single UInt64. Requires n < 64.
+    irr stores the lower n coefficients of a monic degree-n
+    irreducible; the leading x^n term is implicit. -/
+structure GF2n (n : Nat) (irr : UInt64)
+    (hn : 0 < n) (hn64 : n < 64)
+    (hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)) where
+  val : UInt64
+  val_lt : val.toNat < 2^n
+
+/-- GF(2^n) for arbitrary n, using GF2Poly.
+    This is a quotient ring F_2[x]/(f), parallel to hex-gfq-ring
+    but over GF2Poly instead of FpPoly. Operations: add via XOR,
+    multiply via CLMUL then reduce mod f. -/
+structure GF2nPoly (f : GF2Poly) (hirr : GF2Poly.Irreducible f) where
+  val : GF2Poly
+  val_reduced : val.IsZero ∨ val.degree < f.degree
+```
+
+For the small case, `GF2n` gets `Field` and `Fintype` instances
+directly (field axioms from the irreducibility proof `hirr`).
+For large n, `GF2nPoly` builds its own quotient-field structure
+(parallel to hex-gfq-ring/hex-gfq-field, but over the packed
+`GF2Poly` representation rather than `FpPoly`).
+
+The ring equivalences `GF2n ≃+* FiniteField 2 f hirr` and
+`GF2nPoly ≃+* FiniteField 2 f hirr` live in hex-gf2-mathlib,
+transferring via `GF2Poly ≃+* FpPoly 2`.
 
 ---
 
@@ -877,7 +1129,6 @@ Specialized polynomial arithmetic over `Z`.
   def ZPoly.coprimeModP (f g : ZPoly) (p : Nat) : Prop := ...
   ```
 - Content and primitive part: `f = content(f) * primitivePart(f)`
-- Gauss's lemma: the product of primitive polynomials is primitive
 - Mignotte bound computation: `|gⱼ| ≤ C(k,j) · ‖f‖₂` for any degree-k
   factor `g | f` in `Z[x]`. The computation is just binomial coefficients
   and the 2-norm of `f`'s coefficients. The proof that the bound is valid
@@ -885,8 +1136,10 @@ Specialized polynomial arithmetic over `Z`.
 - Reduction modulo p: `ZPoly → FpPoly p`
 
 **Key properties:**
-- `content(f * g) = content(f) * content(g)` (Gauss)
 - `primitivePart(f)` is primitive (content = 1)
+- Gauss's lemma (`content(f * g) = content(f) * content(g)`) is not
+  needed in this library — it transfers from Mathlib via the ring
+  equivalence in hex-poly-z-mathlib.
 
 ---
 
@@ -2285,6 +2538,7 @@ Each library with its immediate dependencies:
 - **hex-gfq-ring** — hex-poly-fp
 - **hex-gfq-field** — hex-berlekamp
 - **hex-gfq** — hex-gfq-field, hex-conway
+- **hex-gf2** — hex-poly
 - **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel, hex-lll
 
 Mathlib bridge libraries (each also depends on Mathlib):
@@ -2297,6 +2551,7 @@ Mathlib bridge libraries (each also depends on Mathlib):
 - **hex-lll-mathlib** — hex-lll
 - **hex-berlekamp-mathlib** — hex-berlekamp
 - **hex-hensel-mathlib** — hex-hensel
+- **hex-gf2-mathlib** — hex-gf2, hex-poly-fp, hex-gfq-field
 - **hex-gfq-mathlib** — hex-gfq
 - **hex-berlekamp-zassenhaus-mathlib** — hex-berlekamp-zassenhaus, hex-poly-z-mathlib
 
@@ -2452,10 +2707,10 @@ linear systems. Like HNF, requires extended GCD and is not needed for
 Berlekamp-Zassenhaus.
 
 **Sylvester's identity (hex-matrix).** The Desnanot-Jacobi identity
-relating minors of a matrix. A useful result in its own right, and
-gives an alternative proof that `bareiss M = det M`: show by induction
-that Bareiss step k computes the leading k×k minor
-`det(M[1..k, 1..k])`, with Sylvester's identity as the inductive step.
+relating minors of a matrix. Now the primary proof strategy for
+`bareiss_eq_det` (see hex-matrix section above). Listed here as
+further work only in the sense that it's a useful standalone result
+beyond the Bareiss application.
 
 **Generic Bareiss over integral domains (hex-matrix).** Generalize
 Bareiss from `Int` to any integral domain with a data-carrying exact
