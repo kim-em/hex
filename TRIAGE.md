@@ -34,16 +34,40 @@ Then `d | n` (subfield containment), so `d ≤ n/q` for some prime
   the minimal polynomial of a root of `f` has degree `n`, and
   `n/q < n` — contradiction.
 
-**Finite field theory needed** (not needed for Berlekamp):
-1. Irreducible `f` of degree `n` ⟹ `F_p[x]/(f)` is a field
-   (quotient by irreducible is integral domain, finite integral
-   domain is a field)
-2. `|F_p[x]/(f)| = p^n` (counting polynomials of degree `< n`)
-3. `a^(p^n) = a` for all `a ∈ GF(p^n)` (Lagrange on the
-   multiplicative group of order `p^n - 1`)
-4. `GF(p^m) ⊆ GF(p^n)` iff `m | n`
-5. If `g` is irreducible of degree `d` and `g | X^(p^n) - X`,
-   then `d | n`
+**Finite field theory needed** (not needed for Berlekamp).
+All five pieces are in Mathlib:
+
+1. Irreducible `f` of degree `n` ⟹ `F_p[x]/(f)` is a field.
+   `AdjoinRoot.instField` (`Mathlib.RingTheory.AdjoinRoot`): gives
+   `Field (AdjoinRoot f)` when `[Fact (Irreducible f)]`.
+
+2. `|F_p[x]/(f)| = p^n`.
+   `pow_finrank_eq_natCard` (`Mathlib.FieldTheory.Finite.GaloisField`):
+   `p ^ Module.finrank (ZMod p) k = Nat.card k`.
+   `AdjoinRoot.powerBasis` provides `{1, root, …, root^(n-1)}`.
+
+3. `a^(p^n) = a` for all `a ∈ GF(p^n)`.
+   `FiniteField.pow_card` (`Mathlib.FieldTheory.Finite.Basic`):
+   `a ^ q = a` for any element of a finite field of order `q`.
+   Iterated: `FiniteField.pow_card_pow`.
+
+4. `GF(p^m) ⊆ GF(p^n)` iff `m | n`.
+   `nonempty_algHom_iff_finrank_dvd`
+   (`Mathlib.FieldTheory.Finite.GaloisField`):
+   `Nonempty (K →ₐ[F] L) ↔ Module.finrank F K ∣ Module.finrank F L`.
+
+5. `g` irreducible of degree `d`, `g | X^(p^n) - X` ⟹ `d | n`.
+   Not a single Mathlib theorem; assembled from (1)+(4): if `g` has a
+   root in `GF(p^n)` then `AdjoinRoot g` (degree `d` over `F_p`)
+   embeds into `GF(p^n)` (degree `n`), so `d | n` by
+   `nonempty_algHom_iff_finrank_dvd`.
+
+Additional useful Mathlib API:
+- `GaloisField` = `SplittingField (X ^ p ^ n - X)`, with
+  `GaloisField.card`: `Nat.card (GaloisField p n) = p ^ n`
+- `algEquivGaloisField`: any finite field with `p^n` elements `≅ GaloisField p n`
+- `roots_X_pow_card_sub_X`: all elements of `K` are roots of `X^|K| - X`
+- `galois_poly_separable`: `X^q - X` is separable
 
 **Where this lives.** Rabin's test is implemented in `hex-berlekamp`
 (computational black box). Both directions of the correctness proof
