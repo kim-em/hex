@@ -201,22 +201,6 @@ and are useful building blocks regardless.
 
 ---
 
-### 8. Nullspace completeness
-
-```lean
-theorem nullspace_complete (E : IsEchelonForm M D) (v : Vector R m) :
-    M * v = 0 → E.nullspace.toMatrix.spanContains v
-```
-
-**Why it's hard:** Must show the computed basis vectors (one per free
-variable) span the entire kernel. The standard argument: any kernel
-vector, when restricted to pivot columns, is determined by its free-
-variable entries (back-substitution from RREF), so it's a linear
-combination of the basis vectors. Formalizing the back-substitution
-argument requires careful index manipulation.
-
----
-
 ## Tier 3: Hard but Well-Understood Patterns
 
 ### 11. Barrett reduction correctness
@@ -269,7 +253,6 @@ Difficulty depends on how cooperative Mathlib's API is.
 | 3 | `lll_swap_bound` | hex-lll | Yes (termination) |
 | 6 | Mignotte bound | hex-poly-z-mathlib | Yes (unconditional BZ) |
 | 7 | `bareiss_eq_det` | hex-matrix | No (det not needed for BZ) |
-| 8 | Nullspace completeness | hex-matrix | Yes (Berlekamp kernel) |
 | 11 | Barrett correctness | hex-arith | Yes (performance) |
 | 12 | Gauss's lemma | hex-poly-z | Yes (content machinery) |
 | 13 | Ring equivalences | various -mathlib | No (bridges) |
