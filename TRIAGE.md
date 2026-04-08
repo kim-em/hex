@@ -10,8 +10,7 @@ relevant library section) and deleted from here.
 
 ### 6. Mignotte bound validity
 
-**Corrected statement** (needs `hf : f ≠ 0`; false otherwise since
-every polynomial divides 0):
+Statement (needs `hf : f ≠ 0` since every polynomial divides 0):
 
 ```lean
 -- In hex-poly-z-mathlib
