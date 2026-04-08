@@ -52,6 +52,8 @@ What we get for free and what we need to build.
 
 **Available:**
 - `Nat.gcd` / `Int.gcd` — GMP-backed via `@[extern "lean_nat_gcd"]`
+- `Nat.divExact` / `Int.divExact` — GMP-backed (`mpz_divexact`), requires
+  divisibility proof; faster than regular division
 - `Nat.Coprime` — `gcd m n = 1`, decidable, with lemmas
 - `Nat.lcm` / `Int.lcm`
 - `Rat` — proper rational field with `Lean.Grind.Field` instance
@@ -361,7 +363,8 @@ elimination) over `Int`. The Bareiss recurrence at step k is:
 ```
 a_{ij}^{(k)} = (a_{kk}^{(k-1)} · a_{ij}^{(k-1)} - a_{ik}^{(k-1)} · a_{kj}^{(k-1)}) / a_{k-1,k-1}^{(k-2)}
 ```
-where `/` is `Int.div` — the division is always exact (no remainder).
+where `/` is `Int.divExact` (GMP-backed `mpz_divexact`) — the division is
+always exact, and the divisibility proof is carried.
 
 **Proof that `bareiss M = det M`:** Via row operations. Each Bareiss
 step is equivalent to: scale rows below the pivot,
@@ -1128,7 +1131,8 @@ namespace ComputationalAlgebra.GramSchmidt.Int
 noncomputable def basis (b : Matrix Int n m) : Matrix Rat n m
 
 /-- The Gram-Schmidt coefficients. Lower-unitriangular: entry (i,j) is
-    ⟨b_i, gso_j⟩ / ⟨gso_j, gso_j⟩ for j < i, 1 on diagonal, 0 above. -/
+    ⟨b[i], (basis b)[j]⟩ / ⟨(basis b)[j], (basis b)[j]⟩ for j < i,
+    1 on diagonal, 0 above. -/
 noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n
 
 /-- The k-th Gram determinant: det of the k×k leading Gram submatrix.
@@ -1596,5 +1600,6 @@ that Bareiss step k computes the leading k×k minor
 
 **Generic Bareiss over integral domains (hex-matrix).** Generalize
 Bareiss from `Int` to any integral domain with a data-carrying exact
-division operation (`ediv : α → α → α` with `b ∣ a → ediv a b * b = a`)
+division operation (`ediv : α → α → α` with `b ∣ a → ediv a b * b = a`);
+for `Int` this is `Int.divExact`
 and no zero divisors (`a * b = 0 → a = 0 ∨ b = 0`).

@@ -23,76 +23,78 @@ theorem lll_short_vector (b : Matrix Int n m) (δ : Rat)
 **Hypotheses.** `δ ∈ (1/4, 1]` is required: `δ > 1/4` so that
 `α = 1/(δ - 1/4)` is well-defined and positive; `δ ≤ 1` for
 termination (the Lovász failure condition is strict, so each swap
-gives `gramDet[k]^{new} < δ · gramDet[k] ≤ gramDet[k]`, strictly
+gives `gramDet b' k < δ · gramDet b k ≤ gramDet b k`, strictly
 decreasing the potential even at `δ = 1`).
 Linear independence of the input basis ensures all Gram determinants
-`gramDet[k] > 0`, which is needed for the GS orthogonalization to
-exist and for the d-representation denominators to be nonzero.
+`gramDet b k > 0`, which is needed for the GS orthogonalization to
+exist and for the scaledCoeffs denominators to be nonzero.
 
 
 ---
 
 #### 2a. Definitions
 
-All indices are 0-based throughout (matching Lean and the Isabelle
-formalization).
+**Gram-Schmidt orthogonalization.** Given a basis b : Matrix Int n m
+(rows b[0], ..., b[n-1]) of a lattice L in Z^m, the GS functions
+from lean-gram-schmidt produce:
 
-**Gram-Schmidt orthogonalization.** Given a basis b_0, ..., b_{n-1}
-of a lattice L in Z^m, define orthogonal vectors basis[0], ...,
-basis[n-1] (traditionally gso_0, ..., gso_{n-1}) and coefficients
-coeffs[i][j] (traditionally μ_{i,j}) by:
+- `basis b : Matrix Rat n m` — the orthogonal vectors
+- `coeffs b : Matrix Rat n n` — the GS coefficients (lower-unitriangular)
+- `gramDet b k : Nat` — the k-th Gram determinant
+- `scaledCoeffs b : Matrix Int n n` — integer-scaled coefficients
 
-    basis[0] = b_0
-    coeffs[i][j] = <b_i, basis[j]> / <basis[j], basis[j]>     for j < i
-    basis[i] = b_i - sum_{j=0}^{i-1} coeffs[i][j] * basis[j]
+Defined by:
 
-Key property: basis[i] is the projection of b_i onto the orthogonal
-complement of span(b_0, ..., b_{i-1}). Size reduction does not
-change the basis vectors (only column operations b_k <- b_k + c*b_j
-with j < k are performed, which leave the Gram-Schmidt vectors
-invariant).
+    (basis b)[0] = b[0]
+    (coeffs b)[i][j] = <b[i], (basis b)[j]> / <(basis b)[j], (basis b)[j]>     for j < i
+    (basis b)[i] = b[i] - sum_{j=0}^{i-1} (coeffs b)[i][j] * (basis b)[j]
 
-**Gram determinants.** Define gramDet[0] = 1 (traditionally d_0 = 1)
-and for k >= 1:
+Key property: (basis b)[i] is the projection of b[i] onto the
+orthogonal complement of span(b[0], ..., b[i-1]). Size reduction
+does not change the GS basis (only column operations
+b[k] <- b[k] + c*b[j] with j < k are performed, which leave
+basis b invariant).
 
-    gramDet[k] = det(G_k)
+**Gram determinants.** gramDet b 0 = 1, and for k >= 1:
 
-where G_k is the k x k Gram matrix of b_0, ..., b_{k-1},
-i.e., (G_k)_{i,j} = <b_i, b_j> for 0 <= i, j < k. For integer
-lattices, gramDet[k] is always a positive integer (determinant of a
-positive-definite integer Gram matrix).
+    gramDet b k = det(G_k)
+
+where G_k is the k x k Gram matrix of b[0], ..., b[k-1],
+i.e., (G_k)_{i,j} = <b[i], b[j]> for 0 <= i, j < k. For integer
+lattices, gramDet b k is always a positive integer (determinant of
+a positive-definite integer Gram matrix).
 
 **Theorem (GS norms = ratio of consecutive Gram determinants).**
 By induction on the Gram-Schmidt recurrence:
 
-    gramDet[k] = prod_{j=0}^{k-1} ||basis[j]||^2
+    gramDet b k = prod_{j=0}^{k-1} ||(basis b)[j]||^2
 
 *Proof sketch.* The Gram matrix G_k factors as L D L^T where L is
-lower-unitriangular with L_{i,j} = coeffs[i][j] and
-D = diag(||basis[j]||^2). So det(G_k) = prod ||basis[j]||^2.
+lower-unitriangular with L_{i,j} = (coeffs b)[i][j] and
+D = diag(||(basis b)[j]||^2).
+So det(G_k) = prod ||(basis b)[j]||^2.
 
 This gives the crucial identity:
 
-    ||basis[k]||^2 = gramDet[k+1] / gramDet[k]
+    ||(basis b)[k]||^2 = gramDet b (k+1) / gramDet b k
 
-**Scaled GS coefficients.** Define scaledCoeffs[i][j] (traditionally
-ν_{i,j}):
+**Scaled GS coefficients.**
 
-    scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j]     for j < i
+    (scaledCoeffs b)[i][j] = gramDet b (j+1) * (coeffs b)[i][j]     for j < i
 
 These are always integers (see Section 2d for the proof). The
 algorithm works entirely with scaledCoeffs and gramDet, never
 computing coeffs directly.
 
-**delta-LLL-reduced.** A basis b_0, ..., b_{n-1} is delta-LLL-reduced
-(for delta in (1/4, 1]) if it satisfies two conditions:
+**delta-LLL-reduced.** A basis b is delta-LLL-reduced (for
+delta in (1/4, 1]) if it satisfies two conditions:
 
-1. **Size-reduced:** |coeffs[i][j]| <= 1/2 for all 0 <= j < i < n.
+1. **Size-reduced:** |(coeffs b)[i][j]| <= 1/2 for all 0 <= j < i < n.
 
 2. **Lovász condition:** For all 0 <= i < n-1:
-       delta * ||basis[i]||^2 <= ||basis[i+1]||^2 + coeffs[i+1][i]^2 * ||basis[i]||^2
+       delta * ||(basis b)[i]||^2 <= ||(basis b)[i+1]||^2 + (coeffs b)[i+1][i]^2 * ||(basis b)[i]||^2
 
-   Equivalently: (delta - coeffs[i+1][i]^2) * ||basis[i]||^2 <= ||basis[i+1]||^2
+   Equivalently: (delta - (coeffs b)[i+1][i]^2) * ||(basis b)[i]||^2 <= ||(basis b)[i+1]||^2
 
 ---
 
@@ -148,7 +150,7 @@ Let B = ν[k][k-1]. After swapping b[k] and b[k-1]:
 
 *d update:*
 
-    d[k]^{new} = (d[k+1] * d[k-1] + B^2) / d[k]
+    d[k]' = (d[k+1] * d[k-1] + B^2) / d[k]
 
 This division is exact (see Section 2d). All other d[i] are unchanged.
 
@@ -158,8 +160,8 @@ For j < k-1: ν[k-1][j] and ν[k][j] simply swap.
 
 For i > k, the two affected columns update simultaneously:
 
-    ν[i][k-1]^{new} = (ν[i][k-1] * d[k]^{new} + ν[i][k] * B) / d[k]
-    ν[i][k]^{new}   = (ν[i][k] * d[k-1] - ν[i][k-1] * B) / d[k]
+    ν[i][k-1]' = (ν[i][k-1] * d[k]' + ν[i][k] * B) / d[k]
+    ν[i][k]'   = (ν[i][k] * d[k-1] - ν[i][k-1] * B) / d[k]
 
 (Verify precise formulas against Cohen Algorithm 2.6.3 or von zur
 Gathen & Gerhard Algorithm 16.10 during implementation.) All
@@ -194,7 +196,7 @@ termination_by (s.potential, n - k)
 -- Advance: sizeReduce preserves d (GS vectors unchanged), so potential
 --   unchanged; n - k decreases.
 -- Swap: the failing Lovász condition (read from d and ν via d_eq/ν_eq)
---   gives d[k]^new < δ * d[k] < d[k]; potential strictly decreases.
+--   gives d[k]' < δ * d[k] < d[k]; potential strictly decreases.
 
 def lll (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hind : b.independent) : Matrix Int n m :=
@@ -203,14 +205,14 @@ def lll (b : Matrix Int n m) (δ : Rat)
 ```
 
 The swap bound `potential_initial ≤ (maxNormSq b)^{n*(n-1)/2}` follows
-from `gramDet[k] ≤ (maxNormSq b)^k` (each row of the Gram matrix has entries
+from `gramDet k ≤ (maxNormSq b)^k` (each row of the Gram matrix has entries
 ≤ maxNormSq b, so the determinant is bounded by the product of row norms).
 
 **Loop invariant.** At the top of the loop with current index k,
 expressed in terms of the noncomputable projections `s.gramSchmidtCoeff` and the
 GS vectors (which are mathematical functions of `s.b`, not stored):
 
-(I1) b_0, ..., b_{n-1} is a basis of the same lattice L as the input.
+(I1) b[0], ..., b[n-1] is a basis of the same lattice L as the input.
 (I2) basis[0], ..., basis[n-1] and coeffs[i][j] are the correct
      Gram-Schmidt orthogonalization of the current basis. (This is
      captured by `s.ν_eq` and `s.d_eq`, which assert that the stored
@@ -250,7 +252,7 @@ At entry (j = k-1), (SR1) is vacuous. At exit (j < 0), (SR1) gives
   below k-1, we now have all conditions below k, so (I3)+(I4) hold
   for the new k.
 
-- *Swap (b_k <-> b_{k-1}, k <- max(k-1, 1)):* Preserves the lattice
+- *Swap (b[k] <-> b[k-1], k <- max(k-1, 1)):* Preserves the lattice
   (I1). Changes only basis[k-1] and basis[k] among the GS vectors (I2).
   The Lovász conditions for indices < k-2 are unaffected (I4). We
   lose the size-reduction guarantee at the new k (the swapped vector
@@ -287,17 +289,17 @@ v in L, we have:
 
     ||v||^2 >= min_{0 <= i < n} ||basis[i]||^2
 
-*Proof.* Write v = sum_{i=0}^{n-1} a_i * b_i with a_i in Z (not all
+*Proof.* Write v = sum_{i=0}^{n-1} a_i * b[i] with a_i in Z (not all
 zero). Let k be the largest index with a_k != 0. Expand in the
 GS basis:
 
-    v = sum_{i=0}^{k} a_i * b_i
+    v = sum_{i=0}^{k} a_i * b[i]
       = sum_{i=0}^{k} a_i * (basis[i] + sum_{j<i} coeffs[i][j] * basis[j])
       = sum_{i=0}^{k} c_i * basis[i]
 
 for some real coefficients c_i, where crucially c_k = a_k (because
-b_k = basis[k] + sum_{j<k} coeffs[k][j] * basis[j], and no later
-b_i contributes to the basis[k] component). Since a_k is a nonzero
+b[k] = basis[k] + sum_{j<k} coeffs[k][j] * basis[j], and no later
+b[i] contributes to the basis[k] component). Since a_k is a nonzero
 integer, |c_k| >= 1.
 
 By orthogonality of the basis[i]:
@@ -309,18 +311,18 @@ By orthogonality of the basis[i]:
 
 **Step 3: Combining.** For any nonzero v in L:
 
-    ||b_0||^2 = ||basis[0]||^2              (b_0 = basis[0] by definition)
+    ||b[0]||^2 = ||basis[0]||^2              (b[0] = basis[0] by definition)
               <= alpha^{n-1} * min_i ||basis[i]||^2    (Step 1)
               <= alpha^{n-1} * ||v||^2                 (Step 2)
 
 This gives the main theorem:
 
-    ||b_0||^2 <= alpha^{n-1} * ||v||^2
+    ||b[0]||^2 <= alpha^{n-1} * ||v||^2
 
 for any nonzero lattice vector v, where alpha = 1/(delta - 1/4).
 
 For the standard choice delta = 3/4, alpha = 2, and we get
-||b_0|| <= 2^{(n-1)/2} * lambda_1(L).
+||b[0]|| <= 2^{(n-1)/2} * lambda_1(L).
 
 ---
 
@@ -330,29 +332,29 @@ This section provides the proofs that the integer update formulas
 used in Section 2b are correct and that all divisions are exact.
 
 **Integrality of scaledCoeffs[i][j].** (Von zur Gathen & Gerhard,
-Lemma 16.7.) scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j] can be
+Lemma 16.7.) scaledCoeffs[i][j] = gramDet (j+1) * coeffs[i][j] can be
 expressed as a (j+1) × (j+1) determinant of a matrix of inner products:
 
-    scaledCoeffs[i][j] = det | <b_0,b_0>  ...  <b_0,b_j>   <b_0,b_i> |
-                              | <b_1,b_0>  ...  <b_1,b_j>   <b_1,b_i> |
+    scaledCoeffs[i][j] = det | <b[0],b[0]>  ...  <b[0],b[j]>   <b[0],b[i]> |
+                              | <b[1],b[0]>  ...  <b[1],b[j]>   <b[1],b[i]> |
                               |   ...      ...    ...          ...     |
-                              | <b_j,b_0>  ...  <b_j,b_j>   <b_j,b_i> |
+                              | <b[j],b[0]>  ...  <b[j],b[j]>   <b[j],b[i]> |
 
-Since the b_l are integer vectors, all inner products are integers,
+Since the b[l] are integer vectors, all inner products are integers,
 so this determinant is an integer. (The formula follows from expanding
 the Gram-Schmidt recurrence and using the cofactor expansion of
-gramDet[j+1] along the last column.) This is the fundamental
-integrality lemma of the d-representation.
+gramDet (j+1) along the last column.) This is the fundamental
+integrality lemma of the gramDet/scaledCoeffs representation.
 
 Alternatively: by Cramer's rule on the system G_j * x = g (where
-g is the column of inner products with b_i), coeffs[i][j] has the
-form (integer determinant) / gramDet[j]. Therefore
-gramDet[j] * coeffs[i][j] is an integer. Since
-gramDet[j+1] = gramDet[j] * ||basis[j]||^2 and
-||basis[j]||^2 = gramDet[j+1]/gramDet[j], we need
-gramDet[j+1] * coeffs[i][j] = (gramDet[j+1]/gramDet[j]) * (integer)
+g is the column of inner products with b[i]), coeffs[i][j] has the
+form (integer determinant) / gramDet j. Therefore
+gramDet j * coeffs[i][j] is an integer. Since
+gramDet (j+1) = gramDet j * ||basis[j]||^2 and
+||basis[j]||^2 = gramDet (j+1)/gramDet j, we need
+gramDet (j+1) * coeffs[i][j] = (gramDet (j+1)/gramDet j) * (integer)
 to be an integer. This requires showing
-gramDet[j] | gramDet[j+1] * (the Cramer numerator), which follows
+gramDet j | gramDet (j+1) * (the Cramer numerator), which follows
 from the determinant formula above.
 
 **Derivation of the integer Lovász condition.** The rational Lovász
@@ -360,30 +362,30 @@ condition rearranged (following Cohen, section 2.6.3):
 
     ||basis[k]||^2 + coeffs[k][k-1]^2 * ||basis[k-1]||^2 >= delta * ||basis[k-1]||^2
 
-Substitute ||basis[i]||^2 = gramDet[i+1]/gramDet[i] and
-coeffs[k][k-1] = scaledCoeffs[k][k-1]/gramDet[k]:
+Substitute ||basis[i]||^2 = gramDet (i+1)/gramDet i and
+coeffs[k][k-1] = scaledCoeffs[k][k-1]/gramDet k:
 
-    gramDet[k+1]/gramDet[k] + (scaledCoeffs[k][k-1]/gramDet[k])^2 * (gramDet[k]/gramDet[k-1])
-        >= delta * (gramDet[k]/gramDet[k-1])
+    gramDet (k+1)/gramDet k + (scaledCoeffs[k][k-1]/gramDet k)^2 * (gramDet k/gramDet (k-1))
+        >= delta * (gramDet k/gramDet (k-1))
 
-Multiply through by gramDet[k] * gramDet[k-1] (both positive):
+Multiply through by gramDet k * gramDet (k-1) (both positive):
 
-    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 >= delta * gramDet[k]^2
+    gramDet (k+1) * gramDet (k-1) + scaledCoeffs[k][k-1]^2 >= delta * gramDet k^2
 
 So the Lovász condition in integer form is:
 
-    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 >= delta * gramDet[k]^2
+    gramDet (k+1) * gramDet (k-1) + scaledCoeffs[k][k-1]^2 >= delta * gramDet k^2
 
 (Negated for the swap trigger: swap when this fails.)
 
 **Correctness of size-reduction updates.** The rational size-reduction
 step sets coeffs[k][j] <- coeffs[k][j] - r (and
 coeffs[k][l] <- coeffs[k][l] - r * coeffs[j][l] for l < j).
-Multiplying through by gramDet[j+1] (resp. gramDet[l+1]) gives
+Multiplying through by gramDet (j+1) (resp. gramDet (l+1)) gives
 the scaledCoeffs update formulas:
 
     scaledCoeffs[k][l] <- scaledCoeffs[k][l] - r * scaledCoeffs[j][l]    for l < j
-    scaledCoeffs[k][j] <- scaledCoeffs[k][j] - r * gramDet[j+1]
+    scaledCoeffs[k][j] <- scaledCoeffs[k][j] - r * gramDet (j+1)
 
 The gramDet values are unchanged because size reduction preserves the
 GS basis.
@@ -397,29 +399,32 @@ def Rat.round (q : Rat) : Int := (q + 1/2).floor
 ```
 
 The rounding value r = round(coeffs[k][j]) =
-round(scaledCoeffs[k][j] / gramDet[j+1]) is computed as
-`Int.fdiv (2 * scaledCoeffs[k][j] + gramDet[j+1]) (2 * gramDet[j+1])`,
-which is pure integer arithmetic since gramDet[j+1] > 0.
+round(scaledCoeffs[k][j] / gramDet (j+1)) is computed as
+`Int.fdiv (2 * scaledCoeffs[k][j] + gramDet (j+1)) (2 * gramDet (j+1))`,
+which is pure integer arithmetic since gramDet (j+1) > 0.
 
-**Correctness of swap updates.** When swapping b_k and b_{k-1},
-let B = scaledCoeffs[k][k-1]. The gramDet update:
+**Correctness of swap updates.** Let b' be the basis after swapping
+b[k] and b[k-1], and let B = (scaledCoeffs b)[k][k-1]. The gramDet
+update:
 
-    gramDet[k]^{new} = (gramDet[k+1] * gramDet[k-1] + B^2) / gramDet[k]
+    gramDet b' k = (gramDet b (k+1) * gramDet b (k-1) + B^2) / gramDet b k
 
 follows from the determinant identity for the Gram matrix after the
 swap. The scaledCoeffs updates for i > k:
 
-    scaledCoeffs[i][k-1]^{new} = (scaledCoeffs[i][k-1] * gramDet[k]^{new} + scaledCoeffs[i][k] * B) / gramDet[k]
-    scaledCoeffs[i][k]^{new}   = (scaledCoeffs[i][k] * gramDet[k-1] - scaledCoeffs[i][k-1] * B) / gramDet[k]
+    (scaledCoeffs b')[i][k-1] = ((scaledCoeffs b)[i][k-1] * gramDet b' k + (scaledCoeffs b)[i][k] * B) / gramDet b k
+    (scaledCoeffs b')[i][k]   = ((scaledCoeffs b)[i][k] * gramDet b (k-1) - (scaledCoeffs b)[i][k-1] * B) / gramDet b k
 
 follow from substituting the definitions scaledCoeffs = gramDet * coeffs
 into the rational coeffs update formulas and simplifying. For j < k-1,
-scaledCoeffs[k-1][j] and scaledCoeffs[k][j] simply swap.
+(scaledCoeffs b')[k-1][j] and (scaledCoeffs b')[k][j] are
+(scaledCoeffs b)[k][j] and (scaledCoeffs b)[k-1][j] respectively
+(simply swapped).
 
 **Why all divisions are exact.**
-scaledCoeffs[i][j] = gramDet[j+1] * coeffs[i][j] and the coeffs
+scaledCoeffs[i][j] = gramDet (j+1) * coeffs[i][j] and the coeffs
 values are always expressible as ratios of integer determinants with
-denominator gramDet[j+1]. After a swap, the new coeffs values have
+denominator gramDet (j+1). After a swap, the new coeffs values have
 the same property with the new gramDet values. The algebraic
 identities can also be verified directly by substituting the
 definitions and using the fact that Gram determinants of sub-lattices
@@ -431,45 +436,45 @@ are always integers.
 
 **Potential function.** Define:
 
-    D = prod_{i=1}^{n-1} gramDet[i]
+    D = prod_{i=1}^{n-1} gramDet i
 
 This is the product of the first n-1 Gram determinants. Equivalently:
 
     D = prod_{k=0}^{n-2} ||basis[k]||^{2(n-1-k)}
 
-(since gramDet[i] = prod_{j=0}^{i-1} ||basis[j]||^2, each
-||basis[k]||^2 appears in gramDet[i] for i = k+1, k+2, ..., n-1,
-contributing exponent n-1-k to the product). Since each gramDet[i]
+(since gramDet i = prod_{j=0}^{i-1} ||basis[j]||^2, each
+||basis[k]||^2 appears in gramDet i for i = k+1, k+2, ..., n-1,
+contributing exponent n-1-k to the product). Since each gramDet i
 is a positive integer for integer lattices, D is a positive integer,
 so D >= 1.
 
-**Size reduction preserves D.** The GS basis[i] are unchanged
-by size reduction, so all gramDet[i] (and hence D) are unchanged.
+**Size reduction preserves D.** Size reduction does not change
+basis b, so all gramDet b i (and hence D) are unchanged.
 
-**Each swap decreases D.** When b_k and b_{k-1} are swapped with
-the Lovász condition failing:
+**Each swap decreases D.** Let b' be the basis after swapping b[k]
+and b[k-1], with the Lovász condition failing:
 
-    gramDet[k]^{new} = (gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2) / gramDet[k]
+    gramDet b' k = (gramDet b (k+1) * gramDet b (k-1) + (scaledCoeffs b)[k][k-1]^2) / gramDet b k
 
 The Lovász condition fails, meaning:
 
-    gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2 < delta * gramDet[k]^2
+    gramDet b (k+1) * gramDet b (k-1) + (scaledCoeffs b)[k][k-1]^2 < delta * (gramDet b k)^2
 
-So gramDet[k]^{new} < delta * gramDet[k]. Since only gramDet[k]
-changes among the gramDet values, and gramDet[k] appears exactly
-once in the product D:
+So gramDet b' k < delta * gramDet b k. Since only gramDet at
+index k changes (gramDet b' i = gramDet b i for i ≠ k), and
+gramDet b k appears exactly once in the product D:
 
-    D^{new} = D * (gramDet[k]^{new} / gramDet[k]) < D * delta
+    D' = D * (gramDet b' k / gramDet b k) < D * delta
 
 Since delta < 1, D strictly decreases. Since D >= 1 is a positive
 integer (for integer lattices), the number of swaps is bounded by:
 
     #swaps <= log_{1/delta}(D_initial)
 
-More precisely, using D_initial <= (max_i ||b_i||^2)^{n(n-1)/2}
-(since gramDet[i] <= (max ||b_j||^2)^i and the product has n-1 terms):
+More precisely, using D_initial <= (max_i ||b[i]||^2)^{n(n-1)/2}
+(since gramDet i <= (max ||b[j]||^2)^i and the product has n-1 terms):
 
-    #swaps <= n(n-1)/2 * log(max_i ||b_i||^2) / log(1/delta)
+    #swaps <= n(n-1)/2 * log(max_i ||b[i]||^2) / log(1/delta)
 
 This is polynomial in n and the bit-size of the input.
 
@@ -488,8 +493,8 @@ rational specification and an integer implementation, we use a
 single-state design. The `LLLState` stores only integers (b, ν, d).
 The rational GS quantities are recovered via `noncomputable`
 projections (`LLLState.gramSchmidtCoeff`, and similarly for
-`||basis[k]||^2 = gramDet[k+1] / gramDet[k]`), which exist only for
-the proof layer.
+`||(basis b)[k]||^2 = gramDet b (k+1) / gramDet b k`), which exist
+only for the proof layer.
 
 The key advantage: no bisimulation proof is needed. There is one
 state, one algorithm, and the correctness proofs unfold the
@@ -518,7 +523,7 @@ to leak into the executable code.
   error-prone part. Each formula must be verified algebraically and
   the exact division proofs must be discharged.
 - **Exact division under swap.** Proving that
-  `(gramDet[k+1] * gramDet[k-1] + scaledCoeffs[k][k-1]^2) / gramDet[k]`
+  `(gramDet b (k+1) * gramDet b (k-1) + (scaledCoeffs b)[k][k-1]^2) / gramDet b k`
   and the scaledCoeffs update divisions are exact requires the
   determinant-based integrality arguments from Section 2d.
 

@@ -1,4 +1,4 @@
-# lean-algebra
+# hex
 
 Verified computational algebra in Lean 4, Mathlib-free.
 
@@ -20,13 +20,13 @@ it from TRIAGE.md. Never create a "pointer" stub — just delete.
 
 ## Mathlib-free vs Mathlib split
 
-Each library `lean-foo` has a potential companion `lean-foo-mathlib`.
+Each library `hex-foo` has a potential companion `hex-foo-mathlib`.
 
-- **`lean-foo`** (no Mathlib): algorithm implementations + correctness
+- **`hex-foo`** (no Mathlib): algorithm implementations + correctness
   properties needed to define/state the computational interface.
   Proving your own GCD algorithm works is not "duplicating Mathlib."
 
-- **`lean-foo-mathlib`** (with Mathlib): deeper correctness theorems
+- **`hex-foo-mathlib`** (with Mathlib): deeper correctness theorems
   that rely on abstract algebra Mathlib already provides (e.g.
   Euclidean domain theory, UFD, finite field theory). Uses ring
   equivalences to transfer results.
