@@ -115,28 +115,6 @@ extended GCD).
 
 ---
 
-### 10. Factor uniqueness up to associates (`factor_unique`)
-
-```lean
-theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
-    gs.prod = f → hs.prod = f →
-    (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
-    gs ~ hs  -- multiset equality up to associates
-```
-
-**Why it's hard:** This is unique factorization in Z[x]. Requires
-Gauss's lemma (product of primitive polynomials is primitive) plus
-unique factorization in F_p[x] (which follows from F_p[x] being a
-Euclidean domain). The full proof chains: Z[x] is a UFD because Z
-is a UFD and the polynomial ring over a UFD is a UFD (via Gauss).
-
-**Research needed:**
-- Whether to prove UFD for Z[x] directly or factor through a more
-  general result
-- The Isabelle approach to this
-
----
-
 ## Tier 3: Hard but Well-Understood Patterns
 
 ### 11. Barrett reduction correctness
@@ -191,7 +169,6 @@ Difficulty depends on how cooperative Mathlib's API is.
 | 7 | `bareiss_eq_det` | hex-matrix | No (det not needed for BZ) |
 | 8 | Nullspace completeness | hex-matrix | Yes (Berlekamp kernel) |
 | 9 | Montgomery correctness | hex-arith | Yes (performance) |
-| 10 | `factor_unique` | hex-bz-mathlib | No (correctness suffices) |
 | 11 | Barrett correctness | hex-arith | Yes (performance) |
 | 12 | Gauss's lemma | hex-poly-z | Yes (content machinery) |
 | 13 | Ring equivalences | various -mathlib | No (bridges) |

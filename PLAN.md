@@ -2030,6 +2030,10 @@ theorem factor_product (f : ZPoly) :
 theorem factor_irreducible (f : ZPoly) :
     ∀ g ∈ factor f (mignotteBound f), Irreducible g
 
+-- Follows from Mathlib's `UniqueFactorizationMonoid.factors_unique`
+-- (in `Mathlib.RingTheory.UniqueFactorizationDomain.Basic`) via the
+-- ring equivalence. `Polynomial ℤ` gets the `UniqueFactorizationMonoid`
+-- instance from `Mathlib.RingTheory.Polynomial.UniqueFactorization`.
 theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
     gs.prod = f → hs.prod = f →
     (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
