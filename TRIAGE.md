@@ -168,29 +168,36 @@ The computational side uses `Int.divExact`; the correctness proof
 in hex-matrix-mathlib packages the divisibility witness from the
 invariant.
 
-**Zero-pivot handling.** If `a^{(k-1)}_{k-1,k-1} = 0` at some step,
-the bordered-minor interpretation still holds (the `k`th principal
-minor of `M` is zero), but the Bareiss recurrence as stated divides
-by zero. Standard fix: pivot (swap rows) before each step, flipping
-a sign bit. If all remaining pivots are zero, `det M = 0`. The
-formalization either (a) adds row-swap bookkeeping to the algorithm
-and the invariant, or (b) stipulates that `M` has nonzero principal
-minors and proves a separate lemma that singular matrices return 0.
-This is a design choice for hex-matrix, not a proof obstacle.
+**Zero-pivot handling: two-layer design.**
+
+Note: "zero leading principal minor ⟹ det = 0" is **false**.
+Example: `[[0,1],[1,0]]` has first principal minor 0 but det = -1.
+A zero pivot means the no-pivot Bareiss precondition failed, not
+that the matrix is singular.
+
+Two-layer approach:
+
+1. `bareissNoPivot` — the clean Bareiss recurrence without pivoting.
+   Correctness proved under precondition `NonzeroBareissPivots M`
+   (all leading principal minors nonzero). The bordered-minor
+   invariant + Desnanot–Jacobi proof stays clean and simple.
+
+2. `bareissDet` — the public API with row pivoting and sign
+   tracking. Correct for all matrices. Proof: after pivoting, the
+   reordered matrix has nonzero pivots, so apply
+   `bareissNoPivot_eq_det` to the permuted matrix, then use
+   `det_rowSwap` to account for the sign changes.
+
+Pivoting infrastructure is shared with RREF (which already needs
+row swaps). One verified pivot-search abstraction serves both.
 
 **Where this lives.** Bareiss is implemented in hex-matrix
-(computational). The `bareiss_eq_det` proof lives in hex-matrix
-itself: the Leibniz definition of `det` and the row-operation
-lemmas are needed anyway for other results (RREF, spanCoeffs),
-and the Desnanot–Jacobi identity is pure combinatorial algebra —
-no abstract algebra that would push it to the -mathlib layer.
-
-**Open design question:** The PLAN.md currently mentions "via row
-operations" as the proof strategy. The invariant approach above is
-cleaner and should replace it, but the row-operation lemmas
-(`det_rowSwap`, `det_rowScale`, `det_rowAdd`) are still needed
-elsewhere (RREF correctness) and are useful building blocks for
-the Laplace expansion proof of Desnanot–Jacobi itself.
+(computational). The `bareiss_eq_det` proof lives in
+hex-matrix-mathlib (uses Desnanot–Jacobi, either from
+mathlib4#37716 or proved locally using Mathlib's `Matrix.adjugate`).
+The row-operation lemmas (`det_rowSwap`, `det_rowScale`,
+`det_rowAdd`) are still needed in hex-matrix for RREF correctness
+and are useful building blocks regardless.
 
 ---
 
