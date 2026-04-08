@@ -54,19 +54,143 @@ further.
 theorem bareiss_eq_det (M : Matrix Int n n) : bareiss M = det M
 ```
 
-**Why it's hard:** Must track the determinant through fraction-free
-Gaussian elimination. Each Bareiss step performs the recurrence
-a_{ij}^{(k)} = (a_{kk} · a_{ij} − a_{ik} · a_{kj}) / a_{k−1,k−1}
-where the division is exact. The proof shows this equals applying row
-operations (which have known determinant effects) and then dividing
-by the previous pivot — the key being that the division is always
-exact (Sylvester's identity or direct induction).
+**The Bareiss recurrence:**
+```
+a^{(k+1)}_{ij} = (a^{(k)}_{kk} · a^{(k)}_{ij} − a^{(k)}_{ik} · a^{(k)}_{kj}) / a^{(k-1)}_{k-1,k-1}
+```
+with `a^{(0)} := M` and the convention `a^{(-1)}_{-1,-1} := 1`.
+The final answer is `a^{(n-1)}_{n-1,n-1}`. Each division is exact
+(proved as a corollary of the invariant below).
 
-**Research needed:**
-- Whether to use the row-operation approach or the Sylvester identity
-  approach (the plan mentions both)
-- Sylvester's identity is listed as "further work" — is it needed for
-  the primary proof?
+**Proof strategy: the bordered-minor invariant.**
+
+Define the "bordered minor" for `k ≥ 0` and `i, j ≥ k`:
+```
+μ(k; i, j) := det M[rows 0..k-1 ∪ {i} | cols 0..k-1 ∪ {j}]
+```
+This is a `(k+1) × (k+1)` determinant. Note `μ(0; i, j) = M_{ij}`
+(a 1×1 minor) and `μ(k; k, k) = det M[0..k | 0..k]` is the leading
+principal `(k+1) × (k+1)` minor.
+
+**Key invariant** (Bareiss's theorem):
+```
+∀ k ≥ 0, ∀ i, j ≥ k, a^{(k)}_{ij} = μ(k; i, j)
+```
+
+Extracting the result: at `k = n-1, i = j = n-1`, the invariant
+gives `a^{(n-1)}_{n-1,n-1} = μ(n-1; n-1, n-1) = det M`. ∎
+
+**Base case** (`k = 0`). `a^{(0)}_{ij} = M_{ij} = μ(0; i, j)`.
+
+**Inductive step.** Assume the invariant holds at step `k`. We need:
+```
+μ(k+1; i, j) = (μ(k; k, k) · μ(k; i, j) − μ(k; i, k) · μ(k; k, j)) / μ(k-1; k-1, k-1)
+```
+Rearranged, this is the **Desnanot–Jacobi identity** applied to
+the `(k+2) × (k+2)` bordered minor `M[0..k, i | 0..k, j]`:
+```
+μ(k+1; i, j) · μ(k-1; k-1, k-1) = μ(k; k, k) · μ(k; i, j)
+                                − μ(k; i, k) · μ(k; k, j)
+```
+
+This is a single mathematical fact — the Desnanot–Jacobi identity —
+applied at each step.
+
+**Desnanot–Jacobi identity** (the hard lemma). For an `n × n` matrix
+`A`, let `A_{i,j}` denote `A` with row `i` and column `j` deleted,
+and `A_{i,j;k,l}` denote `A` with rows `i, k` and columns `j, l`
+deleted. Then:
+```
+det(A) · det(A_{1,1;n,n}) = det(A_{1,1}) · det(A_{n,n})
+                          − det(A_{1,n}) · det(A_{n,1})
+```
+This specializes to what we need: take `A = M[0..k, i | 0..k, j]`
+(a `(k+2) × (k+2)` submatrix with rows 0..k, i and columns 0..k, j,
+placed so that the "last" row/column is `i`/`j`). The four "corner"
+minors `A_{1,1}, A_{n,n}, A_{1,n}, A_{n,1}` are the `(k+1)×(k+1)`
+bordered minors `μ(k; ·, ·)` that appear in the Bareiss recurrence.
+The "doubly-punctured" `A_{1,1;n,n}` is `μ(k-1; k-1, k-1)`, the
+previous pivot.
+
+**Proofs of Desnanot–Jacobi.** Three options:
+
+1. **Via Jacobi's complementary minor theorem.** Jacobi: for
+   invertible `M`, an `r × r` minor of `adjugate(M)` equals
+   `det(M)^{r-1}` times the complementary `(n-r) × (n-r)` cominor
+   of `M`. Apply with `r = 2` and rows/columns `{1, n}`: the 2×2
+   minor of `adj(M)` at `(1, n) × (1, n)` equals
+   `adj(M)_{1,1} · adj(M)_{n,n} − adj(M)_{1,n} · adj(M)_{n,1}`,
+   and each factor unfolds via the cofactor formula (signs cancel
+   because `(-1)^{1+n} · (-1)^{1+n} = 1`). The complementary minor
+   is `M_{1,1;n,n}`. This gives Desnanot–Jacobi for invertible `M`,
+   and extends to the general case by Zariski density / polynomial
+   identity.
+2. **Via Laplace expansion.** Expand both sides as sums over
+   permutations and show they match term-by-term. Tedious but
+   completely elementary.
+3. **Via multilinear alternating forms.** Both sides are
+   multilinear alternating in the rows of the matrix and agree on
+   permutation matrices. This is the cleanest proof given Mathlib's
+   `MultilinearMap` infrastructure, but setting up the ambient form
+   is still work.
+
+Likely path: start with Laplace expansion (no new infrastructure).
+If it's too painful, switch to the Jacobi approach using Mathlib's
+`Matrix.adjugate` and `Matrix.mul_adjugate`.
+
+**Mathlib API available** (`Matrix.det` is defined via Leibniz, so
+hex-matrix's `det` should correspond via the ring equivalence):
+- `Matrix.det_apply`, `Matrix.det_succ_row_zero`, `Matrix.det_succ_column_zero`
+  — cofactor expansion
+- `Matrix.adjugate`, `Matrix.mul_adjugate`, `Matrix.adjugate_mul`
+- `Matrix.det_updateRow_add`, `Matrix.det_updateRow_smul` — row-op
+  determinant effects
+- `Matrix.det_transpose`, `Matrix.det_mul`
+- `Matrix.submatrix`, `Matrix.det_submatrix_equiv_self` — for
+  stating minors
+- Index manipulation: `Fin.succAbove`, `Matrix.submatrix_succAbove_succAbove`
+
+**Mathlib PR in progress:**
+https://github.com/leanprover-community/mathlib4/pull/37716 —
+"feat(LinearAlgebra/Matrix/Determinant): Desnanot-Jacobi identity"
+by slavanaprienko (opened 2026-04-06, status: awaiting-author).
+Adds the identity to `Mathlib.LinearAlgebra.Matrix.Determinant.DesnanotJacobi`
+using Bressoud's proof (adjugate-based, then lift to polynomial ring
+to cancel `det(M)` factor). If merged, this eliminates the hard lemma
+entirely — we just apply it through the matrix ring equivalence in
+hex-matrix-mathlib.
+
+**Exact division.** The division `/ a^{(k-1)}_{k-1,k-1}` in the
+Bareiss recurrence is exact. This falls out of the invariant: both
+sides of the Desnanot–Jacobi identity are integers, so the quotient
+`a^{(k+1)}_{ij}` is an integer whenever the pivot is nonzero.
+The computational side uses `Int.divExact`; the correctness proof
+in hex-matrix-mathlib packages the divisibility witness from the
+invariant.
+
+**Zero-pivot handling.** If `a^{(k-1)}_{k-1,k-1} = 0` at some step,
+the bordered-minor interpretation still holds (the `k`th principal
+minor of `M` is zero), but the Bareiss recurrence as stated divides
+by zero. Standard fix: pivot (swap rows) before each step, flipping
+a sign bit. If all remaining pivots are zero, `det M = 0`. The
+formalization either (a) adds row-swap bookkeeping to the algorithm
+and the invariant, or (b) stipulates that `M` has nonzero principal
+minors and proves a separate lemma that singular matrices return 0.
+This is a design choice for hex-matrix, not a proof obstacle.
+
+**Where this lives.** Bareiss is implemented in hex-matrix
+(computational). The `bareiss_eq_det` proof lives in hex-matrix
+itself: the Leibniz definition of `det` and the row-operation
+lemmas are needed anyway for other results (RREF, spanCoeffs),
+and the Desnanot–Jacobi identity is pure combinatorial algebra —
+no abstract algebra that would push it to the -mathlib layer.
+
+**Open design question:** The PLAN.md currently mentions "via row
+operations" as the proof strategy. The invariant approach above is
+cleaner and should replace it, but the row-operation lemmas
+(`det_rowSwap`, `det_rowScale`, `det_rowAdd`) are still needed
+elsewhere (RREF correctness) and are useful building blocks for
+the Laplace expansion proof of Desnanot–Jacobi itself.
 
 ---
 
@@ -83,35 +207,6 @@ vector, when restricted to pivot columns, is determined by its free-
 variable entries (back-substitution from RREF), so it's a linear
 combination of the basis vectors. Formalizing the back-substitution
 argument requires careful index manipulation.
-
----
-
-### 9. Montgomery correctness (`toNat_mulMont`)
-
-```lean
-theorem MontCtx.toNat_mulMont (ctx : MontCtx p) (a b : UInt64)
-    (ha : a < p) (hb : b < p) :
-    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
-      (a.toNat * b.toNat) % p.toNat
-```
-
-**Why it's hard:** Montgomery reduction computes (T + (T · p' mod R) · p) / R
-where R = 2^64. The proof requires: (1) the result is congruent to
-T · R⁻¹ mod p, (2) it's in range [0, 2p), (3) a conditional
-subtraction brings it into [0, p). All of this at the UInt64 / 2^64
-level, where overflow semantics must be handled precisely. Lean's
-`UInt64` arithmetic wraps mod 2^64, so every intermediate step needs
-careful bounds tracking.
-
-The Montgomery inverse p' satisfying p' · p ≡ −1 (mod 2^64) must
-also be computed and verified (via Newton's method on UInt64, or
-extended GCD).
-
-**Research needed:**
-- Lean 4's current `UInt64` lemma library — what's available for
-  overflow reasoning?
-- Whether to prove at the `Nat` level and cast down, or work directly
-  with `UInt64`
 
 ---
 
@@ -168,7 +263,6 @@ Difficulty depends on how cooperative Mathlib's API is.
 | 6 | Mignotte bound | hex-poly-z-mathlib | Yes (unconditional BZ) |
 | 7 | `bareiss_eq_det` | hex-matrix | No (det not needed for BZ) |
 | 8 | Nullspace completeness | hex-matrix | Yes (Berlekamp kernel) |
-| 9 | Montgomery correctness | hex-arith | Yes (performance) |
 | 11 | Barrett correctness | hex-arith | Yes (performance) |
 | 12 | Gauss's lemma | hex-poly-z | Yes (content machinery) |
 | 13 | Ring equivalences | various -mathlib | No (bridges) |
