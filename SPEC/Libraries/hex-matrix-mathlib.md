@@ -12,7 +12,7 @@ This bridge connects our computable versions to those definitions.
 **Matrix equivalence:**
 ```lean
 def matrixEquiv :
-    ComputationalAlgebra.Matrix R n m ≃ Matrix (Fin n) (Fin m) R
+    Hex.Matrix R n m ≃ Matrix (Fin n) (Fin m) R
 ```
 
 **Row operations correspond to Mathlib transvections:**
@@ -22,15 +22,15 @@ to Mathlib's `Equiv.swap` and diagonal matrices.
 
 **Determinant:**
 ```lean
-theorem det_eq (M : ComputationalAlgebra.Matrix R n n) :
-    ComputationalAlgebra.det M = Matrix.det (matrixEquiv M)
+theorem det_eq (M : Hex.Matrix R n n) :
+    Hex.det M = Matrix.det (matrixEquiv M)
 ```
 
 **Rank:** Our `RowEchelonData.rank` (computed via RREF) agrees with
 Mathlib's `Matrix.rank` (noncomputable, defined as
 `finrank R (LinearMap.range M.mulVecLin)`).
 ```lean
-theorem rank_eq (M : ComputationalAlgebra.Matrix R n m)
+theorem rank_eq (M : Hex.Matrix R n m)
     (D : RowEchelonData R n m) (E : IsEchelonForm M D) :
     D.rank = Matrix.rank (matrixEquiv M)
 ```

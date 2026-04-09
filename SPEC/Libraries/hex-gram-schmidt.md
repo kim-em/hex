@@ -18,7 +18,7 @@ independent of LLL.
 **API:**
 
 ```lean
-namespace ComputationalAlgebra.GramSchmidt.Int
+namespace Hex.GramSchmidt.Int
 
 /-- The Gram-Schmidt orthogonal basis. Row i is the projection of b.row i
     onto the orthogonal complement of span(b.row 0, ..., b.row (i-1)). -/
@@ -42,15 +42,15 @@ def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1)
     for j < i. Always integers (integrality lemma). -/
 def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n
 
-end ComputationalAlgebra.GramSchmidt.Int
+end Hex.GramSchmidt.Int
 
-namespace ComputationalAlgebra.GramSchmidt.Rat
+namespace Hex.GramSchmidt.Rat
 
 noncomputable def basis (b : Matrix Rat n m) : Matrix Rat n m
 noncomputable def coeffs (b : Matrix Rat n m) : Matrix Rat n n
 def gramDet (b : Matrix Rat n m) (k : Nat) (hk : k ≤ n) : Rat
 
-end ComputationalAlgebra.GramSchmidt.Rat
+end Hex.GramSchmidt.Rat
 ```
 
 **Key properties** (stated for `GramSchmidt.Int`; `Rat` analogous):
