@@ -1,4 +1,4 @@
-# hex-poly-z-mathlib (depends on hex-poly-z + Mathlib)
+# hex-poly-z-mathlib (depends on hex-poly-z + hex-poly-mathlib + Mathlib)
 
 Proves `DensePoly Int ≃+* Polynomial ℤ` and the Mignotte bound.
 

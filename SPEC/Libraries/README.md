@@ -1,7 +1,7 @@
 # Libraries
 
 - **hex-arith** — extended GCD, Barrett/Montgomery reduction, binomial coefficients, Fermat's little theorem
-- **hex-poly** — polynomial typeclass interface + dense `Array`-backed representation
+- **hex-poly** — dense `Array`-backed polynomial representation
 - **hex-matrix** — dense matrices as `Vector (Vector R m) n`, RREF, Bareiss determinant, span, nullspace
 - **hex-gram-schmidt** — Gram-Schmidt orthogonalization, GS coefficients, Gram determinants, update formulas under row operations
 - **hex-mod-arith** — `ZMod64 p`: `UInt64`-backed arithmetic in `Z/pZ`
@@ -61,8 +61,8 @@ Mathlib bridge libraries (each also depends on Mathlib):
 - **hex-matrix-mathlib** — hex-matrix
 - **hex-gram-schmidt-mathlib** — hex-gram-schmidt
 - **hex-lll-mathlib** — hex-lll
-- **hex-berlekamp-mathlib** — hex-berlekamp
-- **hex-hensel-mathlib** — hex-hensel
+- **hex-berlekamp-mathlib** — hex-berlekamp, hex-poly-mathlib, hex-mod-arith-mathlib
+- **hex-hensel-mathlib** — hex-hensel, hex-poly-mathlib
 - **hex-gf2-mathlib** — hex-gf2, hex-poly-fp, hex-gfq-field
 - **hex-gfq-mathlib** — hex-gfq
 - **hex-berlekamp-zassenhaus-mathlib** — hex-berlekamp-zassenhaus, hex-poly-z-mathlib
