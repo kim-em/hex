@@ -24,12 +24,10 @@ and related tools.
    GCD, etc.). FLINT is used for conformance testing, not as a runtime
    dependency.
 
-4. **Swappable polynomial representations.** A `PolyOps` typeclass defines
-   operations including `dropZeros : P → P` (normalize to canonical form).
-   `LawfulPolyOps` states the ring axioms and that `dropZeros` is
-   idempotent, preserves coefficients, and gives extensionality on the
-   subtype `{ p : P // dropZeros p = p }`. The default representation is
-   dense `Array`-backed. Subtypes throughout, never quotients.
+4. **Dense `Array`-backed polynomials.** `DensePoly R` stores coefficients
+   in an `Array R` with a normalization invariant (no trailing zeros),
+   giving structural equality = semantic equality. Subtypes throughout,
+   never quotients.
 
 5. **Lean algorithms from the start.** All algorithms are implemented and
    run in Lean natively. No external CAS in the loop. Certificate
@@ -135,7 +133,7 @@ hex-poly ── hex-gf2
 proving correspondence with Mathlib's mathematical definitions):
 
 - **hex-mod-arith-mathlib** — `ZMod64 p ≃+* ZMod p`
-- **hex-poly-mathlib** — `DensePoly R ≃+* Polynomial R` via `LawfulPolyOps`
+- **hex-poly-mathlib** — `DensePoly R ≃+* Polynomial R`
 - **hex-matrix-mathlib** — matrix equivalence, `det` agreement, rank = `Matrix.rank`, nullspace = `LinearMap.ker`, row ops = transvections
 - **hex-gram-schmidt-mathlib** — `GramSchmidt.Int.basis` = Mathlib's `gramSchmidt`
 - **hex-poly-z-mathlib** — `DensePoly Int ≃+* Polynomial ℤ`, Mignotte bound (via Mathlib's Mahler measure)
@@ -807,74 +805,9 @@ is known correct in the mathematical sense.
 
 ---
 
-### hex-poly (polynomial interface + dense representation, no dependencies)
+### hex-poly (dense polynomial library, no dependencies)
 
-The core polynomial library. Defines both the typeclass interface and the
-default dense representation.
-
-**Typeclass interface:**
-```lean
-class PolyOps (P : Type*) (R : outParam Type*) extends
-    Add P, Mul P, Neg P, Zero P, One P, BEq P where
-  X : P
-  C : R → P
-  degree : P → Nat
-  coeff : P → Nat → R
-  leadingCoeff : P → R
-  dropZeros : P → P
-  divMod : P → P → P × P
-  eval : P → R → R
-  ofCoeffs : Array R → P
-  toCoeffs : P → Array R
-
-class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
-  -- Ring axioms
-  add_comm : ∀ a b : P, a + b = b + a
-  add_assoc : ∀ a b c : P, a + b + c = a + (b + c)
-  mul_comm : ∀ a b : P, a * b = b * a
-  mul_assoc : ∀ a b c : P, a * b * c = a * (b * c)
-  add_zero : ∀ a : P, a + 0 = a
-  mul_one : ∀ a : P, a * 1 = a
-  left_distrib : ∀ a b c : P, a * (b + c) = a * b + a * c
-  -- Coefficient semantics
-  coeff_add : ∀ (a b : P) (i : Nat), coeff (a + b) i = coeff a i + coeff b i
-  coeff_mul : ...  -- convolution formula
-  -- BEq correctness: == agrees with coefficient equality
-  beq_iff : ∀ a b : P, (a == b) = true ↔ ∀ i, coeff a i = coeff b i
-  -- dropZeros: normalization to canonical form
-  dropZeros_idem : ∀ p, dropZeros (dropZeros p) = dropZeros p
-  dropZeros_coeff : ∀ p i, coeff (dropZeros p) i = coeff p i
-  dropZeros_ext : ∀ p q, dropZeros p = p → dropZeros q = q →
-      (∀ i, coeff p i = coeff q i) → p = q
-  -- Division
-  divMod_spec : ∀ a b : P, let (q, r) := divMod a b; q * b + r = a
-  -- Evaluation is a ring homomorphism
-  eval_C : ∀ r x, eval (C r) x = r
-  eval_X : ∀ x, eval X x = x
-  eval_add : ∀ p q x, eval (p + q) x = eval p x + eval q x
-  eval_mul : ∀ p q x, eval (p * q) x = eval p x * eval q x
-```
-
-**`dropZeros` is the canonical form function.** For dense representations,
-it strips trailing zeros. For sparse representations, it removes entries
-with zero coefficients. `dropZeros_ext` gives extensionality on the
-subtype `{ p : P // dropZeros p = p }` — two canonical-form polynomials
-with the same coefficients are propositionally equal.
-
-**The subtype `CanonicalPoly P := { p : P // dropZeros p = p }`** is where
-the `≃+*` lives. In the `-mathlib` bridge library:
-
-```lean
-def CanonicalPoly (P : Type*) [PolyOps P R] := { p : P // dropZeros p = p }
-
--- The -mathlib bridge library proves:
-def equiv [LawfulPolyOps P R] : CanonicalPoly P ≃+* Polynomial R
-```
-
-Eagerly-normalizing implementations (like `DensePoly`) satisfy
-`dropZeros = id`, so `CanonicalPoly (DensePoly R) ≃ DensePoly R` and
-the subtype wrapper is trivial. Lazy implementations pay the cost of
-normalization only when they need propositional equality.
+The core polynomial library.
 
 **Dense representation:**
 ```lean
@@ -903,14 +836,17 @@ The normalization invariant (no trailing zeros) ensures structural equality
 **Existential CRT for polynomials** (corollary of Bezout):
 
 ```lean
-def polyCRT [PolyOps P R] (a b u v s t : P) : P :=
+def polyCRT [CommRing R] [DecidableEq R]
+    (a b u v s t : DensePoly R) : DensePoly R :=
   u * t * b + v * s * a
 
-theorem polyCRT_mod_fst [LawfulPolyOps P R] (a b u v s t : P)
+theorem polyCRT_mod_fst [CommRing R] [DecidableEq R]
+    (a b u v s t : DensePoly R)
     (hbez : s * a + t * b = 1) :
     (polyCRT a b u v s t) % a = u % a
 
-theorem polyCRT_mod_snd [LawfulPolyOps P R] (a b u v s t : P)
+theorem polyCRT_mod_snd [CommRing R] [DecidableEq R]
+    (a b u v s t : DensePoly R)
     (hbez : s * a + t * b = 1) :
     (polyCRT a b u v s t) % b = v % b
 ```
@@ -919,45 +855,14 @@ Given coprime `a, b` with Bezout coefficients `s, t`, constructs `h`
 with `h ≡ u (mod a)` and `h ≡ v (mod b)`. Used by hex-hensel,
 hex-gfq-ring, and hex-berlekamp-mathlib (Berlekamp correctness proof).
 
-**Alternative representations (Phase 2):**
-
-Sparse sorted array:
-```lean
-structure SparsePoly (R : Type*) [Zero R] [DecidableEq R] where
-  terms : Array (Nat × R)
-  sorted : ∀ i j, i < j → i < terms.size → j < terms.size →
-           (terms[i]).1 < (terms[j]).1
-  nonzero : ∀ i, i < terms.size → (terms[i]).2 ≠ 0
-```
-
-Sparse `ExtHashMap`-backed (with extensional equality):
-```lean
-structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
-    [EquivBEq Nat] [LawfulHashable Nat] where
-  map : ExtHashMap Nat R
-  nonzero : ∀ k v, map.find? k = some v → v ≠ 0
-```
-
-Using `ExtHashMap` (not `HashMap`) gives extensionality lemmas — two
-`ExtHashPoly` values are equal iff they have the same key-value pairs.
-
-**Normalization:** `DensePoly` normalizes eagerly, so `dropZeros = id`
-and `CanonicalPoly (DensePoly R) ≃ DensePoly R` trivially. Sparse
-representations may defer normalization, paying the cost only when
-propositional equality is needed (via `dropZeros`).
-
 ---
 
 ### hex-poly-mathlib (depends on hex-poly + Mathlib)
 
-Proves `LawfulPolyOps` for `DensePoly R` and constructs the ring
-equivalence. Since `DensePoly` normalizes eagerly, `dropZeros = id`
-and `CanonicalPoly (DensePoly R)` is trivially `DensePoly R`:
+Proves the ring equivalence between `DensePoly R` and Mathlib's
+`Polynomial R`:
 
 ```lean
-instance [CommRing R] [DecidableEq R] : LawfulPolyOps (DensePoly R) R := ...
-
--- dropZeros is id for DensePoly, so CanonicalPoly is trivial
 def equiv [CommRing R] [DecidableEq R] : DensePoly R ≃+* Polynomial R
 ```
 
@@ -2571,8 +2476,6 @@ point of contact is at the very top (Berlekamp-Zassenhaus).
 
 ## Polynomial representation design
 
-### Primary: Dense (Array-backed)
-
 ```lean
 structure DensePoly (R : Type*) [Zero R] [DecidableEq R] where
   coeffs : Array R
@@ -2583,35 +2486,6 @@ structure DensePoly (R : Type*) [Zero R] [DecidableEq R] where
 - Normalization invariant: no trailing zeros
 - Structural equality = semantic equality
 - O(1) degree, O(1) coefficient access
-
-### Secondary: Sparse sorted (Array of pairs)
-
-```lean
-structure SparsePoly (R : Type*) [Zero R] [DecidableEq R] where
-  terms : Array (Nat × R)
-  sorted : ∀ i j, i < j → i < terms.size → j < terms.size →
-           (terms[i]).1 < (terms[j]).1
-  nonzero : ∀ i, i < terms.size → (terms[i]).2 ≠ 0
-```
-
-### Tertiary: Sparse ExtHashMap-backed
-
-```lean
-structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
-    [EquivBEq Nat] [LawfulHashable Nat] where
-  map : ExtHashMap Nat R
-  nonzero : ∀ k v, map.find? k = some v → v ≠ 0
-```
-
-`ExtHashMap` provides extensionality: two maps are equal iff they have the
-same key-value pairs. No iteration order issues.
-
-### The typeclasses
-
-`PolyOps` for operations (including `dropZeros`), `LawfulPolyOps` for
-ring axioms + `dropZeros` properties. The `-mathlib` bridge library proves
-`CanonicalPoly P ≃+* Polynomial R` where
-`CanonicalPoly P := { p : P // dropZeros p = p }`.
 
 ---
 
@@ -2726,3 +2600,93 @@ Bareiss from `Int` to any integral domain with a data-carrying exact
 division operation (`ediv : α → α → α` with `b ∣ a → ediv a b * b = a`);
 for `Int` this is `Int.divExact`
 and no zero divisors (`a * b = 0 → a = 0 ∨ b = 0`).
+
+**Swappable polynomial representations.** Abstract over the polynomial
+representation via typeclasses, allowing sparse and hash-backed
+representations alongside `DensePoly`. For now, all libraries use
+`DensePoly` directly.
+
+Typeclass interface:
+```lean
+class PolyOps (P : Type*) (R : outParam Type*) extends
+    Add P, Mul P, Neg P, Zero P, One P, BEq P where
+  X : P
+  C : R → P
+  degree : P → Nat
+  coeff : P → Nat → R
+  leadingCoeff : P → R
+  dropZeros : P → P
+  divMod : P → P → P × P
+  eval : P → R → R
+  ofCoeffs : Array R → P
+  toCoeffs : P → Array R
+
+class LawfulPolyOps (P : Type*) (R : outParam Type*) [PolyOps P R] where
+  -- Ring axioms
+  add_comm : ∀ a b : P, a + b = b + a
+  add_assoc : ∀ a b c : P, a + b + c = a + (b + c)
+  mul_comm : ∀ a b : P, a * b = b * a
+  mul_assoc : ∀ a b c : P, a * b * c = a * (b * c)
+  add_zero : ∀ a : P, a + 0 = a
+  mul_one : ∀ a : P, a * 1 = a
+  left_distrib : ∀ a b c : P, a * (b + c) = a * b + a * c
+  -- Coefficient semantics
+  coeff_add : ∀ (a b : P) (i : Nat), coeff (a + b) i = coeff a i + coeff b i
+  coeff_mul : ...  -- convolution formula
+  -- BEq correctness: == agrees with coefficient equality
+  beq_iff : ∀ a b : P, (a == b) = true ↔ ∀ i, coeff a i = coeff b i
+  -- dropZeros: normalization to canonical form
+  dropZeros_idem : ∀ p, dropZeros (dropZeros p) = dropZeros p
+  dropZeros_coeff : ∀ p i, coeff (dropZeros p) i = coeff p i
+  dropZeros_ext : ∀ p q, dropZeros p = p → dropZeros q = q →
+      (∀ i, coeff p i = coeff q i) → p = q
+  -- Division
+  divMod_spec : ∀ a b : P, let (q, r) := divMod a b; q * b + r = a
+  -- Evaluation is a ring homomorphism
+  eval_C : ∀ r x, eval (C r) x = r
+  eval_X : ∀ x, eval X x = x
+  eval_add : ∀ p q x, eval (p + q) x = eval p x + eval q x
+  eval_mul : ∀ p q x, eval (p * q) x = eval p x * eval q x
+```
+
+`dropZeros` is the canonical form function. For dense representations,
+it strips trailing zeros. For sparse representations, it removes entries
+with zero coefficients. `dropZeros_ext` gives extensionality on the
+subtype `{ p : P // dropZeros p = p }` — two canonical-form polynomials
+with the same coefficients are propositionally equal.
+
+The subtype `CanonicalPoly P := { p : P // dropZeros p = p }` is where
+the `≃+*` lives. The `-mathlib` bridge library would prove:
+
+```lean
+def CanonicalPoly (P : Type*) [PolyOps P R] := { p : P // dropZeros p = p }
+
+def equiv [LawfulPolyOps P R] : CanonicalPoly P ≃+* Polynomial R
+```
+
+Eagerly-normalizing implementations (like `DensePoly`) satisfy
+`dropZeros = id`, so `CanonicalPoly (DensePoly R) ≃ DensePoly R` and
+the subtype wrapper is trivial. Lazy implementations pay the cost of
+normalization only when they need propositional equality.
+
+Alternative representations:
+
+Sparse sorted array:
+```lean
+structure SparsePoly (R : Type*) [Zero R] [DecidableEq R] where
+  terms : Array (Nat × R)
+  sorted : ∀ i j, i < j → i < terms.size → j < terms.size →
+           (terms[i]).1 < (terms[j]).1
+  nonzero : ∀ i, i < terms.size → (terms[i]).2 ≠ 0
+```
+
+Sparse `ExtHashMap`-backed (with extensional equality):
+```lean
+structure ExtHashPoly (R : Type*) [Zero R] [BEq R] [Hashable Nat]
+    [EquivBEq Nat] [LawfulHashable Nat] where
+  map : ExtHashMap Nat R
+  nonzero : ∀ k v, map.find? k = some v → v ≠ 0
+```
+
+Using `ExtHashMap` (not `HashMap`) gives extensionality lemmas — two
+`ExtHashPoly` values are equal iff they have the same key-value pairs.
