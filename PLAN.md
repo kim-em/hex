@@ -152,10 +152,8 @@ obligation.
 Work units are **dynamic**, not one-per-library. The orchestrating agent
 decides how to decompose based on SPEC complexity:
 
-- A small library (hex-conway, hex-gfq) might be one work unit.
-- A large library (hex-lll with LLLState, integrality, termination;
-  hex-arith with Barrett, Montgomery, extGcd, Fermat) should be broken
-  into multiple work units.
+- A single structure definition and its basic API lemmas might be one
+  work unit. Every library will need many PRs/agent sessions.
 - Guidance: one work unit per major `structure` or API surface in the
   SPEC, or per SPEC subsection if the file has clear subsections.
 - Each work unit is a GitHub issue + PR with auto-merge enabled.
@@ -183,8 +181,7 @@ These are not rubber-stamp coverage audits — they ask:
 
 ### Output
 
-GitHub issues flagging gaps, with proposed additions to the SPEC or
-directly to the scaffold. This may take multiple sessions per library.
+GitHub issues flagging gaps. This may take multiple sessions per library.
 
 ---
 
@@ -252,6 +249,12 @@ In priority order:
 
 Bring sorry-free proofs to Mathlib quality. This is substantially more
 than mechanical cleanup.
+
+### Granularity
+
+Every non-trivial definition or theorem needs separate treatment here.
+This is not a "run a linter and clean up" pass — it requires careful
+thought about API design for each declaration.
 
 ### What Mathlib quality means
 
