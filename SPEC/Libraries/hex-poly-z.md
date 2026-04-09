@@ -16,8 +16,6 @@ Specialized polynomial arithmetic over `Z`.
   factor `g | f` in `Z[x]`. The computation is just binomial coefficients
   and the 2-norm of `f`'s coefficients. The proof that the bound is valid
   lives in `hex-poly-z-mathlib`.
-- Reduction modulo p: `ZPoly → FpPoly p`
-
 **Key properties:**
 - `primitivePart(f)` is primitive (content = 1)
 - Gauss's lemma (`content(f * g) = content(f) * content(g)`) is not

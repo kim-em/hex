@@ -5,6 +5,8 @@ Contains only the lifting algorithms — all correctness proofs live in
 hex-hensel-mathlib.
 
 **Contents:**
+- **Reduction modulo p**: `ZPoly → FpPoly p` (coefficient-wise reduction,
+  bridging hex-poly-z and hex-poly-fp)
 - **Linear Hensel lifting**: from `mod p^k` to `mod p^(k+1)`
 - **Quadratic Hensel lifting**: from `mod p^k` to `mod p^(2k)` (doubling)
 - **Multifactor lifting**: binary factor tree approach
