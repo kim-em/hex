@@ -4,19 +4,17 @@ Verified computational algebra in Lean 4, Mathlib-free.
 
 ## Key files
 
-- **PLAN.md** — the canonical design document. All library descriptions,
-  API surfaces, theorem statements, and vetted proof strategies live here.
-  When proof research is complete and incorporated, the material belongs
-  in PLAN.md under the relevant library section.
+- **SPEC/** — the canonical design document, split into focused files.
+  `SPEC/SPEC.md` is the entry point. Per-library specs live in
+  `SPEC/Libraries/hex-*.md`. All API surfaces, theorem statements,
+  and vetted proof strategies live here.
 
-- **TRIAGE.md** — scratch space for proof research in progress. Items
-  here are unvetted and may be incomplete. Once a proof strategy is
-  understood, it gets incorporated into PLAN.md and deleted from
-  TRIAGE.md. The goal is for TRIAGE.md to eventually be empty.
+- **PLAN.md** — workflow document describing how agents/humans execute
+  the SPEC. Phases: monorepo scaffolding, library scaffolding,
+  scaffolding review, conformance testing, implementation, polishing.
 
-**Rule: no duplication between PLAN.md and TRIAGE.md.** Content lives
-in exactly one place. If it's been incorporated into PLAN.md, delete
-it from TRIAGE.md. Never create a "pointer" stub — just delete.
+**Rule: no duplication between SPEC files.** Content lives in exactly
+one place. If material is moved between files, delete the original.
 
 ## Mathlib-free vs Mathlib split
 
@@ -39,5 +37,5 @@ library, even if it overlaps with Mathlib.
 
 Don't add "research completed" timestamps, progress notes, or
 meta-commentary about the history of our research process to any
-file. The git history tracks that. PLAN.md and TRIAGE.md contain
+file. The git history tracks that. SPEC files and PLAN.md contain
 the current state of the design, not a journal of how we got there.
