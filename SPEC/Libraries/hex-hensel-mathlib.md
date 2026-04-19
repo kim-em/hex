@@ -21,17 +21,17 @@ Multiply the lifted Bezout identity by its inverse.
 **Correctness theorems** (transferred from hex-hensel via ring equiv
 `DensePoly Int ≃+* Polynomial ℤ`):
 ```lean
-theorem hensel_correct (f g h : ZPoly) (p k : Nat) :
-    let (g', h') := henselLift f g h p k
-    (g'.map φ) * (h'.map φ) = f.map φ
+theorem hensel_correct (f g h : ZPoly) (p k : Nat) (s t : FpPoly p) :
+    let r := henselLift p k f g h s t
+    (r.g.map φ) * (r.h.map φ) = f.map φ
   where φ := Int.castRingHom (ZMod (p ^ (k + 1)))
 
-theorem hensel_extends (f g h : ZPoly) (p k : Nat) :
-    (henselLift f g h p k).1.map φ = g.map φ
+theorem hensel_extends (f g h : ZPoly) (p k : Nat) (s t : FpPoly p) :
+    (henselLift p k f g h s t).g.map φ = g.map φ
   where φ := Int.castRingHom (ZMod (p ^ k))
 
-theorem hensel_degree (f g h : ZPoly) (p k : Nat) :
-    (henselLift f g h p k).1.degree = g.degree
+theorem hensel_degree (f g h : ZPoly) (p k : Nat) (s t : FpPoly p) :
+    (henselLift p k f g h s t).g.degree = g.degree
 ```
 
 **Uniqueness theorem:**

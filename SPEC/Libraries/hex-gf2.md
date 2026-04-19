@@ -56,7 +56,12 @@ Slower than hardware CLMUL but avoids the per-operation Barrett
 overhead of the generic `ZMod64 2` path.
 
 **GF(2^n) elements.** Elements of `GF(2^n)` are polynomials of degree
-< n over F_2, reduced modulo an irreducible of degree n. Two cases:
+< n over F_2, reduced modulo an irreducible of degree n. This library
+provides the optimized representations and operations; the convenience
+constructor that automatically chooses the canonical modulus lives in
+`hex-gfq` as `GF2q`.
+
+Two cases:
 
 1. **n < 64**: a single `UInt64` suffices. The irreducible modulus
    `x^n + (lower terms)` is stored as `irr : UInt64` containing only
@@ -96,6 +101,6 @@ For large n, `GF2nPoly` builds its own quotient-field structure
 (parallel to hex-gfq-ring/hex-gfq-field, but over the packed
 `GF2Poly` representation rather than `FpPoly`).
 
-The ring equivalences `GF2n ≃+* FiniteField 2 f hirr` and
-`GF2nPoly ≃+* FiniteField 2 f hirr` live in hex-gf2-mathlib,
+The ring equivalences `GF2n ≃+* FiniteField 2 f hf hirr` and
+`GF2nPoly ≃+* FiniteField 2 f hf hirr` live in hex-gf2-mathlib,
 transferring via `GF2Poly ≃+* FpPoly 2`.

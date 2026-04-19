@@ -1,23 +1,39 @@
-# hex-gfq-field (GF(q) as a field, depends on hex-berlekamp)
+# hex-gfq-field (GF(q) as a field, depends on hex-gfq-ring)
 
-Extends `hex-gfq-ring` with field operations when the modulus is
-irreducible. Takes any irreducible polynomial as parameter — not tied
-to Conway polynomials.
+Field structure on top of the canonical quotient-ring implementation
+from hex-gfq-ring. Takes any irreducible polynomial as parameter — not
+tied to Conway polynomials.
+
+The key layering decision is that this library does not introduce a
+separate representation. `FiniteField p f hf hirr` should be a thin
+wrapper over `PolyQuotient p f hf`, or reuse that same underlying data
+with stronger assumptions. There is one quotient representation, one
+canonical reduction function, and one equality story across the ring and
+field libraries.
 
 **Contents:**
-- `FiniteField p f (hirr : Irreducible f)` — the field `F_p[x]/(f)`,
-  where `f` is any irreducible polynomial over `F_p`
+- `FiniteField p f hf hirr` — the field `F_p[x]/(f)`, where `hf : 0 <
+  f.degree` and `hirr : Irreducible f`
+- Coercions or conversion functions to and from `PolyQuotient p f hf`
 - Multiplicative inverse via extended GCD in `F_p[x]`
-- `Lean.Grind.Field` instance
-- `IsCharP (FiniteField p f hirr) p`
+- Division and exponentiation
+- Frobenius map `frob : FiniteField p f hf hirr → FiniteField p f hf hirr`
+- `Lean.Grind.Field (FiniteField p f hf hirr)` instance
+- `IsCharP (FiniteField p f hf hirr) p`
 
-The irreducibility proof `hirr` comes from hex-berlekamp (either via
-the algorithm or via a certificate). This type is not tied to Conway
-polynomials — any irreducible polynomial works (e.g. AES uses
-`x^8 + x^4 + x^3 + x + 1` over `F_2`). For a canonical choice, see
+The irreducibility proof `hirr` may come from hex-berlekamp (either via
+the algorithm or via a certificate), but this library should not depend
+on hex-berlekamp for its core API. It works for any supplied proof of
+irreducibility. For a canonical choice of irreducible modulus, see
 hex-gfq.
+
+`Fintype` and cardinality belong in the Mathlib bridge, not here. The
+computational library should expose the concrete field operations and
+their algebraic laws, while `hex-gfq-mathlib` supplies finiteness,
+cardinality, and correspondence with Mathlib's abstract finite fields.
 
 **Key properties:**
 - `inv a * a = 1` for `a ≠ 0`
-- `Fintype (FiniteField p f hirr)` with `card = p ^ f.degree`
-- Frobenius automorphism: `frob(a) = a^p`
+- `a / b = a * b⁻¹`
+- `frob(a) = a ^ p`
+- Field axioms for `FiniteField p f hf hirr`

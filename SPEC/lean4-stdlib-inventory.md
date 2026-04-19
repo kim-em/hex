@@ -17,8 +17,10 @@ What we get for free and what we need to build.
 
 **Not available (we build):**
 - Extended GCD / Bezout coefficients — completely absent
-- Modular exponentiation — absent, and GMP's `mpz_powm` not exposed
-- Modular inverse — absent, `mpz_invert` not exposed
+- Modular exponentiation — absent as a stdlib primitive, but this
+  project's specified path is a pure Lean implementation
+- Modular inverse — absent as a stdlib primitive, but this project's
+  specified path is via extended GCD
 - Primality testing — absent (not needed for this project; Berlekamp-
   Zassenhaus only needs small known primes)
 - Polynomial types — none (only internal `grind` polynomials)
@@ -26,9 +28,7 @@ What we get for free and what we need to build.
 - Finite field types / `ZMod` — absent (only `Fin n`)
 
 **GMP primitives to expose (via `@[extern]` FFI, ideally upstreamed):**
-- `mpz_powm` — modular exponentiation
 - `mpz_gcdext` — extended GCD with Bezout coefficients
-- `mpz_invert` — modular inverse
 
 These would live in `hex-gmp-extras` or be proposed as upstream additions
 to the Lean runtime.

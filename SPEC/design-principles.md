@@ -14,8 +14,8 @@
 3. **Performant by default.** Dense array-backed representations, `UInt64`
    coefficients for `F_p`, Barrett/Montgomery reduction for modular
    arithmetic. New GMP `@[extern]` primitives where Lean's runtime
-   doesn't yet expose what we need (modular exponentiation, extended
-   GCD, etc.). FLINT is used for conformance testing, not as a runtime
+   doesn't yet expose what we need (notably extended GCD for big
+   integers). FLINT is used for conformance testing, not as a runtime
    dependency.
 
 4. **Lean algorithms from the start.** All algorithms are implemented and

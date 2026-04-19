@@ -8,8 +8,8 @@ Core integer arithmetic that everything else builds on.
 - Barrett and Montgomery reduction for `UInt64` modular arithmetic
   (see below)
 - Modular exponentiation by squaring (using Montgomery internally)
-- GMP FFI extras: `@[extern]` wrappers for `mpz_powm`, `mpz_gcdext`,
-  `mpz_invert` — for big-integer operations where values exceed 64 bits
+- GMP FFI extra: `@[extern]` wrapper for `mpz_gcdext` — for big-integer
+  extended GCD / Bezout computations
 - Pure Lean implementations of the same for the proof target
 
 **Barrett reduction** — fast single modular multiplication on `UInt64`

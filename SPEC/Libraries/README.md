@@ -11,11 +11,11 @@
 - **hex-berlekamp** — Berlekamp factoring and Rabin irreducibility test over `F_p`
 - **hex-hensel** — Hensel lifting from `mod p` to `mod p^k`
 - **hex-lll** — LLL lattice basis reduction
-- **hex-berlekamp-zassenhaus** — complete factoring of `Z[x]`
+- **hex-berlekamp-zassenhaus** — complete factoring of `Z[x]`, initially with exhaustive recombination
 - **hex-conway** — Conway polynomial database
-- **hex-gfq-ring** — quotient ring `F_p[x]/(f)`
-- **hex-gfq-field** — field structure when `f` is irreducible
-- **hex-gfq** — convenience wrapper: `GFq p n` using Conway polynomials
+- **hex-gfq-ring** — canonical quotient ring `F_p[x]/(f)` by a nonconstant modulus
+- **hex-gfq-field** — field structure on top of `hex-gfq-ring` when `f` is irreducible
+- **hex-gfq** — convenience wrapper: canonical `GFq p n` plus optimized `GF2q n` using Conway polynomials
 
 **Mathlib bridge libraries** (each depends on a computational lib + Mathlib,
 proving correspondence with Mathlib's mathematical definitions):
@@ -28,8 +28,8 @@ proving correspondence with Mathlib's mathematical definitions):
 - **hex-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
 - **hex-hensel-mathlib** — Hensel correctness, uniqueness, `coprime_mod_p_lifts`
 - **hex-lll-mathlib** — lattice = `Submodule ℤ`, short vector bound
-- **hex-gf2-mathlib** — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hirr`
-- **hex-gfq-mathlib** — `GFq p n ≃+* GaloisField p n`
+- **hex-gf2-mathlib** — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`
+- **hex-gfq-mathlib** — finiteness/cardinality for quotient fields, and `GFq p n ≃+* GaloisField p n`
 - **hex-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
 ## Implementation dependencies
@@ -48,10 +48,10 @@ Each library with its immediate dependencies:
 - **hex-hensel** — hex-poly-fp, hex-poly-z
 - **hex-conway** — hex-berlekamp
 - **hex-gfq-ring** — hex-poly-fp
-- **hex-gfq-field** — hex-berlekamp
-- **hex-gfq** — hex-gfq-field, hex-conway
+- **hex-gfq-field** — hex-gfq-ring
+- **hex-gfq** — hex-gfq-field, hex-conway, hex-gf2
 - **hex-gf2** — hex-poly
-- **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel, hex-lll
+- **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel
 
 Mathlib bridge libraries (each also depends on Mathlib):
 
@@ -76,15 +76,15 @@ Three independent roots: hex-poly, hex-arith, hex-matrix.
 
 ```
       hex-poly     hex-arith      hex-matrix
-       /     \          |            /       \
+       /     \          |           /       \
       /       \     hex-mod-arith  /  hex-gram-schmidt
-     /         \       /           /         |
-hex-poly-z  hex-poly-fp         /       hex-lll
-     \        /       |          /         /
-     hex-hensel  hex-gfq-ring /         /
-               \       |       /         /
-                \  hex-berlekamp       /
-                 \      |              /
+     /         \       /          /         |
+hex-poly-z  hex-poly-fp          /       hex-lll
+     \        /       |         /         /
+     hex-hensel  hex-gfq-ring  /
+               \       |      /
+                \  hex-berlekamp
+                 \      |
                   hex-berlekamp-zassenhaus
 ```
 
@@ -92,11 +92,13 @@ Additional libraries (finite field construction, GF(2)):
 ```
 hex-poly ── hex-gf2
 
-        hex-berlekamp
-         /          \
-  hex-gfq-field  hex-conway
-         \          /
-          hex-gfq
+hex-gfq-ring
+     |
+hex-gfq-field   hex-conway   hex-gf2
+       \        /           /
+        \      /           /
+         \    /           /
+            hex-gfq
 ```
 
 ## Index
@@ -110,7 +112,7 @@ hex-poly ── hex-gf2
 - [hex-poly-mathlib.md](hex-poly-mathlib.md) — `DensePoly R ≃+* Polynomial R`
 - [hex-poly-fp.md](hex-poly-fp.md) — polynomials over `F_p`, Frobenius, square-free decomposition
 - [hex-gf2.md](hex-gf2.md) — packed bitwise polynomials over `F_2`, `GF(2^n)` elements
-- [hex-gf2-mathlib.md](hex-gf2-mathlib.md) — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hirr`
+- [hex-gf2-mathlib.md](hex-gf2-mathlib.md) — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`
 - [hex-poly-z.md](hex-poly-z.md) — polynomials over `Z`, content/primitive part, Mignotte bound
 - [hex-poly-z-mathlib.md](hex-poly-z-mathlib.md) — Mignotte bound proof via Mathlib's Mahler measure
 - [hex-berlekamp.md](hex-berlekamp.md) — Berlekamp factoring and Rabin irreducibility test
@@ -118,10 +120,10 @@ hex-poly ── hex-gf2
 - [hex-hensel.md](hex-hensel.md) — Hensel lifting algorithms
 - [hex-hensel-mathlib.md](hex-hensel-mathlib.md) — Hensel correctness, uniqueness, coprimality lifting
 - [hex-conway.md](hex-conway.md) — Conway polynomial database
-- [hex-gfq-ring.md](hex-gfq-ring.md) — quotient ring `F_p[x]/(f)`
-- [hex-gfq-field.md](hex-gfq-field.md) — field structure when `f` is irreducible
-- [hex-gfq.md](hex-gfq.md) — convenience wrapper `GFq p n` using Conway polynomials
-- [hex-gfq-mathlib.md](hex-gfq-mathlib.md) — `GFq p n ≃+* GaloisField p n`
+- [hex-gfq-ring.md](hex-gfq-ring.md) — canonical quotient ring `F_p[x]/(f)`
+- [hex-gfq-field.md](hex-gfq-field.md) — field structure on top of the quotient ring when `f` is irreducible
+- [hex-gfq.md](hex-gfq.md) — convenience wrapper `GFq p n` and optimized `GF2q n` using Conway polynomials
+- [hex-gfq-mathlib.md](hex-gfq-mathlib.md) — finiteness/cardinality for quotient fields and `GFq p n ≃+* GaloisField p n`
 - [hex-gram-schmidt.md](hex-gram-schmidt.md) — Gram-Schmidt orthogonalization, coefficients, Gram determinants
 - [hex-gram-schmidt-mathlib.md](hex-gram-schmidt-mathlib.md) — correspondence with Mathlib's `gramSchmidt`
 - [hex-lll.md](hex-lll.md) — LLL lattice basis reduction algorithm and proofs

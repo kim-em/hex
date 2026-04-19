@@ -29,6 +29,19 @@ dependency on polynomial arithmetic, Hensel lifting is independent of LLL,
 and all proof work is fully parallelizable once theorem statements are in
 place.
 
+## Project-wide proof policy
+
+`native_decide` is banned throughout the project. Large computational
+proofs must be carried by explicit verified checkers or tactics with
+stable, benchmarked runtime characteristics, rather than by delegating
+proof checking to `native_decide`.
+
+`@[extern]` is allowed only for runtime hooks explicitly called for in
+the SPEC. New trusted extern boundaries must not be invented during
+implementation. For each approved extern, the corresponding library spec
+should state the intended contract, any fallback path, and any relevant
+platform assumptions.
+
 ## Applications
 
 **Cryptographic field construction:** To build `GF(2^128)` for AES, you
@@ -51,6 +64,8 @@ verified LLL gives confidence in attack results.
 - [Design principles](design-principles.md)
 - [Lean 4 stdlib inventory](lean4-stdlib-inventory.md)
 - [Libraries](Libraries/) (DAG + per-library docs)
+- [Tutorials](tutorials.md)
 - [Testing](testing.md)
+- [Benchmarking](benchmarking.md)
 - [Prior art](prior-art.md)
 - [Future work](future-work.md)

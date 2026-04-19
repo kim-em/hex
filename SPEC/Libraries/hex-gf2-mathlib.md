@@ -5,9 +5,9 @@ the generic finite field constructions:
 
 - `GF2Poly ≃+* FpPoly 2` — unpack/repack between packed bitwise
   representation and the generic `DensePoly (ZMod64 2)` representation.
-- `GF2n n irr ≃+* FiniteField 2 f hirr` — single-word GF(2^n) elements
+- `GF2n n irr ≃+* FiniteField 2 f hf hirr` — single-word GF(2^n) elements
   correspond to the quotient-ring field construction from hex-gfq-field.
-- `GF2nPoly f hirr ≃+* FiniteField 2 f hirr` — multi-word GF(2^n)
+- `GF2nPoly f hirr ≃+* FiniteField 2 f hf hirr` — multi-word GF(2^n)
   elements (for n >= 64) similarly correspond.
 
 These transfer via `GF2Poly ≃+* FpPoly 2`, so Mathlib theorems about

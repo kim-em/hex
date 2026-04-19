@@ -6,19 +6,25 @@ with the Mignotte bound from hex-poly-z-mathlib, giving unconditional
 results:
 ```lean
 theorem factor_product (f : ZPoly) :
-    (factor f (mignotteBound f)).prod = f
+    Array.foldl (· * ·) 1 (factor f) = f
 
 theorem factor_irreducible (f : ZPoly) :
-    ∀ g ∈ factor f (mignotteBound f), Irreducible g
+    ∀ g ∈ factor f, Irreducible g
 
 -- Follows from Mathlib's `UniqueFactorizationMonoid.factors_unique`
 -- (in `Mathlib.RingTheory.UniqueFactorizationDomain.Basic`) via the
 -- ring equivalence. `Polynomial ℤ` gets the `UniqueFactorizationMonoid`
 -- instance from `Mathlib.RingTheory.Polynomial.UniqueFactorization`.
-theorem factor_unique (f : ZPoly) (gs hs : List ZPoly) :
-    gs.prod = f → hs.prod = f →
-    (∀ g ∈ gs, Irreducible g) → (∀ h ∈ hs, Irreducible h) →
-    gs ~ hs  -- multiset equality up to associates
+theorem factor_unique (f : ZPoly) (gs hs : Array ZPoly) :
+    Array.foldl (· * ·) 1 gs = f →
+    Array.foldl (· * ·) 1 hs = f →
+    (∀ g ∈ gs, Irreducible g) →
+    (∀ h ∈ hs, Irreducible h) →
+    gs.toList ~ hs.toList  -- multiset equality up to associates
+
+theorem checkIrreducibleCert_sound
+    (f : ZPoly) (cert : ZPolyIrreducibilityCertificate) :
+    checkIrreducibleCert f cert = true → Irreducible f
 ```
 
 Also connects to Mathlib's `Polynomial ℤ` and provides
