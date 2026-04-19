@@ -52,18 +52,19 @@ structure LiftData where
   p : Nat
   k : Nat
   liftedFactors : Array ZPoly
-
-structure RecombinationData where
-  p : Nat
-  k : Nat
-  liftedFactors : Array ZPoly
 ```
+
+`LiftData` is the pipeline's shared "we have factors mod `p^k`"
+record: it is the output of the Hensel-lift stage and the input to
+recombination. There is no separate `RecombinationData`; if a future
+LLL-based recombination needs extra metadata, introduce it as a
+dedicated internal helper record at that point.
 
 Suggested stage helpers:
 ```lean
 def choosePrimeData (f : ZPoly) : PrimeChoiceData
 def henselLiftData (f : ZPoly) (B : Nat) (d : PrimeChoiceData) : LiftData
-def recombine (f : ZPoly) (d : RecombinationData) : Array ZPoly
+def recombine (f : ZPoly) (d : LiftData) : Array ZPoly
 ```
 
 `recombine` is a named public helper. Its initial implementation may be
@@ -106,15 +107,27 @@ results remain in `hex-berlekamp-zassenhaus-mathlib`.
 
 **Certificate structures for Z[x] irreducibility:**
 ```lean
+structure PrimeFactorData where
+  p : Nat
+  factorDegrees : Array Nat
+  factorCerts : Array IrreducibilityCertificate
+
 structure ZPolyIrreducibilityCertificate where
-  primes : Array Nat
-  factorDegrees : Array (Array Nat)
-  factorCerts : Array (Array IrreducibilityCertificate)
+  perPrime : Array PrimeFactorData
   -- Degree analysis data ruling out nontrivial factor degrees
 
 def checkIrreducibleCert
     (f : ZPoly) (cert : ZPolyIrreducibilityCertificate) : Bool
 ```
+
+Grouping by prime in a single `PrimeFactorData` record keeps the
+per-prime triple (prime, modular factor degrees, irreducibility
+witnesses) aligned by construction, instead of relying on parallel
+arrays matched up implicitly. Each `IrreducibilityCertificate` in
+`factorCerts` carries its own `p` and `n` fields (see
+`hex-berlekamp`), so the checker can cross-check that each entry's
+`p` matches the enclosing `PrimeFactorData.p` and that its `n` lies
+in `factorDegrees`.
 
 The outer contract is checker-first: the precise internal certificate
 layout may evolve, but the public contract should be stable.

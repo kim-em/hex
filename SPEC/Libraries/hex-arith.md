@@ -361,3 +361,21 @@ Proof via extended GCD: if `p ∤ a` then `gcd(a, p) = 1`, Bezout gives
 it for extended GCD. The pure Lean `extGcd` is the logical definition used
 in proofs; the GMP `@[extern]` for `mpz_gcdext` replaces it at runtime,
 trusted in the same way as every other `@[extern]` in Lean.
+
+## Extern contract: `mpz_gcdext`
+
+```lean
+@[extern "lean_hex_mpz_gcdext"]
+def Int.extGcd (a b : @& Int) : Nat × Int × Int := Hex.pureIntExtGcd a b
+```
+
+`Hex.pureIntExtGcd` is the pure-Lean reference used for proofs and as
+the portable fallback. The C wrapper
+`lean_hex_mpz_gcdext(lean_object *, lean_object *) → lean_object *`
+in `HexArith/ffi/mpz_gcdext.c` converts to `mpz_t`, calls GMP's
+`mpz_gcdext(g, s, t, a, b)`, and packs `(g.toNat, s, t)` back into
+`Nat × Int × Int`. GMP is linked via `moreLinkArgs := #["-lgmp"]` in
+`lakefile.toml`; the extern is trusted in the same way as every other
+`@[extern]` GMP binding in Lean. If GMP is unavailable, the
+attachment falls through to `Hex.pureIntExtGcd` — correct, but slow
+on large inputs.

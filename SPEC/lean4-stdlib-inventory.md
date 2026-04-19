@@ -28,7 +28,16 @@ What we get for free and what we need to build.
 - Finite field types / `ZMod` — absent (only `Fin n`)
 
 **GMP primitives to expose (via `@[extern]` FFI, ideally upstreamed):**
-- `mpz_gcdext` — extended GCD with Bezout coefficients
+- `mpz_gcdext` — extended GCD with Bezout coefficients, landed in
+  `hex-arith` as the `Int.extGcd` extern. See the "Extern contract:
+  `mpz_gcdext`" section in `Libraries/hex-arith.md`.
 
-These would live in `hex-gmp-extras` or be proposed as upstream additions
-to the Lean runtime.
+**Hardware intrinsics exposed via `@[extern]`:**
+- `clmul` (64×64 carry-less multiply) — landed in `hex-gf2` as the
+  `clmul` extern. Backed by CLMUL on x86-64 and `vmull_p64` on
+  aarch64. See the "Extern contract: `clmul`" section in
+  `Libraries/hex-gf2.md`.
+
+Every new `@[extern]` boundary in this project must ship with an
+analogous "Extern contract" section in the owning library spec, per
+the project-wide policy in `SPEC.md`.

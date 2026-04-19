@@ -55,6 +55,26 @@ def clmul (a b : UInt64) : UInt64 × UInt64 :=
 Slower than hardware CLMUL but avoids the per-operation Barrett
 overhead of the generic `ZMod64 2` path.
 
+### Extern contract: `clmul`
+
+```lean
+@[extern "lean_hex_clmul_u64"]
+def clmul (a b : @& UInt64) : UInt64 × UInt64 := Hex.pureClmul a b
+```
+
+`Hex.pureClmul` (shift-and-XOR, above) is the reference semantics.
+The C wrapper `lean_hex_clmul_u64(uint64_t, uint64_t) → lean_obj_res`
+in `HexGf2/ffi/clmul.c` returns the 128-bit product packed as `(hi, lo)`.
+
+The C wrapper picks its implementation by preprocessor guards (no
+runtime CPU detection): x86-64 `__PCLMUL__` uses
+`_mm_clmulepi64_si128`; aarch64 `__ARM_FEATURE_CRYPTO` uses
+`vmull_p64`; otherwise it runs a portable shift-and-XOR mirroring
+`Hex.pureClmul`. Correctness of the intrinsic paths is trusted, same
+as the GMP externs in hex-arith. Tests must exercise each compiled
+wrapper path and the pure-Lean body (built without the extern
+attached) to catch divergence.
+
 **GF(2^n) elements.** Elements of `GF(2^n)` are polynomials of degree
 < n over F_2, reduced modulo an irreducible of degree n. This library
 provides the optimized representations and operations; the convenience

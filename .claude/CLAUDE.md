@@ -11,7 +11,8 @@ Verified computational algebra in Lean 4, Mathlib-free.
 
 - **PLAN.md** — workflow document describing how agents/humans execute
   the SPEC. Phases: monorepo scaffolding, library scaffolding,
-  scaffolding review, conformance testing, implementation, polishing.
+  scaffolding review, conformance testing, performance and
+  benchmarking, implementation, polishing.
 
 **Rule: no duplication between SPEC files.** Content lives in exactly
 one place. If material is moved between files, delete the original.

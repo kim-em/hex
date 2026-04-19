@@ -172,6 +172,10 @@ which ones run where.
 - the full benchmark suite may run on a scheduled workflow or
   release-candidate workflow
 - each release target must name the benchmark cases it must pass
+- specific cases and thresholds may evolve between releases, but every
+  such change must be accompanied by a short rationale in the PR that
+  changes the benchmark set (one paragraph per change). This keeps the
+  release gate machine-checkable without freezing the case list.
 - a release is blocked by obvious performance regressions even if proofs
   are complete
 

@@ -30,3 +30,51 @@
 6. **`Hex` namespace.** All definitions live under `Hex` to avoid
    collisions with Mathlib's root-namespace types (`Matrix`,
    `Polynomial`, etc.).
+
+## Fully autonomous execution
+
+The project runs without human interaction after launch. Lean, Mathlib,
+and this SPEC are fixed inputs. Agents resolve every issue they
+encounter:
+
+- If a needed result is not in Mathlib, prove it locally.
+- If a tactic misbehaves, work around it.
+
+There is no human escalation channel. "Stop and flag" is not an
+option; "decide and proceed" is.
+
+### Scope of autonomous SPEC edits
+
+Agents may edit the SPEC only to fix clauses that are ill-typed,
+internally contradictory, or clearly mathematically impossible. Every
+such edit is accompanied by an explicit rationale in the PR
+description citing the offending clause and the project goal that
+breaks the tie. Changes to public APIs or release goals are
+exceptional and should be called out as such, even though no human
+approves them. Routine refactoring and "I would have written it
+differently" are not grounds for SPEC edits.
+
+### Push sorries earlier
+
+When a proof is hard, replace it with a proof outline that cites new, clearly-stated lemmas
+(which may themselves be `sorry`) one level closer to the
+foundations. Repeat until the remaining sorries are individually
+plausible. This keeps the proof graph reviewable even when the
+leaves are incomplete, and lets later workers attack foundational
+lemmas in isolation.
+
+## Naming and documentation
+
+**Namespaces.** New types, functions, and theorems introduced by this
+project live under `Hex` (e.g. `Hex.FpPoly`, `Hex.GF2n`). Additions to
+existing Lean/Mathlib datatypes live in the original namespace
+(`Nat.foo`, `Array.polyProduct`, `UInt64.mulHi`). Subnamespaces like
+`Hex.GramSchmidt.Int` are fine when they aid discoverability.
+
+**Docstrings.** All public `def`/`structure`/`class`/`inductive`
+declarations carry a docstring. Non-obvious private helpers — anything
+encoding an invariant, a subtle algorithmic choice, or a non-trivial
+specification — also carry one. Routine private plumbing (unfolding
+lemmas, `_aux` helpers, trivial getters) is exempt. Every theorem
+another file could reasonably import carries a docstring stating what
+it proves and why the caller cares.

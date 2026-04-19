@@ -15,12 +15,19 @@ over finite fields.
 
 **Certificate structures** (generated and checked in Lean):
 ```lean
-structure IrreducibilityCertificate (p n : Nat) where
+structure IrreducibilityCertificate where
+  p : Nat
+  n : Nat
   -- Square-and-multiply witnesses for X^(p^k) mod f
   powChain : Array (FpPoly p)
   -- Bezout coefficients for coprimality at each maximal divisor
   bezout : Array (FpPoly p × FpPoly p)
 ```
+
+The prime `p` and target degree `n` are bundled as fields so that a
+certificate is self-describing and collections of certificates at
+different primes can share a single type. `FpPoly p` references use
+the preceding field, which Lean 4 supports natively.
 
 The certificate checker is tiny and fully verified. The algorithm that
 *generates* certificates is also in Lean — Berlekamp's algorithm produces

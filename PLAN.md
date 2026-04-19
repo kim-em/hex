@@ -7,6 +7,17 @@ this file for progress tracking.
 The spec (`SPEC/SPEC.md` and linked files) describes **what** to build.
 This document describes the pipeline for building it.
 
+**Do not modify files under `SPEC/`.** The SPEC is a fixed design
+document, not a working surface. The only exception is the narrow
+"scope of autonomous SPEC edits" rule in `SPEC/design-principles.md`:
+agents may edit a SPEC clause that is ill-typed, internally
+contradictory, or clearly mathematically impossible, with the
+rationale in the PR description. Release churn, benchmark tweaks,
+refactoring preferences, and "I would have written it differently"
+are **not** grounds for SPEC edits. When in doubt, leave `SPEC/`
+alone and record the change elsewhere (PR description, issue, release
+notes).
+
 ## Release Targets
 
 Think about release targets in terms of **verified finite fields**, not
@@ -85,11 +96,14 @@ spec and this document.
 
 ### Steps
 
-1. Create `lean-toolchain` pinning the current stable Lean 4 release.
+1. Create `lean-toolchain` containing exactly
+   `leanprover/lean4:v4.30.0-rc2`. This is the project baseline; do
+   not substitute a different release. 
 
 2. Create `lakefile.toml` with one `[[lean_lib]]` per library in the DAG
-   (see `SPEC/Libraries/README.md` for the full list). Pin Mathlib to a
-   specific commit (not `master`). Each library entry needs:
+   (see `SPEC/Libraries/README.md` for the full list). All `-mathlib`
+   bridge libraries depend on the Mathlib tag `v4.30.0-rc2`.
+   Each library entry needs:
    - `name` — PascalCase (e.g. `HexArith`, `HexPolyZMathlib`)
    - `srcDir = "."`
    - `roots` — matching the PascalCase name
@@ -142,7 +156,7 @@ spec and this document.
      `"mathlib": true` in `dag.json`.
    - Exit non-zero on any violation, printing all violations to stderr.
 
-6. Set up CI:
+6. Set up CI using `leanprover/lean-action`.
 
    **`.github/workflows/ci.yml`** (required, runs on every push/PR):
    ```yaml
@@ -153,16 +167,22 @@ spec and this document.
        runs-on: ubuntu-latest
        steps:
          - uses: actions/checkout@v4
-         - uses: leanprover/lean-action@v1
          - run: python3 scripts/check_dag.py
-         - run: lake build
+         - uses: leanprover/lean-action@v1
    ```
+
+   The DAG check runs before the Lean build so import-boundary
+   violations fail fast without spending build time. `lean-action`
+   performs the `lake build` itself.
 
    **`.github/workflows/conformance.yml`** (optional, manual trigger):
    Manual or locally-triggered conformance workflow following
-   `SPEC/testing.md`. This may use external tools such as Sage, FLINT,
-   or fpLLL when available, but should not be required for the minimal
-   Phase 0 repository bootstrap.
+   `SPEC/testing.md`. Also uses `leanprover/lean-action` for the
+   Lean portion of the build; external tools (Sage, FLINT, fpLLL)
+   layer on top via `cachix/install-nix-action` when available. The
+   full conformance workflow is not required for the minimal Phase 0
+   repository bootstrap — a stub file pointing at `SPEC/testing.md`
+   is sufficient at this stage.
 
 7. Create `.gitignore` (at minimum: `.lake/`, `build/`).
 
@@ -170,6 +190,16 @@ spec and this document.
 
 9. Verify: `lake build` succeeds (trivially — empty files) and
    `python3 scripts/check_dag.py` exits 0.
+
+### Exit criteria
+
+Phase 0 is done when: `lean-toolchain` is the pinned baseline,
+`lakefile.toml` lists every library in the DAG, `lake-manifest.json`
+pins Mathlib to the resolved tag for `v4.30.0-rc2`, every library has
+an empty-or-stub root `.lean` file and source directory, `scripts/
+dag.json` and `scripts/check_dag.py` exist, the two CI workflow files
+exist, and `lake build` and `python3 scripts/check_dag.py` both
+succeed.
 
 ### FFI convention
 
@@ -327,6 +357,20 @@ When an issue is only partially completed, the agent should normally:
 - record the new boundaries clearly so later agents can resume without
   re-discovering the decomposition.
 
+### Exit criteria
+
+For library `hex-foo`, Phase 1 is done when:
+
+- every named `def`, `structure`, `class`, `instance`, and `theorem`
+  in `SPEC/Libraries/hex-foo.md` has a matching Lean declaration with
+  the SPEC's signature;
+- `lake build <HexFooLib>` succeeds (proofs may be `sorry`; data-level
+  declarations must not be);
+- each new `.lean` file carries a module docstring summarising the
+  library contents;
+- no `TODO`, `FIXME`, or `...` placeholder remains in the scaffolded
+  code (other than `sorry` in proofs).
+
 ---
 
 ## Phase 2: Scaffolding Review — "What Are We Missing?"
@@ -351,6 +395,15 @@ These are not rubber-stamp coverage audits — they ask:
 ### Output
 
 GitHub issues flagging gaps. This may take multiple sessions per library.
+
+### Exit criteria
+
+For library `hex-foo`, Phase 2 is done when a reviewer *agent* (not
+the author of the scaffolding) has read the scaffolded code against
+`SPEC/Libraries/hex-foo.md`, opened follow-up issues for any gaps it
+identifies, and committed a machine-checkable token file
+`status/hex-foo.scaffolding-reviewed` recording that the review has
+been performed. 
 
 ---
 
@@ -404,9 +457,24 @@ Phase 3 should follow `SPEC/testing.md`. In particular:
 - Keep standard CI small enough for hosted runners and partial tool
   availability; reserve larger runs for `local` or manual jobs.
 
+### Exit criteria
+
+Phase 3 is done for a library when, for each of the `core`/`ci`/
+`local` profiles in `SPEC/testing.md`:
+
+- the library has named fixtures committed to the repository;
+- the property-test runner passes on the default seed recorded with
+  the fixture metadata;
+- there is at least one end-to-end case exercising every advertised
+  user story in the library's release target (see "Release ladder"
+  above).
+
+CI for the `core` and `ci` profiles must be green on the conformance
+workflow before a library leaves Phase 3.
+
 ---
 
-## Phase 3.5: Performance and Benchmarking
+## Phase 4: Performance and Benchmarking
 
 Performance is part of the project spec, not an optional cleanup task.
 Before calling a release target successful, measure the cost of the
@@ -450,7 +518,12 @@ native Lean implementations on representative workloads.
 
 ### Release expectations
 
-- Each release target should name the benchmark cases it must pass.
+- Each release target must name the benchmark cases it must pass.
+- Specific cases and thresholds may evolve between releases, but every
+  such change must be accompanied by a short rationale in the PR that
+  changes the benchmark set (one paragraph per change). This keeps the
+  release gate machine-checkable without freezing the case list, and
+  keeps release-specific churn out of `SPEC/`.
 - A release is blocked by obvious performance pathologies even if proofs
   are complete.
 - Record benchmark results in PRs or milestone notes so the orchestrator
@@ -458,7 +531,7 @@ native Lean implementations on representative workloads.
 
 ---
 
-## Phase 4: Implementation Work Loop
+## Phase 5: Implementation Work Loop
 
 Fill in `sorry`'d proofs. One GitHub issue per theorem or small group
 of related theorems.
@@ -477,9 +550,11 @@ In priority order:
   (tactic blocks with intermediate `sorry`s) before filling in helper
   lemmas. This reveals the proof structure early.
 
-- **Push sorries earlier.** If theorem A uses lemma B, and B is `sorry`,
-  that's fine — work on A's proof structure anyway. Lean treats `sorry`
-  as an axiom; downstream proofs compile.
+- **Push sorries earlier.** When a proof is hard, replace it with a proof outline
+  that cites new, clearly-stated lemmas (which may themselves be
+  `sorry`) one level closer to the foundations. See
+  `SPEC/design-principles.md` for the authoritative statement of the
+  idiom. 
 
 - **PRs with auto-merge** enabled where CI is passing.
 
@@ -487,9 +562,16 @@ In priority order:
   milestones): regression check for definition-level sorries, identify
   hardest remaining items, flag neglected libraries.
 
+### Exit criteria
+
+For library `hex-foo`, Phase 5 is done when it has zero `sorry`
+occurrences (counted across all declarations, not just top-level
+theorems), `lake build` is green on the pinned toolchain, and the
+Phase 3 conformance suite for the library still passes.
+
 ---
 
-## Phase 5: Proof Polishing
+## Phase 6: Proof Polishing
 
 Bring sorry-free proofs to Mathlib quality. This is substantially more
 than mechanical cleanup.
@@ -527,6 +609,19 @@ thought about API design for each declaration.
 This project is not committing to upstreaming as part of the plan; the
 point of these references is to set a local quality bar for bridge
 libraries and proof-heavy cleanup.
+
+### Exit criteria
+
+For library `hex-foo`, Phase 6 is done when:
+
+- the Mathlib linter is clean on the library;
+- docstring coverage meets the rule in `SPEC/design-principles.md`
+  (public declarations and non-obvious private helpers);
+- the library contains no dead or unreferenced declarations;
+- the library passes a performance regression check against the
+  previous tagged benchmark baseline if one exists, otherwise
+  against the most recent committed benchmark baseline (the
+  bootstrap case before any release has been tagged).
 
 ---
 
