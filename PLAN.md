@@ -94,6 +94,12 @@ driver of early scaffolding or proof scheduling.
 One-time setup. Create the Lake monorepo infrastructure by reading the
 spec and this document.
 
+The repository begins markdown-only (`SPEC/`, `PLAN.md`, `AGENTS.md`,
+`.claude/CLAUDE.md`). Phase 0 is responsible for creating every
+non-markdown file in the repository. Treat it as a single
+`--critical-path` feature issue handled by one worker; do not fan out
+into Phase 1 until the Phase 0 PR lands on `main`.
+
 ### Steps
 
 1. Create `lean-toolchain` containing exactly
@@ -168,12 +174,16 @@ spec and this document.
        steps:
          - uses: actions/checkout@v4
          - run: python3 scripts/check_dag.py
+         - run: sudo apt-get install -y libgmp-dev
          - uses: leanprover/lean-action@v1
    ```
 
    The DAG check runs before the Lean build so import-boundary
    violations fail fast without spending build time. `lean-action`
-   performs the `lake build` itself.
+   performs the `lake build` itself. `libgmp-dev` is installed
+   explicitly because the `hex-arith` extern C shims `#include
+   <gmp.h>`; Lean's toolchain ships `libgmp.a` for linking but not the
+   headers, and `ubuntu-latest` does not preinstall `libgmp-dev`.
 
    **`.github/workflows/conformance.yml`** (optional, manual trigger):
    Manual or locally-triggered conformance workflow following
