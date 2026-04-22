@@ -1,0 +1,141 @@
+# libraries.yml — per-library structure + state.
+#
+# Structural fields (deps, mathlib) change rarely, only when the library
+# graph changes. The state field (done_through) changes every planner
+# cycle as libraries complete phases.
+#
+# Semantics:
+# - done_through: K means phases 1..K are all complete for L (linear,
+#   no skipping — enforced by the phase-dep table in PLAN/README.md).
+# - done_through: 0 means no per-library phases are complete; L is
+#   ready to start Phase 1 once Phase 0's global bootstrap is done.
+# - done_through: 7 means L is fully done.
+# - Phase 0 (monorepo bootstrap) is global; its completion is observable
+#   by the existence of lakefile.toml, scripts/check_dag.py, etc., not
+#   by any field in this file.
+#
+# This file is the single source of truth for the library graph.
+# lakefile.toml entries are cross-checked against libraries.yml in CI via
+# scripts/check_dag.py.
+
+libraries:
+
+  # ---------- Roots ----------
+  HexArith:
+    deps: []
+    mathlib: false
+    done_through: 0
+  HexPoly:
+    deps: []
+    mathlib: false
+    done_through: 0
+  HexMatrix:
+    deps: []
+    mathlib: false
+    done_through: 0
+
+  # ---------- Depth 1 ----------
+  HexModArith:
+    deps: [HexArith]
+    mathlib: false
+    done_through: 0
+  HexGramSchmidt:
+    deps: [HexMatrix]
+    mathlib: false
+    done_through: 0
+  HexGf2:
+    deps: [HexPoly]
+    mathlib: false
+    done_through: 0
+  HexPolyZ:
+    deps: [HexPoly]
+    mathlib: false
+    done_through: 0
+
+  # ---------- Depth 2 ----------
+  HexLll:
+    deps: [HexGramSchmidt]
+    mathlib: false
+    done_through: 0
+  HexPolyFp:
+    deps: [HexPoly, HexModArith]
+    mathlib: false
+    done_through: 0
+
+  # ---------- Finite-field quotient pipeline ----------
+  HexGfqRing:
+    deps: [HexPolyFp]
+    mathlib: false
+    done_through: 0
+  HexGfqField:
+    deps: [HexGfqRing]
+    mathlib: false
+    done_through: 0
+
+  # ---------- Factoring pipeline ----------
+  HexBerlekamp:
+    deps: [HexPolyFp, HexMatrix, HexGfqRing]
+    mathlib: false
+    done_through: 0
+  HexHensel:
+    deps: [HexPolyFp, HexPolyZ]
+    mathlib: false
+    done_through: 0
+  HexConway:
+    deps: [HexBerlekamp]
+    mathlib: false
+    done_through: 0
+  HexGfq:
+    deps: [HexGfqField, HexConway, HexGf2]
+    mathlib: false
+    done_through: 0
+  HexBerlekampZassenhaus:
+    deps: [HexBerlekamp, HexHensel]
+    mathlib: false
+    done_through: 0
+
+  # ---------- Mathlib bridges ----------
+  HexPolyMathlib:
+    deps: [HexPoly]
+    mathlib: true
+    done_through: 0
+  HexMatrixMathlib:
+    deps: [HexMatrix]
+    mathlib: true
+    done_through: 0
+  HexModArithMathlib:
+    deps: [HexModArith]
+    mathlib: true
+    done_through: 0
+  HexGramSchmidtMathlib:
+    deps: [HexGramSchmidt]
+    mathlib: true
+    done_through: 0
+  HexPolyZMathlib:
+    deps: [HexPolyZ, HexPolyMathlib]
+    mathlib: true
+    done_through: 0
+  HexLllMathlib:
+    deps: [HexLll]
+    mathlib: true
+    done_through: 0
+  HexBerlekampMathlib:
+    deps: [HexBerlekamp, HexPolyMathlib, HexModArithMathlib]
+    mathlib: true
+    done_through: 0
+  HexHenselMathlib:
+    deps: [HexHensel, HexPolyMathlib]
+    mathlib: true
+    done_through: 0
+  HexGf2Mathlib:
+    deps: [HexGf2, HexPolyFp, HexGfqField]
+    mathlib: true
+    done_through: 0
+  HexGfqMathlib:
+    deps: [HexGfq]
+    mathlib: true
+    done_through: 0
+  HexBerlekampZassenhausMathlib:
+    deps: [HexBerlekampZassenhaus, HexPolyZMathlib]
+    mathlib: true
+    done_through: 0
