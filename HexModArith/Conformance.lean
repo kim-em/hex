@@ -11,11 +11,16 @@ Deterministic core conformance checks for `HexModArith`.
   - `HexModArith.ZMod64.add`
   - `HexModArith.ZMod64.sub`
   - `HexModArith.ZMod64.mul`
+  - `HexModArith.ZMod64.inv?`
   - `HexModArith.ZMod64.pow`
 - Covered properties:
   - `ofNat` canonicalizes representatives by reduction modulo `p`.
   - `add`, `sub`, `mul`, and `pow` agree with the corresponding
     `Nat` modular arithmetic formulas on committed inputs.
+  - `inv?` returns the expected inverse for committed units and
+    `none` for committed non-units.
+  - On committed invertible residues, the returned inverse multiplies
+    with the original residue to `1`.
   - `add` preserves the zero identity, `mul` preserves the one
     identity, and `pow a 0 = 1` on committed inputs.
 - Covered edge cases:
@@ -47,6 +52,9 @@ private def one17 : ZMod64 17 :=
 
 private def one97 : ZMod64 97 :=
   ZMod64.one 97 (by decide)
+
+private def invToNat? {p : Nat} (a : ZMod64 p) : Option Nat :=
+  Option.map ZMod64.toNat (ZMod64.inv? a)
 
 /-! ## `ZMod64.ofNat` -/
 
@@ -109,6 +117,34 @@ private def one97 : ZMod64 97 :=
 #guard (ZMod64.mul (z1 0) (z1 0)).toNat = (0 * 0) % 1
 #guard (ZMod64.mul (z97 96) (z97 96)).toNat = (96 * 96) % 97
 #guard (ZMod64.mul (z97 96) one97).toNat = (z97 96).toNat
+
+/-! ## `ZMod64.inv?` -/
+
+/-- info: some 7 -/
+#guard_msgs in #eval invToNat? (z17 5)
+
+/-- info: none -/
+#guard_msgs in #eval invToNat? zero17
+
+/-- info: some 96 -/
+#guard_msgs in #eval invToNat? (z97 96)
+
+/-- info: some 21 -/
+#guard_msgs in #eval invToNat? (z97 37)
+
+#guard invToNat? (z17 5) = some 7
+#guard invToNat? zero17 = none
+#guard invToNat? (z97 96) = some 96
+#guard invToNat? (z97 37) = some 21
+#guard match ZMod64.inv? (z17 5) with
+  | some b => (ZMod64.mul b (z17 5)).toNat = one17.toNat
+  | none => false
+#guard match ZMod64.inv? (z97 96) with
+  | some b => (ZMod64.mul b (z97 96)).toNat = one97.toNat
+  | none => false
+#guard match ZMod64.inv? (z97 37) with
+  | some b => (ZMod64.mul b (z97 37)).toNat = one97.toNat
+  | none => false
 
 /-! ## `ZMod64.pow` -/
 

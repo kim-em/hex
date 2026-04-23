@@ -13,8 +13,8 @@ associated characteristic scaffold expected by downstream modular
 polynomial and bridge code, together with the prime-modulus theorem
 surface for inverse correctness, zero-divisor elimination, and Fermat's
 little theorem. The Phase 3 `Conformance` module adds deterministic core
-checks for canonicalization, arithmetic, and exponentiation on fixed
-small moduli.
+checks for canonicalization, arithmetic, inversion, and exponentiation
+on fixed small moduli.
 -/
 
 namespace HexModArith
