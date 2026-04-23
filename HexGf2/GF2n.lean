@@ -1,3 +1,6 @@
+import Mathlib.Algebra.Field.MinimalAxioms
+import Mathlib.Data.Fintype.Card
+import Mathlib.Data.Fintype.OfMap
 import HexGf2.FiniteExtension
 
 /-!
@@ -6,7 +9,9 @@ Executable small-word arithmetic for packed `GF(2^n)` extensions.
 This module adds the Phase 1 operation layer for the single-word `GF2n`
 carrier. Addition is XOR on representatives; multiplication uses the
 carry-less `clmul` boundary followed by executable reduction modulo the
-implicit monic irreducible `x^n + irr`.
+implicit monic irreducible `x^n + irr`. It also exposes the spec-promised
+small-word `Field` and `Fintype` scaffolding via canonical `n`-bit
+representatives.
 -/
 
 namespace HexGf2
@@ -132,6 +137,134 @@ theorem one_val {n : Nat} {irr : UInt64}
     {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
     (1 : GF2n n irr hn hn64 hirr).val = 1 := by
   sorry
+
+/-- Packed `GF(2^n)` elements are determined by their canonical word. -/
+@[ext] theorem ext {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    {x y : GF2n n irr hn hn64 hirr} (h : x.val = y.val) : x = y := by
+  cases x
+  cases y
+  cases h
+  simp
+
+/-- Decidable equality reduces to equality of canonical packed representatives. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    DecidableEq (GF2n n irr hn hn64 hirr) := by
+  intro x y
+  by_cases h : x.val = y.val
+  · exact isTrue (ext h)
+  · exact isFalse (fun hxy => h (congrArg GF2n.val hxy))
+
+/-- Canonical equivalence between packed representatives and `Fin (2^n)`. -/
+def finEquiv {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    GF2n n irr hn hn64 hirr ≃ Fin (2 ^ n) where
+  toFun x := ⟨x.val.toNat, x.val_lt⟩
+  invFun k := ofUInt64 (n := n) (irr := irr) (hn := hn) (hn64 := hn64)
+    (hirr := hirr) (UInt64.ofNat k.1)
+  left_inv x := by
+    apply ext
+    sorry
+  right_inv k := by
+    apply Fin.ext
+    sorry
+
+/-- The small-word carrier is finite by enumeration of its `n`-bit representatives. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Fintype (GF2n n irr hn hn64 hirr) :=
+  Fintype.ofEquiv (Fin (2 ^ n)) (finEquiv (n := n) (irr := irr) (hn := hn)
+    (hn64 := hn64) (hirr := hirr)).symm
+
+/-- Executable search for a multiplicative inverse among canonical representatives. -/
+def inv {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    (a : GF2n n irr hn hn64 hirr) : GF2n n irr hn hn64 hirr :=
+  if _h0 : a = 0 then
+    0
+  else
+    match (List.range (2 ^ n)).find? fun k =>
+        decide (((a *
+          ofUInt64 (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+            (UInt64.ofNat k)).val = 1)) with
+    | some k =>
+        ofUInt64 (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+          (UInt64.ofNat k)
+    | none => 0
+
+/-- Negation is the identity in characteristic two. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Neg (GF2n n irr hn hn64 hirr) where
+  neg a := a
+
+/-- Subtraction agrees with addition in characteristic two. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Sub (GF2n n irr hn hn64 hirr) where
+  sub a b := a + b
+
+/-- The executable inverse uses the canonical representative search. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Inv (GF2n n irr hn hn64 hirr) where
+  inv := inv
+
+/-- The finite enumeration is definitionally the `Fin` enumeration transported across `finEquiv`. -/
+theorem fintype_card {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Fintype.card (GF2n n irr hn hn64 hirr) = 2 ^ n := by
+  sorry
+
+/-- The executable inverse returns zero on the zero element. -/
+theorem inv_zero {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    inv (0 : GF2n n irr hn hn64 hirr) = 0 := by
+  simp [inv]
+
+/-- Nonzero packed representatives multiply with `inv` to the packed one. -/
+theorem mul_inv_cancel {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    (a : GF2n n irr hn hn64 hirr) (ha : a ≠ 0) :
+    a * inv a = 1 := by
+  sorry
+
+/-- The small-word carrier supports the spec-promised field structure. -/
+noncomputable instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Field (GF2n n irr hn hn64 hirr) :=
+  Field.ofMinimalAxioms (GF2n n irr hn hn64 hirr)
+    (fun a b c => by sorry)
+    (fun a => by sorry)
+    (fun a => by sorry)
+    (fun a b c => by sorry)
+    (fun a b => by sorry)
+    (fun a => by sorry)
+    (fun a ha => by
+      simpa [Inv.inv, inv] using mul_inv_cancel (n := n) (irr := irr) (hn := hn)
+        (hn64 := hn64) (hirr := hirr) a ha)
+    (by
+      exact inv_zero (n := n) (irr := irr) (hn := hn)
+        (hn64 := hn64) (hirr := hirr))
+    (fun a b c => by sorry)
+    (by
+      refine ⟨0, 1, ?_⟩
+      intro h
+      have := congrArg GF2n.val h
+      simp [zero_val, one_val] at this)
 
 end GF2n
 
