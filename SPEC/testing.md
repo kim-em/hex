@@ -1,114 +1,273 @@
 # Conformance testing
 
+Conformance testing cross-checks Lean implementations against either
+(a) independently stated algebraic properties, or (b) an external
+oracle (Sage, FLINT, python-flint, fpLLL, GAP, PARI). The goal is to
+catch implementation bugs *before* proof work starts. No point proving
+theorems about wrong implementations.
+
 Conformance testing is a tiered system rather than one monolithic
-workflow. The repository should support at least three profiles:
+workflow. The repository supports three profiles:
 
-- `core` — deterministic Lean-side checks with no external dependencies
-- `ci` — modest randomized cross-checks, using external tools only when
-  available
-- `local` — developer-driven runs with customizable sizes and tools
+- `core` — deterministic Lean-only checks with no external dependencies.
+  Runs on every push and every pull request. MUST be green to merge.
+- `ci` — modest randomized cross-checks against external oracles, run
+  only when the oracle is available on the runner. Runs on every push
+  and every pull request; oracle-missing cases are recorded as skipped.
+- `local` — developer-driven runs with customisable sizes and tools.
+  Triggered via `workflow_dispatch` or run by hand; not a merge gate.
 
-Every failure must be replayable by recording the library name, test
-profile, seed, and fully serialized input case.
+Every failure must be replayable: record the library, profile, seed,
+fully serialised input, and the oracle (if any) in the failure report.
+
+## Per-library module contract
+
+Every library `HexFoo` at `done_through ≥ 2` MUST provide
+`HexFoo/Conformance.lean`, re-exported from `HexFoo.lean`. This module
+is the `core` profile for `HexFoo`. It MUST:
+
+1. **Open with a docstring** declaring the library-specific
+   conformance contract:
+
+   - **Oracle:** which external oracle applies, or `none`.
+   - **Mode:** `always` / `if_available` / `required`.
+   - **Covered operations:** bulleted list of the public operations
+     this module exercises (matches the library's SPEC API surface).
+   - **Covered properties:** bulleted list of the algebraic /
+     structural properties this module asserts via `#guard`
+     (Bézout, degree bound, round-trip identities, etc.).
+   - **Covered edge cases:** bulleted list of the edge inputs
+     exercised (zero / empty / identity / modulus-1 / singular /
+     degree-0, as applicable).
+
+   This docstring is the library's local conformance spec, written
+   by the agent doing the Phase 3 work. Reviewers check the rest of
+   the file against this docstring.
+
+2. **Cover every advertised operation** listed in the library's
+   SPEC API surface with at least one elaboration-time check
+   (`#guard`, `#guard_msgs in #eval`, or `example ... := by decide`)
+   that evaluates the operation on a concrete committed input and
+   asserts the result.
+
+3. **Check every advertised algebraic property** on committed
+   inputs — not just spot values. Worked examples:
+
+   - `extGcd a b = (g, s, t)` → `s * a + t * b = g` and
+     `g = Nat.gcd a.natAbs b.natAbs`.
+   - `det`, `rowSwap` → `det (rowSwap M i j) = -det M` for `i ≠ j`.
+   - `rowScale` → `det (rowScale M i c) = c * det M`.
+   - `rowAdd` → `det (rowAdd M i j c) = det M` for `i ≠ j`.
+   - Polynomial multiplication → `(p * q).degree ≤ p.degree + q.degree`
+     on committed pairs; commutativity on the same pairs.
+   - Factorisation → product of committed factors equals the committed
+     input; each factor certified irreducible by the library's own
+     irreducibility checker (not `native_decide`).
+
+4. **Provide ≥3 cases per advertised operation**, covering:
+   - one *typical* input (non-edge, non-degenerate);
+   - one *edge* input (zero / empty / identity / modulus-1 / singular
+     / degree-0, as applicable);
+   - one *adversarial* input (hand-crafted to exercise a known failure
+     mode — e.g. trailing zero coefficients for polynomial
+     normalisation, a swap of non-adjacent rows for determinant sign,
+     a modulus equal to a power of two for modular reduction).
+
+5. **Store each case's inputs and expected outputs in exactly one
+   place** in the source — inline in the `#guard` / `example` /
+   `#guard_msgs` line, or via a single `let`-bound value referenced
+   by the check. No parallel "expected" struct fields that the check
+   doesn't reference.
+
+6. **Use `#guard_msgs in #eval` for spot values** whenever the
+   expected output is small enough to read in-source. This form makes
+   the expected value visible to reviewers and fails at elaboration
+   (hence in CI) if the evaluator changes:
+
+   ```lean
+   /-- info: (6, 1, -2) -/
+   #guard_msgs in #eval HexArith.extGcd 30 12
+   ```
+
+7. **Use `#guard` for property assertions** — they turn any
+   Bool-valued invariant into a CI-enforced check:
+
+   ```lean
+   #guard let (g, s, t) := HexArith.extGcd 30 12; s * 30 + t * 12 = g
+   ```
+
+## Banned anti-patterns
+
+These patterns have produced ceremony-heavy modules with no teeth and
+MUST NOT appear in any `Conformance.lean`:
+
+- **Dead "expected" struct fields.** Every field named `expectedX`
+  (or otherwise representing an expected output) must appear on the
+  RHS of at least one `#guard` / `example` / `by decide` check in
+  the same file. If a fixture structure carries expected values the
+  `eval` function throws away with `_`, delete the fields.
+
+- **Serialise-and-compare-to-reconstructed-literal.** Checking
+  `serialiseMatrix (intMatN a00 a01 …)` against `[[a00, a01, …]]`
+  tests that the serialiser is the identity; it does not test the
+  operation under study. Assert the *operation's* output directly.
+
+- **Trivial `by decide` where RHS is a copy of the LHS's evaluation.**
+  `by decide` on `fixtures.map evalFixture = [literalCopyOfEvaluation]`
+  proves only that evaluation is deterministic. The assertion must
+  carry content the evaluator alone does not: an algebraic identity,
+  an oracle-supplied expected value, or a cross-implementation
+  agreement.
+
+- **Metadata `def`s with no consumer.**
+  `def library : String := "HexFoo"`, `def profile : String := "core"`,
+  `def seed : Nat := 0` are prohibited unless a named driver (CI
+  workflow step, Python oracle script) actually reads them.
+
+- **Single-case-per-operation fixtures.** Minimum three cases per
+  operation, per §"Per-library module contract" item 3.
+
+- **Duplicated literal data.** Each case's inputs and expected
+  outputs appear in source exactly once. No `rawRows : List (List
+  Int)` alongside `matrix := intMatN …` alongside a third copy on the
+  RHS of `by decide`.
+
+- **`native_decide`.** Banned project-wide (see
+  [SPEC.md](SPEC.md#project-wide-proof-policy)). Restated here because
+  conformance checks on large fixtures are a common temptation.
+
+- **Conformance modules not reached by `lake build HexFoo`.** Every
+  `Conformance.lean` MUST be imported from the library's root module
+  so that `lake build HexFoo` elaborates its `#guard`s.
 
 ## Oracle strategy
 
-External tools are used for **testing**, not for algorithms — all actual
-computation still runs in Lean. But the project should not route every
-test through the same oracle stack. The intended oracle choices are:
+External tools are used for **testing**, not for algorithms — all
+actual computation still runs in Lean. The spec declares *which*
+oracle applies to *which* library, but individual per-library SPEC
+files decide the oracle for that library in the `## Conformance`
+subsection. Default oracle assignments:
 
-- `hex-arith` — Lean's built-in `Nat` / `Int` big integer semantics
-- `hex-mod-arith` — Lean big-integer modular arithmetic
-- `hex-poly`, `hex-poly-z`, `hex-poly-fp` — FLINT or Sage polynomial
-  arithmetic
-- `hex-matrix`, `hex-gram-schmidt` — Sage exact matrix / rational linear
-  algebra
+- `hex-arith` — Lean's built-in `Nat` / `Int` big integer semantics;
+  property checks (Bézout, `Nat.gcd` agreement) sufficient for `core`.
+- `hex-mod-arith` — Lean big-integer modular arithmetic as property
+  oracle.
+- `hex-poly`, `hex-poly-z`, `hex-poly-fp` — `python-flint` for
+  univariate polynomial arithmetic; Sage as fallback.
+- `hex-matrix`, `hex-gram-schmidt` — Sage exact matrix / rational
+  linear algebra; numpy/scipy accepted for cross-checks that only
+  need float-level agreement on well-conditioned inputs.
 - `hex-gf2`, `hex-gfq-ring`, `hex-gfq-field`, `hex-gfq` — Sage finite
-  field and quotient-ring computations
+  field and quotient-ring computations; GAP acceptable for the
+  character-table adjacent checks.
 - `hex-berlekamp`, `hex-berlekamp-zassenhaus` — FLINT or Sage
-  factorization / irreducibility checks
+  factorisation / irreducibility checks.
 - `hex-hensel` — Sage or FLINT Hensel-lifting support, plus direct
-  congruence/product checks
-- `hex-lll` — fpLLL, or Sage's `LLL`, comparing reducedness, lattice
-  equality, and determinant preservation rather than exact basis equality
-- `hex-conway` — committed database fixtures cross-checked against Sage's
-  Conway tables, not random generation
+  Lean-side congruence/product checks.
+- `hex-lll` — fpLLL or Sage `LLL`, comparing reducedness, lattice
+  equality, and determinant preservation rather than exact basis
+  equality.
+- `hex-conway` — committed database fixtures cross-checked against
+  Sage's Conway tables. No random generation.
 
-The `-mathlib` bridge libraries are not the primary target of external
-conformance testing. They should rely mainly on internal equivalence /
-property tests plus the conformance coverage of the computational
-libraries.
-
-Python-accessible wrappers may reduce dependence on full Sage for some
-layers. In particular, `python-flint` is a suitable oracle candidate for
-much of the `hex-poly` / `hex-poly-z` / `hex-poly-fp` surface. But Sage
-remains the preferred umbrella oracle for the mixed finite-field,
-quotient-ring, exact linear algebra, Conway, and cross-library
-factorization workflows.
+The `-mathlib` bridge libraries are not the primary target of
+external conformance testing. They rely mainly on internal
+equivalence / property tests plus the coverage of the computational
+libraries they bridge. Their `core` profile is a set of `#guard`
+assertions that the bridge theorems hold on committed small
+instances.
 
 ## Profile sizes
 
-The spec should define size policies per profile. The exact values may
-live in named constants rather than being hard-coded in prose, but every
-generator must be parameterized by size bounds and seed.
+Size policies per profile. Generators must be parameterised by size
+bounds and seed.
 
-- `core`: tiny deterministic cases only
-  Examples: polynomial degrees up to about `8-12`, matrix dimensions up
-  to about `6-8`, finite-field extensions up to degree `6`, LLL
-  dimensions up to about `10`.
-- `ci`: modest randomized cases
-  Examples: integer/finite-field polynomial degrees around `16-32`,
-  coefficient bit-sizes around `8-32`, Hensel lift exponents around
-  `2-5`, and LLL dimensions around `15-25` with small entries.
-- `local`: larger campaigns
-  More seeds, larger degrees/dimensions, optional high-cost oracles, and
-  manually triggered runs that would be too expensive for standard CI.
+- `core`: tiny deterministic cases only. Polynomial degrees up to
+  about `8-12`, matrix dimensions up to about `6-8`, finite-field
+  extensions up to degree `6`, LLL dimensions up to about `10`.
+- `ci`: modest randomised cases. Integer/finite-field polynomial
+  degrees around `16-32`, coefficient bit-sizes around `8-32`, Hensel
+  lift exponents around `2-5`, and LLL dimensions around `15-25`
+  with small entries.
+- `local`: larger campaigns. More seeds, larger degrees/dimensions,
+  optional high-cost oracles, manually triggered runs that would be
+  too expensive for standard CI.
 
-CI defaults must remain small enough to tolerate partial external-tool
-availability and ordinary GitHub-hosted runners.
+CI defaults must remain small enough for GitHub-hosted runners and
+partial external-tool availability.
+
+## Execution modes
+
+- `always` — no external tools; must run everywhere. The `core`
+  profile is always `always`.
+- `if_available` — run oracle-backed checks only for tools present on
+  the runner; skip (and record the skip) otherwise. The `ci` profile
+  is typically `if_available`.
+- `required` — manual jobs that fail if declared tools are missing.
+  The `local` profile may use `required` when the whole point is the
+  oracle being present.
+
+## CI integration
+
+The conformance workflow MUST:
+
+- Run on `push` to `main` and on `pull_request`. Not
+  `workflow_dispatch`-only.
+- Always run the `core` profile. Any elaboration error in
+  `HexFoo/Conformance.lean` fails the job.
+- Run the `ci` profile for libraries whose oracle mode is `always`
+  or `if_available`. For `if_available`, a missing oracle counts as
+  skipped, not failed; the job summary records which oracles were
+  skipped.
+- For oracle mode `always`, a missing oracle fails the job.
+- Keep the `local` profile gated behind `workflow_dispatch`.
+
+Separately, the default `lake build` MUST elaborate every
+`HexFoo/Conformance.lean` as part of the ordinary library build, so
+even the minimal CI job (no oracle) catches broken `#guard`s.
 
 ## Infrastructure contract
 
-Lean should produce and consume a simple serialized case/result format,
-preferably JSON or JSONL, for:
+Lean produces and consumes a simple serialised case/result format —
+JSON or JSONL — for:
 
 - polynomials
 - matrices
 - lattice bases
 - primes / modulus choices
-- expected normalized outputs
+- expected normalised outputs
 
 Python or shell driver scripts are responsible for:
 
 - detecting which tools are installed
 - invoking external oracles
-- normalizing oracle outputs into the shared format
+- normalising oracle outputs into the shared format
 - gracefully skipping checks when an optional tool is unavailable
 
-The spec should define at least three execution modes:
-
-- `always` — no external tools; must run everywhere
-- `if_available` — run oracle-backed conformance checks only for tools
-  present on the machine
-- `required` — manual jobs that fail if declared tools are
-  missing
+The serialised artefact layout (where JSON/JSONL files live, which
+Lean target emits them, where oracle drivers read them) is specified
+alongside the first oracle-backed library's Phase 3 work, not
+upfront. The initial `core` profile does not require JSONL; a
+library's `#guard`s suffice until its oracle is wired.
 
 ## Sage strategy
 
 Sage is important enough to deserve an explicit deployment story.
-Ubuntu's `apt` packages are not a stable basis for Sage-backed CI, so
-the preferred path should be a Nix-based Sage job:
+Ubuntu's `apt` packages are not a stable basis for Sage-backed CI;
+the preferred path is Nix-based Sage:
 
 - local use via `nix shell nixpkgs#sage --command ...`
 - CI use via `cachix/install-nix-action` followed by Sage commands
   through `nix shell`
 
-This keeps local and CI execution closer together and avoids depending
-on Ubuntu package availability. A conda-forge Sage install is an
-acceptable secondary path for local experimentation, but the spec should
-not require it as the primary CI mechanism.
+This keeps local and CI execution close and avoids depending on
+Ubuntu package availability. A conda-forge Sage install is an
+acceptable secondary path for local experimentation, but not the
+primary CI mechanism.
 
-This file specifies correctness-oriented cross-checking only. Performance
-measurement, benchmark case definitions, external timing comparisons,
-and publication of benchmark reports on GitHub Pages are specified in
-[benchmarking.md](benchmarking.md).
+---
+
+This file specifies correctness-oriented cross-checking only.
+Performance measurement, benchmark case definitions, external timing
+comparisons, and publication of benchmark reports on GitHub Pages are
+specified in [benchmarking.md](benchmarking.md).
