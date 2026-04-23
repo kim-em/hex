@@ -38,8 +38,14 @@ private def serializeVector (v : Vector α n) : List α :=
 private def serializeMatrix (M : Matrix Int n m) : List (List Int) :=
   M.toList.map Vector.toList
 
+private def serializeRatMatrix (M : Matrix Rat n m) : List (List Rat) :=
+  M.toList.map Vector.toList
+
 private def serializeBasis (B : Vector (Vector α m) n) : List (List α) :=
   B.toList.map serializeVector
+
+private def serializePivotCols (v : Vector (Fin n) k) : List Nat :=
+  v.toList.map Fin.val
 
 private def matrixOfList2D! [Inhabited α] (rows : List (List α)) : Matrix α n m :=
   (Matrix.ofList2D (n := n) (m := m) rows).get!
@@ -62,6 +68,9 @@ private def identity3 : Matrix Int 3 3 :=
 
 private def denseAdversarial : Matrix Int 3 3 :=
   matrixOfList2D! [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+
+private def rrefTypical : Matrix Rat 2 3 :=
+  matrixOfList2D! [[1, 2, 3], [0, 1, 4]]
 /-- info: 9 -/
 #guard_msgs in
 #eval Matrix.det detTypical
@@ -137,6 +146,23 @@ private def denseAdversarial : Matrix Int 3 3 :=
 #guard Matrix.det (Matrix.rowAdd detTypical fin3_2 fin3_0 3) = Matrix.det detTypical
 #guard Matrix.det (Matrix.rowAdd identity3 fin3_0 fin3_1 0) = Matrix.det identity3
 #guard Matrix.det (Matrix.rowAdd denseAdversarial fin3_1 fin3_2 (-2)) = Matrix.det denseAdversarial
+
+/-- info: [[1, 0, -5], [0, 1, 4]] -/
+#guard_msgs in
+#eval serializeRatMatrix (rref rrefTypical).echelon
+
+/-- info: [[1, -2], [0, 1]] -/
+#guard_msgs in
+#eval serializeRatMatrix (rref rrefTypical).transform
+
+/-- info: [0, 1] -/
+#guard_msgs in
+#eval serializePivotCols (rref rrefTypical).pivotCols
+
+#guard (rref rrefTypical).rank = 2
+#guard serializeRatMatrix (rref rrefTypical).echelon = [[1, 0, -5], [0, 1, 4]]
+#guard serializeRatMatrix (rref rrefTypical).transform = [[1, -2], [0, 1]]
+#guard serializePivotCols (rref rrefTypical).pivotCols = [0, 1]
 end Conformance
 
 end HexMatrix

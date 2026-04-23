@@ -64,7 +64,8 @@ theorem nullspace_complete {R : Type u} [Field R] {n m : Nat} {M : Matrix R n m}
 namespace Matrix
 
 /-- Convenience wrapper: compute the scaffolded nullspace through RREF. -/
-noncomputable def nullspace {R : Type u} [Field R] {n m : Nat} (M : Matrix R n m) :
+noncomputable def nullspace {R : Type u} [Field R] [DecidableEq R] {n m : Nat}
+    (M : Matrix R n m) :
     Vector (Vector R m) (m - (rref M).rank) := by
   sorry
 
