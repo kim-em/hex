@@ -65,8 +65,8 @@ structure GF2n (n : Nat) (irr : UInt64)
 /--
 Packed `GF(2^n)` carrier for arbitrary-degree irreducible moduli.
 
-The reduction invariant is stated now; executable modular arithmetic arrives
-in later scaffolding slices.
+The reduction invariant is stated here; executable quotient arithmetic and
+field scaffolding over this carrier live in `HexGf2.GF2nPoly`.
 -/
 structure GF2nPoly (f : GF2Poly) (hirr : GF2Poly.Irreducible f) where
   val : GF2Poly
