@@ -20,63 +20,38 @@ unless it explicitly fixes the public API or theorem split.
 
 ## Rules
 
-- **Writing a `def` with anything other than a complete and plausibly
-  true body is worse than nothing.** Every `def`, `structure` field,
-  `class`, and `instance` MUST have a body that the author *believes*
-  correctly implements the SPEC contract for that declaration. There
-  is no acceptable placeholder form:
+- **Read the SPEC prose for each declaration before writing its
+  body.** The signature alone is not the contract. Locate the SPEC
+  prose that describes *what algorithm* the declaration computes,
+  read it end to end, and make sure your body implements that
+  algorithm. If the SPEC gives explicit update formulas, case
+  analysis, or a pseudocode sketch, your body must follow it. If
+  you cannot find such prose, or cannot understand it, do not
+  commit the declaration.
+
+- Every `def`, data-carrying `structure` field, `class`, and
+  `instance` MUST have a body that the author *believes*
+  correctly implements the SPEC contract for that declaration.
+  There is no acceptable placeholder form:
   - NOT wrong-but-plausible bodies
     (`def rref M := { rank := 0, echelon := M, transform := 1 }`),
   - NOT `sorry` bodies (`noncomputable def rref ... := sorry`),
   - NOT `axiom rref : ...`,
   - NOT trivial returns (`Matrix.identity`, `none`, the input
     unchanged, an identity cast),
+  - NOT alternative implementations with the wrong algorithmic
+    complexity,
   - NOT a body marked "honest placeholder" or "Phase 1 scaffold
     returns <trivial>" in its docstring.
 
   If you cannot implement the function correctly in this PR: **do
   not commit the declaration**. Leave it out of Lean entirely. The
-  SPEC file is the record of what's *designed*; the Lean surface is
-  the record of what's *implemented correctly so far*. An
-  incomplete-but-honest Phase 1 is strictly better than a
-  complete-looking one with placeholder bodies.
-
-  **If an older issue asks you to commit a `sorry` body or "honest
-  placeholder": refuse it.** Comment on the issue, link this rule,
-  and close the issue in favour of one that either (a) correctly
-  implements the declaration, or (b) deletes it. The rule here
-  overrides any pre-existing issue text.
-
-  Why: a placeholder that typechecks lies to downstream code and to
-  future agents. A wrong-but-plausible body invites scaffold-locking
-  conformance tests. A `sorry` body makes every caller's `#eval`
-  refuse to run (Lean conservatively refuses any term transitively
-  depending on `sorry`), so any conformance test against that caller
-  has to use `#eval!`, which then silently accepts whatever bits the
-  runtime produces for `sorryAx` — neither "correct" nor "obviously
-  wrong", just untrustworthy. An omitted declaration, by contrast,
-  breaks the build at the use site loudly and points the next agent
-  directly at the thing to implement.
-
-  Forbidden data-level body patterns, each observed in practice:
-  - `def rref M := { rank := 0, echelon := M, transform := 1 }`
-    — the name promises RREF; the body is not RREF.
-  - `def spanCoeffs _ _ := none` — promises a span decomposition;
-    always says "no".
-  - `def gramSchmidt.basis b := b` — promises orthogonalisation;
-    returns input unchanged.
-  - `def gramSchmidt.coeffs _ := Matrix.identity` — promises the
-    lower-triangular coefficient matrix; returns the identity.
-  - `noncomputable def rref ... := sorry` — an explicit placeholder;
-    still forbidden, same reasons.
-
-  What to do if you can't implement it: narrow the Phase 1 issue,
-  commit only the declarations you *can* correctly implement,
-  document (in the PR description) which SPEC declarations are being
-  deferred to a follow-up issue, and open that follow-up. Don't
-  commit stubs to keep the PR "complete" — an incomplete but honest
-  Phase 1 is strictly better than a complete-looking one with
-  placeholders.
+  SPEC file is the record of what's *designed*; the Lean surface
+  is the record of what's *implemented correctly so far*. Any bad
+  definitions will poison all downstream conformance testing,
+  benchmarking, and theorem proving. We need to get definitions
+  right, and if we ever discover they are wrong, fix them
+  immediately rather than working around them.
 
 - **`sorry`'d theorem proofs are expected.** The point of scaffolding
   is to get the API surface compiling, not to fill in proofs. This
