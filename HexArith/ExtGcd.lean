@@ -76,6 +76,7 @@ namespace Int
 Extended GCD on integers, currently implemented by the pure Lean
 reference function until the GMP-backed attachment lands.
 -/
+@[extern "lean_hex_mpz_gcdext"]
 def extGcd (a b : @& Int) : Nat × Int × Int :=
   Hex.pureIntExtGcd a b
 
