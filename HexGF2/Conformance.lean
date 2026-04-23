@@ -1,7 +1,7 @@
-import HexGF2.Ops
+import HexGF2.Gcd
 
 /-!
-# `HexGF2` -- packed-core conformance
+# `HexGF2` -- packed-core and Euclidean conformance
 
 Deterministic Lean-only conformance checks for the packed `GF(2)`
 core arithmetic surface.
@@ -12,7 +12,8 @@ core arithmetic surface.
 - **Mode:** `always`.
 - **Covered operations:** `Hex.pureClmul`, `HexGF2.clmul`,
   `GF2Poly.ofWords`, packed XOR addition, `GF2Poly.shiftLeft`,
-  `GF2Poly.shiftRight`.
+  `GF2Poly.shiftRight`, `GF2Poly.divMod`, `(/)`, `(%)`,
+  `GF2Poly.gcd`, `GF2Poly.xgcd`.
 - **Covered properties:**
   - `HexGF2.clmul` agrees with the pure-Lean `Hex.pureClmul`
     reference semantics on committed fixtures;
@@ -21,10 +22,22 @@ core arithmetic surface.
   - packed addition agrees with `GF2Poly.xorWords` on committed
     fixtures;
   - left and right shifts agree with `GF2Poly.shiftLeftWords` and
-    `GF2Poly.shiftRightWords` on committed fixtures.
+    `GF2Poly.shiftRightWords` on committed fixtures;
+  - `GF2Poly.divMod` reconstructs the dividend from quotient and
+    remainder on committed nonzero-divisor fixtures, and division by
+    zero falls back to zero quotient plus the original dividend as
+    remainder;
+  - nonzero packed remainders have degree strictly smaller than the
+    committed divisor;
+  - `GF2Poly.gcd` agrees with the `gcd` field of `GF2Poly.xgcd` on
+    committed fixtures;
+  - packed `GF2Poly.xgcd` data satisfies the committed Bezout
+    identity.
 - **Covered edge cases:** zero inputs for carry-less multiply,
   empty packed words, cancellation to zero under XOR addition, and
-  cross-word carry / borrow behavior for bit shifts.
+  cross-word carry / borrow behavior for bit shifts, division by the
+  zero polynomial, a zero left Euclidean input, and a nonzero
+  remainder Euclidean step.
 -/
 
 namespace HexGF2
@@ -35,6 +48,14 @@ private def serializeClmul (product : UInt64 × UInt64) : Nat × Nat :=
 
 private def serializePoly (f : GF2Poly) : List Nat × Nat :=
   (f.words.toList.map UInt64.toNat, f.degree)
+
+private def serializeDivMod (result : GF2Poly.DivMod) :
+    (List Nat × Nat) × (List Nat × Nat) :=
+  (serializePoly result.quotient, serializePoly result.remainder)
+
+private def serializeXgcd (result : GF2Poly.Xgcd) :
+    (List Nat × Nat) × (List Nat × Nat) × (List Nat × Nat) :=
+  (serializePoly result.gcd, serializePoly result.s, serializePoly result.t)
 
 private def ofWordsTypicalInput : Array UInt64 :=
   #[0x13, 0x80]
@@ -74,6 +95,27 @@ private def shiftLeftAdversarial : GF2Poly :=
 
 private def shiftRightAdversarial : GF2Poly :=
   GF2Poly.ofWords #[0x0, 0x1]
+
+private def euclidTypicalDividend : GF2Poly :=
+  GF2Poly.ofWords #[0x1b]
+
+private def euclidTypicalDivisor : GF2Poly :=
+  GF2Poly.ofWords #[0x5]
+
+private def euclidEdgeDividend : GF2Poly :=
+  GF2Poly.ofWords #[0x9]
+
+private def euclidEdgeDivisor : GF2Poly :=
+  GF2Poly.ofWords #[]
+
+private def euclidAdversarialDividend : GF2Poly :=
+  GF2Poly.ofWords #[0x15]
+
+private def euclidAdversarialDivisor : GF2Poly :=
+  GF2Poly.ofWords #[0x6]
+
+private def euclidZeroLeft : GF2Poly :=
+  GF2Poly.ofWords #[]
 
 /-! ## `pureClmul` and `clmul` -/
 
@@ -175,6 +217,125 @@ example :
     GF2Poly.shiftRight shiftTypical 1 =
       GF2Poly.ofWords (GF2Poly.shiftRightWords shiftTypical.words 1) := by
   simpa using GF2Poly.shiftRight_eq_ofWords shiftTypical 1
+
+/-! ## Packed Euclidean operations -/
+
+-- `#eval!` is required here because `GF2Poly`, `DivMod`, and `Xgcd`
+-- all transitively carry sorry-backed packed-normalization proofs.
+/-- info: (([7], 2), [], 0) -/
+#guard_msgs in
+#eval! serializeDivMod (GF2Poly.divMod euclidTypicalDividend euclidTypicalDivisor)
+
+/-- info: (([], 0), [9], 3) -/
+#guard_msgs in
+#eval! serializeDivMod (GF2Poly.divMod euclidEdgeDividend euclidEdgeDivisor)
+
+/-- info: (([6], 2), [1], 0) -/
+#guard_msgs in
+#eval! serializeDivMod (GF2Poly.divMod euclidAdversarialDividend euclidAdversarialDivisor)
+
+/-- info: ([7], 2) -/
+#guard_msgs in
+#eval! serializePoly (euclidTypicalDividend / euclidTypicalDivisor)
+
+/-- info: ([], 0) -/
+#guard_msgs in
+#eval! serializePoly (euclidEdgeDividend / euclidEdgeDivisor)
+
+/-- info: ([6], 2) -/
+#guard_msgs in
+#eval! serializePoly (euclidAdversarialDividend / euclidAdversarialDivisor)
+
+/-- info: ([], 0) -/
+#guard_msgs in
+#eval! serializePoly (euclidTypicalDividend % euclidTypicalDivisor)
+
+/-- info: ([9], 3) -/
+#guard_msgs in
+#eval! serializePoly (euclidEdgeDividend % euclidEdgeDivisor)
+
+/-- info: ([1], 0) -/
+#guard_msgs in
+#eval! serializePoly (euclidAdversarialDividend % euclidAdversarialDivisor)
+
+example :
+    serializePoly
+        (euclidTypicalDivisor * (GF2Poly.divMod euclidTypicalDividend euclidTypicalDivisor).quotient +
+          (GF2Poly.divMod euclidTypicalDividend euclidTypicalDivisor).remainder) =
+      serializePoly euclidTypicalDividend := by
+  decide
+
+#guard let data := GF2Poly.divMod euclidEdgeDividend euclidEdgeDivisor
+  data.quotient.words = #[] ∧
+    serializePoly data.remainder = serializePoly euclidEdgeDividend
+
+#guard let remainder := euclidAdversarialDividend % euclidAdversarialDivisor
+  remainder.words ≠ #[] ∧ remainder.degree < euclidAdversarialDivisor.degree
+
+example :
+    serializePoly (GF2Poly.gcd euclidTypicalDividend euclidTypicalDivisor) = ([5], 2) := by
+  decide
+
+example :
+    serializePoly (GF2Poly.gcd euclidZeroLeft euclidTypicalDivisor) = ([5], 2) := by
+  decide
+
+example :
+    serializePoly (GF2Poly.gcd euclidAdversarialDividend euclidAdversarialDivisor) = ([1], 0) := by
+  decide
+
+example :
+    serializeXgcd (GF2Poly.xgcd euclidTypicalDividend euclidTypicalDivisor) =
+      (([5], 2), ([], 0), ([1], 0)) := by
+  decide
+
+example :
+    serializeXgcd (GF2Poly.xgcd euclidZeroLeft euclidTypicalDivisor) =
+      (([5], 2), ([], 0), ([1], 0)) := by
+  decide
+
+example :
+    serializeXgcd (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor) =
+      (([1], 0), ([1], 0), ([6], 2)) := by
+  decide
+
+example :
+    serializePoly (GF2Poly.gcd euclidTypicalDividend euclidTypicalDivisor) =
+      serializePoly (GF2Poly.xgcd euclidTypicalDividend euclidTypicalDivisor).gcd := by
+  decide
+
+example :
+    serializePoly (GF2Poly.gcd euclidZeroLeft euclidTypicalDivisor) =
+      serializePoly (GF2Poly.xgcd euclidZeroLeft euclidTypicalDivisor).gcd := by
+  decide
+
+example :
+    serializePoly (GF2Poly.gcd euclidAdversarialDividend euclidAdversarialDivisor) =
+      serializePoly (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).gcd := by
+  decide
+
+example :
+    serializePoly
+        ((GF2Poly.xgcd euclidTypicalDividend euclidTypicalDivisor).s * euclidTypicalDividend +
+          (GF2Poly.xgcd euclidTypicalDividend euclidTypicalDivisor).t * euclidTypicalDivisor) =
+      serializePoly (GF2Poly.xgcd euclidTypicalDividend euclidTypicalDivisor).gcd := by
+  decide
+
+example :
+    serializePoly
+        ((GF2Poly.xgcd euclidZeroLeft euclidTypicalDivisor).s * euclidZeroLeft +
+          (GF2Poly.xgcd euclidZeroLeft euclidTypicalDivisor).t * euclidTypicalDivisor) =
+      serializePoly (GF2Poly.xgcd euclidZeroLeft euclidTypicalDivisor).gcd := by
+  decide
+
+example :
+    serializePoly
+        ((GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).s *
+            euclidAdversarialDividend +
+          (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).t *
+            euclidAdversarialDivisor) =
+      serializePoly (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).gcd := by
+  decide
 
 end Conformance
 end HexGF2
