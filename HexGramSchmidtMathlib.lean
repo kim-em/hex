@@ -11,3 +11,5 @@ Mathlib's `gramSchmidt`.
 -/
 
 namespace HexGramSchmidtMathlib
+
+end HexGramSchmidtMathlib
