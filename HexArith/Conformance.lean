@@ -1,4 +1,5 @@
 import HexArith.Barrett.Context
+import HexArith.Barrett.Reduce
 import HexArith.ExtGcd
 import HexArith.Montgomery.Context
 import HexArith.PowMod
@@ -17,22 +18,25 @@ fails CI immediately.
   Wiring an external oracle (python-flint for big-integer agreement
   with GMP) is a follow-up.
 - **Mode:** `always`.
-- **Covered operations:** `HexArith.extGcd` (Nat), `HexArith.Int.extGcd`,
-  `HexArith.UInt64.extGcd`, `HexArith.powMod`, `HexArith.BarrettCtx.mulMod`,
-  `HexArith.MontCtx.toMont` / `fromMont` / `mulMont`.
+-- **Covered operations:** `HexArith.extGcd` (Nat), `HexArith.Int.extGcd`,
+  `HexArith.UInt64.extGcd`, `HexArith.powMod`, `HexArith.barrettReduce`,
+  `HexArith.BarrettCtx.mulMod`, `HexArith.MontCtx.toMont` / `fromMont` /
+  `mulMont`.
 - **Covered properties:**
   - Bézout: `extGcd a b = (g, s, t) ⇒ s * a + t * b = g` for all
     three arithmetic entry points.
   - `gcd` agreement: `(extGcd a b).1 = Nat.gcd a.natAbs b.natAbs`.
   - `powMod a n p = a ^ n % p`.
+  - Barrett reduction identity: `(barrettReduce ctx T).toNat = T.toNat % p.toNat`
+    for `T < p.toNat ^ 2`.
   - Barrett identity: `(ctx.mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat`.
   - Montgomery round-trip: `ctx.fromMont (ctx.toMont a) = a` for `a < p`.
   - Montgomery identity: `(ctx.mulMont a b).toNat = (a.toNat * b.toNat) % p.toNat`
     for `a, b < p`.
 - **Covered edge cases:** `extGcd 0 0`, `extGcd 0 n`, `extGcd n 0`,
   sign-mixed `Int` pairs; `powMod a 0 p`, `powMod _ _ 1`, `powMod 0 n p`;
-  Barrett with `p = 3` and `p = 65537`; Montgomery with odd `p = 5` and
-  `p = 97`.
+  Barrett reduction / multiplication with `p = 3` and `p = 65537`;
+  Montgomery with odd `p = 5` and `p = 97`.
 
 Reference implementation for the
 [Phase 3 per-library module contract](../SPEC/testing.md#per-library-module-contract).
@@ -139,7 +143,7 @@ example : HexArith.Int.extGcd = Hex.pureIntExtGcd := rfl
 #guard HexArith.powMod 42 5 17   = 42 ^ 5 % 17
 #guard HexArith.powMod 0 5 13    = 0 ^ 5 % 13
 
-/-! ## `HexArith.BarrettCtx.mulMod`
+/-! ## `HexArith.barrettReduce` and `HexArith.BarrettCtx.mulMod`
 
 The Barrett scaffold requires a proof that `1 < p < 2^32`. For
 concrete small moduli these are `by decide`. We commit one tiny
@@ -154,13 +158,24 @@ private def barrett65537 : BarrettCtx 65537 :=
   BarrettCtx.mk 65537 (by decide) (by decide)
 
 /-- info: 1 -/
-#guard_msgs in #eval (barrett3.mulMod 2 2).toNat     -- 4 % 3
+#guard_msgs in #eval (HexArith.barrettReduce barrett3 4).toNat  -- 4 % 3
 
 /-- info: 0 -/
-#guard_msgs in #eval (barrett3.mulMod 0 2).toNat     -- 0 % 3
+#guard_msgs in #eval (HexArith.barrettReduce barrett3 0).toNat  -- 0 % 3
+
+/-- info: 2 -/
+#guard_msgs in #eval (HexArith.barrettReduce barrett3 8).toNat  -- 8 % 3
+
+/-- info: 65535 -/
+#guard_msgs in #eval (barrett65537.mulMod 65536 2).toNat  -- 131072 % 65537
 
 /-- info: 65536 -/
 #guard_msgs in #eval (barrett65537.mulMod 256 256).toNat  -- 65536 % 65537
+
+-- Direct Barrett reduction agrees with `% p` on in-range products.
+#guard (HexArith.barrettReduce barrett3 4).toNat = 4 % 3
+#guard (HexArith.barrettReduce barrett3 0).toNat = 0 % 3
+#guard (HexArith.barrettReduce barrett3 8).toNat = 8 % 3
 
 -- Barrett identity: `(mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat`.
 #guard (barrett3.mulMod 2 2).toNat     = (2 * 2) % 3
