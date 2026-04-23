@@ -1,13 +1,15 @@
 import HexPoly.Eval
 import HexPoly.Gcd
+import HexPoly.Content
+import HexPoly.Crt
 
 /-!
 # `HexPoly` — core conformance
 
 Deterministic Lean-only conformance checks for the `HexPoly` evaluation,
-derivative, arithmetic, division, and GCD surface. Every check
-elaborates as part of `lake build HexPoly`, so regressions in these
-executable operations fail CI immediately.
+derivative, arithmetic, division, GCD, content, and CRT surface. Every
+check elaborates as part of `lake build HexPoly`, so regressions in
+these executable operations fail CI immediately.
 
 **Conformance contract for this slice:**
 
@@ -18,7 +20,9 @@ executable operations fail CI immediately.
   `HexPoly.DensePoly.derivative`, `HexPoly.DensePoly.compose`,
   `HexPoly.DensePoly.add`, `HexPoly.DensePoly.sub`,
   `HexPoly.DensePoly.mul`, `HexPoly.DensePoly.divModMonic`,
-  `HexPoly.DensePoly.gcd`, `HexPoly.DensePoly.xgcd`.
+  `HexPoly.DensePoly.gcd`, `HexPoly.DensePoly.xgcd`,
+  `HexPoly.DensePoly.content`, `HexPoly.DensePoly.primitivePart`,
+  `HexPoly.DensePoly.polyCRT`.
 - **Covered properties:**
   - evaluation on committed inputs agrees with constant-term and
     zero-polynomial identities;
@@ -32,11 +36,17 @@ executable operations fail CI immediately.
   - monic division satisfies `divisor * quotient + remainder = dividend`
     on committed exact and inexact examples;
   - `xgcd` agrees with `gcd` and satisfies the Bezout identity on
-    committed field-valued examples.
+    committed field-valued examples;
+  - `scaleInt (content p) (primitivePart p) = p` on committed nonzero
+    integer examples, while the zero polynomial stays fixed;
+  - `polyCRT` preserves the requested residues modulo each coprime
+    monic input on committed examples.
 - **Covered edge cases:** zero polynomial, constant polynomial,
   monomials, and trailing-zero coefficient arrays that must normalize
   before arithmetic or composition; zero divisor handling in monic
-  division; zero second argument and non-monic constant outputs in GCD.
+  division; zero second argument and non-monic constant outputs in GCD;
+  zero integer polynomial for content/primitive part; and zero or
+  oversized CRT residues against monic linear moduli.
 -/
 
 namespace HexPoly
@@ -130,6 +140,39 @@ private def gcdAdversarialF : HexPoly.DensePoly Rat :=
 
 private def gcdAdversarialG : HexPoly.DensePoly Rat :=
   HexPoly.DensePoly.ofArray #[(1 : Rat), 1]
+
+private def contentTypical : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[6, -9, 3]
+
+private def contentAdversarial : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[0, -12, 18, 0, 0]
+
+private def crtModA : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[0, 1]
+
+private def crtModB : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[-1, 1]
+
+private def crtBezoutS : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[1]
+
+private def crtBezoutT : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[-1]
+
+private def crtTypicalU : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[2, 1]
+
+private def crtTypicalV : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[3]
+
+private def crtEdgeV : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[-4]
+
+private def crtAdversarialU : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[1, 0, 1]
+
+private def crtAdversarialV : HexPoly.DensePoly Int :=
+  HexPoly.DensePoly.ofArray #[-1, 2]
 
 /-! ## `DensePoly.eval` -/
 
@@ -294,6 +337,84 @@ private def gcdAdversarialG : HexPoly.DensePoly Rat :=
        r.gcd.coeffs.toList = (HexPoly.DensePoly.gcd gcdAdversarialF gcdAdversarialG).coeffs.toList
 #guard let r := HexPoly.DensePoly.xgcd gcdAdversarialF gcdAdversarialG;
        (r.s * gcdAdversarialF + r.t * gcdAdversarialG).coeffs.toList = r.gcd.coeffs.toList
+
+/-! ## `DensePoly.content` and `DensePoly.primitivePart` -/
+
+/-- info: 3 -/
+#guard_msgs in #eval! HexPoly.DensePoly.content contentTypical
+
+/-- info: 0 -/
+#guard_msgs in #eval! HexPoly.DensePoly.content (0 : HexPoly.DensePoly Int)
+
+/-- info: 6 -/
+#guard_msgs in #eval! HexPoly.DensePoly.content contentAdversarial
+
+#guard HexPoly.DensePoly.content contentTypical = 3
+#guard HexPoly.DensePoly.content (0 : HexPoly.DensePoly Int) = 0
+#guard HexPoly.DensePoly.content contentAdversarial = 6
+
+/-- info: [2, -3, 1] -/
+#guard_msgs in #eval! (HexPoly.DensePoly.primitivePart contentTypical).coeffs.toList
+
+/-- info: [] -/
+#guard_msgs in #eval! (HexPoly.DensePoly.primitivePart (0 : HexPoly.DensePoly Int)).coeffs.toList
+
+/-- info: [0, -2, 3] -/
+#guard_msgs in #eval! (HexPoly.DensePoly.primitivePart contentAdversarial).coeffs.toList
+
+#guard (HexPoly.DensePoly.primitivePart contentTypical).coeffs.toList = [2, -3, 1]
+#guard (HexPoly.DensePoly.primitivePart (0 : HexPoly.DensePoly Int)).coeffs.toList = []
+#guard (HexPoly.DensePoly.primitivePart contentAdversarial).coeffs.toList = [0, -2, 3]
+#guard (HexPoly.DensePoly.scaleInt (HexPoly.DensePoly.content contentTypical : Int)
+          (HexPoly.DensePoly.primitivePart contentTypical)).coeffs.toList =
+         contentTypical.coeffs.toList
+#guard (HexPoly.DensePoly.scaleInt (HexPoly.DensePoly.content contentAdversarial : Int)
+          (HexPoly.DensePoly.primitivePart contentAdversarial)).coeffs.toList =
+         contentAdversarial.coeffs.toList
+#guard (HexPoly.DensePoly.scaleInt (HexPoly.DensePoly.content (0 : HexPoly.DensePoly Int) : Int)
+          (HexPoly.DensePoly.primitivePart (0 : HexPoly.DensePoly Int))).coeffs.toList = []
+#guard HexPoly.DensePoly.content (HexPoly.DensePoly.primitivePart contentTypical) = 1
+#guard HexPoly.DensePoly.content (HexPoly.DensePoly.primitivePart contentAdversarial) = 1
+
+/-! ## `DensePoly.polyCRT` -/
+
+/-- info: [2, 2, -1] -/
+#guard_msgs in #eval!
+  (HexPoly.DensePoly.polyCRT crtModA crtModB crtTypicalU crtTypicalV
+    crtBezoutS crtBezoutT).coeffs.toList
+
+/-- info: [0, -4] -/
+#guard_msgs in #eval!
+  (HexPoly.DensePoly.polyCRT crtModA crtModB (0 : HexPoly.DensePoly Int) crtEdgeV
+    crtBezoutS crtBezoutT).coeffs.toList
+
+/-- info: [1, -2, 3, -1] -/
+#guard_msgs in #eval!
+  (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
+    crtBezoutS crtBezoutT).coeffs.toList
+
+#guard (HexPoly.DensePoly.polyCRT crtModA crtModB crtTypicalU crtTypicalV
+          crtBezoutS crtBezoutT).coeffs.toList = [2, 2, -1]
+#guard (HexPoly.DensePoly.polyCRT crtModA crtModB (0 : HexPoly.DensePoly Int) crtEdgeV
+          crtBezoutS crtBezoutT).coeffs.toList = [0, -4]
+#guard (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
+          crtBezoutS crtBezoutT).coeffs.toList = [1, -2, 3, -1]
+#guard (HexPoly.DensePoly.modMonic
+          (HexPoly.DensePoly.polyCRT crtModA crtModB crtTypicalU crtTypicalV
+            crtBezoutS crtBezoutT) crtModA).coeffs.toList =
+         (HexPoly.DensePoly.modMonic crtTypicalU crtModA).coeffs.toList
+#guard (HexPoly.DensePoly.modMonic
+          (HexPoly.DensePoly.polyCRT crtModA crtModB (0 : HexPoly.DensePoly Int) crtEdgeV
+            crtBezoutS crtBezoutT) crtModB).coeffs.toList =
+         (HexPoly.DensePoly.modMonic crtEdgeV crtModB).coeffs.toList
+#guard (HexPoly.DensePoly.modMonic
+          (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
+            crtBezoutS crtBezoutT) crtModA).coeffs.toList =
+         (HexPoly.DensePoly.modMonic crtAdversarialU crtModA).coeffs.toList
+#guard (HexPoly.DensePoly.modMonic
+          (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
+            crtBezoutS crtBezoutT) crtModB).coeffs.toList =
+         (HexPoly.DensePoly.modMonic crtAdversarialV crtModB).coeffs.toList
 
 end DensePoly
 end Conformance
