@@ -65,7 +65,7 @@ Extend this table when adding libraries whose names involve further
 acronyms. Do not silently introduce a mixed-case spelling.
 
 > **Current state note (2026-04-23).** The existing modules
-> `HexGf2` / `HexGf2Mathlib` / `HexLll` / `HexLllMathlib` in the
+> `HexGF2` / `HexGF2Mathlib` / `HexLLL` / `HexLLLMathlib` in the
 > repository predate this rule and still use the un-exceptioned
 > transliteration. A global rename PR will align them with this
 > convention; until that lands, agents must not rename these
