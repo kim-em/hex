@@ -19,19 +19,29 @@ These are not rubber-stamp coverage audits — they ask:
 - Are the theorem statements faithful to the SPEC? (Not "verbatim" — but
   do they capture the same mathematical content?)
 - Are there missing imports or DAG violations?
-- **Does every committed `def` / `structure` field / `class` /
-  `instance` body actually implement the SPEC contract correctly?**
-  [PLAN/Phase1.md](Phase1.md) forbids data-level placeholders of any
-  kind — no `sorry` bodies, no `axiom`s standing in for data, no
-  trivial returns (input unchanged, `0`, `Matrix.identity`, `none`,
-  empty list). A library must commit only the declarations it can
-  correctly implement; everything else stays out of Lean until a
-  later PR implements it. Flag any committed declaration whose body
-  is a placeholder in any of these forms. Flagged bodies must be
-  deleted (and any downstream callers updated) in a follow-up issue
-  before the `scaffolding-reviewed` token is committed — either the
+- **Does every committed `def` / data-carrying `structure` field /
+  `class` / `instance` body actually implement the SPEC contract
+  correctly?** [PLAN/Phase1.md](Phase1.md) forbids data-level
+  placeholders of any kind — no `sorry` bodies, no `axiom`s
+  standing in for data, no trivial returns (input unchanged, `0`,
+  `Matrix.identity`, `none`, empty list). A library must commit
+  only the declarations it can correctly implement; everything
+  else stays out of Lean until a later PR implements it. Flag any
+  committed declaration whose body is a placeholder in any of
+  these forms. Flagged bodies must be deleted (and any downstream
+  callers updated) in a follow-up issue before the
+  `scaffolding-reviewed` token is committed — either the
   implementation becomes correct, or the declaration leaves the
   tree. "Rewrite as `sorry`" is **not** an acceptable fix.
+- **Does each data-level body match the SPEC's intended algorithmic
+  shape — not just its input/output contract?** Flag any body that
+  produces the right output via an unrelated algorithm: a full
+  rebuild where the SPEC prescribes an in-place update; a
+  reference implementation behind a name that promises the
+  optimised version; a detour through canonical form when the SPEC
+  gives explicit update formulas. These are "wrong-shape" scaffolds
+  and are forbidden by [PLAN/Phase1.md](Phase1.md), same remedy as
+  wrong-output scaffolds: fix the body, or delete the declaration.
 
 ## Output
 
