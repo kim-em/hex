@@ -113,6 +113,11 @@ example : HexArith.Int.extGcd = Hex.pureIntExtGcd := rfl
 #guard let (g, s, t) := HexArith.UInt64.extGcd 42 30
        s * (42 : Int) + t * (30 : Int) = Int.ofNat g.toNat
 
+-- Agreement with `Nat.gcd` after coercing the machine-word gcd back to `Nat`.
+#guard (HexArith.UInt64.extGcd 0 0).1.toNat   = Nat.gcd 0 0
+#guard (HexArith.UInt64.extGcd 0 7).1.toNat   = Nat.gcd 0 7
+#guard (HexArith.UInt64.extGcd 42 30).1.toNat = Nat.gcd 42 30
+
 /-! ## `HexArith.powMod` -/
 
 /-- info: 1 -/

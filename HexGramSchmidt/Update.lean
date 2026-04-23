@@ -104,6 +104,27 @@ theorem basis_adjacentSwap_other (b : HexMatrix.Matrix Int n m)
       HexMatrix.Matrix.row (basis b) i := by
   sorry
 
+theorem basis_adjacentSwap_prev (b : HexMatrix.Matrix Int n m)
+    (k : Nat) (_hk : k < n) (_hpos : 0 < k) :
+    HexMatrix.Matrix.row (basis (adjacentSwap b k)) (k - 1) =
+      HexMatrix.Matrix.row (basis b) k +
+        HexMatrix.Matrix.entry (coeffs b) k (k - 1) •
+          HexMatrix.Matrix.row (basis b) (k - 1) := by
+  sorry
+
+theorem basis_adjacentSwap_curr (b : HexMatrix.Matrix Int n m)
+    (k : Nat) (hk : k < n) (_hpos : 0 < k) (hkm1 : k - 1 ≤ n) :
+    HexMatrix.Matrix.row (basis (adjacentSwap b k)) k =
+      ((((gramDet b (k + 1) (Nat.succ_le_of_lt hk) : Nat) : Rat) *
+            ((gramDet b (k - 1) hkm1 : Nat) : Rat)) /
+          (((gramDet b k (Nat.le_of_lt hk) : Nat) : Rat) *
+            (gramDet (adjacentSwap b k) k (Nat.le_of_lt hk) : Rat))) •
+          HexMatrix.Matrix.row (basis b) (k - 1) -
+        ((((HexMatrix.Matrix.entry (scaledCoeffs b) k (k - 1) : Int) : Rat) /
+            (gramDet (adjacentSwap b k) k (Nat.le_of_lt hk) : Rat))) •
+          HexMatrix.Matrix.row (basis b) k := by
+  sorry
+
 theorem gramDet_adjacentSwap_other (b : HexMatrix.Matrix Int n m)
     (k t : Nat) (_hk : k < n) (_hpos : 0 < k) (ht : t ≤ n) (htk : t ≠ k) :
     gramDet (adjacentSwap b k) t ht = gramDet b t ht := by
@@ -136,6 +157,33 @@ theorem scaledCoeffs_adjacentSwap_curr (b : HexMatrix.Matrix Int n m)
       HexMatrix.Matrix.entry (scaledCoeffs b) (k - 1) j := by
   sorry
 
+theorem coeffs_adjacentSwap_other (b : HexMatrix.Matrix Int n m)
+    (k i j : Nat) (_hk : k < n) (_hpos : 0 < k) (_hi : i < n) (_hj : j < n)
+    (hiPrev : i ≠ k - 1) (hiCurr : i ≠ k)
+    (hjPrev : j ≠ k - 1) (hjCurr : j ≠ k) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) i j =
+      HexMatrix.Matrix.entry (coeffs b) i j := by
+  sorry
+
+theorem coeffs_adjacentSwap_pivot (b : HexMatrix.Matrix Int n m)
+    (k : Nat) (hk : k < n) (_hpos : 0 < k) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) k (k - 1) =
+      (((HexMatrix.Matrix.entry (scaledCoeffs b) k (k - 1) : Int) : Rat) /
+        (gramDet (adjacentSwap b k) k (Nat.le_of_lt hk) : Rat)) := by
+  sorry
+
+theorem coeffs_adjacentSwap_prev (b : HexMatrix.Matrix Int n m)
+    (k j : Nat) (_hk : k < n) (_hpos : 0 < k) (_hj : j < k - 1) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) (k - 1) j =
+      HexMatrix.Matrix.entry (coeffs b) k j := by
+  sorry
+
+theorem coeffs_adjacentSwap_curr (b : HexMatrix.Matrix Int n m)
+    (k j : Nat) (_hk : k < n) (_hpos : 0 < k) (_hj : j < k - 1) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) k j =
+      HexMatrix.Matrix.entry (coeffs b) (k - 1) j := by
+  sorry
+
 theorem scaledCoeffs_adjacentSwap_tail_prev (b : HexMatrix.Matrix Int n m)
     (k i : Nat) (hk : k < n) (hpos : 0 < k) (_hik : k < i) (_hi : i < n) :
     ((HexMatrix.Matrix.entry (scaledCoeffs (adjacentSwap b k)) i (k - 1) : Int) : Rat) =
@@ -154,6 +202,29 @@ theorem scaledCoeffs_adjacentSwap_tail_curr (b : HexMatrix.Matrix Int n m)
         (((HexMatrix.Matrix.entry (scaledCoeffs b) i (k - 1) : Int) : Rat) *
           ((HexMatrix.Matrix.entry (scaledCoeffs b) k (k - 1) : Int) : Rat))) /
         (gramDet b k (Nat.le_of_lt hk) : Rat) := by
+  sorry
+
+theorem coeffs_adjacentSwap_tail_prev (b : HexMatrix.Matrix Int n m)
+    (k i : Nat) (hk : k < n) (_hpos : 0 < k) (_hik : k < i) (_hi : i < n) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) i (k - 1) =
+      (((((HexMatrix.Matrix.entry (scaledCoeffs b) i (k - 1) : Int) : Rat) *
+            (gramDet (adjacentSwap b k) k (Nat.le_of_lt hk) : Rat)) +
+          (((HexMatrix.Matrix.entry (scaledCoeffs b) i k : Int) : Rat) *
+            ((HexMatrix.Matrix.entry (scaledCoeffs b) k (k - 1) : Int) : Rat))) /
+        (gramDet b k (Nat.le_of_lt hk) : Rat)) /
+        (gramDet (adjacentSwap b k) k (Nat.le_of_lt hk) : Rat) := by
+  sorry
+
+theorem coeffs_adjacentSwap_tail_curr (b : HexMatrix.Matrix Int n m)
+    (k i : Nat) (hk : k < n) (_hpos : 0 < k) (hkm1 : k - 1 ≤ n)
+    (_hik : k < i) (_hi : i < n) :
+    HexMatrix.Matrix.entry (coeffs (adjacentSwap b k)) i k =
+      (((((HexMatrix.Matrix.entry (scaledCoeffs b) i k : Int) : Rat) *
+            ((gramDet b (k - 1) hkm1 : Nat) : Rat)) -
+          (((HexMatrix.Matrix.entry (scaledCoeffs b) i (k - 1) : Int) : Rat) *
+            ((HexMatrix.Matrix.entry (scaledCoeffs b) k (k - 1) : Int) : Rat))) /
+        (gramDet b k (Nat.le_of_lt hk) : Rat)) /
+        (gramDet b (k + 1) (Nat.succ_le_of_lt hk) : Rat) := by
   sorry
 
 end Int
