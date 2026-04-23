@@ -10,6 +10,18 @@ open Matrix
 
 universe u
 
+/-- Convert Hex's dense vectors to Mathlib's function representation. -/
+def vectorEquiv (R : Type u) (n : Nat) : Vector R n ≃ (Fin n → R) where
+  toFun v := fun i => v[i]
+  invFun v := Vector.ofFn v
+  left_inv v := by
+    apply Vector.ext
+    intro i hi
+    simp
+  right_inv v := by
+    funext i
+    simp [Vector.getElem_ofFn]
+
 /-- Convert Hex's dense matrix representation to Mathlib's `Matrix`. -/
 def matrixEquiv (R : Type u) (n m : Nat) :
     HexMatrix.Matrix R n m ≃ Matrix (Fin n) (Fin m) R where
