@@ -15,7 +15,7 @@ namespace HexMatrixMathlib
 
 universe u
 
-variable {R : Type u} [Field R] {n m : Nat}
+variable {R : Type u} [Field R] [DecidableEq R] {n m : Nat}
 
 /--
 Hex's computed nullspace basis spans Mathlib's kernel after transport along
