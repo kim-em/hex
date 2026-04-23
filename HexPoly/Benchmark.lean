@@ -74,6 +74,50 @@ structure GcdResult where
   t : List Rat
   deriving Repr
 
+/-- Render a list of `Int` coefficients as one stable CSV field. -/
+def renderIntListField (coeffs : List Int) : String :=
+  ";".intercalate (coeffs.map toString)
+
+/-- Render a list of `Rat` coefficients as one stable CSV field. -/
+def renderRatListField (coeffs : List Rat) : String :=
+  ";".intercalate (coeffs.map toString)
+
+/-- Render one multiplication benchmark result as a stable CSV row. -/
+def MulResult.toCsvRow (result : MulResult) : String :=
+  ",".intercalate
+    [ result.name
+    , renderIntListField result.coeffs
+    ]
+
+/-- Header shared by the multiplication CSV runner. -/
+def mulCsvHeader : String :=
+  "name,coeffs"
+
+/-- Render one monic-division benchmark result as a stable CSV row. -/
+def DivModMonicResult.toCsvRow (result : DivModMonicResult) : String :=
+  ",".intercalate
+    [ result.name
+    , renderIntListField result.quotient
+    , renderIntListField result.remainder
+    ]
+
+/-- Header shared by the monic-division CSV runner. -/
+def divModMonicCsvHeader : String :=
+  "name,quotient,remainder"
+
+/-- Render one GCD/XGCD benchmark result as a stable CSV row. -/
+def GcdResult.toCsvRow (result : GcdResult) : String :=
+  ",".intercalate
+    [ result.name
+    , renderRatListField result.gcd
+    , renderRatListField result.s
+    , renderRatListField result.t
+    ]
+
+/-- Header shared by the GCD/XGCD CSV runner. -/
+def gcdCsvHeader : String :=
+  "name,gcd,s,t"
+
 private def intCoeffs (p : HexPoly.DensePoly Int) : List Int :=
   p.coeffs.toList
 
@@ -195,5 +239,17 @@ def runDivModMonicBenchmarks : List DivModMonicResult :=
 /-- Run all committed GCD/XGCD benchmark cases. -/
 def runGcdBenchmarks : List GcdResult :=
   gcdCases.map runGcdCase
+
+/-- Run all committed multiplication cases and return CSV-style rows. -/
+def runMulCsv : List String :=
+  mulCsvHeader :: runMulBenchmarks.map MulResult.toCsvRow
+
+/-- Run all committed monic-division cases and return CSV-style rows. -/
+def runDivModMonicCsv : List String :=
+  divModMonicCsvHeader :: runDivModMonicBenchmarks.map DivModMonicResult.toCsvRow
+
+/-- Run all committed GCD/XGCD cases and return CSV-style rows. -/
+def runGcdCsv : List String :=
+  gcdCsvHeader :: runGcdBenchmarks.map GcdResult.toCsvRow
 
 end HexPoly.Benchmark
