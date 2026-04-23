@@ -22,8 +22,9 @@ equivalence, and gcd/xgcd correspondence surface on committed tiny
 - **Covered properties:**
   - dense-to-Mathlib and Mathlib-to-dense round trips hold on
     committed typical, edge, and adversarial examples;
-  - the bridge equivalence preserves committed addition and
-    multiplication examples, including a trailing-zero-normalized input;
+  - the bridge equivalence preserves committed addition,
+    multiplication, negation, subtraction, and exponentiation examples,
+    including trailing-zero-normalized inputs;
   - executable dense gcd agrees with Mathlib gcd after conversion, and
     converting Mathlib gcd back to dense form recovers the executable
     gcd on committed examples;
@@ -62,13 +63,13 @@ private def denseAdversarial : HexPoly.DensePoly Rat :=
   denseRat [5, 0, 0]
 
 private def polynomialTypical : Rat[X] :=
-  C (1 : Rat) + C (-2 : Rat) * X + C (3 : Rat) * X ^ 2
+  toPolynomial denseTypical
 
 private def polynomialEdge : Rat[X] :=
-  0
+  toPolynomial denseEdge
 
 private def polynomialAdversarial : Rat[X] :=
-  C (5 : Rat)
+  toPolynomial denseAdversarial
 
 private def addTypicalLeft : HexPoly.DensePoly Rat :=
   denseRat [1, -1, 2]
@@ -76,11 +77,29 @@ private def addTypicalLeft : HexPoly.DensePoly Rat :=
 private def addTypicalRight : HexPoly.DensePoly Rat :=
   denseRat [3, 0, 1]
 
+private def addAdversarialLeft : HexPoly.DensePoly Rat :=
+  denseRat [5, 0, 0]
+
+private def addAdversarialRight : HexPoly.DensePoly Rat :=
+  denseRat [0, 1]
+
 private def mulTypicalLeft : HexPoly.DensePoly Rat :=
   denseRat [2, 3, 1]
 
 private def mulTypicalRight : HexPoly.DensePoly Rat :=
   denseRat [1, 1]
+
+private def subAdversarialLeft : HexPoly.DensePoly Rat :=
+  denseRat [7, 0, 0]
+
+private def subAdversarialRight : HexPoly.DensePoly Rat :=
+  denseRat [2]
+
+private def powTypical : HexPoly.DensePoly Rat :=
+  denseRat [1, 1]
+
+private def powAdversarial : HexPoly.DensePoly Rat :=
+  denseRat [-1, 1]
 
 private def gcdTypicalLeft : HexPoly.DensePoly Rat :=
   denseRat [2, 3, 1]
@@ -101,66 +120,193 @@ private def gcdAdversarialRight : HexPoly.DensePoly Rat :=
   denseRat [2, 2, 0]
 
 private def polynomialGcdTypicalLeft : Rat[X] :=
-  C (2 : Rat) + C (3 : Rat) * X + X ^ 2
+  toPolynomial gcdTypicalLeft
 
 private def polynomialGcdTypicalRight : Rat[X] :=
-  C (3 : Rat) + C (4 : Rat) * X + X ^ 2
+  toPolynomial gcdTypicalRight
 
 private def polynomialGcdEdgeLeft : Rat[X] :=
-  0
+  toPolynomial gcdEdgeLeft
 
 private def polynomialGcdEdgeRight : Rat[X] :=
-  C (1 : Rat) + X
+  toPolynomial gcdEdgeRight
 
 private def polynomialGcdAdversarialLeft : Rat[X] :=
-  C (2 : Rat) + C (4 : Rat) * X + C (2 : Rat) * X ^ 2
+  toPolynomial gcdAdversarialLeft
 
 private def polynomialGcdAdversarialRight : Rat[X] :=
-  C (2 : Rat) + C (2 : Rat) * X
+  toPolynomial gcdAdversarialRight
+
+-- `#eval` must bypass `DensePoly`'s sorry-bearing proof fields while
+-- still evaluating the executable dense side of the bridge.
 
 /-! ## Conversion spot checks -/
 
-example := ofPolynomial_toPolynomial denseTypical
-example := ofPolynomial_toPolynomial denseEdge
-example := ofPolynomial_toPolynomial denseAdversarial
+example :
+    denseCoeffs (ofPolynomial polynomialTypical) = denseCoeffs denseTypical := by
+  simpa [polynomialTypical] using congrArg denseCoeffs (ofPolynomial_toPolynomial denseTypical)
 
-example := toPolynomial_ofPolynomial polynomialTypical
-example := toPolynomial_ofPolynomial polynomialEdge
-example := toPolynomial_ofPolynomial polynomialAdversarial
+example :
+    denseCoeffs (ofPolynomial polynomialEdge) = denseCoeffs denseEdge := by
+  simpa [polynomialEdge] using congrArg denseCoeffs (ofPolynomial_toPolynomial denseEdge)
+
+example :
+    denseCoeffs (ofPolynomial polynomialAdversarial) = denseCoeffs denseAdversarial := by
+  simpa [polynomialAdversarial] using congrArg denseCoeffs (ofPolynomial_toPolynomial denseAdversarial)
+
+example :
+    polynomialCoeffs 2 (toPolynomial (ofPolynomial polynomialTypical)) =
+      polynomialCoeffs 2 polynomialTypical := by
+  simpa using congrArg (polynomialCoeffs 2) (toPolynomial_ofPolynomial polynomialTypical)
+
+example :
+    polynomialCoeffs 0 (toPolynomial (ofPolynomial polynomialEdge)) =
+      polynomialCoeffs 0 polynomialEdge := by
+  simpa using congrArg (polynomialCoeffs 0) (toPolynomial_ofPolynomial polynomialEdge)
+
+example :
+    polynomialCoeffs 0 (toPolynomial (ofPolynomial polynomialAdversarial)) =
+      polynomialCoeffs 0 polynomialAdversarial := by
+  simpa using congrArg (polynomialCoeffs 0) (toPolynomial_ofPolynomial polynomialAdversarial)
 
 /-! ## Ring-equivalence checks -/
+
+/-- info: [4, -1, 3] -/
+#guard_msgs in
+#eval! denseCoeffs (addTypicalLeft + addTypicalRight)
+
+/-- info: [3, 0, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (denseEdge + addTypicalRight)
+
+/-- info: [5, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (addAdversarialLeft + addAdversarialRight)
 
 example :
     equiv (addTypicalLeft + addTypicalRight) =
       equiv addTypicalLeft + equiv addTypicalRight := by
-  exact equiv.map_add addTypicalLeft addTypicalRight
+  simpa using equiv.map_add addTypicalLeft addTypicalRight
 
 example :
     equiv (denseEdge + addTypicalRight) =
       equiv denseEdge + equiv addTypicalRight := by
-  exact equiv.map_add denseEdge addTypicalRight
+  simpa using equiv.map_add denseEdge addTypicalRight
 
 example :
-    equiv (denseAdversarial + denseEdge) =
-      equiv denseAdversarial + equiv denseEdge := by
-  exact equiv.map_add denseAdversarial denseEdge
+    equiv (addAdversarialLeft + addAdversarialRight) =
+      equiv addAdversarialLeft + equiv addAdversarialRight := by
+  simpa using equiv.map_add addAdversarialLeft addAdversarialRight
+
+/-- info: [2, 5, 4, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (mulTypicalLeft * mulTypicalRight)
+
+/-- info: [] -/
+#guard_msgs in
+#eval! denseCoeffs (denseEdge * mulTypicalRight)
+
+/-- info: [0, 5] -/
+#guard_msgs in
+#eval! denseCoeffs (denseAdversarial * denseRat [0, 1])
 
 example :
     equiv (mulTypicalLeft * mulTypicalRight) =
       equiv mulTypicalLeft * equiv mulTypicalRight := by
-  exact equiv.map_mul mulTypicalLeft mulTypicalRight
+  simpa using equiv.map_mul mulTypicalLeft mulTypicalRight
 
 example :
     equiv (denseEdge * mulTypicalRight) =
       equiv denseEdge * equiv mulTypicalRight := by
-  exact equiv.map_mul denseEdge mulTypicalRight
+  simpa using equiv.map_mul denseEdge mulTypicalRight
 
 example :
     equiv (denseAdversarial * denseRat [0, 1]) =
       equiv denseAdversarial * equiv (denseRat [0, 1]) := by
-  exact equiv.map_mul denseAdversarial (denseRat [0, 1])
+  simpa using equiv.map_mul denseAdversarial (denseRat [0, 1])
+
+/-- info: [-1, 2, -3] -/
+#guard_msgs in
+#eval! denseCoeffs (-denseTypical)
+
+/-- info: [] -/
+#guard_msgs in
+#eval! denseCoeffs (-denseEdge)
+
+/-- info: [-5] -/
+#guard_msgs in
+#eval! denseCoeffs (-denseAdversarial)
+
+example : equiv (-denseTypical) = -equiv denseTypical := by
+  simpa using equiv.map_neg denseTypical
+
+example : equiv (-denseEdge) = -equiv denseEdge := by
+  simpa using equiv.map_neg denseEdge
+
+example : equiv (-denseAdversarial) = -equiv denseAdversarial := by
+  simpa using equiv.map_neg denseAdversarial
+
+/-- info: [-2, -1, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (addTypicalLeft - addTypicalRight)
+
+/-- info: [-3, 0, -1] -/
+#guard_msgs in
+#eval! denseCoeffs (denseEdge - addTypicalRight)
+
+/-- info: [5] -/
+#guard_msgs in
+#eval! denseCoeffs (subAdversarialLeft - subAdversarialRight)
+
+example :
+    equiv (addTypicalLeft - addTypicalRight) =
+      equiv addTypicalLeft - equiv addTypicalRight := by
+  simpa using equiv.map_sub addTypicalLeft addTypicalRight
+
+example :
+    equiv (denseEdge - addTypicalRight) =
+      equiv denseEdge - equiv addTypicalRight := by
+  simpa using equiv.map_sub denseEdge addTypicalRight
+
+example :
+    equiv (subAdversarialLeft - subAdversarialRight) =
+      equiv subAdversarialLeft - equiv subAdversarialRight := by
+  simpa using equiv.map_sub subAdversarialLeft subAdversarialRight
+
+/-- info: [1, 3, 3, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (powTypical * powTypical * powTypical)
+
+/-- info: [1] -/
+#guard_msgs in
+#eval! denseCoeffs (denseRat [1])
+
+/-- info: [1, -2, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (powAdversarial * powAdversarial)
+
+example : equiv (powTypical ^ 3) = equiv powTypical ^ 3 := by
+  simpa using equiv.map_pow powTypical 3
+
+example : equiv (denseEdge ^ 0) = equiv denseEdge ^ 0 := by
+  simpa using equiv.map_pow denseEdge 0
+
+example : equiv (powAdversarial ^ 2) = equiv powAdversarial ^ 2 := by
+  simpa using equiv.map_pow powAdversarial 2
 
 /-! ## GCD bridge checks -/
+
+/-- info: [-1, -1] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.gcd gcdTypicalLeft gcdTypicalRight)
+
+/-- info: [1, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.gcd gcdEdgeLeft gcdEdgeRight)
+
+/-- info: [2, 2] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.gcd gcdAdversarialLeft gcdAdversarialRight)
 
 example := toPolynomial_gcd gcdTypicalLeft gcdTypicalRight
 example := toPolynomial_gcd gcdEdgeLeft gcdEdgeRight
@@ -172,9 +318,37 @@ example := ofPolynomial_gcd polynomialGcdAdversarialLeft polynomialGcdAdversaria
 
 /-! ## Extended-GCD bridge checks -/
 
+/-- info: [-1, -1] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.xgcd gcdTypicalLeft gcdTypicalRight).gcd
+
+/-- info: [1, 1] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.xgcd gcdEdgeLeft gcdEdgeRight).gcd
+
+/-- info: [2, 2] -/
+#guard_msgs in
+#eval! denseCoeffs (HexPoly.DensePoly.xgcd gcdAdversarialLeft gcdAdversarialRight).gcd
+
 example := toPolynomial_xgcd_gcd gcdTypicalLeft gcdTypicalRight
 example := toPolynomial_xgcd_gcd gcdEdgeLeft gcdEdgeRight
 example := toPolynomial_xgcd_gcd gcdAdversarialLeft gcdAdversarialRight
+
+#guard
+  denseCoeffs
+      ((HexPoly.DensePoly.xgcd gcdTypicalLeft gcdTypicalRight).s * gcdTypicalLeft +
+        (HexPoly.DensePoly.xgcd gcdTypicalLeft gcdTypicalRight).t * gcdTypicalRight) =
+    denseCoeffs (HexPoly.DensePoly.xgcd gcdTypicalLeft gcdTypicalRight).gcd
+#guard
+  denseCoeffs
+      ((HexPoly.DensePoly.xgcd gcdEdgeLeft gcdEdgeRight).s * gcdEdgeLeft +
+        (HexPoly.DensePoly.xgcd gcdEdgeLeft gcdEdgeRight).t * gcdEdgeRight) =
+    denseCoeffs (HexPoly.DensePoly.xgcd gcdEdgeLeft gcdEdgeRight).gcd
+#guard
+  denseCoeffs
+      ((HexPoly.DensePoly.xgcd gcdAdversarialLeft gcdAdversarialRight).s * gcdAdversarialLeft +
+        (HexPoly.DensePoly.xgcd gcdAdversarialLeft gcdAdversarialRight).t * gcdAdversarialRight) =
+    denseCoeffs (HexPoly.DensePoly.xgcd gcdAdversarialLeft gcdAdversarialRight).gcd
 
 example := toPolynomial_xgcd_bezout gcdTypicalLeft gcdTypicalRight
 example := toPolynomial_xgcd_bezout gcdEdgeLeft gcdEdgeRight
