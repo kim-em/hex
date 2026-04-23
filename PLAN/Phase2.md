@@ -19,17 +19,19 @@ These are not rubber-stamp coverage audits — they ask:
 - Are the theorem statements faithful to the SPEC? (Not "verbatim" — but
   do they capture the same mathematical content?)
 - Are there missing imports or DAG violations?
-- **Does every `def` / `structure` / `class` / `instance` body
-  actually implement the SPEC contract, or is it `sorry`?** Flag any
-  data-level body that returns the input unchanged, `0`,
-  `Matrix.identity`, `none`, an empty list, or similar trivial output
-  where the SPEC promises non-trivial computation. These are
-  "wrong-but-plausible" scaffolds — forbidden by
-  [PLAN/Phase1.md](Phase1.md) ("correct implementations, or honest
-  placeholders — no middle ground"). A reviewer flagging a wrong
-  scaffold is an acceptable Phase 2 outcome: open a follow-up issue
-  that rewrites the body as `sorry` (or implements it correctly), and
-  do not commit the `scaffolding-reviewed` token until the fix lands.
+- **Does every committed `def` / `structure` field / `class` /
+  `instance` body actually implement the SPEC contract correctly?**
+  [PLAN/Phase1.md](Phase1.md) forbids data-level placeholders of any
+  kind — no `sorry` bodies, no `axiom`s standing in for data, no
+  trivial returns (input unchanged, `0`, `Matrix.identity`, `none`,
+  empty list). A library must commit only the declarations it can
+  correctly implement; everything else stays out of Lean until a
+  later PR implements it. Flag any committed declaration whose body
+  is a placeholder in any of these forms. Flagged bodies must be
+  deleted (and any downstream callers updated) in a follow-up issue
+  before the `scaffolding-reviewed` token is committed — either the
+  implementation becomes correct, or the declaration leaves the
+  tree. "Rewrite as `sorry`" is **not** an acceptable fix.
 
 ## Output
 

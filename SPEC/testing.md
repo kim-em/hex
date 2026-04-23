@@ -150,19 +150,14 @@ MUST NOT appear in any `Conformance.lean`:
 - **Scaffold-locking `#guard`s.** A `#guard` that asserts against
   *current stub output* rather than against the SPEC contract —
   e.g. `#guard (rref M).rank = 0` when `rref` is a placeholder —
-  locks the wrong answer in and hides the scaffold. If the
-  implementation is not yet correct, **do not** commit a conformance
-  check that accepts its wrong output. Either:
-  1. mark the implementation `sorry` per
-     [PLAN/Phase1.md](../PLAN/Phase1.md) and omit the conformance
-     check for that operation (it returns when the real
-     implementation lands); or
-  2. fix the implementation to match the contract before committing
-     the conformance check.
-
-  If the committed implementation returns wrong output, the
-  implementation is the bug — don't paper over it with a test that
-  says "this wrong output is expected".
+  locks the wrong answer in and hides the scaffold. Per
+  [PLAN/Phase1.md](../PLAN/Phase1.md), no data-level placeholders
+  are allowed in committed Lean at all; if a conformance test has to
+  lock in trivial output to pass, the underlying implementation is
+  a placeholder that should not have been committed in the first
+  place. Fix the implementation (or remove the declaration until
+  it's implementable), don't paper over it with a test that says
+  "this wrong output is expected".
 
 - **`native_decide`.** Banned project-wide (see
   [SPEC.md](SPEC.md#project-wide-proof-policy)). Restated here because
