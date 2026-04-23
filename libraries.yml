@@ -66,7 +66,7 @@ libraries:
   HexGfqRing:
     deps: [HexPolyFp]
     mathlib: false
-    done_through: 1
+    done_through: 2
   HexGfqField:
     deps: [HexGfqRing]
     mathlib: false
