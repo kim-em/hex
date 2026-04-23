@@ -1,4 +1,5 @@
 import HexMatrix.Determinant
+import HexMatrix.Conformance
 import HexMatrix.RowEchelon
 import HexMatrix.Nullspace
 import HexMatrix.RowOps
