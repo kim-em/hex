@@ -1,4 +1,3 @@
-import HexModArith
 import HexPolyFp
 import HexPolyZ
 
