@@ -4,6 +4,7 @@ import HexLLL.State
 import HexLLL.SizeReduce
 import HexLLL.SwapStep
 import HexLLL.Loop
+import HexLLL.Correctness
 
 /-!
 Core LLL scaffolding.
@@ -14,7 +15,7 @@ Gram-determinant independence, the public reducedness predicates,
 together with the integer `LLLState` record, its proof-facing
 Gram-Schmidt coefficient recovery helper, and the executable
 potential, size-reduction transition, adjacent-swap transition, and
-public loop entrypoints used by later correctness work.
+public loop entrypoints used by the new correctness-theorem scaffold.
 -/
 
 namespace HexLLL
