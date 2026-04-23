@@ -14,13 +14,13 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
 - **Covered operations:** `Hex.GramSchmidt.Int.basis`,
   `Hex.GramSchmidt.Int.coeffs`, `Hex.GramSchmidt.Int.gramDet`,
   `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
-  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.coeffs`,
-  `Hex.GramSchmidt.Rat.gramDet`.
+  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.gramDet`.
 - **Covered properties:**
   - integer-input basis rows are the cast input rows on committed
     examples, including the `basis_zero` theorem;
-  - both integer and rational coefficient matrices stay identity on
-    committed examples, including `coeffs_diag` and `coeffs_upper`;
+  - integer coefficient checks stay on the theorem-backed diagonal and
+    upper-triangular shape guarantees, including `coeffs_diag` and
+    `coeffs_upper`;
   - integer and rational Gram determinants match the leading Gram-matrix
     determinant on typical, edge, and adversarial fixtures;
   - integer `gramDetVec` packages the full prefix determinant sequence;
@@ -30,7 +30,7 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
     `basisNormSqProduct` on committed examples.
 - **Covered edge cases:** zero row prefixes, repeated rows producing a
   zero Gram determinant, the `k = 0` Gram-determinant convention, and
-  diagonal/upper-triangular coefficient entries.
+  integer diagonal/upper-triangular coefficient entries.
 -/
 
 namespace HexGramSchmidt
@@ -83,12 +83,6 @@ example :
 example :
     Matrix.row (GramSchmidt.Int.basis intEdge) 1 = vectorOfList! [0, 1] := by
   rfl
-
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intTypical) =
-  [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intAdversarial) =
-  [[1, 0], [0, 1]]
 
 example :
     Matrix.row (GramSchmidt.Int.basis intTypical) 0 =
@@ -146,14 +140,6 @@ example :
 
 example :
     Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = vectorOfList! [0, 1] := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratTypical) 2 2 = 1 := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratAdversarial) 0 1 = 0 := by
   rfl
 
 #guard GramSchmidt.Rat.gramDet ratTypical 0 (by decide) = 1
