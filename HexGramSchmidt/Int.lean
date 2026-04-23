@@ -5,7 +5,8 @@ Initial integer Gram-Schmidt scaffolding.
 
 This module introduces the first `HexGramSchmidt` API slice for integer
 input matrices: the rational Gram-Schmidt basis and coefficient matrix,
-together with the immediate theorem surface used by downstream LLL work.
+together with the immediate theorem surface used by downstream LLL work,
+including the prefix-span equivalence between input rows and basis rows.
 -/
 
 namespace HexMatrix
@@ -62,6 +63,22 @@ giving the expected lower-unitriangular shape for the initial API slice.
 def coeffs (_b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n n :=
   HexMatrix.Matrix.identity
 
+/--
+The first `k + 1` scaffolded Gram-Schmidt basis rows as a standalone
+matrix, so prefix-span statements can use the existing row-span API.
+-/
+noncomputable def basisPrefix (b : HexMatrix.Matrix Int n m) (k : Nat) :
+    HexMatrix.Matrix Rat (k + 1) m :=
+  Vector.ofFn fun i => HexMatrix.Matrix.row (basis b) i.1
+
+/--
+The first `k + 1` input rows cast to `Rat`, packaged as a standalone
+matrix for prefix-span statements.
+-/
+def inputPrefix (b : HexMatrix.Matrix Int n m) (k : Nat) :
+    HexMatrix.Matrix Rat (k + 1) m :=
+  Vector.ofFn fun i => castRow (HexMatrix.Matrix.row b i.1)
+
 theorem basis_zero (b : HexMatrix.Matrix Int n m) (hn : 0 < n) :
     HexMatrix.Matrix.row (basis b) 0 = castRow (HexMatrix.Matrix.row b 0) := by
   sorry
@@ -87,6 +104,12 @@ theorem coeffs_diag (b : HexMatrix.Matrix Int n m) (i : Nat) (_hi : i < n) :
 theorem coeffs_upper (b : HexMatrix.Matrix Int n m)
     (i j : Nat) (_hi : i < n) (_hj : j < n) (_hij : j > i) :
     HexMatrix.Matrix.entry (coeffs b) i j = 0 := by
+  sorry
+
+theorem basis_span (b : HexMatrix.Matrix Int n m) (i : Nat) (_hi : i < n)
+    (v : Vector Rat m) :
+    HexMatrix.Matrix.spanContains (basisPrefix b i) v =
+      HexMatrix.Matrix.spanContains (inputPrefix b i) v := by
   sorry
 
 end Int
