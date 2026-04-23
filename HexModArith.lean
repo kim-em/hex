@@ -1,6 +1,7 @@
 import HexModArith.Core
 import HexModArith.Instances
 import HexModArith.Theorems
+import HexModArith.Conformance
 
 /-!
 Modular arithmetic declarations.
@@ -11,7 +12,9 @@ instance layer presenting `ZMod64 p` as a commutative ring with the
 associated characteristic scaffold expected by downstream modular
 polynomial and bridge code, together with the prime-modulus theorem
 surface for inverse correctness, zero-divisor elimination, and Fermat's
-little theorem.
+little theorem. The Phase 3 `Conformance` module adds deterministic core
+checks for canonicalization, arithmetic, and exponentiation on fixed
+small moduli.
 -/
 
 namespace HexModArith
