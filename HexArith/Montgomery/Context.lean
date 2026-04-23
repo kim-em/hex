@@ -53,6 +53,36 @@ def mulMont (ctx : MontCtx p) (a b : UInt64) : UInt64 :=
   let _hi := UInt64.mulHi a (b + ctx.p')
   .ofNat ((a.toNat * b.toNat * montgomeryRadixInvNat p) % p.toNat)
 
+/-- Any odd modulus used for Montgomery arithmetic is positive. -/
+theorem p_pos (ctx : MontCtx p) : 0 < p.toNat := by
+  sorry
+
+/-- A single-word Montgomery modulus fits below the radix `R = 2^64`. -/
+theorem p_lt_R (ctx : MontCtx p) : p.toNat < montgomeryRadix := by
+  sorry
+
+/-- The stored oddness witness is available at the Nat level. -/
+theorem p_odd_nat (ctx : MontCtx p) : p.toNat % 2 = 1 := by
+  sorry
+
+/-- Montgomery conversion lands back in the canonical residue range. -/
+theorem toMont_lt (ctx : MontCtx p) (a : UInt64) : ctx.toMont a < p := by
+  sorry
+
+/-- Montgomery multiplication stays within the canonical residue range. -/
+theorem mulMont_lt (ctx : MontCtx p) (a b : UInt64) : ctx.mulMont a b < p := by
+  sorry
+
+/--
+Multiplying Montgomery representatives preserves the standard Montgomery-domain
+representation invariant.
+-/
+theorem mulMont_repr (ctx : MontCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    (ctx.mulMont (ctx.toMont a) (ctx.toMont b)).toNat =
+      (a.toNat * b.toNat * montgomeryRadix) % p.toNat := by
+  sorry
+
 theorem fromMont_toMont (ctx : MontCtx p) (a : UInt64)
     (ha : a < p) :
     ctx.fromMont (ctx.toMont a) = a := by
