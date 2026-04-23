@@ -13,10 +13,10 @@ import HexArith.UInt64.Wide
 Core arithmetic scaffolding.
 
 This root module re-exports the shared `UInt64` wide-word helpers and
-the Phase 1 Nat and Int extended-GCD, Barrett, and Montgomery reduction
-layers, including the inverse, `UInt64`, and pure-`Nat` REDC
-Montgomery scaffolds plus the modular exponentiation surface that
-downstream modular arithmetic code will build on.
+the Phase 1 Nat, Int, and `UInt64` extended-GCD, Barrett, and
+Montgomery reduction layers, including the inverse, `UInt64`, and
+pure-`Nat` REDC Montgomery scaffolds plus the modular exponentiation
+surface that downstream modular arithmetic code will build on.
 -/
 
 namespace HexArith
