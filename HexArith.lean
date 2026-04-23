@@ -1,6 +1,7 @@
 import HexArith.Barrett.Context
 import HexArith.Barrett.Reduce
 import HexArith.Barrett.ReduceNat
+import HexArith.Benchmark
 import HexArith.Binomial
 import HexArith.Conformance
 import HexArith.ExtGcd
@@ -17,10 +18,12 @@ Core arithmetic scaffolding.
 This root module re-exports the shared `UInt64` wide-word helpers and
 the Phase 1 Nat, Int, and `UInt64` extended-GCD, Barrett, and
 Montgomery reduction layers, the local binomial/Fermat `Nat` surface,
-and the modular exponentiation API that downstream modular arithmetic
-code will build on. The `Conformance` module carries Phase 3 core
-profile checks; see [SPEC/testing.md](../SPEC/testing.md) for the
-per-library module contract this file satisfies.
+the modular exponentiation API that downstream modular arithmetic
+code will build on, and the Phase 4 committed benchmark fixtures for
+the current `extGcd` and `powMod` microbenchmarks. The `Conformance`
+module carries Phase 3 core profile checks; see
+[SPEC/testing.md](../SPEC/testing.md) for the per-library module
+contract this file satisfies.
 -/
 
 namespace HexArith
