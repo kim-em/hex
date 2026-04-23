@@ -1,5 +1,4 @@
 import HexBerlekamp.Splitting
-import HexPoly.Gcd
 
 /-!
 Executable Rabin irreducibility scaffolding for `HexBerlekamp`.

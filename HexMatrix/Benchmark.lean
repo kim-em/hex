@@ -265,7 +265,7 @@ private def runRrefById : RowReductionCaseId → RrefResult
       , pivotCols := serializePivotCols data.pivotCols
       }
 
-private def runNullspaceById : RowReductionCaseId → NullspaceResult
+private noncomputable def runNullspaceById : RowReductionCaseId → NullspaceResult
   | .rectangularSmall =>
       let M := ratMat23 1 2 3 0 1 4
       { name := "row-reduction-rectangular-small"
@@ -297,7 +297,7 @@ def runRrefCase (c : RowReductionCase) : RrefResult :=
   runRrefById c.id
 
 /-- Execute one committed nullspace benchmark case. -/
-def runNullspaceCase (c : RowReductionCase) : NullspaceResult :=
+noncomputable def runNullspaceCase (c : RowReductionCase) : NullspaceResult :=
   runNullspaceById c.id
 
 /-- Execute all committed Bareiss determinant benchmark cases. -/
@@ -309,7 +309,7 @@ def runRrefCases : List RrefResult :=
   rowReductionCases.map runRrefCase
 
 /-- Execute all committed nullspace benchmark cases. -/
-def runNullspaceCases : List NullspaceResult :=
+noncomputable def runNullspaceCases : List NullspaceResult :=
   rowReductionCases.map runNullspaceCase
 
 end HexMatrix.Benchmark

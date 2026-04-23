@@ -67,7 +67,7 @@ variable (hField : Lean.Grind.Field (HexModArith.ZMod64 p))
 Executable Berlekamp-kernel basis for `f`, routed through the shared
 `HexMatrix` nullspace scaffold on `Q_f - I`.
 -/
-def berlekampKernel (f : HexPolyFp.FpPoly p) :
+noncomputable def berlekampKernel (f : HexPolyFp.FpPoly p) :
     Vector (Vector (HexModArith.ZMod64 p) f.degree)
       (f.degree - (rref (berlekampKernelMatrix (p := p) f)).rank) :=
   let _ : Lean.Grind.Field (HexModArith.ZMod64 p) := hField
