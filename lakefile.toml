@@ -1,0 +1,167 @@
+name = "hex"
+version = "0.1.0"
+defaultTargets = [
+  "HexArith",
+  "HexPoly",
+  "HexMatrix",
+  "HexModArith",
+  "HexGramSchmidt",
+  "HexGf2",
+  "HexPolyZ",
+  "HexLll",
+  "HexPolyFp",
+  "HexGfqRing",
+  "HexGfqField",
+  "HexBerlekamp",
+  "HexHensel",
+  "HexConway",
+  "HexGfq",
+  "HexBerlekampZassenhaus",
+  "HexPolyMathlib",
+  "HexMatrixMathlib",
+  "HexModArithMathlib",
+  "HexGramSchmidtMathlib",
+  "HexPolyZMathlib",
+  "HexLllMathlib",
+  "HexBerlekampMathlib",
+  "HexHenselMathlib",
+  "HexGf2Mathlib",
+  "HexGfqMathlib",
+  "HexBerlekampZassenhausMathlib",
+  "HexManual",
+]
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "v4.30.0-rc2"
+
+[[require]]
+name = "verso"
+git = "https://github.com/leanprover/verso.git"
+rev = "v4.30.0-rc2"
+
+[[lean_lib]]
+name = "HexArith"
+
+[[lean_lib]]
+name = "HexPoly"
+
+[[lean_lib]]
+name = "HexMatrix"
+
+[[lean_lib]]
+name = "HexModArith"
+
+[[lean_lib]]
+name = "HexGramSchmidt"
+
+[[lean_lib]]
+name = "HexGf2"
+
+[[lean_lib]]
+name = "HexPolyZ"
+
+[[lean_lib]]
+name = "HexLll"
+
+[[lean_lib]]
+name = "HexPolyFp"
+
+[[lean_lib]]
+name = "HexGfqRing"
+
+[[lean_lib]]
+name = "HexGfqField"
+
+[[lean_lib]]
+name = "HexBerlekamp"
+
+[[lean_lib]]
+name = "HexHensel"
+
+[[lean_lib]]
+name = "HexConway"
+
+[[lean_lib]]
+name = "HexGfq"
+
+[[lean_lib]]
+name = "HexBerlekampZassenhaus"
+
+[[lean_lib]]
+name = "HexPolyMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexMatrixMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexModArithMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexGramSchmidtMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexPolyZMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexLllMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexBerlekampMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexHenselMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexGf2Mathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexGfqMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexBerlekampZassenhausMathlib"
+needs = ["@mathlib"]
+
+[[lean_lib]]
+name = "HexManual"
+needs = [
+  "@verso",
+  "HexArith",
+  "HexPoly",
+  "HexMatrix",
+  "HexModArith",
+  "HexGramSchmidt",
+  "HexGf2",
+  "HexPolyZ",
+  "HexLll",
+  "HexPolyFp",
+  "HexGfqRing",
+  "HexGfqField",
+  "HexBerlekamp",
+  "HexHensel",
+  "HexConway",
+  "HexGfq",
+  "HexBerlekampZassenhaus",
+  "HexPolyMathlib",
+  "HexMatrixMathlib",
+  "HexModArithMathlib",
+  "HexGramSchmidtMathlib",
+  "HexPolyZMathlib",
+  "HexLllMathlib",
+  "HexBerlekampMathlib",
+  "HexHenselMathlib",
+  "HexGf2Mathlib",
+  "HexGfqMathlib",
+  "HexBerlekampZassenhausMathlib",
+]
