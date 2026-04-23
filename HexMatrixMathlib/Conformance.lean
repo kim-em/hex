@@ -13,7 +13,8 @@ dense matrix representation and Mathlib matrices.
   oracle.
 - **Mode:** `always`.
 - **Covered operations:** `vectorEquiv`, `matrixEquiv`,
-  `matrixEquiv_rowSwap`, `matrixEquiv_rowScale`, `matrixEquiv_rowAdd`.
+  `matrixEquiv_rowSwap`, `matrixEquiv_rowScale`, `matrixEquiv_rowAdd`,
+  `det_eq`.
 - **Covered properties:**
   - `vectorEquiv` and `matrixEquiv` round-trip both from Hex data to
     Mathlib and back on committed examples;
@@ -23,9 +24,12 @@ dense matrix representation and Mathlib matrices.
   - the row-operation bridge theorems match Hex row swaps, row
     scalings, and row additions with the corresponding Mathlib
     reindexing and elementary-matrix actions on committed small
-    matrices.
+    matrices;
+  - Hex and Mathlib determinant evaluations agree on committed small
+    square matrices after transport through `matrixEquiv`.
 - **Covered edge cases:** singleton zero vectors and matrices,
-  self-swaps, zero row scalings, and zero-coefficient row additions.
+  self-swaps, zero row scalings, zero-coefficient row additions, and a
+  singleton zero determinant fixture.
 -/
 
 namespace HexMatrixMathlib
@@ -243,6 +247,24 @@ private def matrixAdversarial : HexMatrix.Matrix Int 3 3 :=
     matrixEquiv Int 3 3 (HexMatrix.Matrix.rowAdd matrixAdversarial fin3_1 fin3_0 (-4)) =
       Matrix.transvection fin3_1 fin3_0 (-4) * matrixEquiv Int 3 3 matrixAdversarial := by
   exact matrixEquiv_rowAdd matrixAdversarial fin3_1 fin3_0 (-4)
+
+/-! ## `det_eq` -/
+
+/-- info: 9 -/
+#guard_msgs in
+#eval HexMatrix.Matrix.det matrixTypical
+
+/-- info: 0 -/
+#guard_msgs in
+#eval HexMatrix.Matrix.det matrixEdge
+
+/-- info: 180 -/
+#guard_msgs in
+#eval HexMatrix.Matrix.det matrixAdversarial
+
+#guard HexMatrix.Matrix.det matrixTypical = Matrix.det (matrixEquiv Int 3 3 matrixTypical)
+#guard HexMatrix.Matrix.det matrixEdge = Matrix.det (matrixEquiv Int 1 1 matrixEdge)
+#guard HexMatrix.Matrix.det matrixAdversarial = Matrix.det (matrixEquiv Int 3 3 matrixAdversarial)
 
 end Conformance
 end HexMatrixMathlib
