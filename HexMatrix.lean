@@ -10,7 +10,7 @@ Core matrix scaffolding.
 
 This root module re-exports the dense matrix and row-echelon declarations
 that downstream linear-algebra libraries build on, including the Phase 1
-determinant and row-operation surfaces.
+determinant, row-operation, and vector norm-squared surfaces.
 -/
 
 namespace HexMatrix
