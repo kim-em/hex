@@ -106,7 +106,7 @@ libraries:
   HexModArithMathlib:
     deps: [HexModArith]
     mathlib: true
-    done_through: 0
+    done_through: 1
   HexGramSchmidtMathlib:
     deps: [HexGramSchmidt]
     mathlib: true
