@@ -110,7 +110,7 @@ libraries:
   HexGramSchmidtMathlib:
     deps: [HexGramSchmidt]
     mathlib: true
-    done_through: 0
+    done_through: 1
   HexPolyZMathlib:
     deps: [HexPolyZ, HexPolyMathlib]
     mathlib: true
