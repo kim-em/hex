@@ -1,3 +1,4 @@
+import HexMatrixMathlib.Determinant
 import HexMatrixMathlib.RowOps
 
 /-!
@@ -13,19 +14,23 @@ dense matrix representation and Mathlib matrices.
   oracle.
 - **Mode:** `always`.
 - **Covered operations:** `vectorEquiv`, `matrixEquiv`,
-  `matrixEquiv_rowSwap`, `matrixEquiv_rowScale`, `matrixEquiv_rowAdd`.
+  `det_eq`, `matrixEquiv_rowSwap`, `matrixEquiv_rowScale`,
+  `matrixEquiv_rowAdd`.
 - **Covered properties:**
   - `vectorEquiv` and `matrixEquiv` round-trip both from Hex data to
     Mathlib and back on committed examples;
   - the transported vectors and matrices agree with the expected
     coordinate functions on committed typical, edge, and adversarial
     fixtures;
+  - Hex and Mathlib determinant evaluation agree on committed small
+    square matrices through the determinant bridge;
   - the row-operation bridge theorems match Hex row swaps, row
     scalings, and row additions with the corresponding Mathlib
     reindexing and elementary-matrix actions on committed small
     matrices.
 - **Covered edge cases:** singleton zero vectors and matrices,
-  self-swaps, zero row scalings, and zero-coefficient row additions.
+  zero determinant on a singular matrix, self-swaps, zero row
+  scalings, and zero-coefficient row additions.
 -/
 
 namespace HexMatrixMathlib
@@ -100,6 +105,15 @@ private def matrixEdge : HexMatrix.Matrix Int 1 1 :=
 private def matrixAdversarial : HexMatrix.Matrix Int 3 3 :=
   intMat33 (-2) 0 7 5 (-1) 3 4 4 (-6)
 
+private def detTypical : HexMatrix.Matrix Int 3 3 :=
+  matrixTypical
+
+private def detEdge : HexMatrix.Matrix Int 1 1 :=
+  matrixEdge
+
+private def detAdversarial : HexMatrix.Matrix Int 3 3 :=
+  intMat33 1 2 3 2 4 6 (-1) 5 0
+
 /-! ## `vectorEquiv` -/
 
 /-- info: [2, -1, 5] -/
@@ -157,6 +171,24 @@ private def matrixAdversarial : HexMatrix.Matrix Int 3 3 :=
   matrixEquiv Int 1 1 matrixEdge
 #guard matrixEquiv Int 3 3 ((matrixEquiv Int 3 3).invFun (matrixEquiv Int 3 3 matrixAdversarial)) =
   matrixEquiv Int 3 3 matrixAdversarial
+
+/-! ## Determinant bridge theorem -/
+
+#guard HexMatrix.Matrix.det detTypical = Matrix.det (matrixEquiv Int 3 3 detTypical)
+#guard HexMatrix.Matrix.det detEdge = Matrix.det (matrixEquiv Int 1 1 detEdge)
+#guard HexMatrix.Matrix.det detAdversarial = Matrix.det (matrixEquiv Int 3 3 detAdversarial)
+
+example :
+  HexMatrix.Matrix.det detTypical = Matrix.det (matrixEquiv Int 3 3 detTypical) := by
+  simpa using det_eq detTypical
+
+example :
+  HexMatrix.Matrix.det detEdge = Matrix.det (matrixEquiv Int 1 1 detEdge) := by
+  simpa using det_eq detEdge
+
+example :
+  HexMatrix.Matrix.det detAdversarial = Matrix.det (matrixEquiv Int 3 3 detAdversarial) := by
+  simpa using det_eq detAdversarial
 
 /-! ## Row-operation bridge theorems -/
 
