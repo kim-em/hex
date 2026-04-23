@@ -1,13 +1,12 @@
 import HexBerlekamp.Matrix
 
 /-!
-Executable Berlekamp-kernel scaffolding for `HexBerlekamp`.
+Executable Berlekamp kernel-matrix scaffolding for `HexBerlekamp`.
 
 This module adds the next Phase 1 boundary after the Berlekamp matrix:
-the dense matrix `Q_f - I` and the corresponding nullspace basis routed
-through the existing `HexMatrix` scaffold. The theorem layer records the
-entrywise meaning of `Q_f - I` and the immediate soundness contract that
-each returned basis vector lies in the kernel.
+the dense matrix `Q_f - I`. The theorem layer records its entrywise
+meaning while the actual nullspace basis surface remains deferred until
+`HexMatrix` grows a correct executable nullspace API.
 -/
 
 namespace HexBerlekamp
@@ -58,32 +57,5 @@ theorem berlekampKernelMatrix_apply_diag (f : HexPolyFp.FpPoly p) (i : Fin f.deg
     (berlekampKernelMatrix (p := p) f)[i][i] =
       (berlekampMatrix (p := p) f)[i][i] - 1 := by
   simp [berlekampKernelMatrix]
-
-section WithField
-
-variable (hField : Lean.Grind.Field (HexModArith.ZMod64 p))
-
-/--
-Executable Berlekamp-kernel basis for `f`, routed through the shared
-`HexMatrix` nullspace scaffold on `Q_f - I`.
--/
-noncomputable def berlekampKernel (f : HexPolyFp.FpPoly p) :
-    Vector (Vector (HexModArith.ZMod64 p) f.degree)
-      (f.degree - (rref (berlekampKernelMatrix (p := p) f)).rank) :=
-  let _ : Lean.Grind.Field (HexModArith.ZMod64 p) := hField
-  Matrix.nullspace (berlekampKernelMatrix (p := p) f)
-
-/--
-Every scaffolded Berlekamp-kernel basis vector is annihilated by
-`Q_f - I`.
--/
-theorem berlekampKernel_sound (f : HexPolyFp.FpPoly p)
-    (k : Fin (f.degree - (rref (berlekampKernelMatrix (p := p) f)).rank)) :
-    berlekampKernelMatrix (p := p) f * (berlekampKernel (p := p) (hField := hField) f)[k] =
-      Vector.replicate f.degree
-        (HexModArith.ZMod64.zero p (Nat.pos_of_ne_zero (NeZero.ne p))) := by
-  sorry
-
-end WithField
 
 end HexBerlekamp

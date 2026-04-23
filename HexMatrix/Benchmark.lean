@@ -1,5 +1,5 @@
 import HexMatrix.Determinant
-import HexMatrix.Nullspace
+import HexMatrix.Rref
 
 /-!
 # `HexMatrix` benchmark fixtures
@@ -33,7 +33,7 @@ structure BareissCase where
   dimension : Nat
   deriving Repr
 
-/-- Metadata for one committed RREF/nullspace benchmark case. -/
+/-- Metadata for one committed row-reduction benchmark case. -/
 structure RowReductionCase where
   id : RowReductionCaseId
   name : String
@@ -59,14 +59,6 @@ structure RrefResult where
   pivotCols : List Nat
   deriving Repr
 
-/-- Materialized result for one committed nullspace benchmark case. -/
-structure NullspaceResult where
-  name : String
-  rows : Nat
-  cols : Nat
-  basis : List (List Rat)
-  deriving Repr
-
 private def serializeVector (v : Vector α n) : List α :=
   v.toList
 
@@ -75,9 +67,6 @@ private def serializeMatrix (M : Matrix α n m) : List (List α) :=
 
 private def serializePivotCols (v : Vector (Fin n) k) : List Nat :=
   v.toList.map Fin.val
-
-private def serializeBasis (basis : Vector (Vector α n) k) : List (List α) :=
-  basis.toList.map serializeVector
 
 private def intRow3 (a0 a1 a2 : Int) : Vector Int 3 :=
   Vector.ofFn fun i =>
@@ -213,8 +202,7 @@ def bareissCases : List BareissCase :=
 Stable row-reduction benchmark cases.
 
 The cases cover a small rectangular matrix, a pivot-gap-shaped matrix,
-and a denser medium rectangular matrix for the current `rref` and
-nullspace extraction paths.
+and a denser medium rectangular matrix for the current `rref` path.
 -/
 def rowReductionCases : List RowReductionCase :=
   [ { id := .rectangularSmall, name := "row-reduction-rectangular-small", rows := 2, cols := 3 }
@@ -265,29 +253,6 @@ private def runRrefById : RowReductionCaseId → RrefResult
       , pivotCols := serializePivotCols data.pivotCols
       }
 
-private noncomputable def runNullspaceById : RowReductionCaseId → NullspaceResult
-  | .rectangularSmall =>
-      let M := ratMat23 1 2 3 0 1 4
-      { name := "row-reduction-rectangular-small"
-      , rows := 2
-      , cols := 3
-      , basis := serializeBasis (Matrix.nullspace M)
-      }
-  | .pivotGap =>
-      let M := ratMat34 1 0 2 0 0 0 3 4 5 0 0 6
-      { name := "row-reduction-pivot-gap"
-      , rows := 3
-      , cols := 4
-      , basis := serializeBasis (Matrix.nullspace M)
-      }
-  | .denseMedium =>
-      let M := ratMat46 2 1 0 3 4 5 1 0 1 2 3 5 3 1 4 1 5 9 2 6 5 3 5 8
-      { name := "row-reduction-dense-medium"
-      , rows := 4
-      , cols := 6
-      , basis := serializeBasis (Matrix.nullspace M)
-      }
-
 /-- Execute one committed Bareiss determinant benchmark case. -/
 def runBareissCase (c : BareissCase) : BareissResult :=
   { name := c.name, dimension := c.dimension, value := runBareissById c.id }
@@ -296,10 +261,6 @@ def runBareissCase (c : BareissCase) : BareissResult :=
 def runRrefCase (c : RowReductionCase) : RrefResult :=
   runRrefById c.id
 
-/-- Execute one committed nullspace benchmark case. -/
-noncomputable def runNullspaceCase (c : RowReductionCase) : NullspaceResult :=
-  runNullspaceById c.id
-
 /-- Execute all committed Bareiss determinant benchmark cases. -/
 def runBareissCases : List BareissResult :=
   bareissCases.map runBareissCase
@@ -307,9 +268,5 @@ def runBareissCases : List BareissResult :=
 /-- Execute all committed RREF benchmark cases. -/
 def runRrefCases : List RrefResult :=
   rowReductionCases.map runRrefCase
-
-/-- Execute all committed nullspace benchmark cases. -/
-noncomputable def runNullspaceCases : List NullspaceResult :=
-  rowReductionCases.map runNullspaceCase
 
 end HexMatrix.Benchmark
