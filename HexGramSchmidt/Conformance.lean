@@ -66,6 +66,9 @@ private def intEdge : Matrix Int 2 2 :=
 private def intAdversarial : Matrix Int 2 2 :=
   matrixOfList2D! [[1, 2], [1, 2]]
 
+private def intGramSchmidtCase : Matrix Int 2 2 :=
+  matrixOfList2D! [[1, 0], [1, 1]]
+
 private def ratTypical : Matrix Rat 3 2 :=
   matrixOfList2D! [[1, 2], [3 / 2, -1], [0, 5]]
 
@@ -107,6 +110,26 @@ example :
 example :
     Matrix.entry (GramSchmidt.Int.coeffs intTypical) 1 2 = 0 := by
   simpa using GramSchmidt.Int.coeffs_upper intTypical 1 2 (by decide) (by decide) (by decide)
+
+example :
+    Matrix.dot (Matrix.row (GramSchmidt.Int.basis intGramSchmidtCase) 0)
+      (Matrix.row (GramSchmidt.Int.basis intGramSchmidtCase) 1) = 0 := by
+  simpa using
+    GramSchmidt.Int.basis_orthogonal intGramSchmidtCase 0 1 (by decide) (by decide) (by decide)
+
+example :
+    Matrix.entry (GramSchmidt.Int.coeffs intGramSchmidtCase) 1 0 =
+      GramSchmidt.Int.projCoeff
+        (GramSchmidt.Int.castRow (Matrix.row intGramSchmidtCase 1))
+        (GramSchmidt.Int.basisRow intGramSchmidtCase 0) := by
+  change
+    GramSchmidt.Int.projCoeff
+      (GramSchmidt.Int.castRow (Matrix.row intGramSchmidtCase 1))
+      (GramSchmidt.Int.basisRow intGramSchmidtCase 0) =
+    GramSchmidt.Int.projCoeff
+      (GramSchmidt.Int.castRow (Matrix.row intGramSchmidtCase 1))
+      (GramSchmidt.Int.basisRow intGramSchmidtCase 0)
+  rfl
 
 /-! ## Integer Gram determinants -/
 

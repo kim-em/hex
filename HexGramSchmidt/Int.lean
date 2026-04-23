@@ -53,20 +53,51 @@ def castRow (v : Vector Int m) : Vector Rat m :=
   Vector.ofFn fun j => (v.get j : Rat)
 
 /--
-Placeholder for the integer-input Gram-Schmidt basis.
+The Gram-Schmidt projection coefficient of `v` onto `w`.
 
-This surface promises the true orthogonalization from the SPEC; the
-implementation remains future work.
+For a zero vector `w`, this evaluates to `0` in `Rat`, matching the
+field convention `0⁻¹ = 0`.
 -/
-noncomputable def basis (b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n m :=
-  sorry
+noncomputable def projCoeff (v w : Vector Rat m) : Rat :=
+  HexMatrix.Matrix.dot v w / HexMatrix.Matrix.dot w w
 
 /--
-The Gram-Schmidt coefficient scaffold is currently the identity matrix,
-giving the expected lower-unitriangular shape for the initial API slice.
+The `i`-th Gram-Schmidt basis row for integer input, indexed by `Nat`.
+
+Out-of-bounds indices evaluate against the zero input row, so the same
+definition works for the theorem layer's Nat-indexed API.
 -/
-def coeffs (_b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n n :=
-  HexMatrix.Matrix.identity
+noncomputable def basisRow (b : HexMatrix.Matrix Int n m) (i : Nat) : Vector Rat m :=
+  let v := castRow (HexMatrix.Matrix.row b i)
+  let correction :=
+    (List.finRange i).foldl
+      (fun acc j =>
+        let w := basisRow b j.1
+        let μ := projCoeff v w
+        Vector.ofFn fun k => acc.get k + μ * w.get k)
+      0
+  Vector.ofFn fun k => v.get k - correction.get k
+termination_by i
+decreasing_by
+  exact j.2
+
+/--
+The integer-input Gram-Schmidt basis.
+-/
+noncomputable def basis (b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n m :=
+  Vector.ofFn fun i => basisRow b i.1
+
+/--
+The lower-unitriangular Gram-Schmidt coefficient matrix.
+-/
+noncomputable def coeffs (b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n n :=
+  Vector.ofFn fun i => Vector.ofFn fun j =>
+    if _hji : j.1 < i.1 then
+      projCoeff (castRow (HexMatrix.Matrix.row b i.1)) (basisRow b j.1)
+    else if i = j then
+      1
+    else
+      0
 
 /--
 The first `k + 1` scaffolded Gram-Schmidt basis rows as a standalone
