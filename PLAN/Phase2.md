@@ -19,6 +19,17 @@ These are not rubber-stamp coverage audits — they ask:
 - Are the theorem statements faithful to the SPEC? (Not "verbatim" — but
   do they capture the same mathematical content?)
 - Are there missing imports or DAG violations?
+- **Does every `def` / `structure` / `class` / `instance` body
+  actually implement the SPEC contract, or is it `sorry`?** Flag any
+  data-level body that returns the input unchanged, `0`,
+  `Matrix.identity`, `none`, an empty list, or similar trivial output
+  where the SPEC promises non-trivial computation. These are
+  "wrong-but-plausible" scaffolds — forbidden by
+  [PLAN/Phase1.md](Phase1.md) ("correct implementations, or honest
+  placeholders — no middle ground"). A reviewer flagging a wrong
+  scaffold is an acceptable Phase 2 outcome: open a follow-up issue
+  that rewrites the body as `sorry` (or implements it correctly), and
+  do not commit the `scaffolding-reviewed` token until the fix lands.
 
 ## Output
 
