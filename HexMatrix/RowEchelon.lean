@@ -43,6 +43,21 @@ instance instOne [Zero R] [One R] : One (Matrix R n n) where
 
 end Matrix
 
+namespace Vector
+
+open HexMatrix.Matrix
+
+variable {R : Type u}
+
+/-- Squared norm of a vector, defined via the dense-matrix dot product. -/
+def normSq [Zero R] [Add R] [Mul R] (v : Vector R n) : R :=
+  dot v v
+
+@[simp] theorem normSq_eq_dot [Zero R] [Add R] [Mul R] (v : Vector R n) :
+    Vector.normSq v = dot v v := rfl
+
+end Vector
+
 /-- Pure data extracted from row reduction. -/
 structure RowEchelonData (R : Type u) (n m : Nat) where
   rank : Nat
