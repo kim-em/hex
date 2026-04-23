@@ -44,6 +44,34 @@ The PascalCase form is a direct transliteration of the kebab-case
 name: each hyphen-separated segment becomes capitalised and joined
 (`hex-poly-z-mathlib` → `HexPolyZMathlib`).
 
+**Acronym exception.** Segments that are recognised acronyms keep
+all their letters upper-case rather than capitalising only the first.
+The current acronym list is:
+
+| kebab segment | PascalCase form |
+|---------------|-----------------|
+| `gf2`         | `GF2`           |
+| `lll`         | `LLL`           |
+| `gfq`         | `GFq`           |
+| `fp`          | `Fp`            |
+| `crt`         | `CRT`           |
+
+So `hex-gf2` → `HexGF2`, `hex-lll` → `HexLLL`, `hex-lll-mathlib`
+→ `HexLLLMathlib`, `hex-gfq-field` → `HexGFqField`. (`gfq` is
+"Galois field GF(q)" where `q = p^n` — the `q` is a variable, so
+lower-case; `fp` is "F_p" with `p` variable, lower-case.)
+
+Extend this table when adding libraries whose names involve further
+acronyms. Do not silently introduce a mixed-case spelling.
+
+> **Current state note (2026-04-23).** The existing modules
+> `HexGf2` / `HexGf2Mathlib` / `HexLll` / `HexLllMathlib` in the
+> repository predate this rule and still use the un-exceptioned
+> transliteration. A global rename PR will align them with this
+> convention; until that lands, agents must not rename these
+> identifiers in isolation. New libraries should follow the acronym
+> rule from the start.
+
 ### FFI
 
 Libraries that use `@[extern]` (e.g. `hex-arith` for GMP wrappers,
