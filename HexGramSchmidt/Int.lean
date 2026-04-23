@@ -52,9 +52,14 @@ open HexMatrix
 def castRow (v : Vector Int m) : Vector Rat m :=
   Vector.ofFn fun j => (v.get j : Rat)
 
-/-- The Gram-Schmidt basis scaffold currently casts each input row to `Rat`. -/
+/--
+Placeholder for the integer-input Gram-Schmidt basis.
+
+This surface promises the true orthogonalization from the SPEC; the
+implementation remains future work.
+-/
 noncomputable def basis (b : HexMatrix.Matrix Int n m) : HexMatrix.Matrix Rat n m :=
-  Vector.ofFn fun i => castRow (b.get i)
+  sorry
 
 /--
 The Gram-Schmidt coefficient scaffold is currently the identity matrix,

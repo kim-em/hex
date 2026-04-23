@@ -17,8 +17,8 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
   `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
   `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.gramDet`.
 - **Covered properties:**
-  - integer-input basis rows are the cast input rows on committed
-    examples, including the `basis_zero` theorem;
+  - integer-input basis satisfies the theorem-backed `basis_zero`
+    contract on committed fixtures;
   - integer coefficient checks stay on the theorem-backed diagonal and
     upper-triangular shape guarantees, including `coeffs_diag` and
     `coeffs_upper`;
@@ -94,14 +94,6 @@ private def adjacentSwapAdversarial : Matrix Int 3 2 :=
   matrixOfList2D! [[4, -1], [4, -1], [-8, 5]]
 
 /-! ## Integer basis and coefficients -/
-
-example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 1 = vectorOfList! [0, 3] := by
-  rfl
-
-example :
-    Matrix.row (GramSchmidt.Int.basis intEdge) 1 = vectorOfList! [0, 1] := by
-  rfl
 
 example :
     Matrix.row (GramSchmidt.Int.basis intTypical) 0 =
