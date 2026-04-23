@@ -17,9 +17,10 @@ Core arithmetic scaffolding.
 This root module re-exports the shared `UInt64` wide-word helpers and
 the Phase 1 Nat, Int, and `UInt64` extended-GCD, Barrett, and
 Montgomery reduction layers, the local binomial/Fermat `Nat` surface,
-the modular exponentiation API that downstream modular arithmetic code
-will build on, and the deterministic Phase 3 core conformance fixtures
-for `extGcd` and `powMod`.
+and the modular exponentiation API that downstream modular arithmetic
+code will build on. The `Conformance` module carries Phase 3 core
+profile checks; see [SPEC/testing.md](../SPEC/testing.md) for the
+per-library module contract this file satisfies.
 -/
 
 namespace HexArith

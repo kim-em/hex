@@ -1,179 +1,199 @@
+import HexArith.Barrett.Context
 import HexArith.ExtGcd
+import HexArith.Montgomery.Context
 import HexArith.PowMod
 
 /-!
-Deterministic core conformance fixtures for `HexArith`.
+# `HexArith` — core conformance
 
-This module records replayable Lean-side fixtures for the Phase 3 core
-profile, covering the `Nat`, `Int`, and `UInt64` extended-GCD entry
-points together with modular exponentiation.
+Deterministic Lean-only conformance checks for `HexArith`. Every
+check elaborates as part of `lake build HexArith`, so any regression
+fails CI immediately.
+
+**Conformance contract for this library:**
+
+- **Oracle:** `none`. Bézout identity, `Nat.gcd` agreement, and
+  `a ^ n % p` suffice as property oracles for the `core` profile.
+  Wiring an external oracle (python-flint for big-integer agreement
+  with GMP) is a follow-up.
+- **Mode:** `always`.
+- **Covered operations:** `HexArith.extGcd` (Nat), `HexArith.Int.extGcd`,
+  `HexArith.UInt64.extGcd`, `HexArith.powMod`, `HexArith.BarrettCtx.mulMod`,
+  `HexArith.MontCtx.toMont` / `fromMont` / `mulMont`.
+- **Covered properties:**
+  - Bézout: `extGcd a b = (g, s, t) ⇒ s * a + t * b = g` for all
+    three arithmetic entry points.
+  - `gcd` agreement: `(extGcd a b).1 = Nat.gcd a.natAbs b.natAbs`.
+  - `powMod a n p = a ^ n % p`.
+  - Barrett identity: `(ctx.mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat`.
+  - Montgomery round-trip: `ctx.fromMont (ctx.toMont a) = a` for `a < p`.
+  - Montgomery identity: `(ctx.mulMont a b).toNat = (a.toNat * b.toNat) % p.toNat`
+    for `a, b < p`.
+- **Covered edge cases:** `extGcd 0 0`, `extGcd 0 n`, `extGcd n 0`,
+  sign-mixed `Int` pairs; `powMod a 0 p`, `powMod _ _ 1`, `powMod 0 n p`;
+  Barrett with `p = 3` and `p = 65537`; Montgomery with odd `p = 5` and
+  `p = 97`.
+
+Reference implementation for the
+[Phase 3 per-library module contract](../SPEC/testing.md#per-library-module-contract).
+Other libraries' `Conformance.lean` should follow this shape:
+docstring contract declaration, then grouped `#guard_msgs in #eval`
+spot values, then `#guard` property assertions, covering each
+operation with ≥3 fixtures (typical / edge / adversarial).
 -/
 
 namespace HexArith
 namespace Conformance
 
-structure FixtureMetadata where
-  library : String
-  profile : String
-  seed : Nat
-deriving Repr
+/-! ## `HexArith.extGcd` on `Nat` -/
 
-structure NatExtGcdCase where
-  name : String
-  a : Nat
-  b : Nat
-  expectedGcd : Nat
-  expectedS : Int
-  expectedT : Int
-deriving Repr
+/-- info: (0, 1, 0) -/
+#guard_msgs in #eval HexArith.extGcd 0 0
 
-structure IntExtGcdCase where
-  name : String
-  a : Int
-  b : Int
-  expectedGcd : Nat
-  expectedS : Int
-  expectedT : Int
-deriving Repr
+/-- info: (7, 0, 1) -/
+#guard_msgs in #eval HexArith.extGcd 0 7
 
-structure UInt64ExtGcdCase where
-  name : String
-  a : Nat
-  b : Nat
-  expectedGcd : Nat
-  expectedS : Int
-  expectedT : Int
-deriving Repr
+/-- info: (6, 1, -2) -/
+#guard_msgs in #eval HexArith.extGcd 30 12
 
-structure PowModCase where
-  name : String
-  a : Nat
-  n : Nat
-  p : Nat
-  expected : Nat
-deriving Repr
+-- Bézout identity on each committed case.
+#guard let (g, s, t) := HexArith.extGcd 0 0;   s * 0 + t * 0 = g
+#guard let (g, s, t) := HexArith.extGcd 0 7;   s * 0 + t * 7 = g
+#guard let (g, s, t) := HexArith.extGcd 30 12; s * 30 + t * 12 = g
 
-def metadata : FixtureMetadata :=
-  { library := "HexArith", profile := "core", seed := 0 }
+-- Agreement with the stdlib `Nat.gcd`.
+#guard (HexArith.extGcd 0 0).1   = Nat.gcd 0 0
+#guard (HexArith.extGcd 0 7).1   = Nat.gcd 0 7
+#guard (HexArith.extGcd 30 12).1 = Nat.gcd 30 12
 
-def FixtureMetadata.serialized (m : FixtureMetadata) : String :=
-  s!"library={m.library};profile={m.profile};seed={m.seed}"
+/-! ## `Int` extended GCD — sign handling is the point
 
-def NatExtGcdCase.serialized (c : NatExtGcdCase) : String :=
-  s!"kind=nat-extgcd;name={c.name};a={c.a};b={c.b};g={c.expectedGcd};s={c.expectedS};t={c.expectedT}"
+`HexArith.Int.extGcd` is `@[extern "lean_hex_mpz_gcdext"]`; its GMP
+backend is linked for compiled code but not for the Lean interpreter,
+so `#eval` can only run the pure-Lean body `Hex.pureIntExtGcd`. We
+check the pure body directly and assert by `rfl` that the two agree,
+so any drift between the extern declaration and its body fails at
+elaboration. -/
 
-def IntExtGcdCase.serialized (c : IntExtGcdCase) : String :=
-  s!"kind=int-extgcd;name={c.name};a={c.a};b={c.b};g={c.expectedGcd};s={c.expectedS};t={c.expectedT}"
+example : HexArith.Int.extGcd = Hex.pureIntExtGcd := rfl
 
-def UInt64ExtGcdCase.serialized (c : UInt64ExtGcdCase) : String :=
-  s!"kind=uint64-extgcd;name={c.name};a={c.a};b={c.b};g={c.expectedGcd};s={c.expectedS};t={c.expectedT}"
+/-- info: (6, 1, 2) -/
+#guard_msgs in #eval Hex.pureIntExtGcd 30 (-12)
 
-def PowModCase.serialized (c : PowModCase) : String :=
-  s!"kind=powmod;name={c.name};a={c.a};n={c.n};p={c.p};value={c.expected}"
+/-- info: (6, -1, -2) -/
+#guard_msgs in #eval Hex.pureIntExtGcd (-30) 12
 
-def natExtGcd_zero_zero : NatExtGcdCase :=
-  { name := "nat-zero-zero", a := 0, b := 0, expectedGcd := 0, expectedS := 1, expectedT := 0 }
+/-- info: (7, 0, -1) -/
+#guard_msgs in #eval Hex.pureIntExtGcd 0 (-7)
 
-def natExtGcd_zero_rhs : NatExtGcdCase :=
-  { name := "nat-zero-rhs", a := 0, b := 7, expectedGcd := 7, expectedS := 0, expectedT := 1 }
+#guard let (g, s, t) := Hex.pureIntExtGcd 30 (-12); s * 30 + t * (-12) = (g : Int)
+#guard let (g, s, t) := Hex.pureIntExtGcd (-30) 12; s * (-30) + t * 12 = (g : Int)
+#guard let (g, s, t) := Hex.pureIntExtGcd 0 (-7);   s * 0 + t * (-7) = (g : Int)
 
-def natExtGcd_composite : NatExtGcdCase :=
-  { name := "nat-composite", a := 30, b := 12, expectedGcd := 6, expectedS := 1, expectedT := -2 }
+-- Agreement with stdlib `Int.gcd` (which returns the positive gcd).
+#guard (Hex.pureIntExtGcd 30 (-12)).1 = Int.gcd 30 (-12)
+#guard (Hex.pureIntExtGcd (-30) 12).1 = Int.gcd (-30) 12
+#guard (Hex.pureIntExtGcd 0 (-7)).1   = Int.gcd 0 (-7)
 
-def natExtGcd_cases : List NatExtGcdCase :=
-  [natExtGcd_zero_zero, natExtGcd_zero_rhs, natExtGcd_composite]
+/-! ## `HexArith.UInt64.extGcd` -/
 
-def intExtGcd_pos_neg : IntExtGcdCase :=
-  { name := "int-pos-neg", a := 30, b := -12, expectedGcd := 6, expectedS := 1, expectedT := 2 }
+/-- info: (0, 1, 0) -/
+#guard_msgs in #eval HexArith.UInt64.extGcd 0 0
 
-def intExtGcd_neg_pos : IntExtGcdCase :=
-  { name := "int-neg-pos", a := -30, b := 12, expectedGcd := 6, expectedS := -1, expectedT := -2 }
+/-- info: (7, 0, 1) -/
+#guard_msgs in #eval HexArith.UInt64.extGcd 0 7
 
-def intExtGcd_zero_neg : IntExtGcdCase :=
-  { name := "int-zero-neg", a := 0, b := -7, expectedGcd := 7, expectedS := 0, expectedT := -1 }
+/-- info: (6, -2, 3) -/
+#guard_msgs in #eval HexArith.UInt64.extGcd 42 30
 
-def intExtGcd_cases : List IntExtGcdCase :=
-  [intExtGcd_pos_neg, intExtGcd_neg_pos, intExtGcd_zero_neg]
+#guard let (g, s, t) := HexArith.UInt64.extGcd 0 0
+       s * (0 : Int) + t * (0 : Int) = Int.ofNat g.toNat
+#guard let (g, s, t) := HexArith.UInt64.extGcd 0 7
+       s * (0 : Int) + t * (7 : Int) = Int.ofNat g.toNat
+#guard let (g, s, t) := HexArith.UInt64.extGcd 42 30
+       s * (42 : Int) + t * (30 : Int) = Int.ofNat g.toNat
 
-def uint64ExtGcd_zero_zero : UInt64ExtGcdCase :=
-  { name := "uint64-zero-zero", a := 0, b := 0, expectedGcd := 0, expectedS := 1, expectedT := 0 }
+/-! ## `HexArith.powMod` -/
 
-def uint64ExtGcd_zero_rhs : UInt64ExtGcdCase :=
-  { name := "uint64-zero-rhs", a := 0, b := 7, expectedGcd := 7, expectedS := 0, expectedT := 1 }
+/-- info: 1 -/
+#guard_msgs in #eval HexArith.powMod 7 0 5     -- exponent zero
 
-def uint64ExtGcd_composite : UInt64ExtGcdCase :=
-  { name := "uint64-composite", a := 42, b := 30, expectedGcd := 6, expectedS := -2, expectedT := 3 }
+/-- info: 0 -/
+#guard_msgs in #eval HexArith.powMod 10 4 1    -- modulus one
 
-def uint64ExtGcd_cases : List UInt64ExtGcdCase :=
-  [uint64ExtGcd_zero_zero, uint64ExtGcd_zero_rhs, uint64ExtGcd_composite]
+/-- info: 8 -/
+#guard_msgs in #eval HexArith.powMod 5 3 13
 
-def powMod_zero_exp : PowModCase :=
-  { name := "powmod-zero-exp", a := 7, n := 0, p := 5, expected := 1 }
+/-- info: 9 -/
+#guard_msgs in #eval HexArith.powMod 42 5 17   -- base bigger than modulus
 
-def powMod_small : PowModCase :=
-  { name := "powmod-small", a := 5, n := 3, p := 13, expected := 8 }
+-- Agreement with the spec identity `a ^ n % p` (for `p > 0`).
+#guard HexArith.powMod 7 0 5     = 7 ^ 0 % 5
+#guard HexArith.powMod 10 4 1    = 10 ^ 4 % 1
+#guard HexArith.powMod 5 3 13    = 5 ^ 3 % 13
+#guard HexArith.powMod 42 5 17   = 42 ^ 5 % 17
+#guard HexArith.powMod 0 5 13    = 0 ^ 5 % 13
 
-def powMod_reduce_base : PowModCase :=
-  { name := "powmod-reduce-base", a := 42, n := 5, p := 17, expected := 9 }
+/-! ## `HexArith.BarrettCtx.mulMod`
 
-def powMod_unit_modulus : PowModCase :=
-  { name := "powmod-unit-modulus", a := 10, n := 4, p := 1, expected := 0 }
+The Barrett scaffold requires a proof that `1 < p < 2^32`. For
+concrete small moduli these are `by decide`. We commit one tiny
+modulus and one near the upper end of the Barrett range. -/
 
-def powMod_cases : List PowModCase :=
-  [powMod_zero_exp, powMod_small, powMod_reduce_base, powMod_unit_modulus]
+section Barrett
 
-def serializedFixtures : List String :=
-  [metadata.serialized] ++
-    natExtGcd_cases.map NatExtGcdCase.serialized ++
-    intExtGcd_cases.map IntExtGcdCase.serialized ++
-    uint64ExtGcd_cases.map UInt64ExtGcdCase.serialized ++
-    powMod_cases.map PowModCase.serialized
+private def barrett3 : BarrettCtx 3 :=
+  BarrettCtx.mk 3 (by decide) (by decide)
 
-def NatExtGcdCase.Valid (c : NatExtGcdCase) : Bool :=
-  let actual := HexArith.extGcd c.a c.b
-  (actual == (c.expectedGcd, c.expectedS, c.expectedT)) &&
-    (actual.1 == Nat.gcd c.a c.b) &&
-    (let (g, s, t) := actual
-     decide (s * c.a + t * c.b = g))
+private def barrett65537 : BarrettCtx 65537 :=
+  BarrettCtx.mk 65537 (by decide) (by decide)
 
-def IntExtGcdCase.Valid (c : IntExtGcdCase) : Bool :=
-  let actual := Hex.pureIntExtGcd c.a c.b
-  (actual == (c.expectedGcd, c.expectedS, c.expectedT)) &&
-    (actual.1 == Nat.gcd c.a.natAbs c.b.natAbs) &&
-    (let (g, s, t) := actual
-     decide (s * c.a + t * c.b = g))
+/-- info: 1 -/
+#guard_msgs in #eval (barrett3.mulMod 2 2).toNat     -- 4 % 3
 
-theorem intExtGcd_eq_pure (a b : Int) :
-    HexArith.Int.extGcd a b = Hex.pureIntExtGcd a b := by
-  rfl
+/-- info: 0 -/
+#guard_msgs in #eval (barrett3.mulMod 0 2).toNat     -- 0 % 3
 
-def UInt64ExtGcdCase.Valid (c : UInt64ExtGcdCase) : Bool :=
-  let actual := HexArith.UInt64.extGcd (.ofNat c.a) (.ofNat c.b)
-  (actual == (.ofNat c.expectedGcd, c.expectedS, c.expectedT)) &&
-    (actual.1.toNat == Nat.gcd c.a c.b) &&
-    (let (g, s, t) := actual
-     decide (s * Int.ofNat c.a + t * Int.ofNat c.b = Int.ofNat g.toNat))
+/-- info: 65536 -/
+#guard_msgs in #eval (barrett65537.mulMod 256 256).toNat  -- 65536 % 65537
 
-def PowModCase.Valid (c : PowModCase) : Bool :=
-  let actual := HexArith.powMod c.a c.n c.p
-  (actual == c.expected) && (actual == c.a ^ c.n % c.p)
+-- Barrett identity: `(mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat`.
+#guard (barrett3.mulMod 2 2).toNat     = (2 * 2) % 3
+#guard (barrett3.mulMod 0 2).toNat     = (0 * 2) % 3
+#guard (barrett3.mulMod 2 1).toNat     = (2 * 1) % 3
+#guard (barrett65537.mulMod 256 256).toNat = (256 * 256) % 65537
+#guard (barrett65537.mulMod 65536 2).toNat = (65536 * 2) % 65537
 
-#guard natExtGcd_zero_zero.Valid = true
-#guard natExtGcd_zero_rhs.Valid = true
-#guard natExtGcd_composite.Valid = true
+end Barrett
 
-#guard intExtGcd_pos_neg.Valid = true
-#guard intExtGcd_neg_pos.Valid = true
-#guard intExtGcd_zero_neg.Valid = true
+/-! ## `HexArith.MontCtx`
 
-#guard uint64ExtGcd_zero_zero.Valid = true
-#guard uint64ExtGcd_zero_rhs.Valid = true
-#guard uint64ExtGcd_composite.Valid = true
+Montgomery requires `p` odd. We commit a small `p = 5` and a larger
+`p = 97`; both round-trip `fromMont ∘ toMont = id` for representatives
+below `p`, and `mulMont` agrees with `a * b mod p` after `fromMont`. -/
 
-#guard powMod_zero_exp.Valid = true
-#guard powMod_small.Valid = true
-#guard powMod_reduce_base.Valid = true
-#guard powMod_unit_modulus.Valid = true
+section Montgomery
+
+private def mont5 : MontCtx 5   := MontCtx.mk 5 (by decide)
+private def mont97 : MontCtx 97 := MontCtx.mk 97 (by decide)
+
+-- Round-trip `fromMont (toMont a) = a` on representatives < p.
+#guard mont5.fromMont (mont5.toMont 0) = 0
+#guard mont5.fromMont (mont5.toMont 1) = 1
+#guard mont5.fromMont (mont5.toMont 4) = 4
+#guard mont97.fromMont (mont97.toMont 0)  = 0
+#guard mont97.fromMont (mont97.toMont 1)  = 1
+#guard mont97.fromMont (mont97.toMont 96) = 96
+
+-- `mulMont` represents `a * b mod p`: `fromMont (mulMont (toMont a) (toMont b)) = a * b mod p`.
+#guard mont5.fromMont (mont5.mulMont (mont5.toMont 3) (mont5.toMont 4)) = UInt64.ofNat ((3 * 4) % 5)
+#guard mont5.fromMont (mont5.mulMont (mont5.toMont 0) (mont5.toMont 4)) = UInt64.ofNat ((0 * 4) % 5)
+#guard mont97.fromMont (mont97.mulMont (mont97.toMont 50) (mont97.toMont 50))
+         = UInt64.ofNat ((50 * 50) % 97)
+#guard mont97.fromMont (mont97.mulMont (mont97.toMont 96) (mont97.toMont 96))
+         = UInt64.ofNat ((96 * 96) % 97)
+
+end Montgomery
 
 end Conformance
 end HexArith

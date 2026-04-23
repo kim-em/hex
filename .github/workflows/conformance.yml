@@ -1,11 +1,38 @@
 name: Conformance
 
 on:
+  push:
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  stub:
+  core:
+    name: core profile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Phase 0 stub; implement per SPEC/testing.md."
+      - run: python3 scripts/check_dag.py
+      - run: sudo apt-get install -y libgmp-dev
+      - uses: leanprover/lean-action@v1
+      # Every `HexFoo/Conformance.lean` is imported from `HexFoo.lean`,
+      # so `lake build` already elaborates every `#guard` / `#guard_msgs`
+      # check. We run each conformance module individually so a failure
+      # is visibly attributable to a single library.
+      - name: Elaborate all conformance modules
+        run: |
+          set -euo pipefail
+          failed=0
+          modules="$(git ls-files '*/Conformance.lean' | sed 's|/|.|g; s|\.lean$||')"
+          if [ -z "${modules}" ]; then
+            echo "No Conformance modules found. Phase 3 work has not yet landed."
+            exit 0
+          fi
+          for module in ${modules}; do
+            echo "::group::lake build ${module}"
+            if ! lake build "${module}"; then
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "${failed}"
