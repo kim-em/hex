@@ -3,9 +3,8 @@ import HexMatrix
 /-!
 Initial rational Gram-Schmidt scaffolding.
 
-This module introduces the Phase 1 `HexGramSchmidt` API slice for
-rational input matrices: the rational Gram-Schmidt basis, coefficient
-matrix, and Gram-determinant declarations used by downstream LLL work.
+This module introduces the executable rational-input Gram-determinant
+surface for `HexGramSchmidt`.
 -/
 
 namespace Hex
@@ -22,18 +21,6 @@ outside the matrix bounds.
 -/
 def row (M : HexMatrix.Matrix Rat n m) (i : Nat) : Vector Rat m :=
   if h : i < n then M.get ⟨i, h⟩ else 0
-
-/-- The rational-input Gram-Schmidt basis scaffold currently returns the input rows. -/
-noncomputable def basis (b : HexMatrix.Matrix Rat n m) : HexMatrix.Matrix Rat n m :=
-  b
-
-/--
-The rational-input coefficient scaffold is currently the identity
-matrix, giving the expected lower-unitriangular shape for this API
-slice.
--/
-noncomputable def coeffs (_b : HexMatrix.Matrix Rat n m) : HexMatrix.Matrix Rat n n :=
-  HexMatrix.Matrix.identity
 
 /-- The leading Gram matrix built from the first `k` rows of `b`. -/
 def gramMatrix (b : HexMatrix.Matrix Rat n m) (k : Nat) : HexMatrix.Matrix Rat k k :=
