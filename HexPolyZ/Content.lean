@@ -1,12 +1,15 @@
 import HexPolyZ.Core
 import Init.Data.Float
+import Batteries.Data.Nat.Basic
 
 /-!
 Integer-polynomial content and Mignotte-bound scaffolding.
 
 This module packages the generic integer `DensePoly` content API at the
-`HexPolyZ.ZPoly` surface and adds an executable Mignotte-bound
-computation built from binomial coefficients and the coefficient `2`-norm.
+`HexPolyZ.ZPoly` surface and adds executable Mignotte-bound helpers:
+an exact natural-number API for downstream factorization code and the
+original float-valued analytic formula built from binomial coefficients
+and the coefficient `2`-norm.
 -/
 namespace HexPolyZ
 
@@ -57,11 +60,37 @@ def coeffTwoNorm (f : ZPoly) : Float :=
   Float.sqrt f.coeffTwoNormSq.toFloat
 
 /--
+Ceiling of the coefficient `2`-norm, computed exactly from the squared
+norm using `Nat.sqrt`.
+-/
+def coeffTwoNormCeil (f : ZPoly) : Nat :=
+  let root := Nat.sqrt f.coeffTwoNormSq
+  if root ^ 2 = f.coeffTwoNormSq then
+    root
+  else
+    root + 1
+
+/--
 Executable coefficient bound for a degree-`k` factor of `f`, following
 Mignotte's binomial-times-`2`-norm formula.
 -/
 def mignotteBound (f : ZPoly) (k j : Nat) : Float :=
   (binomial k j).toFloat * coeffTwoNorm f
+
+/--
+Exact natural-number upper bound corresponding to the coefficientwise
+Mignotte formula `|g_j| ≤ binomial k j * ‖f‖₂`.
+-/
+def mignotteCoeffBound (f : ZPoly) (k j : Nat) : Nat :=
+  binomial k j * coeffTwoNormCeil f
+
+/--
+Uniform exact natural-number Mignotte bound for all coefficients of a
+degree-`k` factor of `f`, using the largest binomial coefficient at the
+middle index.
+-/
+def mignotteUniformBound (f : ZPoly) (k : Nat) : Nat :=
+  mignotteCoeffBound f k (k / 2)
 
 end ZPoly
 end HexPolyZ
