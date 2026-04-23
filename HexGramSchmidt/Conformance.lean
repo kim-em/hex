@@ -1,36 +1,27 @@
-import HexGramSchmidt.GramDet
-import HexGramSchmidt.Rat
+import HexGramSchmidt.Update
 
 /-!
-# `HexGramSchmidt` -- core conformance
+# `HexGramSchmidt` -- row-operation conformance
 
-Deterministic Lean-only conformance checks for the foundational
-Gram-Schmidt basis, coefficient, and Gram-determinant surface.
+Deterministic Lean-only conformance checks for the executable
+row-operation helpers in `Hex.GramSchmidt.Int`.
 
 **Conformance contract for this slice:**
 
 - **Oracle:** `none`.
 - **Mode:** `always`.
-- **Covered operations:** `Hex.GramSchmidt.Int.basis`,
-  `Hex.GramSchmidt.Int.coeffs`, `Hex.GramSchmidt.Int.gramDet`,
-  `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
-  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.coeffs`,
-  `Hex.GramSchmidt.Rat.gramDet`.
+- **Covered operations:** `Hex.GramSchmidt.Int.sizeReduce`,
+  `Hex.GramSchmidt.Int.adjacentSwap`.
 - **Covered properties:**
-  - integer-input basis rows are the cast input rows on committed
-    examples, including the `basis_zero` theorem;
-  - both integer and rational coefficient matrices stay identity on
-    committed examples, including `coeffs_diag` and `coeffs_upper`;
-  - integer and rational Gram determinants match the leading Gram-matrix
-    determinant on typical, edge, and adversarial fixtures;
-  - integer `gramDetVec` packages the full prefix determinant sequence;
-  - integer scaled coefficients agree with the determinant witnesses and
-    the `scaledCoeffs_eq` theorem on committed lower-triangular entries;
-  - integer `gramDet_eq_prod_normSq` matches the scaffolded
-    `basisNormSqProduct` on committed examples.
-- **Covered edge cases:** zero row prefixes, repeated rows producing a
-  zero Gram determinant, the `k = 0` Gram-determinant convention, and
-  diagonal/upper-triangular coefficient entries.
+  - `sizeReduce` agrees with `HexMatrix.Matrix.rowAdd` on committed
+    in-bounds fixtures;
+  - `adjacentSwap` agrees with `HexMatrix.Matrix.rowSwap` on committed
+    in-bounds fixtures;
+  - both operations are no-ops on the documented out-of-bounds index
+    cases.
+- **Covered edge cases:** zero-row matrices, `k = 0` for
+  `adjacentSwap`, out-of-bounds source/target indices for
+  `sizeReduce`, and sign-mixed/repeated-row fixtures.
 -/
 
 namespace HexGramSchmidt
@@ -38,17 +29,6 @@ namespace Conformance
 
 open HexMatrix
 open Hex
-
-noncomputable section
-
-private def serializeVector (v : Vector α n) : List α :=
-  v.toList
-
-private def serializeMatrix (M : Matrix α n m) : List (List α) :=
-  M.toList.map serializeVector
-
-private def serializeRatMatrix (M : Matrix Rat n m) : List (List Rat) :=
-  serializeMatrix M
 
 private def intRow2 (a0 a1 : Int) : Vector Int 2 :=
   Vector.ofFn fun i => if i.1 = 0 then a0 else a1
@@ -62,22 +42,10 @@ private def intRow3 (a0 a1 a2 : Int) : Vector Int 3 :=
     else
       a2
 
-private def ratRow2 (a0 a1 : Rat) : Vector Rat 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
-
-private def ratRow3 (a0 a1 a2 : Rat) : Vector Rat 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def intMat22
-    (a00 a01 : Int)
-    (a10 a11 : Int) : Matrix Int 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then intRow2 a00 a01 else intRow2 a10 a11
+private def intMat23
+    (a00 a01 a02 : Int)
+    (a10 a11 a12 : Int) : Matrix Int 2 3 :=
+  Vector.ofFn fun i => if i.1 = 0 then intRow3 a00 a01 a02 else intRow3 a10 a11 a12
 
 private def intMat32
     (a00 a01 : Int)
@@ -91,129 +59,66 @@ private def intMat32
     else
       intRow2 a20 a21
 
-private def ratMat22
-    (a00 a01 : Rat)
-    (a10 a11 : Rat) : Matrix Rat 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then ratRow2 a00 a01 else ratRow2 a10 a11
-
-private def ratMat32
-    (a00 a01 : Rat)
-    (a10 a11 : Rat)
-    (a20 a21 : Rat) : Matrix Rat 3 2 :=
+private def intMat33
+    (a00 a01 a02 : Int)
+    (a10 a11 a12 : Int)
+    (a20 a21 a22 : Int) : Matrix Int 3 3 :=
   Vector.ofFn fun i =>
     if i.1 = 0 then
-      ratRow2 a00 a01
+      intRow3 a00 a01 a02
     else if i.1 = 1 then
-      ratRow2 a10 a11
+      intRow3 a10 a11 a12
     else
-      ratRow2 a20 a21
+      intRow3 a20 a21 a22
 
-private def intTypical : Matrix Int 3 2 :=
-  intMat32 1 2 0 3 4 5
+private def intMat22
+    (a00 a01 : Int)
+    (a10 a11 : Int) : Matrix Int 2 2 :=
+  Vector.ofFn fun i => if i.1 = 0 then intRow2 a00 a01 else intRow2 a10 a11
 
-private def intEdge : Matrix Int 2 2 :=
-  intMat22 1 0 0 1
+private def sizeReduceTypical : Matrix Int 3 3 :=
+  intMat33 5 (-1) 2 0 3 4 7 8 (-6)
 
-private def intAdversarial : Matrix Int 2 2 :=
-  intMat22 1 2 1 2
+private def sizeReduceEdge : Matrix Int 2 3 :=
+  intMat23 0 0 0 0 0 0
 
-private def ratTypical : Matrix Rat 3 2 :=
-  ratMat32 1 2 (3 / 2) (-1) 0 5
+private def sizeReduceAdversarial : Matrix Int 3 2 :=
+  intMat32 2 (-3) 2 (-3) (-5) 11
 
-private def ratEdge : Matrix Rat 2 2 :=
-  ratMat22 1 0 0 1
+private def adjacentSwapTypical : Matrix Int 3 2 :=
+  intMat32 1 2 3 4 5 6
 
-private def ratAdversarial : Matrix Rat 2 2 :=
-  ratMat22 1 2 1 2
+private def adjacentSwapEdge : Matrix Int 2 2 :=
+  intMat22 9 (-2) 4 7
 
-/-! ## Integer basis and coefficients -/
+private def adjacentSwapAdversarial : Matrix Int 3 2 :=
+  intMat32 4 (-1) 4 (-1) (-8) 5
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 1 = ratRow2 0 3 := by
-  rfl
+/-! ## `sizeReduce` -/
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intEdge) 1 = ratRow2 0 1 := by
-  rfl
+#guard GramSchmidt.Int.sizeReduce sizeReduceTypical 2 0 3 =
+  Matrix.rowAdd sizeReduceTypical ⟨2, by decide⟩ ⟨0, by decide⟩ (-3)
 
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intTypical) =
-  [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+#guard GramSchmidt.Int.sizeReduce sizeReduceEdge 2 0 7 = sizeReduceEdge
 
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intAdversarial) =
-  [[1, 0], [0, 1]]
+#guard GramSchmidt.Int.sizeReduce sizeReduceAdversarial 2 3 (-2) =
+  sizeReduceAdversarial
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 0 =
-      GramSchmidt.Int.castRow (Matrix.row intTypical 0) := by
-  simpa using GramSchmidt.Int.basis_zero intTypical (by decide)
+#guard GramSchmidt.Int.sizeReduce sizeReduceAdversarial 1 0 (-2) =
+  Matrix.rowAdd sizeReduceAdversarial ⟨1, by decide⟩ ⟨0, by decide⟩ 2
 
-example :
-    Matrix.entry (GramSchmidt.Int.coeffs intTypical) 1 1 = 1 := by
-  simpa using GramSchmidt.Int.coeffs_diag intTypical 1 (by decide)
+/-! ## `adjacentSwap` -/
 
-example :
-    Matrix.entry (GramSchmidt.Int.coeffs intTypical) 1 2 = 0 := by
-  simpa using GramSchmidt.Int.coeffs_upper intTypical 1 2 (by decide) (by decide) (by decide)
+#guard GramSchmidt.Int.adjacentSwap adjacentSwapTypical 2 =
+  Matrix.rowSwap adjacentSwapTypical ⟨2, by decide⟩ ⟨1, by decide⟩
 
-/-! ## Integer Gram determinants -/
+#guard GramSchmidt.Int.adjacentSwap adjacentSwapEdge 0 = adjacentSwapEdge
 
-#guard GramSchmidt.Int.gramDet intTypical 0 (by decide) = 1
-#guard GramSchmidt.Int.gramDet intTypical 1 (by decide) = 5
-#guard GramSchmidt.Int.gramDet intTypical 2 (by decide) = 9
-#guard GramSchmidt.Int.gramDet intEdge 2 (by decide) = 1
-#guard GramSchmidt.Int.gramDet intAdversarial 2 (by decide) = 0
+#guard GramSchmidt.Int.adjacentSwap adjacentSwapAdversarial 3 =
+  adjacentSwapAdversarial
 
-#guard (GramSchmidt.Int.gramDetVec intTypical).toList = [1, 5, 9, 0]
-#guard (GramSchmidt.Int.gramDetVec intEdge).toList = [1, 1, 1]
-#guard (GramSchmidt.Int.gramDetVec intAdversarial).toList = [1, 5, 0]
+#guard GramSchmidt.Int.adjacentSwap adjacentSwapAdversarial 1 =
+  Matrix.rowSwap adjacentSwapAdversarial ⟨1, by decide⟩ ⟨0, by decide⟩
 
-example :
-    (GramSchmidt.Int.gramDet intTypical 2 (by decide) : Rat) =
-      GramSchmidt.Int.basisNormSqProduct intTypical 2 := by
-  simpa using
-    (GramSchmidt.Int.gramDet_eq_prod_normSq intTypical trivial 2 (by decide))
-
-/-! ## Integer scaled coefficients -/
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intTypical) =
-  [[0, 0, 0], [6, 0, 0], [14, -9, 0]]
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intEdge) =
-  [[0, 0], [0, 0]]
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intAdversarial) =
-  [[0, 0], [5, 0]]
-
-example :
-    ((Matrix.entry (GramSchmidt.Int.scaledCoeffs intTypical) 2 1 : Int) : Rat) =
-      (GramSchmidt.Int.gramDet intTypical 2 (by decide) : Rat) *
-        Matrix.entry (GramSchmidt.Int.coeffs intTypical) 2 1 := by
-  simpa using GramSchmidt.Int.scaledCoeffs_eq intTypical 2 1 (by decide) (by decide)
-
-/-! ## Rational basis, coefficients, and Gram determinants -/
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratTypical) 1 = ratRow2 (3 / 2) (-1) := by
-  rfl
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = ratRow2 0 1 := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratTypical) 2 2 = 1 := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratAdversarial) 0 1 = 0 := by
-  rfl
-
-#guard GramSchmidt.Rat.gramDet ratTypical 0 (by decide) = 1
-#guard GramSchmidt.Rat.gramDet ratTypical 1 (by decide) = 5
-#guard GramSchmidt.Rat.gramDet ratTypical 2 (by decide) = 16
-#guard GramSchmidt.Rat.gramDet ratEdge 2 (by decide) = 1
-#guard GramSchmidt.Rat.gramDet ratAdversarial 2 (by decide) = 0
-
-end
 end Conformance
 end HexGramSchmidt
