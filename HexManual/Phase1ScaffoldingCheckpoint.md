@@ -45,8 +45,8 @@ The current follow-on work remains tracked separately and should be read as the 
 `scripts/status.py` still reports the three active libraries as `Ready` rather than complete, so every downstream library remains blocked on one or more of these fronts.
 
 - Blocked on `HexArith`: `HexModArith`, `HexPolyFp`, `HexModArithMathlib`, `HexBerlekampMathlib`.
-- Blocked on `HexPoly`: `HexGf2`, `HexPolyZ`, `HexPolyFp`, `HexPolyMathlib`, `HexHensel`, `HexGf2Mathlib`, `HexPolyZMathlib`, `HexHenselMathlib`, `HexBerlekampZassenhaus`, `HexBerlekampZassenhausMathlib`.
+- Blocked on `HexPoly`: `HexGF2`, `HexPolyZ`, `HexPolyFp`, `HexPolyMathlib`, `HexHensel`, `HexGF2Mathlib`, `HexPolyZMathlib`, `HexHenselMathlib`, `HexBerlekampZassenhaus`, `HexBerlekampZassenhausMathlib`.
 - Blocked on `HexMatrix`: `HexGramSchmidt`, `HexBerlekamp`, `HexMatrixMathlib`.
-- Transitively blocked beyond those: `HexLll`, `HexGramSchmidtMathlib`, `HexGfqRing`, `HexGfqField`, `HexConway`, `HexGfq`, and `HexGfqMathlib`.
+- Transitively blocked beyond those: `HexLLL`, `HexGramSchmidtMathlib`, `HexGfqRing`, `HexGfqField`, `HexConway`, `HexGfq`, and `HexGfqMathlib`.
 
 No library is yet marked fully done in `scripts/status.py`.

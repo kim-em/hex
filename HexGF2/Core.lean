@@ -26,7 +26,7 @@ def pureClmul (a b : UInt64) : UInt64 × UInt64 := Id.run do
 
 end Hex
 
-namespace HexGf2
+namespace HexGF2
 
 /--
 Polynomial over `GF(2)`, packed into 64-bit words.
@@ -52,4 +52,4 @@ attachment replaces it at runtime when the C shim is available.
 def clmul (a b : @& UInt64) : UInt64 × UInt64 :=
   Hex.pureClmul a b
 
-end HexGf2
+end HexGF2

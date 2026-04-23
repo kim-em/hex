@@ -1,5 +1,5 @@
 import Init.Grind.Ring.Field
-import HexGf2.Gcd
+import HexGF2.Gcd
 
 /-!
 Executable quotient arithmetic for large-degree packed `GF(2^n)` extensions.
@@ -11,7 +11,7 @@ reduction modulo the packed irreducible polynomial, executable `Zero`/`One`/
 that quotient presentation.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2nPoly
 
@@ -376,4 +376,4 @@ instance instField : Field (GF2nPoly f hirr) where
 
 end GF2nPoly
 
-end HexGf2
+end HexGF2

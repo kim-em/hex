@@ -1,9 +1,9 @@
 import HexGramSchmidt
 
 /-!
-Core `HexLll` scaffolding.
+Core `HexLLL` scaffolding.
 
-This module introduces the first `HexLll` API slice promised by the
+This module introduces the first `HexLLL` API slice promised by the
 specification: integer-lattice membership for row spans together with
 the positivity-based independence predicate that later LLL state and
 algorithm code use to assume nondegenerate Gram-Schmidt data.

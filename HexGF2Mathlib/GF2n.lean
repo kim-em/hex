@@ -1,16 +1,16 @@
 import Mathlib.Algebra.Field.MinimalAxioms
 import Mathlib.Data.Fintype.Card
 import Mathlib.Data.Fintype.OfMap
-import HexGf2.GF2n
+import HexGF2.GF2n
 
 /-!
 Mathlib bridge scaffolding for the small-word `GF2n` carrier.
 
 This module adds the `Fintype` and `Field` instances promised by the
-Phase 1 spec on top of the executable arithmetic defined in `HexGf2.GF2n`.
+Phase 1 spec on top of the executable arithmetic defined in `HexGF2.GF2n`.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2n
 
@@ -71,4 +71,4 @@ noncomputable instance {n : Nat} {irr : UInt64}
 
 end GF2n
 
-end HexGf2
+end HexGF2

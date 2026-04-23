@@ -6,9 +6,9 @@ defaultTargets = [
   "HexMatrix",
   "HexModArith",
   "HexGramSchmidt",
-  "HexGf2",
+  "HexGF2",
   "HexPolyZ",
-  "HexLll",
+  "HexLLL",
   "HexPolyFp",
   "HexGfqRing",
   "HexGfqField",
@@ -22,10 +22,10 @@ defaultTargets = [
   "HexModArithMathlib",
   "HexGramSchmidtMathlib",
   "HexPolyZMathlib",
-  "HexLllMathlib",
+  "HexLLLMathlib",
   "HexBerlekampMathlib",
   "HexHenselMathlib",
-  "HexGf2Mathlib",
+  "HexGF2Mathlib",
   "HexGfqMathlib",
   "HexBerlekampZassenhausMathlib",
   "HexManual",
@@ -58,14 +58,14 @@ name = "HexModArith"
 name = "HexGramSchmidt"
 
 [[lean_lib]]
-name = "HexGf2"
-moreLinkArgs = ["HexGf2/ffi/clmul.c"]
+name = "HexGF2"
+moreLinkArgs = ["HexGF2/ffi/clmul.c"]
 
 [[lean_lib]]
 name = "HexPolyZ"
 
 [[lean_lib]]
-name = "HexLll"
+name = "HexLLL"
 
 [[lean_lib]]
 name = "HexPolyFp"
@@ -112,7 +112,7 @@ name = "HexPolyZMathlib"
 needs = ["@mathlib"]
 
 [[lean_lib]]
-name = "HexLllMathlib"
+name = "HexLLLMathlib"
 needs = ["@mathlib"]
 
 [[lean_lib]]
@@ -124,7 +124,7 @@ name = "HexHenselMathlib"
 needs = ["@mathlib"]
 
 [[lean_lib]]
-name = "HexGf2Mathlib"
+name = "HexGF2Mathlib"
 needs = ["@mathlib"]
 
 [[lean_lib]]
@@ -144,9 +144,9 @@ needs = [
   "HexMatrix",
   "HexModArith",
   "HexGramSchmidt",
-  "HexGf2",
+  "HexGF2",
   "HexPolyZ",
-  "HexLll",
+  "HexLLL",
   "HexPolyFp",
   "HexGfqRing",
   "HexGfqField",
@@ -160,10 +160,10 @@ needs = [
   "HexModArithMathlib",
   "HexGramSchmidtMathlib",
   "HexPolyZMathlib",
-  "HexLllMathlib",
+  "HexLLLMathlib",
   "HexBerlekampMathlib",
   "HexHenselMathlib",
-  "HexGf2Mathlib",
+  "HexGF2Mathlib",
   "HexGfqMathlib",
   "HexBerlekampZassenhausMathlib",
 ]

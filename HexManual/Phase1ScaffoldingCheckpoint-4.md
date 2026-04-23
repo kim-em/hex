@@ -10,10 +10,10 @@ This checkpoint records the next merge wave now on `main` after `HexManual/Phase
 - PR `#114`: `HexGramSchmidt/Rat.lean` adds the rational-basis and coefficient API layer.
 - PR `#125`: `HexGramSchmidt/Update.lean` adds the size-reduction and adjacent-swap update scaffold.
 
-### `HexGf2`
+### `HexGF2`
 
-- PR `#108`: `HexGf2/FiniteExtension.lean` adds the packed finite-extension carrier records.
-- PR `#123`: `HexGf2/Ops.lean` adds normalization, XOR-based addition, and shift operations for packed `GF2Poly` values.
+- PR `#108`: `HexGF2/FiniteExtension.lean` adds the packed finite-extension carrier records.
+- PR `#123`: `HexGF2/Ops.lean` adds normalization, XOR-based addition, and shift operations for packed `GF2Poly` values.
 
 ### `HexPolyZ`
 
@@ -33,7 +33,7 @@ This checkpoint records the next merge wave now on `main` after `HexManual/Phase
 
 ## Current frontier
 
-- `HexModArith`, `HexGf2`, and `HexMatrixMathlib` remain the most visible Phase 1 scaffolding fronts on the active queue. `HexModArith` just absorbed two back-to-back scaffolding PRs, `HexGf2` is waiting on the focused multiplication slice from issue `#128`, and `HexMatrixMathlib` still has its determinant bridge issue `#117` in flight.
+- `HexModArith`, `HexGF2`, and `HexMatrixMathlib` remain the most visible Phase 1 scaffolding fronts on the active queue. `HexModArith` just absorbed two back-to-back scaffolding PRs, `HexGF2` is waiting on the focused multiplication slice from issue `#128`, and `HexMatrixMathlib` still has its determinant bridge issue `#117` in flight.
 - The conformance-testing queue is now anchored by `HexArith`, `HexPoly`, and `HexMatrix`, which `python3 scripts/status.py` reports as ready for `PLAN/Phase3.md`.
 - Two additional Phase 1 fronts are also ready and should not be overlooked: `HexGramSchmidt` remains open after its determinant/rational/update merge wave, and `HexPolyZMathlib` has become newly ready now that `HexPolyZ.done_through` advanced.
 
@@ -46,7 +46,7 @@ This checkpoint records the next merge wave now on `main` after `HexManual/Phase
 - `HexMatrix -> Phase 3`
 - `HexModArith -> Phase 1`
 - `HexGramSchmidt -> Phase 1`
-- `HexGf2 -> Phase 1`
+- `HexGF2 -> Phase 1`
 - `HexMatrixMathlib -> Phase 1`
 - `HexPolyZMathlib -> Phase 1`
 
@@ -54,9 +54,9 @@ The remaining libraries are blocked, with immediate blockers grouped as follows:
 
 - Waiting on `HexPoly.done_through >= 3`: `HexPolyZ`, `HexPolyMathlib`
 - Waiting on `HexModArith.done_through >= 1`: `HexPolyFp`, `HexModArithMathlib`
-- Waiting on `HexGramSchmidt.done_through >= 1`: `HexLll`, `HexGramSchmidtMathlib`
+- Waiting on `HexGramSchmidt.done_through >= 1`: `HexLLL`, `HexGramSchmidtMathlib`
 - Waiting on `HexPolyFp.done_through >= 1`: `HexGfqRing`, `HexHensel`
-- Waiting on combined Phase 1 prerequisites: `HexBerlekamp`, `HexGf2Mathlib`, `HexBerlekampMathlib`, `HexBerlekampZassenhausMathlib`
-- Waiting on later downstream combinations: `HexGfqField`, `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexLllMathlib`, `HexHenselMathlib`, `HexGfqMathlib`
+- Waiting on combined Phase 1 prerequisites: `HexBerlekamp`, `HexGF2Mathlib`, `HexBerlekampMathlib`, `HexBerlekampZassenhausMathlib`
+- Waiting on later downstream combinations: `HexGfqField`, `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexLLLMathlib`, `HexHenselMathlib`, `HexGfqMathlib`
 
 No library is fully done yet.
