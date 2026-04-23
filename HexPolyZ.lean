@@ -1,4 +1,5 @@
 import HexPolyZ.Content
+import HexPolyZ.Conformance
 
 /-!
 Integer polynomial declarations.
