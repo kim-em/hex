@@ -59,6 +59,7 @@ name = "HexGramSchmidt"
 
 [[lean_lib]]
 name = "HexGf2"
+moreLinkArgs = ["HexGf2/ffi/clmul.c"]
 
 [[lean_lib]]
 name = "HexPolyZ"
