@@ -9,7 +9,7 @@ example that exercises the advertised user story end-to-end.
 ### Release 1: Finite-field constructor
 
 - **Libraries:** `HexModArith`, `HexPoly`, `HexPolyFp`, `HexGfqRing`,
-  `HexGfqField`, `HexGf2`
+  `HexGfqField`, `HexGF2`
 - **User story:** Users can construct quotient rings `F_p[x]/f` for any
   `f`, and finite fields `GF(p^n)` from a user-supplied irreducibility
   proof.
@@ -47,7 +47,7 @@ example that exercises the advertised user story end-to-end.
 
 ### Release 4: Polynomial-time capstone
 
-- **Libraries:** Release 3 + `HexLll` (integrated into the
+- **Libraries:** Release 3 + `HexLLL` (integrated into the
   Berlekamp-Zassenhaus pipeline)
 - **User story:** The full polynomial-time Berlekamp-Zassenhaus
   pipeline is available, and finite-field/irreducibility workflows no

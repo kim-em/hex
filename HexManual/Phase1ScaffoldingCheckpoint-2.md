@@ -44,7 +44,7 @@ Current root re-export: `HexMatrix.lean`.
 
 `python3 scripts/status.py` now shows three downstream libraries newly ready for Phase 1 scaffolding because `HexPoly` is no longer the blocker:
 
-- `HexGf2`
+- `HexGF2`
 - `HexPolyZ`
 - `HexPolyMathlib`
 
@@ -53,6 +53,6 @@ The remaining blocked libraries are:
 - Blocked on `HexArith.done_through >= 1`: `HexModArith`
 - Blocked on `HexMatrix.done_through >= 1`: `HexGramSchmidt`, `HexMatrixMathlib`
 - Blocked on `HexModArith.done_through >= 1`: `HexPolyFp`, `HexModArithMathlib`
-- Blocked on later dependencies downstream of those roots: `HexLll`, `HexGfqRing`, `HexGfqField`, `HexBerlekamp`, `HexHensel`, `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexGramSchmidtMathlib`, `HexPolyZMathlib`, `HexLllMathlib`, `HexBerlekampMathlib`, `HexHenselMathlib`, `HexGf2Mathlib`, `HexGfqMathlib`, `HexBerlekampZassenhausMathlib`
+- Blocked on later dependencies downstream of those roots: `HexLLL`, `HexGfqRing`, `HexGfqField`, `HexBerlekamp`, `HexHensel`, `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexGramSchmidtMathlib`, `HexPolyZMathlib`, `HexLLLMathlib`, `HexBerlekampMathlib`, `HexHenselMathlib`, `HexGF2Mathlib`, `HexGfqMathlib`, `HexBerlekampZassenhausMathlib`
 
 In short: `HexPoly` has moved past Phase 1, `HexArith` is ready for review, and `HexMatrix` is down to the residual declarations tracked in `#61`.

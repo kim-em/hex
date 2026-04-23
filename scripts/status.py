@@ -26,7 +26,7 @@ PHASES = {
 
 RELEASES = {
     1: {
-        "libraries": ["HexModArith", "HexPoly", "HexPolyFp", "HexGfqRing", "HexGfqField", "HexGf2"],
+        "libraries": ["HexModArith", "HexPoly", "HexPolyFp", "HexGfqRing", "HexGfqField", "HexGF2"],
         "example": ROOT / "Examples" / "Release1.lean",
     },
     2: {
@@ -36,7 +36,7 @@ RELEASES = {
             "HexPolyFp",
             "HexGfqRing",
             "HexGfqField",
-            "HexGf2",
+            "HexGF2",
             "HexBerlekamp",
             "HexBerlekampMathlib",
             "HexConway",
@@ -51,7 +51,7 @@ RELEASES = {
             "HexPolyFp",
             "HexGfqRing",
             "HexGfqField",
-            "HexGf2",
+            "HexGF2",
             "HexBerlekamp",
             "HexBerlekampMathlib",
             "HexConway",
@@ -69,7 +69,7 @@ RELEASES = {
             "HexPolyFp",
             "HexGfqRing",
             "HexGfqField",
-            "HexGf2",
+            "HexGF2",
             "HexBerlekamp",
             "HexBerlekampMathlib",
             "HexConway",
@@ -77,7 +77,7 @@ RELEASES = {
             "HexPolyZ",
             "HexHensel",
             "HexBerlekampZassenhaus",
-            "HexLll",
+            "HexLLL",
         ],
         "example": ROOT / "Examples" / "Release4.lean",
     },
@@ -168,8 +168,9 @@ def validate_against_lakefile(libraries: dict[str, dict[str, object]]) -> None:
 
 
 def spec_path(library: str) -> str:
-    parts = re.findall(r"[A-Z][a-z0-9]*", library)
-    return "SPEC/Libraries/" + "-".join(part.lower() for part in parts) + ".md"
+    kebab = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "-", library)
+    kebab = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "-", kebab)
+    return f"SPEC/Libraries/{kebab.lower()}.md"
 
 
 def evaluate_phase(library: str, data: dict[str, object], libraries: dict[str, dict[str, object]]) -> PhaseState:

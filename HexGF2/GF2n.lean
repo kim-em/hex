@@ -1,4 +1,4 @@
-import HexGf2.FiniteExtension
+import HexGF2.FiniteExtension
 
 /-!
 Executable small-word arithmetic for packed `GF(2^n)` extensions.
@@ -7,10 +7,10 @@ This module adds the Phase 1 operation layer for the single-word `GF2n`
 carrier. Addition is XOR on representatives; multiplication uses the
 carry-less `clmul` boundary followed by executable reduction modulo the
 implicit monic irreducible `x^n + irr`. Mathlib-facing `Field` and
-`Fintype` scaffolding for this carrier lives in `HexGf2Mathlib.GF2n`.
+`Fintype` scaffolding for this carrier lives in `HexGF2Mathlib.GF2n`.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2n
 
@@ -209,4 +209,4 @@ theorem mul_inv_cancel {n : Nat} {irr : UInt64}
 
 end GF2n
 
-end HexGf2
+end HexGF2

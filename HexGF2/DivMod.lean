@@ -1,4 +1,4 @@
-import HexGf2.Mul
+import HexGF2.Mul
 
 /-!
 Packed polynomial division scaffolding for `GF(2)`.
@@ -8,7 +8,7 @@ existing XOR and shift operations. The algebraic correctness proofs remain
 Phase 1 scaffolding obligations.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2Poly
 
@@ -95,4 +95,4 @@ theorem mod_degree_lt (dividend divisor : GF2Poly)
 
 end GF2Poly
 
-end HexGf2
+end HexGF2

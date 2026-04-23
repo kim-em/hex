@@ -1,4 +1,4 @@
-import HexGf2.DivMod
+import HexGF2.DivMod
 
 /-!
 Packed Euclidean scaffolding for `GF(2)` polynomials.
@@ -8,7 +8,7 @@ operations for `GF2Poly` on top of packed division with remainder. The
 algebraic correctness theorems remain Phase 1 scaffolding obligations.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2Poly
 
@@ -106,4 +106,4 @@ theorem xgcd_step_degree_lt (f g : GF2Poly)
 
 end GF2Poly
 
-end HexGf2
+end HexGF2

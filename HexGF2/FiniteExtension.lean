@@ -1,4 +1,4 @@
-import HexGf2.Core
+import HexGF2.Core
 
 /-!
 Finite-extension carrier scaffolding for packed `GF(2)` arithmetic.
@@ -8,7 +8,7 @@ small- and large-degree carrier records used for `GF(2^n)` elements.
 Executable reduction and irreducibility checking land in later issues.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2Poly
 
@@ -42,7 +42,7 @@ def ofUInt64Monic (lower : UInt64) (n : Nat) : GF2Poly :=
 Scaffold irreducibility predicate for packed `GF(2)` polynomials.
 
 The full algebraic notion depends on division and gcd infrastructure that is
-deliberately deferred to later `HexGf2` issues. Phase 1 records the intended
+deliberately deferred to later `HexGF2` issues. Phase 1 records the intended
 nontriviality boundary needed by carrier signatures.
 -/
 def Irreducible (f : GF2Poly) : Prop :=
@@ -66,10 +66,10 @@ structure GF2n (n : Nat) (irr : UInt64)
 Packed `GF(2^n)` carrier for arbitrary-degree irreducible moduli.
 
 The reduction invariant is stated here; executable quotient arithmetic and
-field scaffolding over this carrier live in `HexGf2.GF2nPoly`.
+field scaffolding over this carrier live in `HexGF2.GF2nPoly`.
 -/
 structure GF2nPoly (f : GF2Poly) (hirr : GF2Poly.Irreducible f) where
   val : GF2Poly
   val_reduced : val.IsZero ∨ val.degree < f.degree
 
-end HexGf2
+end HexGF2

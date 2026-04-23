@@ -1,4 +1,4 @@
-import HexGf2.FiniteExtension
+import HexGF2.FiniteExtension
 
 /-!
 Executable packed-polynomial operations for `GF(2)`.
@@ -8,7 +8,7 @@ packed words, wordwise XOR addition, and shifts corresponding to
 multiplication or division by `x^k`.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2Poly
 
@@ -153,4 +153,4 @@ theorem shiftRight_zero (f : GF2Poly) : shiftRight f 0 = f := by
 
 end GF2Poly
 
-end HexGf2
+end HexGF2

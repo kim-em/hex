@@ -34,9 +34,9 @@ This checkpoint records the next scaffolding merge wave now on `main` after `Hex
 
 - PR `#85`: `HexPolyZ/Core.lean` adds the `ZPoly` alias together with the initial congruence and coprimality-over-`ZMod p` scaffold.
 
-### `HexGf2`
+### `HexGF2`
 
-- PR `#96`: `HexGf2/Core.lean` and `HexGf2/ffi/clmul.c` add the packed `GF2Poly` core plus the carry-less multiply FFI boundary and fallback implementation.
+- PR `#96`: `HexGF2/Core.lean` and `HexGF2/ffi/clmul.c` add the packed `GF2Poly` core plus the carry-less multiply FFI boundary and fallback implementation.
 
 ### `HexGramSchmidt`
 
@@ -57,7 +57,7 @@ This checkpoint records the next scaffolding merge wave now on `main` after `Hex
 - `HexPoly -> Phase 3`
 - `HexMatrix -> Phase 3`
 - `HexGramSchmidt -> Phase 1`
-- `HexGf2 -> Phase 1`
+- `HexGF2 -> Phase 1`
 - `HexPolyZ -> Phase 1`
 - `HexPolyMathlib -> Phase 1`
 - `HexMatrixMathlib -> Phase 1`
@@ -65,11 +65,11 @@ This checkpoint records the next scaffolding merge wave now on `main` after `Hex
 The remaining libraries are still blocked, with the immediate blockers grouped as follows:
 
 - Waiting on `HexArith.done_through >= 1`: `HexModArith`
-- Waiting on `HexGramSchmidt.done_through >= 1`: `HexLll`
+- Waiting on `HexGramSchmidt.done_through >= 1`: `HexLLL`
 - Waiting on `HexModArith.done_through >= 1`: `HexPolyFp`, `HexModArithMathlib`
-- Waiting on `HexPolyFp.done_through >= 1`: `HexGfqRing`, `HexGf2Mathlib`
+- Waiting on `HexPolyFp.done_through >= 1`: `HexGfqRing`, `HexGF2Mathlib`
 - Waiting on `HexGfqRing.done_through >= 1`: `HexGfqField`, `HexBerlekamp`
 - Waiting on `HexPolyZ.done_through >= 1`: `HexHensel`, `HexPolyZMathlib`
-- Waiting on later downstream combinations: `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexGramSchmidtMathlib`, `HexLllMathlib`, `HexBerlekampMathlib`, `HexHenselMathlib`, `HexGfqMathlib`, `HexBerlekampZassenhausMathlib`
+- Waiting on later downstream combinations: `HexConway`, `HexGfq`, `HexBerlekampZassenhaus`, `HexGramSchmidtMathlib`, `HexLLLMathlib`, `HexBerlekampMathlib`, `HexHenselMathlib`, `HexGfqMathlib`, `HexBerlekampZassenhausMathlib`
 
 No library is fully done yet.

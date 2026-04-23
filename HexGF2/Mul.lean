@@ -1,4 +1,4 @@
-import HexGf2.Ops
+import HexGF2.Ops
 
 /-!
 Packed multiplication scaffolding for `GF(2)` polynomials.
@@ -8,7 +8,7 @@ word-array multiplication built from the `clmul` boundary together with the
 public polynomial multiplication operation and its initial theorem surface.
 -/
 
-namespace HexGf2
+namespace HexGF2
 
 namespace GF2Poly
 
@@ -89,4 +89,4 @@ theorem mul_zero (f : GF2Poly) :
 
 end GF2Poly
 
-end HexGf2
+end HexGF2
