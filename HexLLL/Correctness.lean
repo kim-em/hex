@@ -49,9 +49,9 @@ theorem lll_short_vector (b : HexMatrix.Matrix Int n m) (δ : Rat)
     (hδ : 1 / 4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hli : b.independent)
     (v : Vector Int m) :
     b.memLattice v → v ≠ 0 →
-      HexMatrix.Vector.normSq
-          (Hex.GramSchmidt.Int.castRow (HexMatrix.Matrix.row (lll b δ hδ hδ' hn hli) 0)) ≤
-        shortVectorFactor δ ^ (n - 1) * HexMatrix.Vector.normSq (Hex.GramSchmidt.Int.castRow v) := by
+      ((HexMatrix.Vector.normSq
+          (HexMatrix.Matrix.row (R := Int) (n := n) (m := m) (lll b δ hδ hδ' hn hli) 0) : Int) : Rat) ≤
+        shortVectorFactor δ ^ (n - 1) * HexMatrix.Vector.normSq v := by
   sorry
 
 end HexLLL
