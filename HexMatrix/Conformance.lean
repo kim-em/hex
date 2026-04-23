@@ -57,78 +57,11 @@ private def serializeMatrix (M : Matrix Int n m) : List (List Int) :=
 private def serializeBasis (B : Vector (Vector α m) n) : List (List α) :=
   B.toList.map serializeVector
 
-private def intRow2 (a0 a1 : Int) : Vector Int 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
+private def vectorOfList! [Inhabited α] (xs : List α) : Vector α n :=
+  (Vector.ofList? (n := n) xs).get!
 
-private def intRow3 (a0 a1 a2 : Int) : Vector Int 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def intMat2
-    (a00 a01 : Int)
-    (a10 a11 : Int) : Matrix Int 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then intRow2 a00 a01 else intRow2 a10 a11
-
-private def intMat3
-    (a00 a01 a02 : Int)
-    (a10 a11 a12 : Int)
-    (a20 a21 a22 : Int) : Matrix Int 3 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      intRow3 a00 a01 a02
-    else if i.1 = 1 then
-      intRow3 a10 a11 a12
-    else
-      intRow3 a20 a21 a22
-
-private def ratRow1 (a0 : Rat) : Vector Rat 1 :=
-  Vector.ofFn fun _ => a0
-
-private def ratRow2 (a0 a1 : Rat) : Vector Rat 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
-
-private def ratRow3 (a0 a1 a2 : Rat) : Vector Rat 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def ratMat11 (a00 : Rat) : Matrix Rat 1 1 :=
-  Vector.ofFn fun _ => ratRow1 a00
-
-private def ratMat23
-    (a00 a01 a02 : Rat)
-    (a10 a11 a12 : Rat) : Matrix Rat 2 3 :=
-  Vector.ofFn fun i => if i.1 = 0 then ratRow3 a00 a01 a02 else ratRow3 a10 a11 a12
-
-private def ratMat32
-    (a00 a01 : Rat)
-    (a10 a11 : Rat)
-    (a20 a21 : Rat) : Matrix Rat 3 2 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      ratRow2 a00 a01
-    else if i.1 = 1 then
-      ratRow2 a10 a11
-    else
-      ratRow2 a20 a21
-
-private def ratVec1 (a0 : Rat) : Vector Rat 1 :=
-  ratRow1 a0
-
-private def ratVec2 (a0 a1 : Rat) : Vector Rat 2 :=
-  ratRow2 a0 a1
-
-private def ratVec3 (a0 a1 a2 : Rat) : Vector Rat 3 :=
-  ratRow3 a0 a1 a2
+private def matrixOfList2D! [Inhabited α] (rows : List (List α)) : Matrix α n m :=
+  (Matrix.ofList2D (n := n) (m := m) rows).get!
 
 private def fin1_0 : Fin 1 := ⟨0, by decide⟩
 private def fin2_0 : Fin 2 := ⟨0, by decide⟩
@@ -138,34 +71,34 @@ private def fin3_1 : Fin 3 := ⟨1, by decide⟩
 private def fin3_2 : Fin 3 := ⟨2, by decide⟩
 
 private def detTypical : Matrix Int 3 3 :=
-  intMat3 2 1 0 1 3 4 0 2 5
+  matrixOfList2D! [[2, 1, 0], [1, 3, 4], [0, 2, 5]]
 
 private def detEdge : Matrix Int 2 2 :=
-  intMat2 1 0 0 1
+  matrixOfList2D! [[1, 0], [0, 1]]
 
 private def detAdversarial : Matrix Int 2 2 :=
-  intMat2 1 2 2 4
+  matrixOfList2D! [[1, 2], [2, 4]]
 
 private def identity3 : Matrix Int 3 3 :=
   Matrix.identity
 
 private def denseAdversarial : Matrix Int 3 3 :=
-  intMat3 1 2 3 4 5 6 7 8 9
+  matrixOfList2D! [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 
 private def zeroRat11 : Matrix Rat 1 1 :=
-  ratMat11 0
+  matrixOfList2D! [[0]]
 
 private def zeroRat23 : Matrix Rat 2 3 :=
-  ratMat23 0 0 0 0 0 0
+  matrixOfList2D! [[0, 0, 0], [0, 0, 0]]
 
 private def zeroRat32 : Matrix Rat 3 2 :=
-  ratMat32 0 0 0 0 0 0
+  matrixOfList2D! [[0, 0], [0, 0], [0, 0]]
 
 private def identityRat2 : Matrix Rat 2 2 :=
   Matrix.identity
 
 private def rrefTypical : Matrix Rat 2 3 :=
-  ratMat23 1 2 3 0 1 4
+  matrixOfList2D! [[1, 2, 3], [0, 1, 4]]
 
 private def rrefZeroWitness23 : IsEchelonForm zeroRat23 (rref zeroRat23) :=
   (rref_isRREF zeroRat23).toIsEchelonForm
@@ -283,21 +216,21 @@ private def rrefZeroRref32 : IsRREF zeroRat32 (rref zeroRat32) :=
 
 /-! ## `spanCoeffs` and `spanContains` -/
 
-#guard match rrefZeroWitness23.spanCoeffs (ratVec3 0 0 0) with
+#guard match rrefZeroWitness23.spanCoeffs (vectorOfList! [0, 0, 0]) with
   | some c => serializeVector c = [0, 0] ∧ serializeVector (zeroRat23 * c) = [0, 0, 0]
   | none => False
-#guard match rrefZeroWitness11.spanCoeffs (ratVec1 0) with
+#guard match rrefZeroWitness11.spanCoeffs (vectorOfList! [0]) with
   | some c => serializeVector c = [0] ∧ serializeVector (zeroRat11 * c) = [0]
   | none => False
-#guard match rrefZeroWitness32.spanCoeffs (ratVec2 0 0) with
+#guard match rrefZeroWitness32.spanCoeffs (vectorOfList! [0, 0]) with
   | some c => serializeVector c = [0, 0, 0] ∧ serializeVector (zeroRat32 * c) = [0, 0]
   | none => False
-#guard rrefZeroWitness23.spanContains (ratVec3 0 0 0) = true
-#guard rrefZeroWitness11.spanContains (ratVec1 0) = true
-#guard rrefZeroWitness32.spanContains (ratVec2 0 0) = true
-#guard Matrix.spanCoeffs identityRat2 (ratVec2 1 0) = none
-#guard Matrix.spanCoeffs zeroRat23 (ratVec3 0 0 0) = none
-#guard Matrix.spanContains rrefTypical (ratVec3 0 1 0) = false
+#guard rrefZeroWitness23.spanContains (vectorOfList! [0, 0, 0]) = true
+#guard rrefZeroWitness11.spanContains (vectorOfList! [0]) = true
+#guard rrefZeroWitness32.spanContains (vectorOfList! [0, 0]) = true
+#guard Matrix.spanCoeffs identityRat2 (vectorOfList! [1, 0]) = none
+#guard Matrix.spanCoeffs zeroRat23 (vectorOfList! [0, 0, 0]) = none
+#guard Matrix.spanContains rrefTypical (vectorOfList! [0, 1, 0]) = false
 
 /-! ## `nullspaceMatrix`, `nullspace`, and `Matrix.nullspace` -/
 
