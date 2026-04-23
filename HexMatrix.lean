@@ -1,4 +1,5 @@
 import HexMatrix.RowEchelon
+import HexMatrix.RowOps
 
 /-!
 Core matrix scaffolding.
