@@ -93,12 +93,16 @@ def LLLState.potential (s : LLLState n m) : Nat :=
   s.d[1:n].foldl (· * ·) 1    -- d_1 * d_2 * ... * d_{n-1}
 ```
 
+The signatures shown for `sizeReduce` and `swapStep` below are the
+required types; the body must implement the algorithm described in
+the prose that follows each block.
+
 **Size reduction.** Size-reduce b[k] against b[k-1], ..., b[0].
 Updates b and ν; d is unchanged (basis is unchanged by size
 reduction).
 
 ```lean
-def LLLState.sizeReduce (s : LLLState n m) (k : Nat) : LLLState n m := sorry
+def LLLState.sizeReduce (s : LLLState n m) (k : Nat) : LLLState n m
 ```
 
 For j = k-1 downto 0: if 2 * |ν[k][j]| > d[j+1] (i.e., |coeffs[k][j]| > 1/2):
@@ -111,7 +115,7 @@ For j = k-1 downto 0: if 2 * |ν[k][j]| > d[j+1] (i.e., |coeffs[k][j]| > 1/2):
 **Swap step.** Swap b[k] and b[k-1], updating ν and d.
 
 ```lean
-def LLLState.swapStep (s : LLLState n m) (k : Nat) : LLLState n m := sorry
+def LLLState.swapStep (s : LLLState n m) (k : Nat) : LLLState n m
 ```
 
 Let B = ν[k][k-1]. After swapping b[k] and b[k-1]:
