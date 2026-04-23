@@ -132,6 +132,38 @@ MUST NOT appear in any `Conformance.lean`:
   Int)` alongside `matrix := intMatN …` alongside a third copy on the
   RHS of `by decide`.
 
+- **Literal duplication across `#guard_msgs` and `#guard`.** A
+  `#guard X = [literal]` that immediately follows a `#guard_msgs in
+  #eval X` producing the same `[literal]` is redundant — the
+  expected value appears twice. Use one idiom per case:
+  - `#guard_msgs in #eval X` when the expected value fits on one
+    line and belongs in the source for reviewer benefit.
+  - `#guard X = formula(inputs)` when there is a closed-form
+    identity (`n % p`, `Nat.gcd a b`, `a * b % c`, Bézout, etc.)
+    that carries more content than a literal copy.
+
+  `#guard_msgs` documents *what the evaluator produces*; `#guard`
+  against a formula documents *what the contract says it should
+  produce*. Both together on the same case is either duplication or
+  contradiction.
+
+- **Scaffold-locking `#guard`s.** A `#guard` that asserts against
+  *current stub output* rather than against the SPEC contract —
+  e.g. `#guard (rref M).rank = 0` when `rref` is a placeholder —
+  locks the wrong answer in and hides the scaffold. If the
+  implementation is not yet correct, **do not** commit a conformance
+  check that accepts its wrong output. Either:
+  1. mark the implementation `sorry` per
+     [PLAN/Phase1.md](../PLAN/Phase1.md) and omit the conformance
+     check for that operation (it returns when the real
+     implementation lands); or
+  2. fix the implementation to match the contract before committing
+     the conformance check.
+
+  If the committed implementation returns wrong output, the
+  implementation is the bug — don't paper over it with a test that
+  says "this wrong output is expected".
+
 - **`native_decide`.** Banned project-wide (see
   [SPEC.md](SPEC.md#project-wide-proof-policy)). Restated here because
   conformance checks on large fixtures are a common temptation.
@@ -139,6 +171,44 @@ MUST NOT appear in any `Conformance.lean`:
 - **Conformance modules not reached by `lake build HexFoo`.** Every
   `Conformance.lean` MUST be imported from the library's root module
   so that `lake build HexFoo` elaborates its `#guard`s.
+
+## `#eval` vs `#eval!`
+
+`#eval e` errors when `e` transitively depends on any `sorry`,
+including `sorry` in Prop-valued proof fields of structures (see
+e.g. `HexPoly.DensePoly.ofArray`, which carries a `sorry`'d
+`isNormalized` proof field — this makes every `HexPoly.DensePoly`
+value's `#eval` refuse). `#eval!` bypasses the safety check.
+
+Prefer `#eval` when it works. Fall back to `#eval!` **only** when
+Lean's strict dependency check forces it — that is, when the
+structure being evaluated transitively depends on an unproven
+theorem-level `sorry`. In that case, a one-line comment above the
+`#eval!` should state which sorry-bearing declaration is blocking
+plain `#eval`, so future readers know when the `!` can come off.
+
+```lean
+-- #eval requires all of DensePoly's propositional fields to be
+-- non-sorry; `isNormalized_normalizeCoeffs` is currently `sorry`.
+/-- info: [3, 0, -2] -/
+#guard_msgs in #eval! (HexPoly.DensePoly.ofArray #[3, 0, -2, 0, 0]).coeffs.toList
+```
+
+Do not cargo-cult `#eval!` just because a neighbouring file uses it.
+`HexArith/Conformance.lean` uses plain `#eval` throughout — its
+computational dependencies are sorry-free — and other libraries
+whose computational graph is similarly clean should follow suit.
+
+## `#guard` vs `#guard decide`
+
+Prefer `#guard <bool-expr>` over `#guard decide (<prop>)`. The
+`decide` form is only needed when the assertion is a propositional
+equation that does not have a `BEq` / `DecidableEq` instance
+available directly — quantified statements, equality on types
+without `DecidableEq`, and similar cases. `List` of concrete types,
+polynomial coefficient comparisons, matrix-entry equality, option of
+such, and nearly every other conformance target have `BEq`
+instances; plain `#guard` works and is easier to read.
 
 ## Oracle strategy
 

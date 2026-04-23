@@ -20,13 +20,45 @@ unless it explicitly fixes the public API or theorem split.
 
 ## Rules
 
-- **Real definitions, no definition-level sorry.** Every `structure`,
-  `def`, `class`, and `instance` must have a real implementation.
-  Data must be constructed. Propositional obligations (theorem
-  proofs, proof fields within structures) should use `sorry`.
+- **Correct implementations, or honest placeholders — no middle
+  ground.** Every `def`, `structure` field, `class`, and `instance`
+  must have a body that either
+  (a) *correctly* implements the SPEC contract for that declaration,
+  or
+  (b) is `sorry` (making the declaration `noncomputable`, trapping
+  at runtime via `sorryAx`, and leaving a visible warning).
+  **Placeholder bodies that typecheck but return wrong-but-plausible
+  output are forbidden** — they lie to downstream callers and invite
+  scaffold-locking conformance tests that pretend the stub is right.
+
+  Examples of forbidden bodies, each observed in practice:
+  - `def rref M := { rank := 0, echelon := M, transform := 1 }`
+    — the name promises RREF; the body is not RREF.
+  - `def spanCoeffs _ _ := none` — promises a span decomposition;
+    always says "no".
+  - `def gramSchmidt.basis b := b` — promises orthogonalisation;
+    returns input unchanged.
+  - `def gramSchmidt.coeffs _ := Matrix.identity` — promises the
+    lower-triangular Gram-Schmidt coefficient matrix; returns the
+    identity.
+
+  If you cannot implement a function correctly in this PR, either
+  defer the declaration entirely (if nothing downstream needs the
+  signature yet) or write the signature with a `sorry` body:
+
+  ```lean
+  noncomputable def rref (M : Matrix Rat n m) : RrefResult n m := sorry
+  ```
+
+  The next agent picking it up sees the `sorry` and knows there's
+  real work to do. A plausible-looking lie is invisible to both the
+  next agent and to conformance tests.
 
 - **`sorry`'d theorem proofs are expected.** The point of scaffolding
-  is to get the API surface compiling, not to fill in proofs.
+  is to get the API surface compiling, not to fill in proofs. This
+  rule applies to `theorem` bodies and propositional `structure`
+  fields. It does **not** extend an escape valve for data-level
+  bodies — see the rule above.
 
 - **Helper definitions** not in the SPEC are fine if needed to state
   the API. Note them in the PR.
@@ -52,8 +84,9 @@ For library `hex-foo`, Phase 1 is done when:
 - every named `def`, `structure`, `class`, `instance`, and `theorem`
   in `SPEC/Libraries/hex-foo.md` has a matching Lean declaration
   with the SPEC's signature;
-- `lake build <HexFooLib>` succeeds (proofs may be `sorry`;
-  data-level declarations must not be);
+- `lake build <HexFooLib>` succeeds (proofs may be `sorry`; data-level
+  declarations are either correct implementations or `sorry`-bodied
+  noncomputable stubs — wrong-but-plausible bodies are forbidden);
 - each new `.lean` file carries a module docstring summarising the
   library contents;
 - no `TODO`, `FIXME`, or `...` placeholder remains in the scaffolded
