@@ -1,4 +1,5 @@
 import HexGramSchmidt.Int
+import HexGramSchmidt.Conformance
 import HexGramSchmidt.GramDet
 import HexGramSchmidt.Rat
 import HexGramSchmidt.Update
