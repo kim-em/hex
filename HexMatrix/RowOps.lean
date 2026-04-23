@@ -1,15 +1,17 @@
-import HexMatrix.RowEchelon
+import HexMatrix.Determinant
 
 /-!
 Elementary row operations for dense matrices.
 
 This module adds executable row swaps, row scaling, and row addition for
 the dense `HexMatrix.Matrix` representation, together with the public
-determinant theorem statements that later determinant work will discharge.
+determinant theorem statements used by later matrix algorithms.
 -/
 namespace HexMatrix
 
 universe u
+
+open Lean.Grind
 
 namespace Matrix
 
@@ -29,24 +31,17 @@ def rowAdd [Add R] [Mul R] (M : Matrix R n m) (i j : Fin n) (c : R) : Matrix R n
 
 end Matrix
 
-/--
-Temporary determinant scaffold used to state the row-operation theorems
-before the full determinant module lands.
--/
-def det {R : Type u} [Zero R] (_ : Matrix R n n) : R :=
-  0
-
-theorem det_rowSwap {R : Type u} [Zero R] [Neg R] (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
-    det (Matrix.rowSwap M i j) = -det M := by
+theorem det_rowSwap {R : Type u} [CommRing R] (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
+    Matrix.det (Matrix.rowSwap M i j) = -Matrix.det M := by
   sorry
 
-theorem det_rowScale {R : Type u} [Zero R] [Mul R] (M : Matrix R n n) (i : Fin n) (c : R) :
-    det (Matrix.rowScale M i c) = c * det M := by
+theorem det_rowScale {R : Type u} [CommRing R] (M : Matrix R n n) (i : Fin n) (c : R) :
+    Matrix.det (Matrix.rowScale M i c) = c * Matrix.det M := by
   sorry
 
-theorem det_rowAdd {R : Type u} [Zero R] [Add R] [Mul R] (M : Matrix R n n)
+theorem det_rowAdd {R : Type u} [CommRing R] (M : Matrix R n n)
     (i j : Fin n) (c : R) (h : i ≠ j) :
-    det (Matrix.rowAdd M i j c) = det M := by
+    Matrix.det (Matrix.rowAdd M i j c) = Matrix.det M := by
   sorry
 
 end HexMatrix
