@@ -19,12 +19,13 @@ variable {p : Nat} [NeZero p]
 /--
 Scaffold irreducibility predicate for quotient-field moduli.
 
-The executable finite-field carrier only needs a nontrivial modulus
-boundary in Phase 1; later issues refine this into the intended
-algebraic irreducibility story over `FpPoly`.
+This remains an honest placeholder until the library wires in the
+intended algebraic irreducibility notion over `FpPoly`.
 -/
 def Irreducible (f : FpPoly p) : Prop :=
-  f ≠ 0 ∧ 0 < f.degree
+  by
+    let _ := f
+    sorry
 
 /--
 Thin wrapper over the quotient-ring carrier `F_p[x] / (f)` under an

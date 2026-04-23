@@ -38,23 +38,24 @@ instance : Pow (FiniteField p f hf hirr) Nat where
   pow x n := ofQuotient (hirr := hirr) (x.toQuotient ^ n)
 
 /--
-Executable inverse candidate on the thin wrapper.
+Placeholder inverse operation on the thin wrapper.
 
-Phase 1 records only the operation boundary; later work refines this
-placeholder into the intended extended-GCD-based inverse over `FpPoly`.
+Phase 1 records only the operation boundary; later work replaces this
+honest placeholder with the intended extended-GCD-based inverse over
+`FpPoly`.
 -/
-def inv (x : FiniteField p f hf hirr) : FiniteField p f hf hirr :=
+noncomputable def inv (x : FiniteField p f hf hirr) : FiniteField p f hf hirr := by
   let _ := x
-  1
+  sorry
 
-instance : Inv (FiniteField p f hf hirr) where
+noncomputable instance : Inv (FiniteField p f hf hirr) where
   inv := inv
 
-/-- Division is multiplication by the executable inverse candidate. -/
-def div (x y : FiniteField p f hf hirr) : FiniteField p f hf hirr :=
+/-- Division is multiplication by the placeholder inverse boundary. -/
+noncomputable def div (x y : FiniteField p f hf hirr) : FiniteField p f hf hirr :=
   x * y⁻¹
 
-instance : Div (FiniteField p f hf hirr) where
+noncomputable instance : Div (FiniteField p f hf hirr) where
   div := div
 
 /-- Frobenius raises the wrapped quotient representative to the characteristic `p`. -/
@@ -67,8 +68,8 @@ theorem div_eq_mul_inv (x y : FiniteField p f hf hirr) :
   rfl
 
 /--
-Under the irreducibility and nonzero hypotheses, the executable inverse
-candidate cancels on the right.
+Under the irreducibility and nonzero hypotheses, the inverse boundary
+cancels on the right.
 -/
 theorem mul_inv_cancel (x : FiniteField p f hf hirr) (hx : x ≠ 0) :
     x * x⁻¹ = 1 := by
@@ -82,12 +83,12 @@ theorem frob_eq_pow_char (x : FiniteField p f hf hirr) :
 end FiniteField
 
 /-- Top-level inverse wrapper on `FiniteField`. -/
-def inv {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f}
+noncomputable def inv {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f}
     (x : FiniteField p f hf hirr) : FiniteField p f hf hirr :=
   @FiniteField.inv p _ f hf hirr x
 
 /-- Top-level division wrapper on `FiniteField`. -/
-def div {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f}
+noncomputable def div {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f}
     (x y : FiniteField p f hf hirr) : FiniteField p f hf hirr :=
   @FiniteField.div p _ f hf hirr x y
 

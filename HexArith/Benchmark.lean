@@ -116,6 +116,56 @@ def renderUInt64Field (value? : Option UInt64) : String :=
   | some value => toString value.toNat
   | none => "NA"
 
+/-- Render one `Nat` extended-GCD result as a stable CSV row. -/
+def NatExtGcdResult.toCsvRow (result : NatExtGcdResult) : String :=
+  ",".intercalate
+    [ result.name
+    , toString result.gcd
+    , toString result.s
+    , toString result.t
+    ]
+
+/-- Header shared by the `Nat` extended-GCD CSV runner. -/
+def natExtGcdCsvHeader : String :=
+  "name,gcd,s,t"
+
+/-- Render one `Int` extended-GCD result as a stable CSV row. -/
+def IntExtGcdResult.toCsvRow (result : IntExtGcdResult) : String :=
+  ",".intercalate
+    [ result.name
+    , toString result.gcd
+    , toString result.s
+    , toString result.t
+    ]
+
+/-- Header shared by the `Int` extended-GCD CSV runner. -/
+def intExtGcdCsvHeader : String :=
+  "name,gcd,s,t"
+
+/-- Render one `UInt64` extended-GCD result as a stable CSV row. -/
+def UInt64ExtGcdResult.toCsvRow (result : UInt64ExtGcdResult) : String :=
+  ",".intercalate
+    [ result.name
+    , toString result.gcd.toNat
+    , toString result.s
+    , toString result.t
+    ]
+
+/-- Header shared by the `UInt64` extended-GCD CSV runner. -/
+def uint64ExtGcdCsvHeader : String :=
+  "name,gcd,s,t"
+
+/-- Render one modular-exponentiation result as a stable CSV row. -/
+def PowModResult.toCsvRow (result : PowModResult) : String :=
+  ",".intercalate
+    [ result.name
+    , toString result.value
+    ]
+
+/-- Header shared by the modular-exponentiation CSV runner. -/
+def powModCsvHeader : String :=
+  "name,value"
+
 /--
 Serialize one comparison result as a stable machine-readable row.
 
@@ -287,6 +337,22 @@ def runUInt64ExtGcdCases : List UInt64ExtGcdResult :=
 /-- Execute all committed modular-exponentiation benchmark cases. -/
 def runPowModCases : List PowModResult :=
   powModCases.map runPowModCase
+
+/-- Execute all committed `Nat` extended-GCD cases and return CSV-style rows. -/
+def runNatExtGcdCsv : List String :=
+  natExtGcdCsvHeader :: runNatExtGcdCases.map NatExtGcdResult.toCsvRow
+
+/-- Execute all committed `Int` extended-GCD cases and return CSV-style rows. -/
+def runIntExtGcdCsv : List String :=
+  intExtGcdCsvHeader :: runIntExtGcdCases.map IntExtGcdResult.toCsvRow
+
+/-- Execute all committed `UInt64` extended-GCD cases and return CSV-style rows. -/
+def runUInt64ExtGcdCsv : List String :=
+  uint64ExtGcdCsvHeader :: runUInt64ExtGcdCases.map UInt64ExtGcdResult.toCsvRow
+
+/-- Execute all committed modular-exponentiation cases and return CSV-style rows. -/
+def runPowModCsv : List String :=
+  powModCsvHeader :: runPowModCases.map PowModResult.toCsvRow
 
 /-- Execute all committed reduction-comparison benchmark cases. -/
 def runReductionComparisonCases : List ReductionComparisonResult :=

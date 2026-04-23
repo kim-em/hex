@@ -233,11 +233,9 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
 /-- info: [0, 1] -/
 #guard_msgs in #eval! (addLeftAdversarial + addRightAdversarial).coeffs.toList
 
-#guard (addLeftTypical + addRightTypical).coeffs.toList = [5, 0, 4]
 #guard (addLeftTypical + addRightTypical).coeffs.toList =
          (addRightTypical + addLeftTypical).coeffs.toList
 #guard ((0 : HexPoly.DensePoly Int) + addEdge).coeffs.toList = addEdge.coeffs.toList
-#guard (addLeftAdversarial + addRightAdversarial).coeffs.toList = [0, 1]
 
 /-- info: [-3, 4, 2] -/
 #guard_msgs in #eval! (addLeftTypical - addRightTypical).coeffs.toList
@@ -249,8 +247,6 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
 #guard_msgs in #eval!
   (addLeftAdversarial - HexPoly.DensePoly.ofArray #[2, 0, 3]).coeffs.toList
 
-#guard (addLeftTypical - addRightTypical).coeffs.toList = [-3, 4, 2]
-#guard (addEdge - addEdge).coeffs.toList = []
 #guard (addLeftTypical - (0 : HexPoly.DensePoly Int)).coeffs.toList = addLeftTypical.coeffs.toList
 #guard ((addLeftAdversarial - HexPoly.DensePoly.ofArray #[2, 0, 3]).coeffs.toList = [])
 
@@ -265,11 +261,8 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
 /-- info: [1, -1, 1, -1] -/
 #guard_msgs in #eval! (mulLeftAdversarial * mulRightAdversarial).coeffs.toList
 
-#guard (mulLeftTypical * mulRightTypical).coeffs.toList = [3, 10, 8]
 #guard (mulLeftTypical * mulRightTypical).coeffs.toList =
          (mulRightTypical * mulLeftTypical).coeffs.toList
-#guard (mulLeftTypical * (0 : HexPoly.DensePoly Int)).coeffs.toList = []
-#guard (mulLeftAdversarial * mulRightAdversarial).coeffs.toList = [1, -1, 1, -1]
 #guard (mulLeftAdversarial * oneIntPoly).coeffs.toList = mulLeftAdversarial.coeffs.toList
 
 /-! ## `DensePoly.divModMonic` -/
@@ -349,10 +342,6 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
 /-- info: 6 -/
 #guard_msgs in #eval! HexPoly.DensePoly.content contentAdversarial
 
-#guard HexPoly.DensePoly.content contentTypical = 3
-#guard HexPoly.DensePoly.content (0 : HexPoly.DensePoly Int) = 0
-#guard HexPoly.DensePoly.content contentAdversarial = 6
-
 /-- info: [2, -3, 1] -/
 #guard_msgs in #eval! (HexPoly.DensePoly.primitivePart contentTypical).coeffs.toList
 
@@ -362,9 +351,6 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
 /-- info: [0, -2, 3] -/
 #guard_msgs in #eval! (HexPoly.DensePoly.primitivePart contentAdversarial).coeffs.toList
 
-#guard (HexPoly.DensePoly.primitivePart contentTypical).coeffs.toList = [2, -3, 1]
-#guard (HexPoly.DensePoly.primitivePart (0 : HexPoly.DensePoly Int)).coeffs.toList = []
-#guard (HexPoly.DensePoly.primitivePart contentAdversarial).coeffs.toList = [0, -2, 3]
 #guard (HexPoly.DensePoly.scaleInt (HexPoly.DensePoly.content contentTypical : Int)
           (HexPoly.DensePoly.primitivePart contentTypical)).coeffs.toList =
          contentTypical.coeffs.toList
@@ -393,12 +379,6 @@ private def crtAdversarialV : HexPoly.DensePoly Int :=
   (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
     crtBezoutS crtBezoutT).coeffs.toList
 
-#guard (HexPoly.DensePoly.polyCRT crtModA crtModB crtTypicalU crtTypicalV
-          crtBezoutS crtBezoutT).coeffs.toList = [2, 2, -1]
-#guard (HexPoly.DensePoly.polyCRT crtModA crtModB (0 : HexPoly.DensePoly Int) crtEdgeV
-          crtBezoutS crtBezoutT).coeffs.toList = [0, -4]
-#guard (HexPoly.DensePoly.polyCRT crtModA crtModB crtAdversarialU crtAdversarialV
-          crtBezoutS crtBezoutT).coeffs.toList = [1, -2, 3, -1]
 #guard (HexPoly.DensePoly.modMonic
           (HexPoly.DensePoly.polyCRT crtModA crtModB crtTypicalU crtTypicalV
             crtBezoutS crtBezoutT) crtModA).coeffs.toList =

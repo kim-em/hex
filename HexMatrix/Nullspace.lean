@@ -43,22 +43,12 @@ private def pivotRow? (D : RowEchelonData R n m) (j : Fin m) : Option (Fin D.ran
 Temporary Phase 1 scaffold for the nullspace basis matrix extracted from
 an RREF witness.
 -/
-def nullspaceMatrix (E : IsRREF M D) : Matrix R m (m - D.rank) :=
-  Vector.ofFn fun j =>
-    Vector.ofFn fun k =>
-      let freeCol : Fin m := E.toIsEchelonForm.freeCols[k]
-      if hFree : j = freeCol then
-        1
-      else
-        match pivotRow? D j with
-        | some i =>
-            let iRow : Fin n := ⟨i.val, Nat.lt_of_lt_of_le i.isLt E.toIsEchelonForm.rank_le_n⟩;
-            -D.echelon[iRow][freeCol]
-        | none => 0
+noncomputable def nullspaceMatrix (E : IsRREF M D) : Matrix R m (m - D.rank) := by
+  sorry
 
 /-- Temporary Phase 1 scaffold for nullspace basis vectors. -/
-def nullspace (E : IsRREF M D) : Vector (Vector R m) (m - D.rank) :=
-  Vector.ofFn fun k => Matrix.col (E.nullspaceMatrix) k
+noncomputable def nullspace (E : IsRREF M D) : Vector (Vector R m) (m - D.rank) := by
+  sorry
 
 theorem nullspace_sound (E : IsRREF M D) (k : Fin (m - D.rank)) :
     M * E.nullspace[k] = 0 := by
@@ -74,9 +64,9 @@ theorem nullspace_complete {R : Type u} [Field R] {n m : Nat} {M : Matrix R n m}
 namespace Matrix
 
 /-- Convenience wrapper: compute the scaffolded nullspace through RREF. -/
-def nullspace {R : Type u} [Field R] {n m : Nat} (M : Matrix R n m) :
-    Vector (Vector R m) (m - (rref M).rank) :=
-  (rref_isRREF M).nullspace
+noncomputable def nullspace {R : Type u} [Field R] {n m : Nat} (M : Matrix R n m) :
+    Vector (Vector R m) (m - (rref M).rank) := by
+  sorry
 
 end Matrix
 
