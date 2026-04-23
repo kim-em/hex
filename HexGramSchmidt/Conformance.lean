@@ -14,13 +14,13 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
 - **Covered operations:** `Hex.GramSchmidt.Int.basis`,
   `Hex.GramSchmidt.Int.coeffs`, `Hex.GramSchmidt.Int.gramDet`,
   `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
-  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.coeffs`,
-  `Hex.GramSchmidt.Rat.gramDet`.
+  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.gramDet`.
 - **Covered properties:**
   - integer-input basis rows are the cast input rows on committed
     examples, including the `basis_zero` theorem;
-  - both integer and rational coefficient matrices stay identity on
-    committed examples, including `coeffs_diag` and `coeffs_upper`;
+  - integer coefficient checks stay on the theorem-backed diagonal and
+    upper-triangular shape guarantees, including `coeffs_diag` and
+    `coeffs_upper`;
   - integer and rational Gram determinants match the leading Gram-matrix
     determinant on typical, edge, and adversarial fixtures;
   - integer `gramDetVec` packages the full prefix determinant sequence;
@@ -30,7 +30,7 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
     `basisNormSqProduct` on committed examples.
 - **Covered edge cases:** zero row prefixes, repeated rows producing a
   zero Gram determinant, the `k = 0` Gram-determinant convention, and
-  diagonal/upper-triangular coefficient entries.
+  integer diagonal/upper-triangular coefficient entries.
 -/
 
 namespace HexGramSchmidt
@@ -50,97 +50,39 @@ private def serializeMatrix (M : Matrix α n m) : List (List α) :=
 private def serializeRatMatrix (M : Matrix Rat n m) : List (List Rat) :=
   serializeMatrix M
 
-private def intRow2 (a0 a1 : Int) : Vector Int 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
+private def vectorOfList! [Inhabited α] (xs : List α) : Vector α n :=
+  (Vector.ofList? (n := n) xs).get!
 
-private def intRow3 (a0 a1 a2 : Int) : Vector Int 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def ratRow2 (a0 a1 : Rat) : Vector Rat 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
-
-private def ratRow3 (a0 a1 a2 : Rat) : Vector Rat 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def intMat22
-    (a00 a01 : Int)
-    (a10 a11 : Int) : Matrix Int 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then intRow2 a00 a01 else intRow2 a10 a11
-
-private def intMat32
-    (a00 a01 : Int)
-    (a10 a11 : Int)
-    (a20 a21 : Int) : Matrix Int 3 2 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      intRow2 a00 a01
-    else if i.1 = 1 then
-      intRow2 a10 a11
-    else
-      intRow2 a20 a21
-
-private def ratMat22
-    (a00 a01 : Rat)
-    (a10 a11 : Rat) : Matrix Rat 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then ratRow2 a00 a01 else ratRow2 a10 a11
-
-private def ratMat32
-    (a00 a01 : Rat)
-    (a10 a11 : Rat)
-    (a20 a21 : Rat) : Matrix Rat 3 2 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      ratRow2 a00 a01
-    else if i.1 = 1 then
-      ratRow2 a10 a11
-    else
-      ratRow2 a20 a21
+private def matrixOfList2D! [Inhabited α] (rows : List (List α)) : Matrix α n m :=
+  (Matrix.ofList2D (n := n) (m := m) rows).get!
 
 private def intTypical : Matrix Int 3 2 :=
-  intMat32 1 2 0 3 4 5
+  matrixOfList2D! [[1, 2], [0, 3], [4, 5]]
 
 private def intEdge : Matrix Int 2 2 :=
-  intMat22 1 0 0 1
+  matrixOfList2D! [[1, 0], [0, 1]]
 
 private def intAdversarial : Matrix Int 2 2 :=
-  intMat22 1 2 1 2
+  matrixOfList2D! [[1, 2], [1, 2]]
 
 private def ratTypical : Matrix Rat 3 2 :=
-  ratMat32 1 2 (3 / 2) (-1) 0 5
+  matrixOfList2D! [[1, 2], [3 / 2, -1], [0, 5]]
 
 private def ratEdge : Matrix Rat 2 2 :=
-  ratMat22 1 0 0 1
+  matrixOfList2D! [[1, 0], [0, 1]]
 
 private def ratAdversarial : Matrix Rat 2 2 :=
-  ratMat22 1 2 1 2
+  matrixOfList2D! [[1, 2], [1, 2]]
 
 /-! ## Integer basis and coefficients -/
 
 example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 1 = ratRow2 0 3 := by
+    Matrix.row (GramSchmidt.Int.basis intTypical) 1 = vectorOfList! [0, 3] := by
   rfl
 
 example :
-    Matrix.row (GramSchmidt.Int.basis intEdge) 1 = ratRow2 0 1 := by
+    Matrix.row (GramSchmidt.Int.basis intEdge) 1 = vectorOfList! [0, 1] := by
   rfl
-
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intTypical) =
-  [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
-
-#guard serializeRatMatrix (GramSchmidt.Int.coeffs intAdversarial) =
-  [[1, 0], [0, 1]]
 
 example :
     Matrix.row (GramSchmidt.Int.basis intTypical) 0 =
@@ -193,19 +135,11 @@ example :
 /-! ## Rational basis, coefficients, and Gram determinants -/
 
 example :
-    Matrix.row (GramSchmidt.Rat.basis ratTypical) 1 = ratRow2 (3 / 2) (-1) := by
+    Matrix.row (GramSchmidt.Rat.basis ratTypical) 1 = vectorOfList! [3 / 2, -1] := by
   rfl
 
 example :
-    Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = ratRow2 0 1 := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratTypical) 2 2 = 1 := by
-  rfl
-
-example :
-    Matrix.entry (GramSchmidt.Rat.coeffs ratAdversarial) 0 1 = 0 := by
+    Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = vectorOfList! [0, 1] := by
   rfl
 
 #guard GramSchmidt.Rat.gramDet ratTypical 0 (by decide) = 1

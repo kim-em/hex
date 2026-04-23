@@ -32,7 +32,7 @@ libraries:
   HexMatrix:
     deps: []
     mathlib: false
-    done_through: 3
+    done_through: 1
 
   # ---------- Depth 1 ----------
   HexModArith:
@@ -42,7 +42,7 @@ libraries:
   HexGramSchmidt:
     deps: [HexMatrix]
     mathlib: false
-    done_through: 2
+    done_through: 1
   HexGF2:
     deps: [HexPoly]
     mathlib: false
@@ -50,7 +50,7 @@ libraries:
   HexPolyZ:
     deps: [HexPoly]
     mathlib: false
-    done_through: 2
+    done_through: 3
 
   # ---------- Depth 2 ----------
   HexLLL:
@@ -70,7 +70,7 @@ libraries:
   HexGfqField:
     deps: [HexGfqRing]
     mathlib: false
-    done_through: 1
+    done_through: 2
 
   # ---------- Factoring pipeline ----------
   HexBerlekamp:

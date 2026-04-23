@@ -1,4 +1,5 @@
 import HexGfqRing.Core
+import HexGfqRing.Conformance
 import HexGfqRing.Instances
 import HexGfqRing.Operations
 

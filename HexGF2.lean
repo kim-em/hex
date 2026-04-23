@@ -1,4 +1,5 @@
 import HexGF2.Core
+import HexGF2.Conformance
 import HexGF2.DivMod
 import HexGF2.FiniteExtension
 import HexGF2.GF2n

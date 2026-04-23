@@ -62,6 +62,7 @@ unless it explicitly fixes the public API or theorem split.
   commit stubs to keep the PR "complete" — an incomplete but honest
   Phase 1 is strictly better than a complete-looking one with
   placeholders.
+    lower-triangular coefficient matrix; returns the identity.
 
 - **`sorry`'d theorem proofs are expected.** The point of scaffolding
   is to get the API surface compiling, not to fill in proofs. This

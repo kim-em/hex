@@ -59,11 +59,11 @@ instance : SMul Int (FiniteField p f hf hirr) where
   smul z x := ofQuotient (hirr := hirr) (z • x.toQuotient)
 
 /-- Integer exponentiation uses inversion on negative powers. -/
-def zpow (x : FiniteField p f hf hirr) : Int → FiniteField p f hf hirr
+noncomputable def zpow (x : FiniteField p f hf hirr) : Int → FiniteField p f hf hirr
   | .ofNat n => x ^ n
   | .negSucc n => (x ^ (n + 1))⁻¹
 
-instance : HPow (FiniteField p f hf hirr) Int (FiniteField p f hf hirr) where
+noncomputable instance : HPow (FiniteField p f hf hirr) Int (FiniteField p f hf hirr) where
   hPow := zpow
 
 /-- Addition is associative on the wrapped quotient carrier. -/
@@ -157,7 +157,7 @@ theorem zero_ne_one :
     (0 : FiniteField p f hf hirr) ≠ 1 := by
   sorry
 
-/-- The executable inverse uses the standard zero junk-value convention. -/
+/-- The inverse boundary sends zero to zero in the eventual field implementation. -/
 theorem inv_zero :
     (0 : FiniteField p f hf hirr)⁻¹ = 0 := by
   sorry
@@ -177,7 +177,7 @@ theorem zpow_neg (a : FiniteField p f hf hirr) (n : Int) :
     a ^ (-n) = (a ^ n)⁻¹ := by
   sorry
 
-instance instField : Field (FiniteField p f hf hirr) where
+noncomputable instance instField : Field (FiniteField p f hf hirr) where
   nsmul := inferInstance
   zsmul := inferInstance
   natCast := inferInstance
@@ -264,7 +264,7 @@ instance {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f} :
     SMul Int (FiniteField p f hf hirr) :=
   FiniteField.instSMulInt
 
-instance {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f} :
+noncomputable instance {f : FpPoly p} {hf : 0 < f.degree} {hirr : Irreducible f} :
     Field (FiniteField p f hf hirr) :=
   FiniteField.instField
 

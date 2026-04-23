@@ -40,10 +40,8 @@ theorem transform_mul_inv (E : IsEchelonForm M D) :
 /--
 Temporary Phase 1 scaffold for the sorted complement of the pivot columns.
 -/
-def freeCols (E : IsEchelonForm M D) : Vector (Fin m) (m - D.rank) :=
-  let _hRank : D.rank ≤ m := E.rank_le_m
-  Vector.ofFn (fun k =>
-    ⟨k.val, Nat.lt_of_lt_of_le k.isLt (Nat.sub_le _ _)⟩)
+noncomputable def freeCols (E : IsEchelonForm M D) : Vector (Fin m) (m - D.rank) := by
+  sorry
 
 theorem freeCols_sorted (E : IsEchelonForm M D) :
     ∀ (i j : Fin (m - D.rank)), i.val < j.val → E.freeCols[i] < E.freeCols[j] := by
