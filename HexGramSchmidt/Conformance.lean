@@ -1,45 +1,33 @@
-import HexGramSchmidt.GramDet
-import HexGramSchmidt.Rat
+import HexGramSchmidt.Update
 
 /-!
-# `HexGramSchmidt` -- core conformance
+# `HexGramSchmidt` -- executable row-operation conformance
 
-Deterministic Lean-only conformance checks for the foundational
-Gram-Schmidt basis, coefficient, and Gram-determinant surface.
+Deterministic Lean-only conformance checks for the executable
+row-operation helpers in `Hex.GramSchmidt.Int`.
 
 **Conformance contract for this slice:**
 
 - **Oracle:** `none`.
 - **Mode:** `always`.
-- **Covered operations:** `Hex.GramSchmidt.Int.basis`,
-  `Hex.GramSchmidt.Int.coeffs`, `Hex.GramSchmidt.Int.gramDet`,
-  `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
-  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.gramDet`.
+- **Covered operations:** `Hex.GramSchmidt.Int.sizeReduce`,
+  `Hex.GramSchmidt.Int.adjacentSwap`.
 - **Covered properties:**
-  - integer-input basis rows are the cast input rows on committed
-    examples, including the `basis_zero` theorem;
-  - integer coefficient checks stay on the theorem-backed diagonal and
-    upper-triangular shape guarantees, including `coeffs_diag` and
-    `coeffs_upper`;
-  - integer and rational Gram determinants match the leading Gram-matrix
-    determinant on typical, edge, and adversarial fixtures;
-  - integer `gramDetVec` packages the full prefix determinant sequence;
-  - integer scaled coefficients agree with the determinant witnesses and
-    the `scaledCoeffs_eq` theorem on committed lower-triangular entries;
-  - integer `gramDet_eq_prod_normSq` matches the scaffolded
-    `basisNormSqProduct` on committed examples.
-- **Covered edge cases:** zero row prefixes, repeated rows producing a
-  zero Gram determinant, the `k = 0` Gram-determinant convention, and
-  integer diagonal/upper-triangular coefficient entries.
+  - `sizeReduce` agrees with the corresponding `HexMatrix.Matrix.rowAdd`
+    update on committed fixtures;
+  - `adjacentSwap` agrees with the corresponding `HexMatrix.Matrix.rowSwap`
+    update on committed fixtures;
+  - both helpers are no-ops on the documented out-of-bounds index cases.
+- **Covered edge cases:** out-of-bounds target/source indices for
+  `sizeReduce`, out-of-bounds swap indices for `adjacentSwap`, and
+  negative row-update coefficients.
 -/
 
 namespace HexGramSchmidt
 namespace Conformance
 
-open HexMatrix
 open Hex
-
-noncomputable section
+open HexMatrix
 
 private def serializeVector (v : Vector α n) : List α :=
   v.toList
@@ -47,107 +35,62 @@ private def serializeVector (v : Vector α n) : List α :=
 private def serializeMatrix (M : Matrix α n m) : List (List α) :=
   M.toList.map serializeVector
 
-private def serializeRatMatrix (M : Matrix Rat n m) : List (List Rat) :=
-  serializeMatrix M
-
-private def vectorOfList! [Inhabited α] (xs : List α) : Vector α n :=
-  (Vector.ofList? (n := n) xs).get!
-
 private def matrixOfList2D! [Inhabited α] (rows : List (List α)) : Matrix α n m :=
   (Matrix.ofList2D (n := n) (m := m) rows).get!
 
-private def intTypical : Matrix Int 3 2 :=
-  matrixOfList2D! [[1, 2], [0, 3], [4, 5]]
+private def sizeReduceTypical : Matrix Int 3 3 :=
+  matrixOfList2D! [[2, 1, 0], [1, 3, 4], [5, 6, 7]]
 
-private def intEdge : Matrix Int 2 2 :=
+private def sizeReduceEdge : Matrix Int 2 2 :=
   matrixOfList2D! [[1, 0], [0, 1]]
 
-private def intAdversarial : Matrix Int 2 2 :=
-  matrixOfList2D! [[1, 2], [1, 2]]
+private def sizeReduceAdversarial : Matrix Int 3 2 :=
+  matrixOfList2D! [[4, -1], [2, 5], [7, 3]]
 
-private def ratTypical : Matrix Rat 3 2 :=
-  matrixOfList2D! [[1, 2], [3 / 2, -1], [0, 5]]
+private def adjacentSwapTypical : Matrix Int 3 2 :=
+  matrixOfList2D! [[1, 2], [3, 4], [5, 6]]
 
-private def ratEdge : Matrix Rat 2 2 :=
-  matrixOfList2D! [[1, 0], [0, 1]]
+private def adjacentSwapEdge : Matrix Int 2 3 :=
+  matrixOfList2D! [[8, 0, -2], [1, 1, 1]]
 
-private def ratAdversarial : Matrix Rat 2 2 :=
-  matrixOfList2D! [[1, 2], [1, 2]]
+private def adjacentSwapAdversarial : Matrix Int 3 2 :=
+  matrixOfList2D! [[9, 0], [-1, 7], [-1, 7]]
 
-/-! ## Integer basis and coefficients -/
+/-! ## `sizeReduce` -/
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 1 = vectorOfList! [0, 3] := by
-  rfl
+/-- info: [[2, 1, 0], [1, 3, 4], [1, 4, 7]] -/
+#guard_msgs in
+#eval serializeMatrix (GramSchmidt.Int.sizeReduce sizeReduceTypical 2 0 2)
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intEdge) 1 = vectorOfList! [0, 1] := by
-  rfl
+#guard
+  serializeMatrix (GramSchmidt.Int.sizeReduce sizeReduceTypical 2 0 2) =
+    serializeMatrix (Matrix.rowAdd sizeReduceTypical ⟨2, by decide⟩ ⟨0, by decide⟩ (-2))
 
-example :
-    Matrix.row (GramSchmidt.Int.basis intTypical) 0 =
-      GramSchmidt.Int.castRow (Matrix.row intTypical 0) := by
-  simpa using GramSchmidt.Int.basis_zero intTypical (by decide)
+#guard
+  serializeMatrix (GramSchmidt.Int.sizeReduce sizeReduceEdge 2 0 5) =
+    serializeMatrix sizeReduceEdge
 
-example :
-    Matrix.entry (GramSchmidt.Int.coeffs intTypical) 1 1 = 1 := by
-  simpa using GramSchmidt.Int.coeffs_diag intTypical 1 (by decide)
+#guard
+  serializeMatrix (GramSchmidt.Int.sizeReduce sizeReduceAdversarial 2 1 (-3)) =
+    serializeMatrix (Matrix.rowAdd sizeReduceAdversarial ⟨2, by decide⟩ ⟨1, by decide⟩ 3)
 
-example :
-    Matrix.entry (GramSchmidt.Int.coeffs intTypical) 1 2 = 0 := by
-  simpa using GramSchmidt.Int.coeffs_upper intTypical 1 2 (by decide) (by decide) (by decide)
+/-! ## `adjacentSwap` -/
 
-/-! ## Integer Gram determinants -/
+/-- info: [[1, 2], [5, 6], [3, 4]] -/
+#guard_msgs in
+#eval serializeMatrix (GramSchmidt.Int.adjacentSwap adjacentSwapTypical 2)
 
-#guard GramSchmidt.Int.gramDet intTypical 0 (by decide) = 1
-#guard GramSchmidt.Int.gramDet intTypical 1 (by decide) = 5
-#guard GramSchmidt.Int.gramDet intTypical 2 (by decide) = 9
-#guard GramSchmidt.Int.gramDet intEdge 2 (by decide) = 1
-#guard GramSchmidt.Int.gramDet intAdversarial 2 (by decide) = 0
+#guard
+  serializeMatrix (GramSchmidt.Int.adjacentSwap adjacentSwapTypical 2) =
+    serializeMatrix (Matrix.rowSwap adjacentSwapTypical ⟨2, by decide⟩ ⟨1, by decide⟩)
 
-#guard (GramSchmidt.Int.gramDetVec intTypical).toList = [1, 5, 9, 0]
-#guard (GramSchmidt.Int.gramDetVec intEdge).toList = [1, 1, 1]
-#guard (GramSchmidt.Int.gramDetVec intAdversarial).toList = [1, 5, 0]
+#guard
+  serializeMatrix (GramSchmidt.Int.adjacentSwap adjacentSwapEdge 2) =
+    serializeMatrix adjacentSwapEdge
 
-example :
-    (GramSchmidt.Int.gramDet intTypical 2 (by decide) : Rat) =
-      GramSchmidt.Int.basisNormSqProduct intTypical 2 := by
-  simpa using
-    (GramSchmidt.Int.gramDet_eq_prod_normSq intTypical trivial 2 (by decide))
+#guard
+  serializeMatrix (GramSchmidt.Int.adjacentSwap adjacentSwapAdversarial 1) =
+    serializeMatrix (Matrix.rowSwap adjacentSwapAdversarial ⟨1, by decide⟩ ⟨0, by decide⟩)
 
-/-! ## Integer scaled coefficients -/
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intTypical) =
-  [[0, 0, 0], [6, 0, 0], [14, -9, 0]]
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intEdge) =
-  [[0, 0], [0, 0]]
-
-#guard serializeMatrix (GramSchmidt.Int.scaledCoeffs intAdversarial) =
-  [[0, 0], [5, 0]]
-
-example :
-    ((Matrix.entry (GramSchmidt.Int.scaledCoeffs intTypical) 2 1 : Int) : Rat) =
-      (GramSchmidt.Int.gramDet intTypical 2 (by decide) : Rat) *
-        Matrix.entry (GramSchmidt.Int.coeffs intTypical) 2 1 := by
-  simpa using GramSchmidt.Int.scaledCoeffs_eq intTypical 2 1 (by decide) (by decide)
-
-/-! ## Rational basis, coefficients, and Gram determinants -/
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratTypical) 1 = vectorOfList! [3 / 2, -1] := by
-  rfl
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = vectorOfList! [0, 1] := by
-  rfl
-
-#guard GramSchmidt.Rat.gramDet ratTypical 0 (by decide) = 1
-#guard GramSchmidt.Rat.gramDet ratTypical 1 (by decide) = 5
-#guard GramSchmidt.Rat.gramDet ratTypical 2 (by decide) = 16
-#guard GramSchmidt.Rat.gramDet ratEdge 2 (by decide) = 1
-#guard GramSchmidt.Rat.gramDet ratAdversarial 2 (by decide) = 0
-
-end
 end Conformance
 end HexGramSchmidt
