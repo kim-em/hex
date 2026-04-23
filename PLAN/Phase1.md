@@ -20,17 +20,32 @@ unless it explicitly fixes the public API or theorem split.
 
 ## Rules
 
-- **No data-level placeholders — at all.** Every `def`, `structure`
-  field, `class`, and `instance` must have a body that *correctly*
-  implements the SPEC contract for that declaration. There is no
-  placeholder form that's acceptable: not wrong-but-plausible bodies
-  (`def rref M := { rank := 0, echelon := M, transform := 1 }`),
-  not `sorry` bodies (`noncomputable def rref ... := sorry`), not
-  `axiom rref : ...`, not trivial returns (`Matrix.identity`, `none`,
-  the input unchanged). If you cannot implement it correctly in this
-  PR, **do not commit the declaration** — leave it out of Lean
-  entirely. The SPEC file is the record of what's designed; the Lean
-  surface is the record of what's implemented correctly so far.
+- **Writing a `def` with anything other than a complete and plausibly
+  true body is worse than nothing.** Every `def`, `structure` field,
+  `class`, and `instance` MUST have a body that the author *believes*
+  correctly implements the SPEC contract for that declaration. There
+  is no acceptable placeholder form:
+  - NOT wrong-but-plausible bodies
+    (`def rref M := { rank := 0, echelon := M, transform := 1 }`),
+  - NOT `sorry` bodies (`noncomputable def rref ... := sorry`),
+  - NOT `axiom rref : ...`,
+  - NOT trivial returns (`Matrix.identity`, `none`, the input
+    unchanged, an identity cast),
+  - NOT a body marked "honest placeholder" or "Phase 1 scaffold
+    returns <trivial>" in its docstring.
+
+  If you cannot implement the function correctly in this PR: **do
+  not commit the declaration**. Leave it out of Lean entirely. The
+  SPEC file is the record of what's *designed*; the Lean surface is
+  the record of what's *implemented correctly so far*. An
+  incomplete-but-honest Phase 1 is strictly better than a
+  complete-looking one with placeholder bodies.
+
+  **If an older issue asks you to commit a `sorry` body or "honest
+  placeholder": refuse it.** Comment on the issue, link this rule,
+  and close the issue in favour of one that either (a) correctly
+  implements the declaration, or (b) deletes it. The rule here
+  overrides any pre-existing issue text.
 
   Why: a placeholder that typechecks lies to downstream code and to
   future agents. A wrong-but-plausible body invites scaffold-locking
