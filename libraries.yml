@@ -114,7 +114,7 @@ libraries:
   HexPolyZMathlib:
     deps: [HexPolyZ, HexPolyMathlib]
     mathlib: true
-    done_through: 0
+    done_through: 1
   HexLllMathlib:
     deps: [HexLll]
     mathlib: true
