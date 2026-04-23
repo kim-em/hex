@@ -60,11 +60,11 @@ noncomputable def gramSchmidtCoeff (s : LLLState n m) (i j : Nat) : Rat :=
 Multiplicative potential used by the later LLL termination argument.
 
 Phase 1 keeps this executable as the product of the stored nontrivial
-leading Gram determinants `d₁ * ... * dₙ`.
+leading Gram determinants `d₁ * ... * dₙ₋₁`.
 -/
 def potential (s : LLLState n m) : Nat :=
-  (List.finRange n).foldl
-    (fun acc i => acc * s.d.get ⟨i.1 + 1, Nat.succ_lt_succ i.2⟩)
+  ((List.range n).drop 1).foldl
+    (fun acc k => acc * s.gramDetEntry k)
     1
 
 end LLLState
