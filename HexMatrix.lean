@@ -1,6 +1,7 @@
 import HexMatrix.RowEchelon
 import HexMatrix.RowOps
 import HexMatrix.Rref
+import HexMatrix.Span
 
 /-!
 Core matrix scaffolding.
