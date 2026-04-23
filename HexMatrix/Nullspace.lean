@@ -1,4 +1,4 @@
-import HexMatrix.Span
+import HexMatrix.Rref
 
 /-!
 Nullspace scaffolding for dense matrices.
