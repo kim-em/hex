@@ -1,8 +1,9 @@
 /-!
 Extended GCD scaffolding.
 
-This module provides the Phase 1 pure-`Nat` extended-GCD API together
-with the pure/public `UInt64` surface promised by the arithmetic SPEC.
+This module provides the Phase 1 pure-`Nat`, `Int`, and `UInt64`
+extended-GCD APIs and their key correctness statements for the
+arithmetic library.
 -/
 
 namespace HexArith
@@ -44,9 +45,49 @@ def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
   let (g, s, t) := HexArith.extGcd a.toNat b.toNat
   (.ofNat g, s, t)
 
+/--
+Pure Lean reference implementation of extended GCD over integers.
+
+The computation reduces to the `Nat` variant on absolute values and then
+re-signs the Bezout coefficients to match the original inputs.
+-/
+def pureIntExtGcd (a b : Int) : Nat × Int × Int :=
+  let (g, s, t) := HexArith.extGcd a.natAbs b.natAbs
+  let s' := if a < 0 then -s else s
+  let t' := if b < 0 then -t else t
+  (g, s', t')
+
+theorem pureIntExtGcd_fst (a b : Int) :
+    (pureIntExtGcd a b).1 = Int.gcd a b := by
+  sorry
+
+theorem pureIntExtGcd_bezout (a b : Int) :
+    let (g, s, t) := pureIntExtGcd a b
+    s * a + t * b = g := by
+  sorry
+
 end Hex
 
 namespace HexArith
+
+namespace Int
+
+/--
+Extended GCD on integers, currently implemented by the pure Lean
+reference function until the GMP-backed attachment lands.
+-/
+def extGcd (a b : @& Int) : Nat × Int × Int :=
+  Hex.pureIntExtGcd a b
+
+theorem extGcd_fst (a b : Int) : (extGcd a b).1 = Int.gcd a b := by
+  sorry
+
+theorem extGcd_bezout (a b : Int) :
+    let (g, s, t) := extGcd a b
+    s * a + t * b = g := by
+  sorry
+
+end Int
 
 namespace UInt64
 
