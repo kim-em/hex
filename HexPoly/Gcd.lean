@@ -4,8 +4,8 @@ import HexPoly.Division
 Dense polynomial GCD scaffolding.
 
 This module adds Euclidean-algorithm style `gcd` and extended-GCD
-operations over dense polynomials, using the existing monic-division
-surface as the executable Phase 1 boundary for later algebraic work.
+operations over dense polynomials, using the field-division surface as
+the executable Phase 1 boundary for later algebraic work.
 -/
 namespace HexPoly
 
@@ -25,14 +25,14 @@ structure XgcdResult (R : Type u) [Zero R] [DecidableEq R] where
   s : _root_.HexPoly.DensePoly R
   t : _root_.HexPoly.DensePoly R
 
-section MonicGcd
+section FieldGcd
 
-variable [Add R] [Sub R] [Mul R] [One R]
+variable [Add R] [Sub R] [Mul R] [Div R] [One R]
 
 /--
-Fuel-bounded Euclidean loop using the existing monic remainder
-operation. Later phases refine the algebraic side conditions ensuring
-that this loop computes the canonical gcd.
+Fuel-bounded Euclidean loop using the field remainder operation. Later
+phases refine the algebraic side conditions ensuring that this loop
+computes the canonical gcd.
 -/
 private def gcdAux :
     Nat →
@@ -44,9 +44,9 @@ private def gcdAux :
       if g.coeffs.size = 0 then
         f
       else
-        gcdAux fuel g (modMonic f g)
+        gcdAux fuel g (f % g)
 
-/-- Polynomial GCD scaffold over the monic-division boundary. -/
+/-- Polynomial GCD scaffold over the field-division boundary. -/
 def gcd (f g : _root_.HexPoly.DensePoly R) : _root_.HexPoly.DensePoly R :=
   gcdAux (f.coeffs.size + g.coeffs.size) f g
 
@@ -69,10 +69,10 @@ private def xgcdAux :
       if r.coeffs.size = 0 then
         { gcd := old_r, s := old_s, t := old_t }
       else
-        let q := divMonic old_r r
+        let q := old_r / r
         xgcdAux fuel
           r
-          (old_r - q * r)
+          (old_r % r)
           s
           (old_s - q * s)
           t
@@ -111,7 +111,7 @@ theorem xgcd_bezout (f g : _root_.HexPoly.DensePoly R) :
     (xgcd f g).s * f + (xgcd f g).t * g = (xgcd f g).gcd := by
   sorry
 
-end MonicGcd
+end FieldGcd
 
 end DensePoly
 end HexPoly
