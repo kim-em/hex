@@ -1,4 +1,5 @@
 import HexMatrix.RowEchelon
+import HexMatrix.Nullspace
 import HexMatrix.RowOps
 import HexMatrix.Rref
 import HexMatrix.Span
