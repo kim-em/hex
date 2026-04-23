@@ -17,6 +17,21 @@ namespace Matrix
 
 variable {R : Type u}
 
+/-- Build a dense matrix from row-major lists when both dimensions match. -/
+def ofList2D (rows : List (List R)) : Option (Matrix R n m) :=
+  if hRows : rows.length = n then
+    if hCols : ∀ row ∈ rows, row.length = m then
+      let rowVecs : Array (Vector R m) :=
+        (rows.attach.map fun row =>
+          ⟨row.1.toArray, by
+            have hLen := hCols row.1 row.2
+            simpa using hLen⟩).toArray
+      some ⟨rowVecs, by simpa [rowVecs, hRows]⟩
+    else
+      none
+  else
+    none
+
 /-- Vectors inherit a pointwise zero from their entries. -/
 instance instZeroVector [Zero R] : Zero (Vector R n) where
   zero := Vector.replicate n 0
@@ -41,6 +56,16 @@ instance instHMul [Zero R] [Add R] [Mul R] :
 instance instOne [Zero R] [One R] : One (Matrix R n n) where
   one := identity
 
+@[simp] theorem ofList2D_isSome_iff (rows : List (List R)) :
+    (ofList2D (R := R) (n := n) (m := m) rows).isSome ↔
+      rows.length = n ∧ ∀ row ∈ rows, row.length = m := by
+  unfold ofList2D
+  by_cases hRows : rows.length = n
+  · by_cases hCols : ∀ row ∈ rows, row.length = m
+    · simp [hRows, hCols]
+    · simp [hRows, hCols]
+  · simp [hRows]
+
 end Matrix
 
 namespace Vector
@@ -49,9 +74,19 @@ open HexMatrix.Matrix
 
 variable {R : Type u}
 
+/-- Build a fixed-length vector from a list when the lengths match. -/
+def ofList? (xs : List R) : Option (Vector R n) :=
+  let data := xs.toArray
+  if h : data.size = n then some ⟨data, h⟩ else none
+
 /-- Squared norm of a vector, defined via the dense-matrix dot product. -/
 def normSq [Zero R] [Add R] [Mul R] (v : Vector R n) : R :=
   dot v v
+
+@[simp] theorem ofList?_isSome_iff (xs : List R) :
+    (ofList? (R := R) (n := n) xs).isSome ↔ xs.length = n := by
+  unfold ofList?
+  simp
 
 @[simp] theorem normSq_eq_dot [Zero R] [Add R] [Mul R] (v : Vector R n) :
     Vector.normSq v = dot v v := rfl

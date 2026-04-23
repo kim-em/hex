@@ -41,56 +41,27 @@ private def serializeMatrix (M : Matrix Int n m) : List (List Int) :=
 private def serializeBasis (B : Vector (Vector α m) n) : List (List α) :=
   B.toList.map serializeVector
 
-private def intRow2 (a0 a1 : Int) : Vector Int 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
+private def matrixOfList2D! [Inhabited α] (rows : List (List α)) : Matrix α n m :=
+  (Matrix.ofList2D (n := n) (m := m) rows).get!
 
-private def intRow3 (a0 a1 a2 : Int) : Vector Int 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      a0
-    else if i.1 = 1 then
-      a1
-    else
-      a2
-
-private def intMat2
-    (a00 a01 : Int)
-    (a10 a11 : Int) : Matrix Int 2 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then intRow2 a00 a01 else intRow2 a10 a11
-
-private def intMat3
-    (a00 a01 a02 : Int)
-    (a10 a11 a12 : Int)
-    (a20 a21 a22 : Int) : Matrix Int 3 3 :=
-  Vector.ofFn fun i =>
-    if i.1 = 0 then
-      intRow3 a00 a01 a02
-    else if i.1 = 1 then
-      intRow3 a10 a11 a12
-    else
-      intRow3 a20 a21 a22
-
-private def ratRow2 (a0 a1 : Rat) : Vector Rat 2 :=
-  Vector.ofFn fun i => if i.1 = 0 then a0 else a1
 private def fin3_0 : Fin 3 := ⟨0, by decide⟩
 private def fin3_1 : Fin 3 := ⟨1, by decide⟩
 private def fin3_2 : Fin 3 := ⟨2, by decide⟩
 
 private def detTypical : Matrix Int 3 3 :=
-  intMat3 2 1 0 1 3 4 0 2 5
+  matrixOfList2D! [[2, 1, 0], [1, 3, 4], [0, 2, 5]]
 
 private def detEdge : Matrix Int 2 2 :=
-  intMat2 1 0 0 1
+  matrixOfList2D! [[1, 0], [0, 1]]
 
 private def detAdversarial : Matrix Int 2 2 :=
-  intMat2 1 2 2 4
+  matrixOfList2D! [[1, 2], [2, 4]]
 
 private def identity3 : Matrix Int 3 3 :=
   Matrix.identity
 
 private def denseAdversarial : Matrix Int 3 3 :=
-  intMat3 1 2 3 4 5 6 7 8 9
-
+  matrixOfList2D! [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
 /-- info: 9 -/
 #guard_msgs in
 #eval Matrix.det detTypical
@@ -166,7 +137,6 @@ private def denseAdversarial : Matrix Int 3 3 :=
 #guard Matrix.det (Matrix.rowAdd detTypical fin3_2 fin3_0 3) = Matrix.det detTypical
 #guard Matrix.det (Matrix.rowAdd identity3 fin3_0 fin3_1 0) = Matrix.det identity3
 #guard Matrix.det (Matrix.rowAdd denseAdversarial fin3_1 fin3_2 (-2)) = Matrix.det denseAdversarial
-
 end Conformance
 
 end HexMatrix
