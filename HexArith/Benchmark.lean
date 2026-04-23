@@ -1,4 +1,6 @@
+import HexArith.Barrett.Context
 import HexArith.ExtGcd
+import HexArith.Montgomery.Context
 import HexArith.PowMod
 
 /-!
@@ -63,6 +65,78 @@ structure PowModResult where
   name : String
   value : Nat
 
+/-- Which reduction path a committed comparison case is meant to highlight. -/
+inductive ReductionPreference
+  | barrett
+  | montgomery
+  | crossover
+  deriving Repr, DecidableEq
+
+/-- Stable identifiers for the committed reduction comparison cases. -/
+inductive ReductionComparisonCaseId
+  | barrettTiny
+  | barrettUpperEdge
+  | montgomeryCrossover
+  deriving Repr, DecidableEq
+
+/--
+Named Barrett-versus-Montgomery comparison case.
+
+The runner dispatches by `ReductionComparisonCaseId`, which lets the
+implementation construct proof-carrying Barrett and Montgomery contexts
+for each committed modulus directly.
+-/
+structure ReductionComparisonCase where
+  id : ReductionComparisonCaseId
+  name : String
+  modulus : UInt64
+  a : UInt64
+  b : UInt64
+  preference : ReductionPreference
+
+/-- Materialized result for one reduction-path measurement case. -/
+structure ReductionComparisonResult where
+  name : String
+  modulus : UInt64
+  a : UInt64
+  b : UInt64
+  preference : ReductionPreference
+  barrettValue? : Option UInt64
+  montgomeryValue? : Option UInt64
+
+/-- Render the committed reduction preference as a stable CSV token. -/
+def ReductionPreference.csvTag : ReductionPreference → String
+  | .barrett => "barrett"
+  | .montgomery => "montgomery"
+  | .crossover => "crossover"
+
+/-- Render an optional `UInt64` result field for CSV-style output. -/
+def renderUInt64Field (value? : Option UInt64) : String :=
+  match value? with
+  | some value => toString value.toNat
+  | none => "NA"
+
+/--
+Serialize one comparison result as a stable machine-readable row.
+
+The output is intentionally simple CSV so later benchmark scripts can
+ingest it without having to parse Lean `repr` output.
+-/
+def ReductionComparisonResult.toCsvRow (result : ReductionComparisonResult) : String :=
+  ",".intercalate
+    [ result.name
+    , toString result.modulus.toNat
+    , toString result.a.toNat
+    , toString result.b.toNat
+    , result.preference.csvTag
+    , renderUInt64Field result.barrettValue?
+    , renderUInt64Field result.montgomeryValue?
+    ]
+
+/-- Header shared by the comparison runner's CSV-style output. -/
+def reductionComparisonCsvHeader : String :=
+  "name,modulus,a,b,preference,barrett,montgomery"
+
 /--
 Stable `Nat` extended-GCD benchmark cases.
 
@@ -111,6 +185,38 @@ def powModCases : List PowModCase :=
   , { name := "powmod-fermat-boundary", a := 1844674407370955161, n := 8191, p := 4294967291 }
   ]
 
+/--
+Stable Barrett-versus-Montgomery comparison cases.
+
+The committed cases cover a tiny Barrett-friendly modulus, one modulus
+near the top of the current Barrett range, and one odd modulus that is
+small enough for the current Montgomery scaffold and serves as the
+committed Montgomery-favored crossover point.
+-/
+def reductionComparisonCases : List ReductionComparisonCase :=
+  [ { id := .barrettTiny
+    , name := "reduction-barrett-tiny"
+    , modulus := 257
+    , a := 231
+    , b := 199
+    , preference := .barrett
+    }
+  , { id := .barrettUpperEdge
+    , name := "reduction-barrett-upper-edge"
+    , modulus := 4294967291
+    , a := 4294967289
+    , b := 4294967231
+    , preference := .crossover
+    }
+  , { id := .montgomeryCrossover
+    , name := "reduction-montgomery-crossover"
+    , modulus := 65537
+    , a := 65535
+    , b := 65521
+    , preference := .montgomery
+    }
+  ]
+
 /-- Execute one named `Nat` extended-GCD benchmark case. -/
 def runNatExtGcdCase (c : NatExtGcdCase) : NatExtGcdResult :=
   let (g, s, t) := HexArith.extGcd c.a c.b
@@ -130,6 +236,42 @@ def runUInt64ExtGcdCase (c : UInt64ExtGcdCase) : UInt64ExtGcdResult :=
 def runPowModCase (c : PowModCase) : PowModResult :=
   { name := c.name, value := HexArith.powMod c.a c.n c.p }
 
+/-- Execute the Barrett path for one committed comparison case. -/
+def runBarrettComparison? (id : ReductionComparisonCaseId) : Option UInt64 :=
+  match id with
+  | .barrettTiny =>
+      let ctx : BarrettCtx 257 := BarrettCtx.mk 257 (by decide) (by decide)
+      some (ctx.mulMod 231 199)
+  | .barrettUpperEdge =>
+      let ctx : BarrettCtx 4294967291 := BarrettCtx.mk 4294967291 (by decide) (by decide)
+      some (ctx.mulMod 4294967289 4294967231)
+  | .montgomeryCrossover =>
+      let ctx : BarrettCtx 65537 := BarrettCtx.mk 65537 (by decide) (by decide)
+      some (ctx.mulMod 65535 65521)
+
+/-- Execute the Montgomery path for one committed comparison case when supported. -/
+def runMontgomeryComparison? (id : ReductionComparisonCaseId) : Option UInt64 :=
+  match id with
+  | .barrettTiny =>
+      let ctx : MontCtx 257 := MontCtx.mk 257 (by decide)
+      some (ctx.fromMont (ctx.mulMont (ctx.toMont 231) (ctx.toMont 199)))
+  | .barrettUpperEdge =>
+      none
+  | .montgomeryCrossover =>
+      let ctx : MontCtx 65537 := MontCtx.mk 65537 (by decide)
+      some (ctx.fromMont (ctx.mulMont (ctx.toMont 65535) (ctx.toMont 65521)))
+
+/-- Execute one named reduction-comparison benchmark case. -/
+def runReductionComparisonCase (c : ReductionComparisonCase) : ReductionComparisonResult :=
+  { name := c.name
+  , modulus := c.modulus
+  , a := c.a
+  , b := c.b
+  , preference := c.preference
+  , barrettValue? := runBarrettComparison? c.id
+  , montgomeryValue? := runMontgomeryComparison? c.id
+  }
+
 /-- Execute all committed `Nat` extended-GCD benchmark cases. -/
 def runNatExtGcdCases : List NatExtGcdResult :=
   natExtGcdCases.map runNatExtGcdCase
@@ -145,5 +287,13 @@ def runUInt64ExtGcdCases : List UInt64ExtGcdResult :=
 /-- Execute all committed modular-exponentiation benchmark cases. -/
 def runPowModCases : List PowModResult :=
   powModCases.map runPowModCase
+
+/-- Execute all committed reduction-comparison benchmark cases. -/
+def runReductionComparisonCases : List ReductionComparisonResult :=
+  reductionComparisonCases.map runReductionComparisonCase
+
+/-- Execute all comparison cases and return CSV-style rows for tooling. -/
+def runReductionComparisonCsv : List String :=
+  reductionComparisonCsvHeader :: runReductionComparisonCases.map ReductionComparisonResult.toCsvRow
 
 end HexArith.Benchmark
