@@ -7,11 +7,10 @@ import HexGramSchmidt.Update
 /-!
 Gram-Schmidt scaffolding.
 
-This root module re-exports the scaffolded integer-input
-and rational-input Gram-Schmidt basis, coefficient, and
-Gram-determinant declarations, together with the integer
-scaled-coefficient and row-operation update surface that downstream
-LLL work will build on.
+This root module re-exports the scaffolded integer-input Gram-Schmidt
+basis, coefficient, Gram-determinant, and row-operation surface,
+together with the executable rational-input Gram-determinant helper
+used by downstream LLL work.
 -/
 
 namespace HexGramSchmidt

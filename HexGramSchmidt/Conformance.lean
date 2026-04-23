@@ -15,15 +15,17 @@ Gram-Schmidt basis, coefficient, and Gram-determinant surface.
 - **Covered operations:** `Hex.GramSchmidt.Int.basis`,
   `Hex.GramSchmidt.Int.coeffs`, `Hex.GramSchmidt.Int.gramDet`,
   `Hex.GramSchmidt.Int.gramDetVec`, `Hex.GramSchmidt.Int.scaledCoeffs`,
-  `Hex.GramSchmidt.Rat.basis`, `Hex.GramSchmidt.Rat.gramDet`.
+  `Hex.GramSchmidt.Rat.gramDet`.
 - **Covered properties:**
   - integer-input basis satisfies the theorem-backed `basis_zero`
     contract on committed fixtures;
   - integer coefficient checks stay on the theorem-backed diagonal and
     upper-triangular shape guarantees, including `coeffs_diag` and
     `coeffs_upper`;
-  - integer and rational Gram determinants match the leading Gram-matrix
-    determinant on typical, edge, and adversarial fixtures;
+- rational Gram determinants match the leading Gram-matrix determinant
+  on typical, edge, and adversarial fixtures;
+- integer Gram determinants match the leading Gram-matrix
+  determinant on typical, edge, and adversarial fixtures;
   - integer `gramDetVec` packages the full prefix determinant sequence;
   - integer scaled coefficients agree with the determinant witnesses and
     the `scaledCoeffs_eq` theorem on committed lower-triangular entries;
@@ -143,15 +145,7 @@ example :
         Matrix.entry (GramSchmidt.Int.coeffs intTypical) 2 1 := by
   simpa using GramSchmidt.Int.scaledCoeffs_eq intTypical 2 1 (by decide) (by decide)
 
-/-! ## Rational basis, coefficients, and Gram determinants -/
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratTypical) 1 = vectorOfList! [3 / 2, -1] := by
-  rfl
-
-example :
-    Matrix.row (GramSchmidt.Rat.basis ratEdge) 1 = vectorOfList! [0, 1] := by
-  rfl
+/-! ## Rational Gram determinants -/
 
 #guard GramSchmidt.Rat.gramDet ratTypical 0 (by decide) = 1
 #guard GramSchmidt.Rat.gramDet ratTypical 1 (by decide) = 5
