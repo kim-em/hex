@@ -30,6 +30,14 @@ variable {R : Type u} [Zero R] [One R] [Add R] [Mul R]
 variable {n m : Nat} {M : Matrix R n m} {D : RowEchelonData R n m}
 
 /--
+Temporary Phase 1 scaffold upgrading the recorded left inverse of the
+transform matrix to a right inverse for the square `n × n` case.
+-/
+theorem transform_mul_inv (E : IsEchelonForm M D) :
+    ∃ Tinv : Matrix R n n, D.transform * Tinv = 1 := by
+  sorry
+
+/--
 Temporary Phase 1 scaffold for the sorted complement of the pivot columns.
 -/
 def freeCols (E : IsEchelonForm M D) : Vector (Fin m) (m - D.rank) :=
@@ -39,6 +47,16 @@ def freeCols (E : IsEchelonForm M D) : Vector (Fin m) (m - D.rank) :=
 
 theorem freeCols_sorted (E : IsEchelonForm M D) :
     ∀ (i j : Fin (m - D.rank)), i.val < j.val → E.freeCols[i] < E.freeCols[j] := by
+  sorry
+
+/-- The sorted pivot-column vector has no duplicates. -/
+theorem pivotCols_injective (E : IsEchelonForm M D) :
+    Function.Injective (fun i : Fin D.rank => D.pivotCols[i]) := by
+  sorry
+
+/-- The sorted free-column vector has no duplicates. -/
+theorem freeCols_injective (E : IsEchelonForm M D) :
+    Function.Injective (fun k : Fin (m - D.rank) => E.freeCols[k]) := by
   sorry
 
 /-- Every column is either a pivot column or a free column. -/
@@ -51,6 +69,12 @@ theorem colPartition (E : IsEchelonForm M D) (j : Fin m) :
 theorem colPartition_exclusive (E : IsEchelonForm M D) (j : Fin m) :
     ¬((∃ i : Fin D.rank, D.pivotCols[i] = j) ∧
       (∃ k : Fin (m - D.rank), E.freeCols[k] = j)) := by
+  sorry
+
+/-- No pivot column appears in the free-column complement. -/
+theorem pivotCols_disjoint_freeCols (E : IsEchelonForm M D)
+    (i : Fin D.rank) (k : Fin (m - D.rank)) :
+    D.pivotCols[i] ≠ E.freeCols[k] := by
   sorry
 
 end IsEchelonForm
