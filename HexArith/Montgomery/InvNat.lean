@@ -25,6 +25,15 @@ can refine this to the intended Newton iteration without changing the API.
 def montPosInv (p : UInt64) : UInt64 :=
   .ofNat <| findWitness montgomeryInvRadix fun x => (p.toNat * x) % montgomeryInvRadix == 1
 
+/--
+One Newton/Hensel refinement step doubles the modulus precision of a positive
+Montgomery inverse witness.
+-/
+theorem newton_step {p x : Nat} (hp_odd : p % 2 = 1) (k : Nat)
+    (hxk : p * x % 2 ^ k = 1) :
+    p * (x * (2 - p * x)) % 2 ^ (2 * k) = 1 := by
+  sorry
+
 theorem montPosInv_spec (p : UInt64) (hp_odd : p.toNat % 2 = 1) :
     p.toNat * (montPosInv p).toNat % (2 ^ 64) = 1 := by
   sorry
