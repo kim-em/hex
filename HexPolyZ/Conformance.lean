@@ -6,7 +6,8 @@ import HexPolyZ.Content
 Deterministic Lean-only conformance checks for the currently exported
 `HexPolyZ` core/content surface. Every check elaborates as part of
 `lake build HexPolyZ`, so regressions in congruence, coprimeness,
-content, or primitive-part normalization fail CI immediately.
+content, primitive-part normalization, or the executable Mignotte-bound
+helpers fail CI immediately.
 
 **Conformance contract for this slice:**
 
@@ -15,7 +16,10 @@ content, or primitive-part normalization fail CI immediately.
 - **Mode:** `always`.
 - **Covered operations:** `HexPolyZ.ZPoly.congr`,
   `HexPolyZ.ZPoly.coprimeModP`, `HexPolyZ.ZPoly.content`,
-  `HexPolyZ.ZPoly.primitivePart`.
+  `HexPolyZ.ZPoly.primitivePart`, `HexPolyZ.ZPoly.binomial`,
+  `HexPolyZ.ZPoly.coeffTwoNormSq`, `HexPolyZ.ZPoly.coeffTwoNormCeil`,
+  `HexPolyZ.ZPoly.mignotteBound`, `HexPolyZ.ZPoly.mignotteCoeffBound`,
+  `HexPolyZ.ZPoly.mignotteUniformBound`.
 - **Covered properties:**
   - congruence holds on committed equal/nonzero, zero, and
     trailing-zero-normalized examples;
@@ -24,10 +28,18 @@ content, or primitive-part normalization fail CI immediately.
   - `HexPoly.DensePoly.scaleInt (content f) (primitivePart f) = f` on
     committed typical, edge, and adversarial inputs;
   - nonzero committed primitive parts have content `1`.
+  - `binomial n k = 0` on committed out-of-range inputs and remains
+    symmetric on a representative interior case;
+  - trailing-zero normalization preserves the committed coefficient
+    `2`-norm and its exact ceiling;
+  - `mignotteCoeffBound f k j = binomial k j * coeffTwoNormCeil f` and
+    `mignotteUniformBound f k = mignotteCoeffBound f k (k / 2)` on
+    committed inputs.
 - **Covered edge cases:** zero polynomials for congruence, coprimeness,
   content, and primitive part; modulus `1` for the coprime-mod-`p`
-  witness boundary; and trailing-zero coefficient arrays that must
-  normalize before the core/content predicates observe them.
+  witness boundary; trailing-zero coefficient arrays that must
+  normalize before the core/content predicates observe them; and
+  out-of-range binomial indices / zero-degree Mignotte inputs.
 -/
 
 namespace HexPolyZ
@@ -58,6 +70,15 @@ private def contentTypical : HexPolyZ.ZPoly :=
 
 private def contentAdversarial : HexPolyZ.ZPoly :=
   HexPoly.DensePoly.ofArray #[0, -12, 18, 0, 0]
+
+private def mignotteTypical : HexPolyZ.ZPoly :=
+  HexPoly.DensePoly.ofArray #[2, -3, 5]
+
+private def mignotteAdversarial : HexPolyZ.ZPoly :=
+  HexPoly.DensePoly.ofArray #[0, -5, 0, 12, 0, 0]
+
+private def mignotteAdversarialNormalized : HexPolyZ.ZPoly :=
+  HexPoly.DensePoly.ofArray #[0, -5, 0, 12]
 
 /-! ## `ZPoly.congr` -/
 
@@ -139,6 +160,95 @@ example :
 
 #guard HexPolyZ.ZPoly.content (HexPolyZ.ZPoly.primitivePart contentTypical) = 1
 #guard HexPolyZ.ZPoly.content (HexPolyZ.ZPoly.primitivePart contentAdversarial) = 1
+
+/-! ## Executable Mignotte helpers -/
+
+-- `#eval` refuses `DensePoly` values while `HexPoly.DensePoly.ofArray` carries `sorry`-backed proofs.
+
+/-! ### `ZPoly.binomial` -/
+
+/-- info: 10 -/
+#guard_msgs in #eval HexPolyZ.ZPoly.binomial 5 2
+
+/-- info: 0 -/
+#guard_msgs in #eval HexPolyZ.ZPoly.binomial 0 3
+
+/-- info: 0 -/
+#guard_msgs in #eval HexPolyZ.ZPoly.binomial 4 5
+
+#guard HexPolyZ.ZPoly.binomial 5 2 = HexPolyZ.ZPoly.binomial 5 3
+#guard HexPolyZ.ZPoly.binomial 4 5 = 0
+
+/-! ### `ZPoly.coeffTwoNormSq` and `ZPoly.coeffTwoNormCeil` -/
+
+/-- info: 38 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormSq mignotteTypical
+
+/-- info: 0 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormSq (0 : HexPolyZ.ZPoly)
+
+/-- info: 169 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormSq mignotteAdversarial
+
+/-- info: 7 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormCeil mignotteTypical
+
+/-- info: 0 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormCeil (0 : HexPolyZ.ZPoly)
+
+/-- info: 13 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.coeffTwoNormCeil mignotteAdversarial
+
+#guard HexPolyZ.ZPoly.coeffTwoNormSq mignotteAdversarial =
+  HexPolyZ.ZPoly.coeffTwoNormSq mignotteAdversarialNormalized
+#guard HexPolyZ.ZPoly.coeffTwoNormCeil mignotteAdversarial =
+  HexPolyZ.ZPoly.coeffTwoNormCeil mignotteAdversarialNormalized
+#guard
+  let ceil := HexPolyZ.ZPoly.coeffTwoNormCeil mignotteTypical
+  let sq := HexPolyZ.ZPoly.coeffTwoNormSq mignotteTypical
+  ceil ^ 2 >= sq && (ceil - 1) ^ 2 < sq
+
+/-! ### `ZPoly.mignotteBound`, `ZPoly.mignotteCoeffBound`, and `ZPoly.mignotteUniformBound` -/
+
+/-- info: 18.493242 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteBound mignotteTypical 3 1
+
+/-- info: 0.000000 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteBound (0 : HexPolyZ.ZPoly) 5 2
+
+/-- info: 78.000000 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteBound mignotteAdversarial 4 2
+
+/-- info: 21 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteCoeffBound mignotteTypical 3 1
+
+/-- info: 0 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteCoeffBound (0 : HexPolyZ.ZPoly) 5 2
+
+/-- info: 78 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteCoeffBound mignotteAdversarial 4 2
+
+/-- info: 42 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteUniformBound mignotteTypical 4
+
+/-- info: 0 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteUniformBound (0 : HexPolyZ.ZPoly) 5
+
+/-- info: 78 -/
+#guard_msgs in #eval! HexPolyZ.ZPoly.mignotteUniformBound mignotteAdversarial 4
+
+#guard
+  HexPolyZ.ZPoly.mignotteCoeffBound mignotteTypical 3 1 =
+    HexPolyZ.ZPoly.binomial 3 1 * HexPolyZ.ZPoly.coeffTwoNormCeil mignotteTypical
+#guard
+  HexPolyZ.ZPoly.mignotteCoeffBound mignotteAdversarial 4 2 =
+    HexPolyZ.ZPoly.binomial 4 2 * HexPolyZ.ZPoly.coeffTwoNormCeil mignotteAdversarial
+#guard
+  HexPolyZ.ZPoly.mignotteUniformBound mignotteTypical 4 =
+    HexPolyZ.ZPoly.mignotteCoeffBound mignotteTypical 4 (4 / 2)
+#guard
+  HexPolyZ.ZPoly.mignotteUniformBound mignotteAdversarial 4 =
+    HexPolyZ.ZPoly.mignotteCoeffBound mignotteAdversarial 4 (4 / 2)
 
 end ZPoly
 end Conformance
