@@ -1,0 +1,3 @@
+import Verso
+
+namespace HexManual
