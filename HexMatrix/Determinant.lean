@@ -81,6 +81,40 @@ def det [Zero R] [One R] [Add R] [Mul R] [Neg R] (M : Matrix R n n) : R :=
     (fun acc σ => acc + permSign σ * permTerm M σ)
     0
 
+/--
+Predicate recording that a Bareiss run can proceed without row pivoting.
+
+Phase 1 exposes the name expected by the spec; the substantive pivot
+invariant is deferred to later determinant work.
+-/
+def NonzeroBareissPivots (_M : Matrix Int n n) : Prop :=
+  True
+
+/--
+Scaffolded fraction-free determinant path with no row pivoting.
+
+Phase 1 keeps this executable by deferring to the existing determinant
+definition until the Bareiss recurrence is implemented.
+-/
+def bareissNoPivot (M : Matrix Int n n) : Int :=
+  det M
+
+/--
+Scaffolded Bareiss determinant with the public row-pivoting-facing name
+used by the spec and downstream theorem statements.
+-/
+def bareissDet (M : Matrix Int n n) : Int :=
+  bareissNoPivot M
+
+/--
+Public Bareiss determinant entry point.
+
+This remains executable at Phase 1 while the dedicated Bareiss algorithm
+and correctness proof are scaffolded separately.
+-/
+def bareiss (M : Matrix Int n n) : Int :=
+  bareissDet M
+
 end Matrix
 
 open Matrix
@@ -89,5 +123,18 @@ open Matrix
 theorem det_one {R : Type u} [CommRing R] {n : Nat} :
     Matrix.det ((Matrix.identity : Matrix R n n)) = 1 := by
   sorry
+
+theorem bareissNoPivot_eq_det {n : Nat} (M : Matrix Int n n)
+    (_h : Matrix.NonzeroBareissPivots M) :
+    Matrix.bareissNoPivot M = Matrix.det M := by
+  rfl
+
+theorem bareissDet_eq_det {n : Nat} (M : Matrix Int n n) :
+    Matrix.bareissDet M = Matrix.det M := by
+  rfl
+
+theorem bareiss_eq_det {n : Nat} (M : Matrix Int n n) :
+    Matrix.bareiss M = Matrix.det M := by
+  rfl
 
 end HexMatrix
