@@ -1,4 +1,3 @@
-import HexModArith
 import HexPolyFp
 import HexPolyZ
 
@@ -14,7 +13,6 @@ compatibility and congruence facts for later lifting phases.
 
 namespace HexHensel
 
-open HexModArith
 open HexPolyFp
 open HexPolyZ
 
@@ -24,8 +22,8 @@ variable {p : Nat} [NeZero p]
 
 /-- Reduce an integer polynomial coefficientwise modulo `p`. -/
 def modP (p : Nat) [NeZero p] (f : ZPoly) : FpPoly p :=
-  HexPoly.DensePoly.ofArray (R := ZMod64 p) <|
-    f.coeffs.map fun coeff : Int => (Int.cast coeff : ZMod64 p)
+  HexPoly.DensePoly.ofArray (R := HexModArith.ZMod64 p) <|
+    f.coeffs.map fun coeff : Int => (Int.cast coeff : HexModArith.ZMod64 p)
 
 /--
 Reduce an integer polynomial coefficientwise modulo `p^k` using the
@@ -81,7 +79,7 @@ theorem coeff_liftToZ_lt (f : FpPoly p) (n : Nat) :
 
 /-- Lifting commutes with coefficientwise reduction back to `FpPoly p`. -/
 theorem liftToZ_modP_coeff (f : ZPoly) (n : Nat) :
-    (ZPoly.modP p f).coeff n = ((f.coeff n : Int) : ZMod64 p) := by
+    (ZPoly.modP p f).coeff n = ((f.coeff n : Int) : HexModArith.ZMod64 p) := by
   sorry
 
 /-- Reducing a lifted `FpPoly` modulo `p` recovers the original coefficients. -/
