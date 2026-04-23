@@ -1,7 +1,8 @@
-import HexGF2.Gcd
+import HexGF2.GF2n
+import HexGF2.GF2nPoly
 
 /-!
-# `HexGF2` -- packed-core and Euclidean conformance
+# `HexGF2` -- packed-core, Euclidean, and extension-field conformance
 
 Deterministic Lean-only conformance checks for the packed `GF(2)`
 core arithmetic surface.
@@ -13,7 +14,9 @@ core arithmetic surface.
 - **Covered operations:** `Hex.pureClmul`, `HexGF2.clmul`,
   `GF2Poly.ofWords`, packed XOR addition, `GF2Poly.shiftLeft`,
   `GF2Poly.shiftRight`, `GF2Poly.divMod`, `(/)`, `(%)`,
-  `GF2Poly.gcd`, `GF2Poly.xgcd`.
+  `GF2Poly.gcd`, `GF2Poly.xgcd`, `GF2n` `0` / `1` / `(+)` /
+  `(*)` / `Inv.inv`, `GF2nPoly` `0` / `1` / `(+)` / `(*)` /
+  `Inv.inv` / `(/)`.
 - **Covered properties:**
   - `HexGF2.clmul` agrees with the pure-Lean `Hex.pureClmul`
     reference semantics on committed fixtures;
@@ -32,12 +35,21 @@ core arithmetic surface.
   - `GF2Poly.gcd` agrees with the `gcd` field of `GF2Poly.xgcd` on
     committed fixtures;
   - packed `GF2Poly.xgcd` data satisfies the committed Bezout
-    identity.
+    identity;
+  - committed `GF2n` and `GF2nPoly` fixtures serialize to the
+    expected reduced representatives for `0`, `1`, addition,
+    multiplication, and one inverse-or-division path on each
+    carrier;
+  - committed `GF2n` and `GF2nPoly` fixtures satisfy
+    characteristic-two cancellation (`x + x = 0`, `x - x = 0`) and
+    the nonzero inverse contract.
 - **Covered edge cases:** zero inputs for carry-less multiply,
   empty packed words, cancellation to zero under XOR addition, and
   cross-word carry / borrow behavior for bit shifts, division by the
-  zero polynomial, a zero left Euclidean input, and a nonzero
-  remainder Euclidean step.
+  zero polynomial, a zero left Euclidean input, a nonzero
+  remainder Euclidean step, the packed extension-field zero / one
+  representatives, and a quotient-field division fixture whose
+  result reduces modulo the committed irreducible polynomial.
 -/
 
 namespace HexGF2
@@ -56,6 +68,51 @@ private def serializeDivMod (result : GF2Poly.DivMod) :
 private def serializeXgcd (result : GF2Poly.Xgcd) :
     (List Nat × Nat) × (List Nat × Nat) × (List Nat × Nat) :=
   (serializePoly result.gcd, serializePoly result.s, serializePoly result.t)
+
+private def serializeGF2n {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    (x : GF2n n irr hn hn64 hirr) : Nat :=
+  x.val.toNat
+
+private def gf2nIrr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic 0x3 3) := by
+  simp [GF2Poly.Irreducible, GF2Poly.IsZero, GF2Poly.ofUInt64Monic]
+
+private theorem gf2nPos : 0 < 3 := by
+  decide
+
+private theorem gf2nLt64 : 3 < 64 := by
+  decide
+
+private abbrev GF2nFixture :=
+  GF2n 3 0x3 gf2nPos gf2nLt64 gf2nIrr
+
+private def gf2nTypical : GF2nFixture :=
+  { val := 0x5
+    val_lt := by decide }
+
+private def gf2nTypicalRight : GF2nFixture :=
+  { val := 0x7
+    val_lt := by decide }
+
+private def gf2nInvFixture : GF2nFixture :=
+  { val := 0x3
+    val_lt := by decide }
+
+private def gf2nPolyModulus : GF2Poly :=
+  GF2Poly.ofUInt64Monic 0x3 3
+
+private abbrev GF2nPolyFixture :=
+  GF2nPoly gf2nPolyModulus gf2nIrr
+
+private def gf2nPolyTypical : GF2nPolyFixture :=
+  GF2nPoly.ofPoly (f := gf2nPolyModulus) (GF2Poly.ofWords #[0x3]) gf2nIrr
+
+private def gf2nPolyTypicalRight : GF2nPolyFixture :=
+  GF2nPoly.ofPoly (f := gf2nPolyModulus) (GF2Poly.ofWords #[0x5]) gf2nIrr
+
+private def gf2nPolyInvFixture : GF2nPolyFixture :=
+  GF2nPoly.ofPoly (f := gf2nPolyModulus) (GF2Poly.ofWords #[0x2]) gf2nIrr
 
 private def ofWordsTypicalInput : Array UInt64 :=
   #[0x13, 0x80]
@@ -333,8 +390,73 @@ example :
         ((GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).s *
             euclidAdversarialDividend +
           (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).t *
-            euclidAdversarialDivisor) =
+          euclidAdversarialDivisor) =
       serializePoly (GF2Poly.xgcd euclidAdversarialDividend euclidAdversarialDivisor).gcd := by
+  decide
+
+/-! ## `GF2n` extension arithmetic -/
+
+-- `#eval!` is required here because `GF2n.ofUInt64` stores the
+-- sorry-backed `val_lt` proof field in the resulting structure.
+/-- info: 0 -/
+#guard_msgs in
+#eval! serializeGF2n (0 : GF2nFixture)
+
+/-- info: 1 -/
+#guard_msgs in
+#eval! serializeGF2n (1 : GF2nFixture)
+
+/-- info: 2 -/
+#guard_msgs in
+#eval! serializeGF2n (gf2nTypical + gf2nTypicalRight)
+
+example : serializeGF2n (gf2nTypical * gf2nTypicalRight) = 6 := by
+  decide
+
+example : serializeGF2n (gf2nInvFixture⁻¹) = 6 := by
+  decide
+
+#guard serializeGF2n (gf2nTypical + gf2nTypical) = 0
+
+#guard serializeGF2n (gf2nTypical - gf2nTypical) = 0
+
+example :
+    serializeGF2n gf2nInvFixture ≠ 0 ∧
+      serializeGF2n (gf2nInvFixture * gf2nInvFixture⁻¹) = 1 := by
+  decide
+
+/-! ## `GF2nPoly` quotient arithmetic -/
+
+-- `#eval!` is required here because `GF2nPoly.ofPoly` stores the
+-- sorry-backed `val_reduced` proof field in the resulting structure.
+/-- info: ([], 0) -/
+#guard_msgs in
+#eval! serializePoly ((0 : GF2nPolyFixture).val)
+
+/-- info: ([1], 0) -/
+#guard_msgs in
+#eval! serializePoly ((1 : GF2nPolyFixture).val)
+
+/-- info: ([6], 2) -/
+#guard_msgs in
+#eval! serializePoly ((gf2nPolyTypical + gf2nPolyTypicalRight).val)
+
+example : serializePoly ((gf2nPolyTypical * gf2nPolyTypicalRight).val) = ([4], 2) := by
+  decide
+
+example : serializePoly ((gf2nPolyInvFixture⁻¹).val) = ([5], 2) := by
+  decide
+
+example : serializePoly ((gf2nPolyInvFixture / gf2nPolyTypicalRight).val) = ([4], 2) := by
+  decide
+
+#guard serializePoly ((gf2nPolyTypical + gf2nPolyTypical).val) = ([], 0)
+
+#guard serializePoly ((gf2nPolyTypical - gf2nPolyTypical).val) = ([], 0)
+
+example :
+    serializePoly gf2nPolyInvFixture.val ≠ ([], 0) ∧
+      serializePoly ((gf2nPolyInvFixture * gf2nPolyInvFixture⁻¹).val) = ([1], 0) := by
   decide
 
 end Conformance
