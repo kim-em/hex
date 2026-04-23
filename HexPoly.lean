@@ -15,7 +15,7 @@ scaffolds used by downstream polynomial libraries, including the
 quotient/remainder division, GCD, CRT, evaluation, composition, and
 derivative surfaces together with the integer content and primitive-part
 layer plus the committed `core` conformance checks for the executable
-evaluation API.
+evaluation, arithmetic, division, and GCD APIs.
 -/
 
 namespace HexPoly
