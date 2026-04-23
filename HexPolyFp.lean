@@ -2,6 +2,7 @@ import HexPolyFp.Core
 import HexPolyFp.Frobenius
 import HexPolyFp.ModCompose
 import HexPolyFp.SquareFree
+import HexPolyFp.Conformance
 
 /-!
 `HexPolyFp` re-exports the dense `FpPoly p := DensePoly (ZMod64 p)` core
