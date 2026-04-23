@@ -1,4 +1,5 @@
 import HexPolyMathlib.DensePoly
+import HexPolyMathlib.Conformance
 import HexPolyMathlib.Gcd
 
 /-!
