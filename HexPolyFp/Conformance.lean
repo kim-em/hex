@@ -1,5 +1,6 @@
 import HexPolyFp.Frobenius
 import HexPolyFp.ModCompose
+import HexPolyFp.SquareFree
 
 /-!
 # `HexPolyFp` -- core conformance
@@ -18,7 +19,9 @@ executable quotient-ring operations fail CI immediately.
 - **Covered operations:** `HexPolyFp.FpPoly.powModMonic`,
   `HexPolyFp.FpPoly.frobeniusModMonic`,
   `HexPolyFp.FpPoly.frobeniusPowModMonic`,
-  `HexPolyFp.FpPoly.modComposeMonic`.
+  `HexPolyFp.FpPoly.modComposeMonic`,
+  `HexPolyFp.FpPoly.squareFreeDecomposition`,
+  `HexPolyFp.FpPoly.squareFreePart`.
 - **Covered properties:**
   - modular powers stay normalized and idempotent under
     `modMonic`, agree with the naive repeated-multiplication
@@ -33,10 +36,19 @@ executable quotient-ring operations fail CI immediately.
   - modular composition agrees with dense composition followed by
     `modMonic`, stays normalized, is idempotent under `modMonic`, and
     stays below the monic modulus degree on committed nonzero moduli.
+  - square-free decomposition records the expected factor/multiplicity
+    pairs on committed small-prime examples, reconstructs the input via
+    its `product`, and records only positive multiplicities on those
+    examples;
+  - the recorded square-free factors are pairwise coprime and
+    individually square-free on committed examples;
+  - square-free part extraction returns the first decomposition layer
+    and that extracted factor is square-free on committed examples.
 - **Covered edge cases:** exponent `0` for modular power, zero
   polynomial inputs for Frobenius and modular composition, linear
-  monic moduli, and trailing-zero coefficient arrays that must
-  normalize before modular reduction.
+  monic moduli, a degree-0 polynomial for square-free extraction, and
+  trailing-zero coefficient arrays that must normalize before modular
+  reduction and decomposition.
 -/
 
 namespace HexPolyFp
@@ -93,6 +105,58 @@ private def composeAdversarialInner : P3 := poly3 [2, 1]
 private def composeAdversarialModulus : P3 := poly3 [2, 1, 1]
 private def composeAdversarialResult : P3 :=
   modComposeMonic composeAdversarialOuter composeAdversarialInner composeAdversarialModulus
+
+private def squareFreeFactorView {p : Nat} [NeZero p] (part : SquareFreeFactor p) :
+    List Nat × Nat :=
+  (coeffsToNat part.factor, part.multiplicity)
+
+private def squareFreeFactorsView {p : Nat} [NeZero p] (decomp : SquareFreeDecomposition p) :
+    List (List Nat × Nat) :=
+  decomp.factors.toList.map squareFreeFactorView
+
+private def squareFreeCoeffDiv {p : Nat} [NeZero p] (a b : ZMod64 p) : ZMod64 p :=
+  match HexModArith.ZMod64.inv? b with
+  | some bInv => a * bInv
+  | none => 0
+
+private def squareFreeGcd {p : Nat} [NeZero p] (f g : HexPolyFp.FpPoly p) : HexPolyFp.FpPoly p := by
+  let _ : Div (ZMod64 p) := ⟨squareFreeCoeffDiv (p := p)⟩
+  exact HexPoly.DensePoly.gcd (R := ZMod64 p) f g
+
+private def squareFreeIsSquareFree {p : Nat} [NeZero p] (f : HexPolyFp.FpPoly p) : Bool :=
+  coeffsToNat (squareFreeGcd f (formalDerivative f)) = coeffsToNat (C (1 : ZMod64 p))
+
+private def squareFreeMultiplicitiesPositive {p : Nat} [NeZero p] (f : HexPolyFp.FpPoly p) : Bool :=
+  (squareFreeDecomposition f).factors.toList.all fun part => 0 < part.multiplicity
+
+private def squareFreePairwiseList {p : Nat} [NeZero p] : List (SquareFreeFactor p) → Bool
+  | [] => true
+  | part :: rest =>
+      rest.all
+          (fun other =>
+            coeffsToNat (squareFreeGcd part.factor other.factor) = coeffsToNat (C (1 : ZMod64 p))) &&
+        squareFreePairwiseList rest
+
+private def squareFreePairwiseCoprime {p : Nat} [NeZero p] (f : HexPolyFp.FpPoly p) : Bool :=
+  squareFreePairwiseList (squareFreeDecomposition f).factors.toList
+
+private def squareFreeFactorsAreSquareFree {p : Nat} [NeZero p] (f : HexPolyFp.FpPoly p) : Bool :=
+  (squareFreeDecomposition f).factors.toList.all fun part => squareFreeIsSquareFree part.factor
+
+private def squareFreeTypicalInput : P3 := poly3 [1, 0, 1]
+private def squareFreeTypicalDecomp : SquareFreeDecomposition 3 :=
+  squareFreeDecomposition squareFreeTypicalInput
+private def squareFreeTypicalPart : P3 := squareFreePart squareFreeTypicalInput
+
+private def squareFreeEdgeInput : P3 := poly3 [1]
+private def squareFreeEdgeDecomp : SquareFreeDecomposition 3 :=
+  squareFreeDecomposition squareFreeEdgeInput
+private def squareFreeEdgePart : P3 := squareFreePart squareFreeEdgeInput
+
+private def squareFreeAdversarialInput : P3 := poly3 [2, 1, 0, 1, 0, 0]
+private def squareFreeAdversarialDecomp : SquareFreeDecomposition 3 :=
+  squareFreeDecomposition squareFreeAdversarialInput
+private def squareFreeAdversarialPart : P3 := squareFreePart squareFreeAdversarialInput
 
 /-! ## `FpPoly.powModMonic` -/
 
@@ -237,6 +301,53 @@ example : HexPoly.DensePoly.IsNormalized composeAdversarialResult.coeffs :=
 #guard decide
   (composeAdversarialResult.natDegree? = none ∨
     composeAdversarialResult.degree < composeAdversarialModulus.degree)
+
+/-! ## `FpPoly.squareFreeDecomposition` and `FpPoly.squareFreePart` -/
+
+/-- info: [([1, 0, 1], 1), ([1], 2)] -/
+#guard_msgs in
+#eval! squareFreeFactorsView squareFreeTypicalDecomp
+
+/-- info: [([1], 1)] -/
+#guard_msgs in
+#eval! squareFreeFactorsView squareFreeEdgeDecomp
+
+/-- info: [([2, 1, 0, 1], 1), ([1], 2)] -/
+#guard_msgs in
+#eval! squareFreeFactorsView squareFreeAdversarialDecomp
+
+/-- info: [1, 0, 1] -/
+#guard_msgs in
+#eval! coeffsToNat squareFreeTypicalPart
+
+/-- info: [1] -/
+#guard_msgs in
+#eval! coeffsToNat squareFreeEdgePart
+
+/-- info: [2, 1, 0, 1] -/
+#guard_msgs in
+#eval! coeffsToNat squareFreeAdversarialPart
+
+#guard decide (coeffsToNat squareFreeTypicalDecomp.product = coeffsToNat squareFreeTypicalInput)
+#guard decide (coeffsToNat squareFreeEdgeDecomp.product = coeffsToNat squareFreeEdgeInput)
+#guard decide
+  (coeffsToNat squareFreeAdversarialDecomp.product = coeffsToNat squareFreeAdversarialInput)
+
+#guard decide (squareFreeMultiplicitiesPositive squareFreeTypicalInput)
+#guard decide (squareFreeMultiplicitiesPositive squareFreeEdgeInput)
+#guard decide (squareFreeMultiplicitiesPositive squareFreeAdversarialInput)
+
+#guard decide (squareFreePairwiseCoprime squareFreeTypicalInput)
+#guard decide (squareFreePairwiseCoprime squareFreeEdgeInput)
+#guard decide (squareFreePairwiseCoprime squareFreeAdversarialInput)
+
+#guard decide (squareFreeFactorsAreSquareFree squareFreeTypicalInput)
+#guard decide (squareFreeFactorsAreSquareFree squareFreeEdgeInput)
+#guard decide (squareFreeFactorsAreSquareFree squareFreeAdversarialInput)
+
+#guard decide (squareFreeIsSquareFree squareFreeTypicalPart)
+#guard decide (squareFreeIsSquareFree squareFreeEdgePart)
+#guard decide (squareFreeIsSquareFree squareFreeAdversarialPart)
 
 end Conformance
 end HexPolyFp
