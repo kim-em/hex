@@ -6,7 +6,8 @@ Executable small-word arithmetic for packed `GF(2^n)` extensions.
 This module adds the Phase 1 operation layer for the single-word `GF2n`
 carrier. Addition is XOR on representatives; multiplication uses the
 carry-less `clmul` boundary followed by executable reduction modulo the
-implicit monic irreducible `x^n + irr`.
+implicit monic irreducible `x^n + irr`. Mathlib-facing `Field` and
+`Fintype` scaffolding for this carrier lives in `HexGf2Mathlib.GF2n`.
 -/
 
 namespace HexGf2
@@ -131,6 +132,79 @@ theorem one_val {n : Nat} {irr : UInt64}
     {hn : 0 < n} {hn64 : n < 64}
     {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
     (1 : GF2n n irr hn hn64 hirr).val = 1 := by
+  sorry
+
+/-- Packed `GF(2^n)` elements are determined by their canonical word. -/
+@[ext] theorem ext {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    {x y : GF2n n irr hn hn64 hirr} (h : x.val = y.val) : x = y := by
+  cases x
+  cases y
+  cases h
+  simp
+
+/-- Decidable equality reduces to equality of canonical packed representatives. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    DecidableEq (GF2n n irr hn hn64 hirr) := by
+  intro x y
+  by_cases h : x.val = y.val
+  · exact isTrue (ext h)
+  · exact isFalse (fun hxy => h (congrArg GF2n.val hxy))
+
+/-- Executable search for a multiplicative inverse among canonical representatives. -/
+def inv {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    (a : GF2n n irr hn hn64 hirr) : GF2n n irr hn hn64 hirr :=
+  if _h0 : a = 0 then
+    0
+  else
+    match (List.range (2 ^ n)).find? fun k =>
+        decide (((a *
+          ofUInt64 (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+            (UInt64.ofNat k)).val = 1)) with
+    | some k =>
+        ofUInt64 (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+          (UInt64.ofNat k)
+    | none => 0
+
+/-- Negation is the identity in characteristic two. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Neg (GF2n n irr hn hn64 hirr) where
+  neg a := a
+
+/-- Subtraction agrees with addition in characteristic two. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Sub (GF2n n irr hn hn64 hirr) where
+  sub a b := a + b
+
+/-- The executable inverse uses the canonical representative search. -/
+instance {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    Inv (GF2n n irr hn hn64 hirr) where
+  inv := inv
+
+/-- The executable inverse returns zero on the zero element. -/
+theorem inv_zero {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)} :
+    inv (0 : GF2n n irr hn hn64 hirr) = 0 := by
+  simp [inv]
+
+/-- Nonzero packed representatives multiply with `inv` to the packed one. -/
+theorem mul_inv_cancel {n : Nat} {irr : UInt64}
+    {hn : 0 < n} {hn64 : n < 64}
+    {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
+    (a : GF2n n irr hn hn64 hirr) (ha : a ≠ 0) :
+    a * inv a = 1 := by
   sorry
 
 end GF2n
