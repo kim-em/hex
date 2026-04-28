@@ -1,4 +1,3 @@
-import Init.Grind.Ring.Field
 import HexGF2.Euclid
 
 /-!
@@ -225,75 +224,6 @@ theorem mul_inv_cancel (a : GF2n n irr hn hn64 hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
   sorry
 
-instance : Lean.Grind.Semiring (GF2n n irr hn hn64 hirr) := by
-  refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a
-    sorry
-  · intro a b
-    sorry
-  · intro a b c
-    sorry
-  · intro a b c
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a b c
-    sorry
-  · intro a b c
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a m
-    sorry
-  · intro m
-    sorry
-  · intro m
-    sorry
-  · intro m a
-    sorry
-
-instance : Lean.Grind.Ring (GF2n n irr hn hn64 hirr) := by
-  refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a
-    sorry
-  · intro a b
-    sorry
-  · intro i a
-    sorry
-  · intro m a
-    sorry
-  · intro m
-    sorry
-  · intro i
-    sorry
-
-instance : Lean.Grind.CommRing (GF2n n irr hn hn64 hirr) := by
-  refine Lean.Grind.CommRing.mk ?_
-  intro a b
-  sorry
-
-instance : Lean.Grind.Field (GF2n n irr hn hn64 hirr) := by
-  refine Lean.Grind.Field.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a b
-    sorry
-  · intro h
-    sorry
-  · sorry
-  · intro a ha
-    sorry
-  · intro a
-    sorry
-  · intro a m
-    sorry
-  · intro a m
-    sorry
-
 end GF2n
 
 namespace GF2nPoly
@@ -442,75 +372,6 @@ theorem div_eq_mul_inv (a b : GF2nPoly f hirr) :
 theorem mul_inv_cancel (a : GF2nPoly f hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
   sorry
-
-instance : Lean.Grind.Semiring (GF2nPoly f hirr) := by
-  refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a
-    sorry
-  · intro a b
-    sorry
-  · intro a b c
-    sorry
-  · intro a b c
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a b c
-    sorry
-  · intro a b c
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a
-    sorry
-  · intro a m
-    sorry
-  · intro m
-    sorry
-  · intro m
-    sorry
-  · intro m a
-    sorry
-
-instance : Lean.Grind.Ring (GF2nPoly f hirr) := by
-  refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a
-    sorry
-  · intro a b
-    sorry
-  · intro i a
-    sorry
-  · intro m a
-    sorry
-  · intro m
-    sorry
-  · intro i
-    sorry
-
-instance : Lean.Grind.CommRing (GF2nPoly f hirr) := by
-  refine Lean.Grind.CommRing.mk ?_
-  intro a b
-  sorry
-
-instance : Lean.Grind.Field (GF2nPoly f hirr) := by
-  refine Lean.Grind.Field.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a b
-    sorry
-  · intro h
-    sorry
-  · sorry
-  · intro a ha
-    sorry
-  · intro a
-    sorry
-  · intro a m
-    sorry
-  · intro a m
-    sorry
 
 end GF2nPoly
 end Hex
