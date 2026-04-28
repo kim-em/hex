@@ -1,4 +1,8 @@
 import HexArith.Nat.ModArith
+import HexArith.Montgomery.Context
+import HexArith.Montgomery.InvNat
+import HexArith.Montgomery.Redc
+import HexArith.Montgomery.RedcNat
 import HexArith.UInt64.Wide
 
 /-!
