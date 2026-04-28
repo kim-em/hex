@@ -203,15 +203,19 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
     (p q m : DensePoly S) : Prop :=
   m ∣ (p - q)
 
-axiom polyCRT_mod_fst :
+/-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
+theorem polyCRT_mod_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
-    (polyCRT a b u v s t) % a = u % a
+    (polyCRT a b u v s t) % a = u % a := by
+  sorry
 
-axiom polyCRT_mod_snd :
+/-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
+theorem polyCRT_mod_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
-    (polyCRT a b u v s t) % b = v % b
+    (polyCRT a b u v s t) % b = v % b := by
+  sorry
 
 end DensePoly
 end Hex
