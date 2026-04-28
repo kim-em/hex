@@ -240,9 +240,13 @@ into anything depending on `lean_lib HexArith`. The same
 `mpz_gcdext`" below). Putting `.c` paths in `moreLinkArgs` (or in
 `lakefile.toml`) does **not** work — Lake ignores `lakefile.toml`
 when `lakefile.lean` is present, and `moreLinkArgs` is for
-link-time flags, not source compilation. The pure-Lean fallback
-body is the portable spec; `@[extern]` falls through to it when
-the C symbol is unavailable.
+link-time flags, not source compilation. The pure-Lean body is the
+portable spec and compiled fallback, but ad hoc interpreter checks
+must still arrange to load the module dynlibs that export the extern
+stubs: `lake lean path/to/file.lean` works, as do explicit
+`--load-dynlib` flags, while plain `lake env lean path/to/file.lean`
+does not auto-load those dynlibs and will raise
+`Could not find native implementation`.
 
 Carries are `Bool` (not `UInt64`) — no preconditions needed. The
 extern boundary is the only place where overflow semantics surface.
