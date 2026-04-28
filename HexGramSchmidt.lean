@@ -1,6 +1,8 @@
 import HexGramSchmidt.Basic
+import HexGramSchmidt.Int
 
 /-!
-The `HexGramSchmidt` library exposes the initial Gram-Schmidt basis and
-coefficient API for integer and rational dense matrices.
+The `HexGramSchmidt` library exposes the dense-matrix Gram-Schmidt basis,
+coefficient, Gram-determinant, and scaled-coefficient APIs for integer and
+rational inputs.
 -/
