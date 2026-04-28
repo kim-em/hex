@@ -60,6 +60,29 @@ These are not rubber-stamp coverage audits — they ask:
   `eventual`, `placeholder`, `Phase 1`, `bridge for` in `*.lean`
   and `ffi/*.c` files.** Every hit is a candidate violation; flag
   in the review issue.
+- **Does each data-level `def` body match the SPEC's stated
+  asymptotic complexity, not just its input/output?** [PLAN/Phase1.md](Phase1.md)
+  forbids "alternative implementations with the wrong algorithmic
+  complexity"; this question makes the rule enforceable at review
+  time. Flag bodies that produce the right output via an
+  asymptotically worse algorithm: descending linear search where
+  the SPEC implies binary search or Newton iteration; Pascal-triangle
+  recursion where the SPEC implies the multiplicative formula;
+  full-precision exponentiation `a ^ n % p` where the SPEC implies
+  square-and-multiply; rebuild-from-scratch where the SPEC implies
+  an in-place update. Same remedy as wrong-shape scaffolds: fix the
+  body, or delete the declaration.
+- **Are there one-line aliases of an adjacent declaration, lemmas
+  duplicating Lean core, or names that misrepresent the body?**
+  Flag any `def`/`theorem` whose body is `exact <other-decl>` for
+  an `<other-decl>` defined in the same file (it should be deleted
+  and call sites pointed at the real declaration). Flag any local
+  `Nat`/`Int`/`UInt64`/`Array`/`List` lemma whose statement
+  matches a same-shape declaration in `Init.*` or the Lean stdlib
+  (it should be deleted and call sites pointed at the core lemma).
+  Flag any name whose verb or qualifier doesn't appear anywhere in
+  the body (e.g. a lemma named `foo_sub_bar` whose statement
+  contains no subtraction).
 
 ## Output
 
