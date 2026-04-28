@@ -6,6 +6,16 @@ oracle (Sage, FLINT, python-flint, fpLLL, GAP, PARI). The goal is to
 catch implementation bugs *before* proof work starts. No point proving
 theorems about wrong implementations.
 
+When conformance fails, the response is the same as when benchmarking
+returns an unexpected complexity verdict ([benchmarking.md](benchmarking.md)):
+file a GitHub issue ([PLAN/Conventions.md §Bench-found and
+conformance-found issues](../PLAN/Conventions.md#bench-found-and-conformance-found-issues))
+and roll the affected library's `done_through` backward
+([PLAN/Conventions.md §Rollback is a normal action](../PLAN/Conventions.md#rollback-is-a-normal-action)).
+Conformance and benchmarking share one bug-finding loop; the choice
+of harness depends on which axis the bug is on (output correctness
+vs. algorithmic complexity), but the response is uniform.
+
 Conformance testing is a tiered system rather than one monolithic
 workflow. The repository supports three profiles:
 
@@ -151,6 +161,7 @@ MUST NOT appear in any `Conformance.lean`:
   *current stub output* rather than against the SPEC contract —
   e.g. `#guard (rref M).rank = 0` when `rref` is a placeholder —
   locks the wrong answer in and hides the scaffold. Per
+  [design-principles.md §7](design-principles.md) and
   [PLAN/Phase1.md](../PLAN/Phase1.md), no data-level placeholders
   are allowed in committed Lean at all; if a conformance test has to
   lock in trivial output to pass, the underlying implementation is
@@ -333,6 +344,5 @@ primary CI mechanism.
 ---
 
 This file specifies correctness-oriented cross-checking only.
-Performance measurement, benchmark case definitions, external timing
-comparisons, and publication of benchmark reports on GitHub Pages are
-specified in [benchmarking.md](benchmarking.md).
+Performance measurement, complexity-verdict checking, and external
+timing comparisons are specified in [benchmarking.md](benchmarking.md).
