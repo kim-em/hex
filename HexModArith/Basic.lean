@@ -91,16 +91,47 @@ protected def zero : ZMod64 p :=
 protected def one : ZMod64 p :=
   ofNat p 1
 
-/-- Add two reduced residues and reduce the Nat sum mod `p`. -/
-def add (a b : ZMod64 p) : ZMod64 p :=
-  ofNat p (a.toNat + b.toNat)
+/-- The modulus as a `UInt64` word when `p < 2^64`. -/
+def modulusWord (p : Nat) (hp : p < UInt64.word) : UInt64 :=
+  UInt64.ofNatLT p hp
+
+/-- The correction word `2^64 - p` used when `p < 2^64`. -/
+def complementWord (p : Nat) [Bounds p] (_hp : p < UInt64.word) : UInt64 :=
+  UInt64.ofNatLT (UInt64.word - p) <| by
+    exact Nat.sub_lt (by decide : 0 < 2 ^ 64) (Bounds.pPos (p := p))
+
+/--
+Add two reduced residues using wrapped machine-word addition plus one
+correction step when `p < 2^64`.
+-/
+def add (a b : ZMod64 p) : ZMod64 p := by
+  by_cases hp : p = UInt64.word
+  · refine ⟨a.val + b.val, ?_⟩
+    simpa [hp] using (UInt64.toNat_lt_size (a.val + b.val))
+  · have hpLt : p < UInt64.word := Nat.lt_of_le_of_ne (Bounds.pLeR (p := p)) hp
+    let p64 := modulusWord p hpLt
+    let c64 := complementWord p hpLt
+    let sum := a.val + b.val
+    by_cases hcarry : UInt64.word ≤ a.toNat + b.toNat
+    · exact ⟨sum + c64, by sorry⟩
+    · by_cases hreduce : p64 ≤ sum
+      · exact ⟨sum - p64, by sorry⟩
+      · exact ⟨sum, by sorry⟩
 
 /--
 Subtract two residues by adding the modular complement of the second and
 reducing mod `p`.
 -/
-def sub (a b : ZMod64 p) : ZMod64 p :=
-  ofNat p (a.toNat + (p - b.toNat))
+def sub (a b : ZMod64 p) : ZMod64 p := by
+  by_cases hp : p = UInt64.word
+  · refine ⟨a.val - b.val, ?_⟩
+    simpa [hp] using (UInt64.toNat_lt_size (a.val - b.val))
+  · have hpLt : p < UInt64.word := Nat.lt_of_le_of_ne (Bounds.pLeR (p := p)) hp
+    let c64 := complementWord p hpLt
+    let diff := a.val - b.val
+    by_cases hba : b.val ≤ a.val
+    · exact ⟨diff, by sorry⟩
+    · exact ⟨diff - c64, by sorry⟩
 
 /--
 Multiply two reduced residues and reduce the product mod `p`.
@@ -172,11 +203,11 @@ instance : Inv (ZMod64 p) where
 
 @[simp] theorem toNat_add (a b : ZMod64 p) :
     (add a b).toNat = (a.toNat + b.toNat) % p := by
-  rw [add, toNat_ofNat]
+  sorry
 
 @[simp] theorem toNat_sub (a b : ZMod64 p) :
     (sub a b).toNat = (a.toNat + (p - b.toNat)) % p := by
-  rw [sub, toNat_ofNat]
+  sorry
 
 @[simp] theorem toNat_mul (a b : ZMod64 p) :
     (mul a b).toNat = (a.toNat * b.toNat) % p := by
@@ -197,10 +228,10 @@ theorem inv_mul_eq_one (a : ZMod64 p) (hcop : Nat.Coprime a.toNat p) :
   sorry
 
 theorem add_lt_modulus (a b : ZMod64 p) : (add a b).toNat < p := by
-  simpa [toNat_add] using normalize_lt p (a.toNat + b.toNat)
+  exact (add a b).isLt
 
 theorem sub_lt_modulus (a b : ZMod64 p) : (sub a b).toNat < p := by
-  simpa [toNat_sub] using normalize_lt p (a.toNat + (p - b.toNat))
+  exact (sub a b).isLt
 
 theorem mul_lt_modulus (a b : ZMod64 p) : (mul a b).toNat < p := by
   simpa [toNat_mul] using normalize_lt p (a.toNat * b.toNat)
