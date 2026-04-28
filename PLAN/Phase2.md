@@ -60,26 +60,27 @@ These are not rubber-stamp coverage audits — they ask:
   `eventual`, `placeholder`, `Phase 1`, `bridge for` in `*.lean`
   and `ffi/*.c` files.** Every hit is a candidate violation; flag
   in the review issue.
-- **Does each data-level `def` body match the canonical fast default
-  for its operation?** [PLAN/Phase1.md](Phase1.md) forbids
-  "alternative implementations with the wrong algorithmic
+- **Does each data-level `def` body match the algorithm named in the
+  library SPEC for its operation?** [PLAN/Phase1.md](Phase1.md)
+  forbids "alternative implementations with the wrong algorithmic
   complexity"; this question makes the rule enforceable at review
-  time. The acceptable bodies for standard mathematical operations
-  are listed in [SPEC/design-principles.md §7
-  "Canonical fast defaults"](../SPEC/design-principles.md). Flag any
-  body whose row in that table is the *forbidden* column: linear-time
-  `pow` in a ring/field, `a^n % p` modular exponentiation, descending
-  linear-scan `floorSqrt`, unmemoised Pascal `binom`, `Nat.rec` over
-  `n` for `nsmul` / `natCast`, `toNat`/`ofNat` round-trip in a
-  `UInt64`-typed operation, rebuild-from-scratch where the SPEC
-  prescribes an in-place update. The table is binding even when the
-  per-library SPEC says only "exponentiation" / "binomial coefficient"
-  / etc. without naming an algorithm. Same remedy as wrong-shape
-  scaffolds: fix the body, or delete the declaration. If a body's
-  operation isn't in the design-principles table and the per-library
-  SPEC doesn't constrain complexity, ask whether a textbook would
-  call the body "the standard fast algorithm" for that operation; if
-  not, flag it.
+  time. Per [SPEC/design-principles.md §7](../SPEC/design-principles.md),
+  the binding complexity contract for an operation lives in its
+  library's SPEC: `hex-arith.md` names the algorithm for `powMod` and
+  `extGcd`, `hex-poly-z.md` for `binom` / `floorSqrt`, and so on.
+  Read the SPEC bullet for each declaration before judging its body,
+  and flag any body whose algorithmic shape doesn't match the
+  library SPEC's named algorithm — linear-time `pow` where
+  square-and-multiply was named, `a^n % p` where Nat-level
+  square-and-multiply was named, descending linear-scan `floorSqrt`
+  where Newton was named, unmemoised Pascal `binom` where the
+  multiplicative formula was named, rebuild-from-scratch where an
+  in-place update was named. If a library SPEC bullet names only
+  "exponentiation" / "binomial coefficient" without naming an
+  algorithm, that's a SPEC gap — file a SPEC issue alongside any
+  implementation issue. Same remedy as wrong-shape scaffolds: fix
+  the body to match the SPEC, fix the SPEC to name the canonical
+  algorithm, or delete the declaration.
 - **Are there one-line aliases of an adjacent declaration, lemmas
   duplicating Lean core, or names that misrepresent the body?**
   Flag any `def`/`theorem` whose body is `exact <other-decl>` for
