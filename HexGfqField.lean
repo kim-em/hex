@@ -2,7 +2,7 @@ import HexGfqField.Basic
 import HexGfqField.Operations
 
 /-!
-Thin finite-field wrapper scaffolding for executable `F_p[x] / (f)`.
+Thin finite-field wrapper for executable `F_p[x] / (f)`.
 
 `HexGfqField` reuses the quotient-ring representation from `HexGfqRing`
 unchanged: `GFqField.FiniteField` is just a wrapper around reduced residues,
