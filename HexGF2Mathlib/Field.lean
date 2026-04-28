@@ -1,0 +1,184 @@
+import HexGF2Mathlib.Basic
+import HexGfqField
+
+/-!
+Bridge definitions between the packed `HexGF2` extension-field wrappers and the
+generic quotient-ring finite-field construction.
+
+This Phase 1 module reuses the packed-polynomial conversion layer from
+`HexGF2Mathlib.Basic` to package both the single-word `GF2n` surface and the
+arbitrary-degree `GF2nPoly` surface as project-local ring equivalences with the
+generic `Hex.GFqField.FiniteField` model over `Hex.FpPoly 2`.
+-/
+
+namespace HexGF2Mathlib
+
+open Hex
+
+namespace GF2n
+
+instance : Hex.ZMod64.Bounds 2 := ⟨by decide, by decide⟩
+
+variable {n : Nat} {irr : UInt64}
+variable {hn : 0 < n} {hn64 : n < 64}
+variable {hirr : Hex.GF2Poly.Irreducible (Hex.GF2Poly.ofUInt64Monic irr n)}
+
+/-- The packed irreducible modulus viewed inside the generic `FpPoly 2`
+representation. -/
+def modulusFpPoly : Hex.FpPoly 2 :=
+  HexGF2Mathlib.GF2Poly.toFpPoly (Hex.GF2Poly.ofUInt64Monic irr n)
+
+/-- The generic `FpPoly 2` modulus inherits positive degree from the packed
+single-word modulus. -/
+theorem modulusFpPoly_degree_pos : 0 < Hex.FpPoly.degree (modulusFpPoly (n := n) (irr := irr)) := by
+  sorry
+
+/-- Packed irreducibility transports across the `GF2Poly ≃+* FpPoly 2`
+conversion layer. -/
+theorem modulusFpPoly_irreducible :
+    Hex.FpPoly.Irreducible (modulusFpPoly (n := n) (irr := irr)) := by
+  sorry
+
+/-- The generic finite-field model corresponding to the packed single-word
+`GF(2^n)` wrapper. -/
+abbrev GenericFiniteField :=
+  Hex.GFqField.FiniteField
+    (modulusFpPoly (n := n) (irr := irr))
+    (modulusFpPoly_degree_pos (n := n) (irr := irr))
+    (modulusFpPoly_irreducible (n := n) (irr := irr))
+
+/-- Interpret a packed single-word field element inside the generic quotient
+field model. -/
+def toGeneric (x : Hex.GF2n n irr hn hn64 hirr) : GenericFiniteField (n := n) (irr := irr) :=
+  Hex.GFqField.ofPoly
+    (modulusFpPoly (n := n) (irr := irr))
+    (modulusFpPoly_degree_pos (n := n) (irr := irr))
+    (modulusFpPoly_irreducible (n := n) (irr := irr))
+    (HexGF2Mathlib.GF2Poly.toFpPoly (Hex.GF2n.toPolyWord x.val))
+
+/-- Repack the canonical representative of a generic quotient-field element as a
+single-word `GF(2^n)` element. -/
+def ofGeneric (x : GenericFiniteField (n := n) (irr := irr)) :
+    Hex.GF2n n irr hn hn64 hirr :=
+  Hex.GF2n.reduce
+    (n := n) (irr := irr)
+    ((((HexGF2Mathlib.GF2Poly.ofFpPoly (Hex.GFqField.repr x)).toWords).getD 0 0))
+
+@[simp]
+theorem ofGeneric_toGeneric (x : Hex.GF2n n irr hn hn64 hirr) :
+    ofGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+        (toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) x) = x := by
+  sorry
+
+@[simp]
+theorem toGeneric_ofGeneric (x : GenericFiniteField (n := n) (irr := irr)) :
+    toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr)
+        (ofGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) x) = x := by
+  sorry
+
+@[simp]
+theorem toGeneric_add (x y : Hex.GF2n n irr hn hn64 hirr) :
+    toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) (x + y) =
+      (toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) x +
+        toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) y) := by
+  sorry
+
+@[simp]
+theorem toGeneric_mul (x y : Hex.GF2n n irr hn hn64 hirr) :
+    toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) (x * y) =
+      (toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) x *
+        toGeneric (n := n) (irr := irr) (hn := hn) (hn64 := hn64) (hirr := hirr) y) := by
+  sorry
+
+/-- The packed single-word field wrapper is ring-equivalent to the generic
+finite-field construction over the transported modulus. -/
+def equiv : Hex.GF2n n irr hn hn64 hirr ≃+*
+    GenericFiniteField (n := n) (irr := irr) where
+  toFun := toGeneric
+  invFun := ofGeneric
+  left_inv := ofGeneric_toGeneric
+  right_inv := toGeneric_ofGeneric
+  map_mul' := toGeneric_mul
+  map_add' := toGeneric_add
+
+end GF2n
+
+namespace GF2nPoly
+
+instance : Hex.ZMod64.Bounds 2 := ⟨by decide, by decide⟩
+
+variable {f : Hex.GF2Poly} {hirr : Hex.GF2Poly.Irreducible f}
+
+/-- The packed irreducible modulus viewed inside the generic `FpPoly 2`
+representation. -/
+def modulusFpPoly : Hex.FpPoly 2 :=
+  HexGF2Mathlib.GF2Poly.toFpPoly f
+
+/-- The generic `FpPoly 2` modulus inherits positive degree from the packed
+irreducible modulus. -/
+theorem modulusFpPoly_degree_pos : 0 < Hex.FpPoly.degree (modulusFpPoly (f := f)) := by
+  sorry
+
+/-- Packed irreducibility transports across the `GF2Poly ≃+* FpPoly 2`
+conversion layer. -/
+theorem modulusFpPoly_irreducible :
+    Hex.FpPoly.Irreducible (modulusFpPoly (f := f)) := by
+  sorry
+
+/-- The generic finite-field model corresponding to the packed arbitrary-degree
+`GF(2^n)` wrapper. -/
+abbrev GenericFiniteField :=
+  Hex.GFqField.FiniteField
+    (modulusFpPoly (f := f))
+    (modulusFpPoly_degree_pos (f := f))
+    (modulusFpPoly_irreducible (f := f))
+
+/-- Interpret a packed quotient-field element inside the generic quotient field
+model. -/
+def toGeneric (x : Hex.GF2nPoly f hirr) : GenericFiniteField (f := f) :=
+  Hex.GFqField.ofPoly
+    (modulusFpPoly (f := f))
+    (modulusFpPoly_degree_pos (f := f))
+    (modulusFpPoly_irreducible (f := f))
+    (HexGF2Mathlib.GF2Poly.toFpPoly x.val)
+
+/-- Repack the canonical representative of a generic quotient-field element as a
+packed `GF(2^n)` residue. -/
+def ofGeneric (x : GenericFiniteField (f := f)) : Hex.GF2nPoly f hirr :=
+  Hex.GF2nPoly.reducePoly (f := f) (HexGF2Mathlib.GF2Poly.ofFpPoly (Hex.GFqField.repr x))
+
+@[simp]
+theorem ofGeneric_toGeneric (x : Hex.GF2nPoly f hirr) :
+    ofGeneric (f := f) (hirr := hirr) (toGeneric (f := f) (hirr := hirr) x) = x := by
+  sorry
+
+@[simp]
+theorem toGeneric_ofGeneric (x : GenericFiniteField (f := f)) :
+    toGeneric (f := f) (hirr := hirr) (ofGeneric (f := f) (hirr := hirr) x) = x := by
+  sorry
+
+@[simp]
+theorem toGeneric_add (x y : Hex.GF2nPoly f hirr) :
+    toGeneric (f := f) (hirr := hirr) (x + y) =
+      (toGeneric (f := f) (hirr := hirr) x + toGeneric (f := f) (hirr := hirr) y) := by
+  sorry
+
+@[simp]
+theorem toGeneric_mul (x y : Hex.GF2nPoly f hirr) :
+    toGeneric (f := f) (hirr := hirr) (x * y) =
+      (toGeneric (f := f) (hirr := hirr) x * toGeneric (f := f) (hirr := hirr) y) := by
+  sorry
+
+/-- The packed arbitrary-degree field wrapper is ring-equivalent to the generic
+finite-field construction over the transported modulus. -/
+def equiv : Hex.GF2nPoly f hirr ≃+* GenericFiniteField (f := f) where
+  toFun := toGeneric
+  invFun := ofGeneric
+  left_inv := ofGeneric_toGeneric
+  right_inv := toGeneric_ofGeneric
+  map_mul' := toGeneric_mul
+  map_add' := toGeneric_add
+
+end GF2nPoly
+
+end HexGF2Mathlib
