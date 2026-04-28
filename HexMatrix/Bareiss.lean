@@ -133,20 +133,13 @@ private def pivotLoop (fuel : Nat) (state : BareissState n) : BareissState n :=
   | fuel + 1 =>
       if hDone : state.step + 1 < n then
         let k : Fin n := ⟨state.step, Nat.lt_trans (Nat.lt_succ_self state.step) hDone⟩
-        let M :=
-          if hp : state.matrix[k][k] = 0 then
+        let (M, swaps) :=
+          if state.matrix[k][k] = 0 then
             match findPivot? state.matrix k (state.step + 1) with
-            | some pivot => rowSwap state.matrix k pivot
-            | none => state.matrix
+            | some pivot => (rowSwap state.matrix k pivot, state.rowSwaps + 1)
+            | none => (state.matrix, state.rowSwaps)
           else
-            state.matrix
-        let swaps :=
-          if hp : state.matrix[k][k] = 0 then
-            match findPivot? state.matrix k (state.step + 1) with
-            | some _ => state.rowSwaps + 1
-            | none => state.rowSwaps
-          else
-            state.rowSwaps
+            (state.matrix, state.rowSwaps)
         let pivot := M[k][k]
         if hp : pivot = 0 then
           { state with matrix := M, rowSwaps := swaps, singularStep := some state.step }
