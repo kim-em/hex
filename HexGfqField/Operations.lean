@@ -71,15 +71,18 @@ def zsmul {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f
     (i : Int) (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
   ofQuotient (i • x.toQuotient)
 
-/-- The extended-GCD left coefficient is the executable inverse candidate for a
-nonzero residue class modulo an irreducible polynomial. -/
+/-- Normalize an extended-GCD witness by the gcd's constant-unit factor so the
+left coefficient becomes a genuine inverse candidate modulo `f`. -/
 private def invPoly {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : GFqRing.PolyQuotient f hf) : FpPoly p :=
-  (DensePoly.xgcd (GFqRing.repr x) f).left
+  let r := DensePoly.xgcd (GFqRing.repr x) f
+  let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
+  DensePoly.scale unitInv r.left
 
 /-- Field inversion stays on the quotient-reduction path by reusing the
-polynomial extended-GCD witness. The `0` case follows the usual junk-value
-convention required by `Lean.Grind.Field`. -/
+polynomial extended-GCD witness, normalized by the gcd's constant unit factor.
+The `0` case follows the usual junk-value convention required by
+`Lean.Grind.Field`. -/
 def inv {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
   if _hx : x = zero f hf hirr then
