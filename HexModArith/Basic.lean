@@ -182,7 +182,7 @@ instance : Inv (ZMod64 p) where
     (mul a b).toNat = (a.toNat * b.toNat) % p := by
   rw [mul, toNat_ofNat]
 
-@[simp] theorem toNat_inv (a : ZMod64 p) :
+@[simp] theorem toNat_inv_def (a : ZMod64 p) :
     (inv a).toNat =
       (Int.toNat ((let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p); s)
         % Int.ofNat p)) % p := by
