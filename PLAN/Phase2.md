@@ -60,26 +60,21 @@ These are not rubber-stamp coverage audits — they ask:
   `eventual`, `placeholder`, `Phase 1`, `bridge for` in `*.lean`
   and `ffi/*.c` files.** Every hit is a candidate violation; flag
   in the review issue.
-- **Does each data-level `def` body match the canonical fast default
-  for its operation?** [PLAN/Phase1.md](Phase1.md) forbids
+- **Does each data-level `def` body run at the canonical fast
+  complexity for its operation?** [PLAN/Phase1.md](Phase1.md) forbids
   "alternative implementations with the wrong algorithmic
   complexity"; this question makes the rule enforceable at review
-  time. The acceptable bodies for standard mathematical operations
-  are listed in [SPEC/design-principles.md §7
-  "Canonical fast defaults"](../SPEC/design-principles.md). Flag any
-  body whose row in that table is the *forbidden* column: linear-time
-  `pow` in a ring/field, `a^n % p` modular exponentiation, descending
-  linear-scan `floorSqrt`, unmemoised Pascal `binom`, `Nat.rec` over
-  `n` for `nsmul` / `natCast`, `toNat`/`ofNat` round-trip in a
-  `UInt64`-typed operation, rebuild-from-scratch where the SPEC
-  prescribes an in-place update. The table is binding even when the
-  per-library SPEC says only "exponentiation" / "binomial coefficient"
-  / etc. without naming an algorithm. Same remedy as wrong-shape
-  scaffolds: fix the body, or delete the declaration. If a body's
-  operation isn't in the design-principles table and the per-library
-  SPEC doesn't constrain complexity, ask whether a textbook would
-  call the body "the standard fast algorithm" for that operation; if
-  not, flag it.
+  time. Per [SPEC/design-principles.md §7](../SPEC/design-principles.md),
+  if the library SPEC names an algorithm for the operation, the body
+  must implement it; if the SPEC is silent on performance, the body
+  must still be optimal for that operation's standard problem. Flag
+  linear-time `pow` where square-and-multiply is canonical, `a^n % p`
+  where Nat-level square-and-multiply is canonical, descending
+  linear-scan `floorSqrt` where Newton is canonical, unmemoised
+  Pascal `binom` where the multiplicative formula is canonical,
+  rebuild-from-scratch where an incremental update is canonical.
+  Same remedy as wrong-shape scaffolds: fix the body, or delete the
+  declaration.
 - **Are there one-line aliases of an adjacent declaration, lemmas
   duplicating Lean core, or names that misrepresent the body?**
   Flag any `def`/`theorem` whose body is `exact <other-decl>` for
