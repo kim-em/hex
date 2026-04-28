@@ -66,19 +66,25 @@ Worked examples (the bugs are real; the verdicts are predicted, not
 observed — the prototype that found these bugs ran a hand-rolled
 harness, not lean-bench):
 
-- HexArith Montgomery `mulMont` declared as `O(log p)` per call but
-  effectively `O(p)` because `montgomeryRadixInvNat` did
+- HexArith Montgomery: `MontCtx.mk` declared as `O(log p)` per call
+  but effectively `O(p)` because `montgomeryRadixInvNat` did
   `(List.range p.toNat).find?` instead of using the existing
-  Bezout-based `extGcd`. A lean-bench run would yield an
-  `inconclusive` verdict with a residual log-log slope around `+1.0`.
-  Response: file issue, roll HexArith back, replace the brute-force
-  inverse.
+  Bezout-based `extGcd`. The broken cost lives in `mk`, not in
+  `mulMont` itself; what the bench reports depends on whether `mk`
+  is hoisted via `with prep := MontCtx.mk p` (bug surfaces as bench
+  startup hitting the wallclock cap at large `p`) or stays inside
+  the timed body (bug surfaces as an `inconclusive` verdict with
+  residual log-log slope around `+1.0`). Either signature triggers
+  the same response: file issue, roll HexArith back, replace the
+  brute-force inverse with `extGcd`.
 - HexLLL `swapStep` declared as `O(n²)` (incremental Gram–Schmidt
   update) but effectively `O(n³)` because the implementation
-  rebuilt Gram–Schmidt from scratch on every swap. A lean-bench run
-  would yield an `inconclusive` verdict with a residual slope around
-  `+1.0` versus the declared model. Response: file issue, roll
-  HexLLL back, implement the incremental update.
+  rebuilt Gram–Schmidt from scratch on every swap. You don't bench
+  `swapStep` directly — you bench `lll`, which performs `O(n)`
+  swaps per call, so the broken `swapStep` shows up at the `lll`
+  level as a residual slope around `+1.0` against whatever
+  complexity the SPEC declares for full reduction. Response: file
+  issue, roll HexLLL back, implement the incremental update.
 
 These are not retrospectives; they are the canonical shape of a
 benchmark finding.
