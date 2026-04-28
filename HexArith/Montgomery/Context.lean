@@ -28,7 +28,8 @@ private def r2OfModulus (p : UInt64) : UInt64 :=
   if p ≤ 1 then
     0
   else
-    r2Loop p 128 1
+    let rModP := r2Loop p 64 1
+    UInt64.ofNat ((rModP.toNat * rModP.toNat) % p.toNat)
 
 /-- Build the executable Montgomery context for an odd `UInt64` modulus. -/
 def mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p :=
