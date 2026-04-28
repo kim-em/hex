@@ -1,27 +1,150 @@
 # hex-mod-arith (modular arithmetic, depends on hex-arith)
 
-Arithmetic in `Z/nZ` with `UInt64`-backed coefficients.
+Arithmetic in `Z/pZ` with `UInt64`-backed coefficients. A single
+`ZMod64 p` type stores residues in standard form (canonical
+representative in `[0, p)`); Barrett and Montgomery from `hex-arith`
+provide opt-in *operations* on `ZMod64` for hot loops, not parallel
+types.
 
-**Contents:**
-- `ZMod64 (p : Nat)` — a `UInt64` with proof `val.toNat < p`
-- Addition, subtraction, multiplication (using Barrett/Montgomery from
-  hex-arith for the `UInt64` modular operations)
-- Inversion via extended GCD (for prime moduli)
-- Exponentiation by squaring
-- `Lean.Grind.CommRing (ZMod64 p)` instance and `IsCharP (ZMod64 p) p`
+## Bounds typeclass and type
 
-**Key properties:**
-- Ring axioms proved directly from the modular arithmetic definitions.
-  Associativity and distributivity of multiplication reduce to
-  `Nat.mod` properties via Barrett/Montgomery correctness from
-  hex-arith.
-- `inv a * a = 1` when `Nat.Coprime a.val p` — via extended GCD
-  from hex-arith: `s * a + t * p = 1` gives `s mod p` as the inverse.
+```lean
+/-- Project-local bounds class: `ZMod64 p` is a faithful model of
+`Z/pZ` only when `p` is positive and fits in a single machine word. -/
+class ZMod64.Bounds (p : Nat) : Prop where
+  pPos : 0 < p
+  pLeR : p ≤ UInt64.word        -- = 2^64
+
+structure ZMod64 (p : Nat) [Bounds p] where
+  val  : UInt64
+  isLt : val.toNat < p
+```
+
+The bounds live in a typeclass that callers provide once per
+modulus, e.g. `instance : ZMod64.Bounds 7 := ⟨by decide, by decide⟩`.
+Every operation takes `[Bounds p]` implicitly; nothing is threaded
+through call sites. `p > 2^64` is rejected at the type boundary
+because no `Bounds p` instance exists for it — and a `UInt64` cannot
+faithfully represent residues in `[2^64, p)` anyway.
+
+Mathlib's `Fact` is unavailable to `hex-mod-arith` (it is a
+computational library, not a Mathlib bridge). The project-local
+`Bounds` class gives the same instance-synthesis ergonomics with no
+Mathlib dependency.
+
+## Default operations
+
+Operations are stated as semantic contracts on the canonical
+representative. Only `mul` carries a mandatory `@[extern]` for
+runtime; `add`/`sub`/`zero`/`one`/`pow` lower to native `UInt64`
+arithmetic in pure Lean already, and `inv` routes through
+`Hex.Int.extGcd` which is itself the `mpz_gcdext` extern at the
+hex-arith level (see "Extern contract: `mpz_gcdext`" in
+`SPEC/Libraries/hex-arith.md`).
+
+```lean
+@[extern "lean_hex_zmod64_mul"]
+def ZMod64.mul (a b : ZMod64 p) : ZMod64 p := ...   -- contract below
+def ZMod64.add (a b : ZMod64 p) : ZMod64 p          -- pure Lean: native add + cond. sub
+def ZMod64.sub (a b : ZMod64 p) : ZMod64 p          -- pure Lean
+def ZMod64.zero : ZMod64 p
+def ZMod64.one  : ZMod64 p                          -- equals zero when p = 1
+def ZMod64.inv  (a : ZMod64 p) : ZMod64 p           -- via Hex.Int.extGcd
+def ZMod64.pow  (a : ZMod64 p) (n : Nat) : ZMod64 p
+```
+
+Key properties:
+
+```lean
+theorem ZMod64.toNat_add (a b : ZMod64 p) :
+    (a.add b).val.toNat = (a.val.toNat + b.val.toNat) % p
+theorem ZMod64.toNat_mul (a b : ZMod64 p) :
+    (a.mul b).val.toNat = (a.val.toNat * b.val.toNat) % p
+theorem ZMod64.toNat_inv (a : ZMod64 p) (hcop : Nat.Coprime a.val.toNat p) :
+    (a.inv.mul a).val.toNat = 1 % p
+```
+
+### `ZMod64.mul` runtime contract
+
+Logical body (used by Lean for proofs and as the portable fallback):
+
+```lean
+⟨.ofNat ((a.val.toNat * b.val.toNat) % p), proof_of_isLt⟩
+```
+
+The runtime implementation is supplied by `lean_hex_zmod64_mul` in
+`HexModArith/ffi/zmod64_mul.c`. Acceptable runtime strategies for
+the C body, in order of simplicity:
+
+1. **Direct 128/64 modular reduction**, e.g. `__uint128_t` on
+   compilers that support it (the portable C reference shape).
+   Note: not every target has a single-instruction 128/64 divide —
+   x86_64 does (`divq`); AArch64 does not. Compilers may lower
+   `__uint128_t %` to a runtime helper. Acceptable as the Phase-1
+   default; later phases may swap to a faster strategy without
+   changing the extern symbol.
+
+2. **Barrett reduction** — precompute `pinv = ⌊2^64 / p⌋` once per
+   modulus (lifted from `BarrettCtx` in `hex-arith`) when
+   `p < 2^32`. ~10 cycles per multiply.
+
+3. **Montgomery reduction** — precompute `p'` and `R^2 mod p` once
+   per modulus (lifted from `MontCtx` in `hex-arith`) when
+   `p % 2 = 1`. ~10 cycles per multiply with values stored in
+   Montgomery form internally; `ZMod64.mul` exposes standard form,
+   so this strategy adds two `redc`s per call to amortize.
+
+The Phase-1 deliverable is the strategy-1 reference body plus the
+`@[extern]` wiring; later phases may swap the body for a
+`p`-dispatched Barrett/Montgomery implementation behind the same
+extern symbol. Whichever strategy is used, it must agree with the
+logical body — the SPEC mandates the contract, not the strategy.
+
+## Hot-loop optimization (opt-in)
+
+Sustained modular multiplication (polynomial arithmetic,
+exponentiation by squaring, Frobenius maps) opts into `BarrettCtx`
+or `MontCtx` from `hex-arith` via thin wrappers at the `ZMod64`
+level:
+
+```lean
+def BarrettCtx.mulMod (ctx : BarrettCtx p) (a b : ZMod64 p) : ZMod64 p
+    -- requires p < 2^32; lifts BarrettCtx.mulMod : UInt64 → UInt64 → UInt64
+
+def MontCtx.toMont   (ctx : MontCtx p) (a : ZMod64 p)        : MontResidue p
+def MontCtx.mulMont  (ctx : MontCtx p) (a b : MontResidue p) : MontResidue p
+def MontCtx.fromMont (ctx : MontCtx p) (a : MontResidue p)   : ZMod64 p
+```
+
+`MontResidue p` is a `UInt64` newtype carrying the Montgomery-form
+invariant; it is **not** a parallel residue type to `ZMod64 p` (its
+values are not canonical representatives in `[0, p)`). Use it inside
+hot loops only — convert in at the loop header, convert out at the
+loop tail. The `CommRing` instance and the Mathlib bridge are stated
+for `ZMod64`, not for `MontResidue`.
+
+## Ring instance and properties
+
+- `Lean.Grind.CommRing (ZMod64 p)` derived from the operations on
+  the canonical representative; associativity and distributivity
+  reduce to `Nat.mod` properties on the logical bodies. (The
+  `@[extern]` on `mul` is a runtime hook; the proof obligation is
+  about the logical body, not the C body.)
+- `IsCharP (ZMod64 p) p`.
+- `inv a * a = 1` when `Nat.Coprime a.val.toNat p` — via extended
+  GCD from `hex-arith`: `s * a + t * p = 1` gives `s mod p` as the
+  inverse.
 - No zero divisors for prime `p`: `a * b = 0 → a = 0 ∨ b = 0` — via
-  Euclid's lemma from hex-arith.
+  Euclid's lemma from `hex-arith`.
 - Fermat's little theorem: `a ^ p = a` — lifts directly from
-  `Nat.pow_prime_mod` in hex-arith.
+  `Nat.pow_prime_mod` in `hex-arith`.
 
-**Note:** `Fin n` already has `Lean.Grind.CommRing` and `IsCharP`. We
-build `ZMod64` for performance (Barrett reduction instead of naive modular
-arithmetic) and for cleaner API (explicit prime parameter, field operations).
+## Why not `Fin n`?
+
+`Fin n` already has `Lean.Grind.CommRing` and `IsCharP`, but its
+runtime model is a `Nat` paired with a proof — every operation
+routes through GMP arbitrary-precision arithmetic. `ZMod64 p`
+exists to put the value in a `UInt64` and route every operation
+through native machine arithmetic, with `mul` going through the
+mandatory C extern above and the rest compiling to native UInt64
+ops in pure Lean.
