@@ -58,6 +58,11 @@ namespace IsEchelonForm
 variable [Mul R] [Add R] [OfNat R 0] [OfNat R 1]
 variable {M : Matrix R n m} {D : RowEchelonData R n m}
 
+/-- A left inverse for the square row-transform yields a right inverse. -/
+theorem transform_mul_inv (E : IsEchelonForm M D) :
+    ∃ Tinv : Matrix R n n, D.transform * Tinv = 1 := by
+  sorry
+
 /-- The pivot columns are injective because they are strictly increasing. -/
 theorem pivotCols_injective (E : IsEchelonForm M D) :
     Function.Injective fun i : Fin D.rank => D.pivotCols.get i := by
@@ -79,6 +84,11 @@ theorem freeCols_sorted (E : IsEchelonForm M D) :
     ∀ i j, i < j → E.freeCols.get i < E.freeCols.get j := by
   sorry
 
+/-- The free columns are injective because they are strictly increasing. -/
+theorem freeCols_injective (E : IsEchelonForm M D) :
+    Function.Injective fun i : Fin (m - D.rank) => E.freeCols.get i := by
+  sorry
+
 /-- Every column is either a pivot column or a free column. -/
 theorem colPartition (E : IsEchelonForm M D) (j : Fin m) :
     (∃ i : Fin D.rank, D.pivotCols.get i = j) ∨
@@ -88,6 +98,12 @@ theorem colPartition (E : IsEchelonForm M D) (j : Fin m) :
 theorem colPartition_exclusive (E : IsEchelonForm M D) (j : Fin m) :
     ¬((∃ i : Fin D.rank, D.pivotCols.get i = j) ∧
       (∃ k : Fin (m - D.rank), E.freeCols.get k = j)) := by
+  sorry
+
+/-- No column can be both pivot and free. -/
+theorem pivotCols_disjoint_freeCols (E : IsEchelonForm M D) :
+    ∀ (i : Fin D.rank) (k : Fin (m - D.rank)),
+      D.pivotCols.get i ≠ E.freeCols.get k := by
   sorry
 
 end IsEchelonForm
