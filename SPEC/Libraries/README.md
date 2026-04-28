@@ -28,7 +28,7 @@ proving correspondence with Mathlib's mathematical definitions):
 - **hex-berlekamp-mathlib** — `Decidable (Irreducible f)` for `Polynomial (ZMod p)`
 - **hex-hensel-mathlib** — Hensel correctness, uniqueness, `coprime_mod_p_lifts`
 - **hex-lll-mathlib** — lattice = `Submodule ℤ`, short vector bound
-- **hex-gf2-mathlib** — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`
+- **hex-gf2-mathlib** — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`, packed-field finiteness/cardinality
 - **hex-gfq-mathlib** — finiteness/cardinality for quotient fields, and `GFq p n ≃+* GaloisField p n`
 - **hex-berlekamp-zassenhaus-mathlib** — unconditional factoring correctness, `Decidable (Irreducible f)` for `Polynomial ℤ`
 
@@ -112,7 +112,7 @@ hex-gfq-field   hex-conway   hex-gf2
 - [hex-poly-mathlib.md](hex-poly-mathlib.md) — `DensePoly R ≃+* Polynomial R`
 - [hex-poly-fp.md](hex-poly-fp.md) — polynomials over `F_p`, Frobenius, square-free decomposition
 - [hex-gf2.md](hex-gf2.md) — packed bitwise polynomials over `F_2`, `GF(2^n)` elements
-- [hex-gf2-mathlib.md](hex-gf2-mathlib.md) — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`
+- [hex-gf2-mathlib.md](hex-gf2-mathlib.md) — `GF2Poly ≃+* FpPoly 2`, `GF2n`/`GF2nPoly ≃+* FiniteField 2 f hf hirr`, packed-field finiteness/cardinality
 - [hex-poly-z.md](hex-poly-z.md) — polynomials over `Z`, content/primitive part, Mignotte bound
 - [hex-poly-z-mathlib.md](hex-poly-z-mathlib.md) — Mignotte bound proof via Mathlib's Mahler measure
 - [hex-berlekamp.md](hex-berlekamp.md) — Berlekamp factoring and Rabin irreducibility test

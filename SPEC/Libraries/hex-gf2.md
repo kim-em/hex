@@ -115,12 +115,17 @@ structure GF2nPoly (f : GF2Poly) (hirr : GF2Poly.Irreducible f) where
   val_reduced : val.IsZero ∨ val.degree < f.degree
 ```
 
-For the small case, `GF2n` gets `Field` and `Fintype` instances
-directly (field axioms from the irreducibility proof `hirr`).
-For large n, `GF2nPoly` builds its own quotient-field structure
-(parallel to hex-gfq-ring/hex-gfq-field, but over the packed
-`GF2Poly` representation rather than `FpPoly`).
+For the small case, `GF2n` gets its executable `Field` operations and
+algebraic laws directly from the irreducibility proof `hirr`, while
+finiteness/cardinality stay on the Mathlib bridge side of the project
+split. For large n, `GF2nPoly` likewise builds the packed quotient-field
+execution structure (parallel to hex-gfq-ring/hex-gfq-field, but over
+the packed `GF2Poly` representation rather than `FpPoly`) without
+introducing Mathlib-only `Fintype` machinery into the computational
+core.
 
 The ring equivalences `GF2n ≃+* FiniteField 2 f hf hirr` and
 `GF2nPoly ≃+* FiniteField 2 f hf hirr` live in hex-gf2-mathlib,
-transferring via `GF2Poly ≃+* FpPoly 2`.
+transferring via `GF2Poly ≃+* FpPoly 2`; that bridge library is also the
+home for `Fintype` and cardinality results about the packed
+representations.
