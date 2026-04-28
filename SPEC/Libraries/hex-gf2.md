@@ -124,6 +124,13 @@ the packed `GF2Poly` representation rather than `FpPoly`) without
 introducing Mathlib-only `Fintype` machinery into the computational
 core.
 
+`pow x n` on `GF2n` and `GF2nPoly` is square-and-multiply
+(`O(log n)` field multiplications). The textbook `n+1 ↦ pow n * x`
+recursion is forbidden — typical use cases (Tonelli–Shanks-style
+square roots, Frobenius squarings, irreducibility witnesses)
+exponentiate by `2^n`-sized integers, which a linear-time `pow`
+cannot complete.
+
 The ring equivalences `GF2n ≃+* FiniteField 2 f hf hirr` and
 `GF2nPoly ≃+* FiniteField 2 f hf hirr` live in hex-gf2-mathlib,
 transferring via `GF2Poly ≃+* FpPoly 2`; that bridge library is also the

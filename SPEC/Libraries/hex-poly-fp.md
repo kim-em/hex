@@ -7,7 +7,12 @@ Specialized polynomial arithmetic over `Z/pZ` using `UInt64` coefficients.
 - Frobenius map: `X^p mod f` via repeated squaring
 - `X^(p^k) mod f` for arbitrary k (square-and-multiply on polynomials)
 - Modular composition (evaluate one polynomial at another, mod a third)
-- Square-free decomposition (Yun's algorithm adapted for `F_p`)
+- Square-free decomposition (Yun's algorithm adapted for `F_p`).
+  Any internal polynomial-power helper used to reconstruct a
+  decomposition's product (e.g. `factor^multiplicity`) is
+  square-and-multiply, `O(log multiplicity)` polynomial
+  multiplications. The textbook `n+1 ↦ f * pow f n` recursion is
+  forbidden.
 
 **Key properties:**
 - Frobenius endomorphism: `frob(a + b) = frob(a) + frob(b)`
