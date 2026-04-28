@@ -87,6 +87,11 @@ def div [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R :=
   (divMod p q).1
 
+/-- Remainder from polynomial long division over a field. -/
+def mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) : DensePoly R :=
+  (divMod p q).2
+
 /-- Remainder from long division by a monic polynomial over a commutative ring. -/
 def modByMonic [One R] [Add R] [Sub R] [Mul R]
     (p q : DensePoly R) (hmonic : Monic q) : DensePoly R :=
@@ -94,6 +99,9 @@ def modByMonic [One R] [Add R] [Sub R] [Mul R]
 
 instance [One R] [Add R] [Sub R] [Mul R] [Div R] : Div (DensePoly R) where
   div := div
+
+instance [One R] [Add R] [Sub R] [Mul R] [Div R] : Mod (DensePoly R) where
+  mod := mod
 
 /-- Commutative-ring divisibility for dense polynomials. -/
 instance [Add R] [Mul R] : Dvd (DensePoly R) where
@@ -161,6 +169,26 @@ theorem modByMonic_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
     modByMonic p q hq = (divModMonic p q hq).2 := by
   rfl
 
+theorem mod_eq_divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    p % q = (divMod p q).2 := by
+  rfl
+
+theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    (p / q) * q + (p % q) = p := by
+  simpa [DensePoly.div, DensePoly.mod] using divMod_spec p q
+
+theorem modByMonic_eq_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) (hq : Monic q) :
+    modByMonic p q hq = p % q := by
+  sorry
+
+theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    (p % q) % q = p % q := by
+  sorry
+
 end DensePoly
 
 namespace DensePoly
@@ -195,19 +223,48 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
     (p q m : DensePoly S) : Prop :=
   m ∣ (p - q)
 
-/-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
-theorem polyCRT_mod_fst :
+/-- Reduction modulo the modulus is congruent to the original polynomial. -/
+theorem congr_mod {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    (p m : DensePoly S) :
+    Congr (p % m) p m := by
+  sorry
+
+/-- Congruent polynomials have the same canonical remainder. -/
+theorem mod_eq_mod_of_congr {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    {p q m : DensePoly S} :
+    Congr p q m -> p % m = q % m := by
+  intro _h
+  sorry
+
+/-- The CRT witness reduces to the prescribed first residue modulo `a` via monic reduction. -/
+theorem polyCRT_modByMonic_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) a ha = modByMonic u a ha := by
   sorry
 
-/-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
-theorem polyCRT_mod_snd :
+/-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
+theorem polyCRT_mod_fst :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
+    polyCRT a b u v s t % a = u % a := by
+  intro S _ _ _ a b u v s t ha hbez
+  simpa [modByMonic_eq_mod] using polyCRT_modByMonic_fst a b u v s t ha hbez
+
+/-- The CRT witness reduces to the prescribed second residue modulo `b` via monic reduction. -/
+theorem polyCRT_modByMonic_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) b hb = modByMonic v b hb := by
   sorry
+
+/-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
+theorem polyCRT_mod_snd :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
+    polyCRT a b u v s t % b = v % b := by
+  intro S _ _ _ a b u v s t hb hbez
+  simpa [modByMonic_eq_mod] using polyCRT_modByMonic_snd a b u v s t hb hbez
 
 end DensePoly
 end Hex
