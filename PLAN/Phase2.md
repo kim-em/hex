@@ -60,18 +60,26 @@ These are not rubber-stamp coverage audits — they ask:
   `eventual`, `placeholder`, `Phase 1`, `bridge for` in `*.lean`
   and `ffi/*.c` files.** Every hit is a candidate violation; flag
   in the review issue.
-- **Does each data-level `def` body match the SPEC's stated
-  asymptotic complexity, not just its input/output?** [PLAN/Phase1.md](Phase1.md)
-  forbids "alternative implementations with the wrong algorithmic
+- **Does each data-level `def` body match the canonical fast default
+  for its operation?** [PLAN/Phase1.md](Phase1.md) forbids
+  "alternative implementations with the wrong algorithmic
   complexity"; this question makes the rule enforceable at review
-  time. Flag bodies that produce the right output via an
-  asymptotically worse algorithm: descending linear search where
-  the SPEC implies binary search or Newton iteration; Pascal-triangle
-  recursion where the SPEC implies the multiplicative formula;
-  full-precision exponentiation `a ^ n % p` where the SPEC implies
-  square-and-multiply; rebuild-from-scratch where the SPEC implies
-  an in-place update. Same remedy as wrong-shape scaffolds: fix the
-  body, or delete the declaration.
+  time. The acceptable bodies for standard mathematical operations
+  are listed in [SPEC/design-principles.md §7
+  "Canonical fast defaults"](../SPEC/design-principles.md). Flag any
+  body whose row in that table is the *forbidden* column: linear-time
+  `pow` in a ring/field, `a^n % p` modular exponentiation, descending
+  linear-scan `floorSqrt`, unmemoised Pascal `binom`, `Nat.rec` over
+  `n` for `nsmul` / `natCast`, `toNat`/`ofNat` round-trip in a
+  `UInt64`-typed operation, rebuild-from-scratch where the SPEC
+  prescribes an in-place update. The table is binding even when the
+  per-library SPEC says only "exponentiation" / "binomial coefficient"
+  / etc. without naming an algorithm. Same remedy as wrong-shape
+  scaffolds: fix the body, or delete the declaration. If a body's
+  operation isn't in the design-principles table and the per-library
+  SPEC doesn't constrain complexity, ask whether a textbook would
+  call the body "the standard fast algorithm" for that operation; if
+  not, flag it.
 - **Are there one-line aliases of an adjacent declaration, lemmas
   duplicating Lean core, or names that misrepresent the body?**
   Flag any `def`/`theorem` whose body is `exact <other-decl>` for
