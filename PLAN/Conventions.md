@@ -50,7 +50,7 @@ until merged PRs land.
 | SPEC library files | kebab-case | `hex-poly-z-mathlib.md` |
 | Lean modules/dirs | PascalCase | `HexPolyZMathlib` |
 | `libraries.yml` keys | PascalCase | `HexPolyZMathlib:` |
-| `lakefile.toml` names | PascalCase | `name = "HexPolyZMathlib"` |
+| `lakefile.lean` names | PascalCase | `lean_lib HexPolyZMathlib where` |
 
 The PascalCase form is a direct transliteration of the kebab-case
 name: each hyphen-separated segment becomes capitalised and joined
@@ -253,7 +253,7 @@ read its output.
   complete.
 - `done_through: 7` is fully done.
 - Phase 0 is *global*, not per-library — its completion is observable
-  via on-disk artifacts (`lakefile.toml`, `scripts/check_dag.py`,
+  via on-disk artifacts (`lakefile.lean`, `scripts/check_dag.py`,
   etc.), not via any `libraries.yml` field.
 - "Dep-coupled" phases (1, 3, 4) require same-phase completion in
   every direct dep before L can start them. "Local" phases (2, 5,

@@ -109,16 +109,13 @@ A library's Phase-4 deliverable is a `HexFoo.Bench` exe rooted at
 `HexFoo/Bench.lean`. Supporting modules may live under
 `HexFoo/Bench/`. The Lake target is named `hexfoo_bench`:
 
-```toml
-# lakefile.toml
-[[require]]
-name = "lean-bench"
-git = "https://github.com/kim-em/lean-bench.git"
-rev = "main"
+```lean
+-- lakefile.lean
+require «lean-bench» from git
+  "https://github.com/kim-em/lean-bench.git" @ "main"
 
-[[lean_exe]]
-name = "hexfoo_bench"
-root = "HexFoo.Bench"
+lean_exe hexfoo_bench where
+  root := `HexFoo.Bench
 ```
 
 Reproducibility comes from committing `lake-manifest.json` alongside
@@ -254,8 +251,16 @@ Two integration patterns:
   register it as a `setup_benchmark` target, and let the
   inner-repeat loop amortise the call cost. Per-call overhead is
   one C call. Add the shim sources under
-  `HexFoo/ffi/<comparator>.c`; record any link arguments in
-  `lakefile.toml` (`moreLinkArgs`). The same `@[extern]` boundary
+  `HexFoo/ffi/<comparator>.c`; wire them into `lakefile.lean` via
+  an `extern_lib hexfooffi (pkg)` block that builds the `.c`
+  sources to `.o` (via `compileO`) and links them into a static
+  library that the corresponding `lean_lib HexFoo` depends on.
+  See `lakefile.lean`'s `extern_lib hexgf2ffi` for the canonical
+  shape. Record any system link arguments (e.g. `-lgmp`) on the
+  `lean_lib` block via `moreLinkArgs := #[…]`. **Do not put `.c`
+  paths in `moreLinkArgs`** — that field is for link-time flags,
+  not source compilation, and putting `.c` paths there silently
+  produces no extern resolution. The same `@[extern]` boundary
   rules from [Conventions.md](../PLAN/Conventions.md) apply.
 - **Process call, acceptable when FFI isn't viable.** The external
   tool is scripted (Sage, python-flint, GAP, PARI) or the per-call
