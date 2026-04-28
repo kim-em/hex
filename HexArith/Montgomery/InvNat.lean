@@ -13,16 +13,15 @@ private def montPosInvStep (p x : UInt64) : UInt64 :=
   x * (2 - p * x)
 
 /--
-Starting from the odd-modulus seed `x = p`, six refinement steps lift the
-inverse from mod `2^3` to mod `2^64`.
+Starting from the odd-modulus seed `x = p`, five refinement steps lift the
+inverse from mod `2^3` to mod `2^96 ≥ 2^64`.
 -/
 def montPosInv (p : UInt64) : UInt64 :=
   let x1 := montPosInvStep p p
   let x2 := montPosInvStep p x1
   let x3 := montPosInvStep p x2
   let x4 := montPosInvStep p x3
-  let x5 := montPosInvStep p x4
-  montPosInvStep p x5
+  montPosInvStep p x4
 
 /-- The user-facing Montgomery inverse is the negated positive inverse. -/
 def montInv (p : UInt64) : UInt64 :=
