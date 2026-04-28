@@ -30,6 +30,9 @@ instance : Sub (ZMod64 p) where
 instance : Mul (ZMod64 p) where
   mul := ZMod64.mul
 
+instance : Div (ZMod64 p) where
+  div a b := ZMod64.mul a (ZMod64.inv b)
+
 instance : DecidableEq (ZMod64 p) := by
   intro a b
   if h : a.val = b.val then
