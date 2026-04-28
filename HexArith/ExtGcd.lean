@@ -1,9 +1,6 @@
 /-!
-Extended GCD scaffolding.
-
-This module provides the Phase 1 pure-`Nat`, `Int`, and `UInt64`
-extended-GCD APIs and their key correctness statements for the
-arithmetic library.
+Extended GCD APIs and correctness statements for the arithmetic
+library.
 -/
 
 namespace HexArith
@@ -48,14 +45,47 @@ def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
 /--
 Pure Lean reference implementation of extended GCD over integers.
 
-The computation reduces to the `Nat` variant on absolute values and then
-re-signs the Bezout coefficients to match the original inputs.
+This runs the Euclidean algorithm directly on `Int`, carrying Bezout
+coefficients through the usual quotient/remainder updates.
 -/
+private def pureIntExtGcd.go (old_r r old_s s old_t t : Int) : Nat × Int × Int :=
+  match r with
+  | 0 => (old_r.natAbs, old_s, old_t)
+  | .ofNat (n + 1) =>
+      let q := old_r / Int.ofNat (n + 1)
+      pureIntExtGcd.go (Int.ofNat (n + 1)) (old_r % Int.ofNat (n + 1))
+        s (old_s - q * s) t (old_t - q * t)
+  | .negSucc n =>
+      let r := Int.negSucc n
+      let q := old_r / r
+      pureIntExtGcd.go r (old_r % r) s (old_s - q * s) t (old_t - q * t)
+termination_by r.natAbs
+decreasing_by
+  · have hmod_nonneg : 0 ≤ old_r % Int.ofNat (n + 1) := by
+      exact Int.emod_nonneg _ (Int.ofNat_ne_zero.mpr (Nat.succ_ne_zero _))
+    have hpos : (0 : Int) < Int.ofNat (n + 1) := by
+      exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+    have hmod_lt : old_r % Int.ofNat (n + 1) < Int.ofNat (n + 1) := by
+      exact Int.emod_lt_of_pos _ hpos
+    have hnatAbs_lt :
+        ((old_r % Int.ofNat (n + 1)).natAbs : Int) < (Int.ofNat (n + 1)).natAbs := by
+      rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg]
+      simpa using hmod_lt
+    exact Int.ofNat_lt.mp hnatAbs_lt
+  · have hmod_nonneg : 0 ≤ old_r % Int.negSucc n := by
+      exact Int.emod_nonneg _ (by simp)
+    have hpos : (0 : Int) < Int.ofNat (n + 1) := by
+      exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+    have hmod_lt : old_r % Int.negSucc n < Int.ofNat (n + 1) := by
+      simpa [Int.negSucc_eq, Int.emod_neg] using (Int.emod_lt_of_pos old_r hpos)
+    have hnatAbs_lt :
+        ((old_r % Int.negSucc n).natAbs : Int) < (Int.negSucc n).natAbs := by
+      rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg, Int.natAbs_negSucc]
+      exact hmod_lt
+    exact Int.ofNat_lt.mp hnatAbs_lt
+
 def pureIntExtGcd (a b : Int) : Nat × Int × Int :=
-  let (g, s, t) := HexArith.extGcd a.natAbs b.natAbs
-  let s' := if a < 0 then -s else s
-  let t' := if b < 0 then -t else t
-  (g, s', t')
+  pureIntExtGcd.go a b 1 0 0 1
 
 theorem pureIntExtGcd_fst (a b : Int) :
     (pureIntExtGcd a b).1 = Int.gcd a b := by
