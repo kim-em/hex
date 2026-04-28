@@ -1,6 +1,9 @@
 /-!
-Extended GCD APIs and correctness statements for the arithmetic
-library.
+Extended GCD algorithms and specifications.
+
+This module defines pure-`Nat`, `Int`, and `UInt64` extended-GCD
+operations together with the core gcd and Bezout-certificate theorems
+used by the arithmetic library.
 -/
 
 namespace HexArith

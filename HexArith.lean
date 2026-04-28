@@ -13,6 +13,6 @@ import HexArith.UInt64.Wide
 /-!
 `HexArith` collects the low-level arithmetic substrate for the project:
 wide-word `UInt64` operations, Nat-level modular-arithmetic lemmas, the
-extended-GCD scaffold, and the mathlib-free modular reduction and
+extended-GCD implementations, and the mathlib-free modular reduction and
 number-theory layers built on top of them.
 -/
