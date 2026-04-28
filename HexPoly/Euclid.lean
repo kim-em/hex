@@ -189,16 +189,20 @@ def polyCRT [One R] [Add R] [Mul R]
     (a b u v s t : DensePoly R) : DensePoly R :=
   u * t * b + v * s * a
 
-theorem polyCRT_mod_fst [One R] [Add R] [Sub R] [Mul R] [Div R]
+/-- `Congr p q m` means `p` and `q` differ by a multiple of `m`. -/
+def Congr [Add R] [Sub R] [Mul R] (p q m : DensePoly R) : Prop :=
+  m ∣ (p - q)
+
+theorem polyCRT_mod_fst [One R] [Add R] [Sub R] [Mul R]
     (a b u v s t : DensePoly R)
     (hbez : s * a + t * b = 1) :
-    polyCRT a b u v s t % a = u % a := by
+    Congr (polyCRT a b u v s t) u a := by
   sorry
 
-theorem polyCRT_mod_snd [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem polyCRT_mod_snd [One R] [Add R] [Sub R] [Mul R]
     (a b u v s t : DensePoly R)
     (hbez : s * a + t * b = 1) :
-    polyCRT a b u v s t % b = v % b := by
+    Congr (polyCRT a b u v s t) v b := by
   sorry
 
 end DensePoly
