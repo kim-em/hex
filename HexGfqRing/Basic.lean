@@ -64,6 +64,33 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : DecidableEq (PolyQuotient f
     repr (ofPoly f hf g) = reduceMod f g :=
   rfl
 
+@[ext] theorem ext
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    {x y : PolyQuotient f hf} (h : repr x = repr y) :
+    x = y :=
+  Subtype.ext h
+
+theorem eq_zero_iff_repr_eq_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    x = ofPoly f hf 0 ↔ repr x = reduceMod f 0 := by
+  constructor
+  · intro hx
+    simpa [hx] using repr_ofPoly f hf (0 : FpPoly p)
+  · intro hx
+    apply ext
+    simpa using hx
+
+theorem ne_zero_iff_repr_ne_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    x ≠ ofPoly f hf 0 ↔ repr x ≠ reduceMod f 0 := by
+  constructor
+  · intro hx hrepr
+    exact hx ((eq_zero_iff_repr_eq_zero x).2 hrepr)
+  · intro hx hzero
+    exact hx ((eq_zero_iff_repr_eq_zero x).1 hzero)
+
 theorem degree_repr_lt_degree {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
     FpPoly.degree (repr x) < FpPoly.degree f := by

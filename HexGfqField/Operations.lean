@@ -79,6 +79,68 @@ private def invPoly {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
   DensePoly.scale unitInv r.left
 
+/-- The inverse candidate is the normalized left Bezout coefficient from the
+extended gcd between the representative and the modulus. -/
+private theorem invPoly_eq_scale_xgcd_left
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    invPoly x =
+      let r := DensePoly.xgcd (GFqRing.repr x) f
+      let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
+      DensePoly.scale unitInv r.left := by
+  rfl
+
+/-- The extended-gcd output gives the unscaled Bezout identity for the reduced
+representative and the modulus. -/
+private theorem xgcd_repr_bezout
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    let r := DensePoly.xgcd (GFqRing.repr x) f
+    r.left * GFqRing.repr x + r.right * f = r.gcd := by
+  simpa using DensePoly.xgcd_bezout (GFqRing.repr x) f
+
+/-- After scaling the Bezout coefficients by the inverse of the gcd's constant
+term, the left coefficient is still a quotient-level inverse candidate. -/
+private theorem scaled_xgcd_repr_bezout
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    let r := DensePoly.xgcd (GFqRing.repr x) f
+    let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
+    DensePoly.scale unitInv r.left * GFqRing.repr x +
+        DensePoly.scale unitInv r.right * f =
+      DensePoly.scale unitInv r.gcd := by
+  sorry
+
+/-- Modulo `f`, multiplying a representative by the normalized inverse
+candidate reduces to the normalized gcd witness from the same xgcd run. -/
+private theorem reduceMod_repr_mul_invPoly_eq_scaled_gcd
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    let r := DensePoly.xgcd (GFqRing.repr x) f
+    let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
+    GFqRing.reduceMod f (GFqRing.repr x * invPoly x) =
+      GFqRing.reduceMod f (DensePoly.scale unitInv r.gcd) := by
+  sorry
+
+/-- Nonzero field elements have nonzero quotient representatives. This is the
+bridge from field-level hypotheses to the quotient-level helper lemmas. -/
+private theorem toQuotient_ne_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    x.toQuotient ≠ (0 : GFqRing.PolyQuotient f hf) := by
+  intro hq
+  apply hx
+  exact GFqField.ext hq
+
+/-- For a nonzero residue class modulo an irreducible polynomial, the
+normalized xgcd witness reduces to the multiplicative identity. -/
+private theorem reduceMod_repr_mul_invPoly_eq_one
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) =
+      GFqRing.reduceMod f 1 := by
+  sorry
+
 /-- Field inversion stays on the quotient-reduction path by reusing the
 polynomial extended-GCD witness, normalized by the gcd's constant unit factor.
 The `0` case follows the usual junk-value convention required by
@@ -89,6 +151,12 @@ def inv {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     zero f hf hirr
   else
     ofPoly f hf hirr (invPoly x.toQuotient)
+
+@[simp] theorem toQuotient_inv_of_ne_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    (inv x).toQuotient = GFqRing.ofPoly f hf (invPoly x.toQuotient) := by
+  simp [GFqField.inv, hx]
 
 /-- Division is multiplication by the inverse candidate. -/
 def div {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
@@ -238,12 +306,14 @@ theorem mul_inv_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     {x : FiniteField f hf hirr} (hx : x ≠ 0) :
     x * x⁻¹ = 1 := by
+  have hreduced := reduceMod_repr_mul_invPoly_eq_one (x := x) hx
   sorry
 
 theorem inv_mul_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     {x : FiniteField f hf hirr} (hx : x ≠ 0) :
     x⁻¹ * x = 1 := by
+  have hleft := mul_inv_cancel (x := x) hx
   sorry
 
 @[simp] theorem repr_zero
