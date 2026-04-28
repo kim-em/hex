@@ -125,6 +125,21 @@ private def powModWordOdd (a n : Nat) (p : UInt64) (hp : p % 2 = 1) : Nat :=
   let base := ctx.toMont (UInt64.ofNat (a % p.toNat))
   (ctx.fromMont (powMont ctx base n)).toNat
 
+/-- Nat-level fallback modular exponentiation by repeated squaring. -/
+private def powModNat (a n p : Nat) : Nat :=
+  let rec go (acc base k : Nat) : Nat :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then (acc * base) % p else acc
+      let base' := (base * base) % p
+      go acc' base' (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go (1 % p) (a % p) n
+
 /--
 Modular exponentiation by repeated squaring, using Montgomery arithmetic for
 odd `UInt64` moduli and a direct Nat fallback otherwise.
@@ -138,9 +153,9 @@ def powMod (a n p : Nat) : Nat :=
       if hodd : p64 % 2 = 1 then
         powModWordOdd a n p64 hodd
       else
-        a ^ n % p
+        powModNat a n p
     else
-      a ^ n % p
+      powModNat a n p
 
 /-- `powMod` agrees with ordinary modular exponentiation. -/
 theorem powMod_eq (a n p : Nat) (hp : p > 0) :
