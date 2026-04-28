@@ -61,7 +61,15 @@ into Phase 1 until the Phase 0 PR lands on `main`.
    - For each `.lean` file (excluding `.lake/`), determine its library
      from the file path (top-level directory or root file name).
    - For each `import` statement, verify the imported module belongs to
-     the same library, a declared dependency, or stdlib/core.
+     the same library, a library reachable in the `libraries.yml`
+     dep closure of the importing library (i.e. a declared
+     dependency, direct **or transitive**), or stdlib/core. The
+     check matches Lake's actual symbol-visibility semantics: if a
+     library is reachable in the dep graph, its modules are
+     importable. Forbidding transitive imports would force HexLLL
+     (whose `deps: [HexGramSchmidt]`) to re-export every
+     HexMatrix-derived symbol it uses just to dodge the rule, which
+     is the opposite of clarity.
    - If the import starts with `Mathlib`, verify the library has
      `mathlib: true` in `libraries.yml` (or is `HexManual`, which may
      import from any hex-* library and from Verso, but not from
