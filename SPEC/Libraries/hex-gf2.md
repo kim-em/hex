@@ -64,7 +64,7 @@ def clmul (a b : @& UInt64) : UInt64 × UInt64 := Hex.pureClmul a b
 
 `Hex.pureClmul` (shift-and-XOR, above) is the reference semantics.
 The C wrapper `lean_hex_clmul_u64(uint64_t, uint64_t) → lean_obj_res`
-in `HexGf2/ffi/clmul.c` returns the 128-bit product packed as `(hi, lo)`.
+in `HexGF2/ffi/clmul.c` returns the 128-bit product packed as `(hi, lo)`.
 
 The C wrapper picks its implementation by preprocessor guards (no
 runtime CPU detection): x86-64 `__PCLMUL__` uses

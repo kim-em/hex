@@ -43,7 +43,7 @@ libraries:
     deps: [HexMatrix]
     mathlib: false
     done_through: 0
-  HexGf2:
+  HexGF2:
     deps: [HexPoly]
     mathlib: false
     done_through: 0
@@ -53,7 +53,7 @@ libraries:
     done_through: 0
 
   # ---------- Depth 2 ----------
-  HexLll:
+  HexLLL:
     deps: [HexGramSchmidt]
     mathlib: false
     done_through: 0
@@ -86,7 +86,7 @@ libraries:
     mathlib: false
     done_through: 0
   HexGfq:
-    deps: [HexGfqField, HexConway, HexGf2]
+    deps: [HexGfqField, HexConway, HexGF2]
     mathlib: false
     done_through: 0
   HexBerlekampZassenhaus:
@@ -115,8 +115,8 @@ libraries:
     deps: [HexPolyZ, HexPolyMathlib]
     mathlib: true
     done_through: 0
-  HexLllMathlib:
-    deps: [HexLll]
+  HexLLLMathlib:
+    deps: [HexLLL]
     mathlib: true
     done_through: 0
   HexBerlekampMathlib:
@@ -127,8 +127,8 @@ libraries:
     deps: [HexHensel, HexPolyMathlib]
     mathlib: true
     done_through: 0
-  HexGf2Mathlib:
-    deps: [HexGf2, HexPolyFp, HexGfqField]
+  HexGF2Mathlib:
+    deps: [HexGF2, HexPolyFp, HexGfqField]
     mathlib: true
     done_through: 0
   HexGfqMathlib:

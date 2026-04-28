@@ -7,64 +7,67 @@
 Conformance testing comes **before** proofs. No point proving theorems
 about wrong implementations.
 
-Phase 3 should follow `SPEC/testing.md`. In particular:
+Phase 3 follows `SPEC/testing.md`. Read that file before dispatching
+or picking up a Phase 3 issue — it defines the per-library module
+contract, the banned anti-patterns, the preferred idioms
+(`#guard_msgs in #eval`, `#guard`), and the CI mandate.
 
-- Use the three testing profiles:
-  - `core` — deterministic Lean-only checks with no external tools
-  - `ci` — modest randomized cross-checks using external tools only when
-    available
-  - `local` — larger or manually triggered campaigns
-- Treat failures as replayable artifacts. Record at least the library,
-  profile, seed, and serialized input case.
-- Keep execution-mode distinctions explicit:
-  - `always`
-  - `if_available`
-  - `required`
-
-## Oracle guidance
-
-- `hex-arith`, `hex-mod-arith`: Lean built-in big integer semantics
-- `hex-poly`, `hex-poly-z`, `hex-poly-fp`: FLINT or Sage polynomial
-  arithmetic; `python-flint` is a useful partial oracle
-- `hex-matrix`, `hex-gram-schmidt`: Sage exact matrix / rational linear
-  algebra
-- `hex-gf2`, `hex-gfq-ring`, `hex-gfq-field`, `hex-gfq`: Sage finite
-  field and quotient-ring computations
-- `hex-berlekamp`, `hex-berlekamp-zassenhaus`: FLINT or Sage
-  factorization / irreducibility checks
-- `hex-hensel`: Sage or FLINT Hensel lifting, plus direct congruence and
-  product checks
-- `hex-lll`: fpLLL or Sage `LLL`, comparing reducedness and lattice
-  equality rather than exact basis equality
-- `hex-conway`: committed fixtures cross-checked against Sage's Conway
-  tables
-
-## Infrastructure guidance
-
-- Prefer JSON or JSONL for serialized test cases and normalized oracle
-  outputs.
-- Lean produces and consumes the shared case format; Python or shell
-  drivers handle tool detection and oracle invocation.
-- Sage should not rely on Ubuntu `apt` packages in CI. Prefer a
-  Nix-based Sage path (`nix shell nixpkgs#sage ...`) for local and CI
-  parity. `cachix/install-nix-action` is the expected GitHub Actions
-  installation path when Sage-backed CI jobs are added.
-- Keep standard CI small enough for hosted runners and partial tool
-  availability; reserve larger runs for `local` or manual jobs.
+The three profiles are `core` / `ci` / `local`; the three execution
+modes are `always` / `if_available` / `required`. The `core` profile
+is `always` and runs on every push and PR.
 
 ## Exit criteria
 
-Phase 3 is done for a library when, for each of the `core`/`ci`/
-`local` profiles in `SPEC/testing.md`:
+Phase 3 is done for a library `HexFoo` when all of:
 
-- the library has named fixtures committed to the repository;
-- the property-test runner passes on the default seed recorded with
-  the fixture metadata;
-- there is at least one end-to-end case exercising every advertised
-  user story in the library's release target (see
-  [Releases.md](Releases.md)).
+1. `HexFoo/Conformance.lean` exists and satisfies the **per-library
+   module contract** in
+   [SPEC/testing.md](../SPEC/testing.md#per-library-module-contract).
+   In particular:
+   - opens with a docstring declaring oracle / mode / covered
+     operations / covered properties / covered edge cases for this
+     library;
+   - has ≥1 elaboration-time check per advertised public operation;
+   - has ≥1 property `#guard` per advertised algebraic property;
+   - has ≥3 cases per operation (typical / edge / adversarial);
+   - contains no banned anti-patterns (dead expected fields,
+     single-case coverage, serialise-roundtrip-to-literal, metadata
+     with no consumer, `native_decide`).
 
-CI for the `core` and `ci` profiles must be green on the conformance
-workflow before a library leaves Phase 3.
+2. `HexFoo/Conformance.lean` is imported from `HexFoo.lean`, so
+   `lake build HexFoo` elaborates every check.
 
-Record completion by bumping `libraries.yml[L].done_through` to `3`.
+3. The conformance CI job at `.github/workflows/conformance.yml` is
+   green on the PR that lands the module, and remains green on
+   `main`. If the library's oracle mode is `always` or `required`,
+   the oracle-backed check is wired in the same PR; if
+   `if_available`, wiring the oracle is a follow-up.
+
+4. Record completion by bumping `libraries.yml[L].done_through` to
+   `3` in the same PR.
+
+Reviewer checklist for Phase 3 PRs:
+
+- [ ] Module docstring declares oracle, mode, covered operations,
+  covered properties, covered edge cases.
+- [ ] Every public operation listed in the library's SPEC file has
+  ≥1 elaboration-time check.
+- [ ] Every property named in the module docstring has ≥1 `#guard`.
+- [ ] Every edge case named in the module docstring has ≥1 fixture.
+- [ ] No `expected*` struct field is unreferenced.
+- [ ] No `#guard` / `example` where RHS is a literal copy of the
+  LHS's evaluation (i.e. the assertion carries content beyond "the
+  evaluator is deterministic").
+- [ ] `lake build HexFoo` green.
+- [ ] Conformance workflow green on the PR.
+
+## Oracle wiring (forward reference)
+
+Default oracle assignments live in
+[SPEC/testing.md § Oracle strategy](../SPEC/testing.md#oracle-strategy).
+Individual `HexFoo/Conformance.lean` modules name the specific
+oracle chosen in the module docstring.
+
+Implementation details for `ci` and `local` profiles — JSON/JSONL
+case format, driver script shape, Nix-Sage wiring — are specified
+by the first library to need them, not upfront.
