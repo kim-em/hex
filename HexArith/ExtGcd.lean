@@ -1,9 +1,9 @@
 /-!
-Extended GCD scaffolding.
+Extended GCD algorithms and specifications.
 
-This module provides the Phase 1 pure-`Nat`, `Int`, and `UInt64`
-extended-GCD APIs and their key correctness statements for the
-arithmetic library.
+This module defines pure-`Nat`, `Int`, and `UInt64` extended-GCD
+operations together with the core gcd and Bezout-certificate theorems
+used by the arithmetic library.
 -/
 
 namespace HexArith

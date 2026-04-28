@@ -1,7 +1,7 @@
 import HexArith.Nat.ModArith
 
 /-!
-Mathlib-free combinatorial and prime-number scaffolding for `HexArith`.
+Mathlib-free combinatorial and prime-number lemmas for `HexArith`.
 
 This module owns the local `Nat.choose` and `Nat.Prime` surfaces that the
 computational core needs for binomial divisibility and Fermat-style congruence

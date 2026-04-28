@@ -1,11 +1,11 @@
 import HexArith.Montgomery.RedcNat
 
 /-!
-Montgomery inverse scaffolding for `HexArith`.
+Montgomery inverses for `HexArith`.
 
 The runtime inverse is computed in wrapping `UInt64` arithmetic by Newton-style
 doubling from the standard odd-modulus seed. The proof surface records the
-expected modular-inverse properties for later phases.
+resulting modular-inverse properties.
 -/
 
 /-- One Newton/Hensel refinement step for the positive Montgomery inverse. -/
