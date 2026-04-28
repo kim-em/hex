@@ -12,6 +12,7 @@ namespace UInt64
 def word : Nat := 2 ^ 64
 
 /-- The high 64 bits of the product `a * b`, viewed in radix `2^64`. -/
+@[extern "lean_hex_uint64_mul_hi"]
 def mulHi (a b : UInt64) : UInt64 :=
   .ofNat (a.toNat * b.toNat / word)
 
@@ -19,6 +20,7 @@ def mulHi (a b : UInt64) : UInt64 :=
 Add `a`, `b`, and an incoming carry bit, returning the wrapped low word and the
 outgoing carry bit.
 -/
+@[extern "lean_hex_uint64_add_carry"]
 def addCarry (a b : UInt64) (cin : Bool) : UInt64 × Bool :=
   let total := a.toNat + b.toNat + cin.toNat
   (.ofNat total, decide (word ≤ total))
@@ -27,6 +29,7 @@ def addCarry (a b : UInt64) (cin : Bool) : UInt64 × Bool :=
 Subtract `b` and an incoming borrow bit from `a`, returning the wrapped low
 word and the outgoing borrow bit.
 -/
+@[extern "lean_hex_uint64_sub_borrow"]
 def subBorrow (a b : UInt64) (bin : Bool) : UInt64 × Bool :=
   let rhs := b.toNat + bin.toNat
   if rhs ≤ a.toNat then

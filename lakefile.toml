@@ -14,7 +14,7 @@ rev = "v4.30.0-rc2"
 
 [[lean_lib]]
 name = "HexArith"
-moreLinkArgs = ["HexArith/ffi/mpz_gcdext.c"]
+moreLinkArgs = ["HexArith/ffi/mpz_gcdext.c", "HexArith/ffi/wide_arith.c"]
 
 [[lean_lib]]
 name = "HexPoly"
