@@ -36,14 +36,35 @@ end HexArith
 namespace Hex
 
 /--
+Tail-recursive `UInt64` extended Euclidean loop.
+
+The remainders stay in `UInt64`; only the Bezout coefficients live in `Int`.
+-/
+private def uint64ExtGcdLoop
+    (old_r r : UInt64) (old_s s old_t t : Int) : UInt64 × Int × Int :=
+  if h : r = 0 then
+    let _ := h
+    (old_r, old_s, old_t)
+  else
+    let q := old_r / r
+    let qz := Int.ofNat q.toNat
+    uint64ExtGcdLoop r (old_r % r) s (old_s - qz * s) t (old_t - qz * t)
+termination_by r.toNat
+decreasing_by
+  simp_wf
+  exact Nat.mod_lt _ (Nat.pos_of_ne_zero (by
+    intro hr
+    apply h
+    exact UInt64.toNat_inj.mp hr))
+
+/--
 Pure-Lean `UInt64` extended GCD reference implementation.
 
-This remains available as a proof/reference helper. The public runtime
-`HexArith.UInt64.extGcd` API delegates through `HexArith.Int.extGcd`.
+This stays entirely in native `UInt64` arithmetic for the Euclidean reduction,
+while the Bezout coefficients are tracked in `Int`.
 -/
 def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
-  let (g, s, t) := HexArith.extGcd a.toNat b.toNat
-  (.ofNat g, s, t)
+  uint64ExtGcdLoop a b 1 0 0 1
 
 /--
 Pure Lean reference implementation of extended GCD over integers.
@@ -97,8 +118,7 @@ namespace UInt64
 
 /-- Public `UInt64` extended GCD API surface. -/
 def extGcd (a b : UInt64) : UInt64 × Int × Int :=
-  let (g, s, t) := Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat)
-  (.ofNat g, s, t)
+  Hex.pureUInt64ExtGcd a b
 
 theorem extGcd_fst (a b : UInt64) :
     (extGcd a b).1.toNat = Nat.gcd a.toNat b.toNat := by
