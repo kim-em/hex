@@ -1,190 +1,389 @@
 # Benchmarking
 
 This document specifies the performance-measurement contract for the
-project. It complements [testing.md](testing.md): testing asks whether
-the implementation is correct, benchmarking asks how fast the verified
-implementation is and how it compares with reference systems.
+project. It complements [testing.md](testing.md): testing asks
+whether the implementation is correct against an oracle, benchmarking
+asks whether the implementation matches its declared algorithmic
+complexity. Both are bug-finding tools and route to the same response
+when they fire.
 
-Benchmarking is part of the SPEC, not an afterthought. The project is
-building executable computational algebra, so every major library must
-have named benchmark cases, reproducible harnesses, and published
-results.
+## Why benchmark
 
-## Goals
+Benchmarking serves three purposes, in priority order:
 
-Benchmarking serves four purposes:
+1. **Detect wrong implementations** by checking declared algorithmic
+   complexity against observed scaling. A Phase-1 commit ships a
+   `def` with the *real* algorithm at the *intended* complexity (per
+   [design-principles.md §7](design-principles.md)). A Phase-4
+   benchmark whose verdict disagrees with the declared model means
+   that promise was broken — the `def` is scaffolding in disguise.
+2. **Measure how Lean compares to external systems** on hard
+   problems. "Factoring `x^128 + 1` over `F_2` takes ~2 s in Lean
+   versus ~0.8 s in FLINT" is a useful sentence even when both
+   systems agree on the answer; benchmarking is how that sentence
+   gets recorded.
+3. **Make design tradeoffs evidence-based.** "Barrett or Montgomery?"
+   "Linear or quadratic Hensel lifting?" are answered by running
+   both and looking at the numbers, not by argument from textbook.
 
-1. Detect performance regressions in Lean implementations over time.
-2. Compare alternative verified algorithms or representations.
-3. Compare Lean implementations against external CAS/reference tools.
-4. Provide concrete evidence for design decisions in the library specs.
+Detecting time-series regressions is a side effect of (1) and (2),
+not the primary goal. A correctly-declared and correctly-implemented
+operation should be regression-stable; if it isn't, the test is the
+benchmark itself.
 
-Benchmarks do **not** relax the requirement that all trusted runtime
-computation happens in Lean. External tools are used as comparators and
-oracles for measurement only.
+## The verdict-as-bug-trigger model
 
-## Benchmark classes
+Every benchmarked operation has a textbook complexity model declared
+*at the registration site* in the per-library `Bench.lean`. The
+benchmark harness ([§Harness](#harness-lean-bench)) fits the
+observed scaling against that model and emits one of two verdicts:
 
-Each computational library must define both microbenchmarks and
-end-to-end benchmarks.
+- **consistent with declared complexity** — observed scaling matches
+  the model within tolerance.
+- **inconclusive** — observed scaling does not match. The
+  implementation is either wrong, or the model was misdeclared.
 
-### Required microbenchmarks
+The latter case is the **valuable** outcome of a benchmark run.
+"Everything looks consistent and within a small constant factor of
+the external comparator" is acceptable but unexciting; "the verdict
+came back inconclusive and the slope is `+0.4` over `n`" is the run
+that earned its keep.
 
-- `hex-poly-fp`: addition, multiplication, modular reduction, GCD,
-  exponentiation mod `f`, Rabin/Berlekamp irreducibility kernels
-- `hex-poly-z`: multiplication, division/remainder, content/primitive
-  part, GCD
-- `hex-berlekamp`: Berlekamp matrix construction, nullspace, factor
-  splitting, irreducibility tests
-- `hex-hensel`: linear lifting and quadratic lifting on the same named
-  inputs
-- `hex-lll`: size reduction, swap-heavy inputs, full reduction
-- `hex-gfq-ring` / `hex-gfq-field` / `hex-gfq`: multiplication,
-  inversion, Frobenius, norm/trace on representative `(p, n)` pairs
-- `hex-conway`: Tier 1 irreducibility verification, Tier 2 Conway-table
-  verification, and Tier 3 search when implemented
+When a verdict is `inconclusive`, or when the verdict is consistent
+but the constant is wildly off an external reference (more than
+about 100×), the response is mandatory and uniform:
 
-### Required end-to-end benchmarks
+1. **File a GitHub issue.** Use the bench-found-bug template in
+   [PLAN/Conventions.md](../PLAN/Conventions.md#bench-found-and-conformance-found-issues).
+2. **Roll the library's `done_through` back** to the phase
+   predating the broken `def`, per
+   [PLAN/Conventions.md §Rollback is a normal action](../PLAN/Conventions.md#rollback-is-a-normal-action).
+3. **Re-enter the rolled-back phase** to fix the implementation;
+   the benchmark stays as written.
 
-- finite-field construction for named `(p, n)` pairs
-- irreducibility certification for named polynomials over `F_p`
-- integer polynomial factorization on small and medium examples
-- end-to-end Berlekamp-Zassenhaus with and without LLL when both paths
-  exist
+Worked examples:
 
-## Required comparisons
+- HexArith Montgomery `mulMont` was declared `O(log p)` per call but
+  observed `O(p)` because `montgomeryRadixInvNat` did
+  `(List.range p.toNat).find?` instead of using the existing
+  Bezout-based `extGcd`. Verdict: `inconclusive` with a slope of
+  `+1.0`. Response: file issue, roll HexArith back, replace the
+  brute-force inverse.
+- HexLLL `swapStep` was declared `O(n²)` (incremental Gram–Schmidt
+  update) but observed `O(n³)` because the implementation rebuilt
+  Gram–Schmidt from scratch on every swap. Verdict: `inconclusive`
+  with a slope of `+1.0` versus the declared model. Response: file
+  issue, roll HexLLL back, implement the incremental update.
 
-The benchmark suite must include direct comparisons where they are
-architecturally important.
+These are not retrospectives; they are the canonical shape of a
+benchmark finding.
 
-- `GF2Poly` vs `FpPoly 2`
-- Barrett vs Montgomery crossover regimes
-- linear vs quadratic Hensel lifting
-- exponential recombination vs LLL-assisted recombination
-- Tier 1 vs Tier 2 Conway verification costs
-- Tier 2 Conway verification vs Tier 3 Conway search
+## Scaffolding cross-link
 
-## External comparison tools
+[Design principles §7](design-principles.md) already forbids
+data-level scaffolding: every committed `def` ships with the
+intended-final implementation, not a wrong-but-plausible stand-in.
+Benchmarking is the third enforcement point for that rule, after
+Phase 1 (the author's own discipline) and Phase 2 (skeptical
+review). A benchmark verdict revealing a scaffolding `def` triggers
+the rollback above; the doctrine is symmetric with conformance
+failures (see [testing.md](testing.md)).
 
-The benchmark harness should compare against the strongest practical
-reference available for each task.
+## Harness: lean-bench
 
-- GAP: Conway polynomial tables, Conway compatibility checks, primitive
-  polynomial checks
-- PARI/GP: finite-field irreducibility checks and large-degree
-  irreducibility experiments
-- FLINT: dense polynomial arithmetic and integer polynomial factoring
-- SageMath: higher-level reference workflows where it offers a simpler
-  orchestration layer than direct FLINT/PARI calls
-- fpLLL: lattice reduction comparisons
+The benchmark harness is [`kim-em/lean-bench`](https://github.com/kim-em/lean-bench).
+It is the only harness; do not roll a per-library replacement.
 
-The spec does not require every machine to have every external tool
-preinstalled. The harness may provision tools via Nix, containers, or
-documented local setup, but the provisioning path must itself be
-reproducible.
+A library's Phase-4 deliverable is `HexFoo/Bench.lean`, registered
+as a Lake exe target named `hexfoo_bench`:
+
+```toml
+# lakefile.toml
+[[require]]
+name = "lean-bench"
+git = "https://github.com/kim-em/lean-bench.git"
+rev = "main"
+
+[[lean_exe]]
+name = "hexfoo_bench"
+root = "HexFoo.Bench"
+```
+
+```lean
+-- HexFoo/Bench.lean
+import LeanBench
+import HexFoo
+
+setup_benchmark Hex.Foo.op n => n * Nat.log2 (n + 1)
+setup_fixed_benchmark Hex.Foo.canonicalHardProblem
+  where { repeats := 10 }
+
+def main (args : List String) : IO UInt32 :=
+  LeanBench.Cli.dispatch args
+```
+
+Two registration forms:
+
+- **`setup_benchmark <fn> <param> => <complexity>`** for parametric
+  sweeps. `<fn> : Nat → α`. `<complexity> : Nat → Nat` is the
+  textbook complexity (e.g. `n`, `n * n`, `n * Nat.log2 (n + 1)`,
+  `2 ^ n`). Optional `with prep := <prepFn>` clause hoists per-param
+  setup out of the timing loop, useful when the hot path takes
+  `σ → α` and `σ` is expensive to construct (random matrices,
+  pre-canonicalised polynomials).
+- **`setup_fixed_benchmark <name>`** for absolute-time measurements
+  on a single canonical input. `<name> : α` (pure) or `<name> : IO α`
+  (effectful — required when the input must be read from disk or
+  the call shells out to an external tool). No parameter, no
+  complexity model; runs `--repeats N` measured calls (default 5)
+  and reports median / min / max.
+
+Both forms accept a `where { … }` clause to override fields of the
+per-benchmark config (`maxSecondsPerCall`, `repeats`, `paramCeiling`,
+slope tolerance, etc.); CLI flags layer on top.
+
+The CLI surface is `lake exe hexfoo_bench <subcommand>`:
+
+- `list` — print every registered benchmark, annotating fixed ones.
+- `run NAME` — run a single benchmark, print the result table and
+  verdict.
+- `compare A B [C…]` — run multiple benchmarks (all parametric or
+  all fixed), report `allAgreed` / `divergedAt` based on result
+  hashes at common parameters, plus a relative-timing summary.
+- `verify [NAMES…]` — smoke-test registration wiring: spawn each
+  benchmark with a tight inner-tuning budget, check the child exits
+  cleanly and emits a hash where one is expected. Used as a CI
+  gate; see [§CI integration](#ci-integration).
+
+Per-library SPECs declare the complexity for each operation in their
+API surface. The textbook model is the contract; the benchmark
+checks observation against it. **Do not declare a complexity model
+that matches the buggy current code.** If the textbook model says
+`O(n²)` but the current implementation is `O(n³)`, declare `O(n²)`,
+let the verdict come back inconclusive, file the issue, roll back.
+
+### Adaptive ladder
+
+The harness picks the parameter ladder (doubling vs. linear) at
+runtime by probing the declared complexity at small parameters.
+Polynomial complexity gets a doubling ladder (`2, 4, 8, …`)
+extending to the configured `paramCeiling`; exponential complexity
+gets a narrow linear ladder bracketing the productive band before
+the wallclock cap kicks in. The user just declares the model
+correctly; the harness handles ladder shape.
+
+### What we don't measure
+
+`lean-bench` measures compiled-code execution. The following are
+**out of scope** for this contract; their performance is a separate
+concern:
+
+- elaboration-time `decide` and `decide +kernel`,
+- `#eval` and `#eval!`,
+- kernel reduction (proof terms, `decide` after elaboration),
+- proof-search tactics inside `Bench.lean`.
+
+If a tactic's compile time matters, it's a Lean / tactic-author
+issue and goes to a different tracker.
+
+## Within-Lean comparisons
+
+Where a SPEC names alternative algorithms or representations,
+register them all and `compare` them in the same exe:
+
+- `Hex.GF2.GF2Poly.mul` vs `Hex.PolyFp.mul` at `p = 2`
+- `Hex.ModArith.mulModBarrett` vs `Hex.ModArith.mulModMontgomery`
+  on overlapping modulus regimes
+- `Hex.Hensel.linearLift` vs `Hex.Hensel.quadraticLift` on the same
+  named inputs
+- exponential-recombination versus LLL-assisted recombination
+  inside Berlekamp–Zassenhaus
+
+`compare` joins on result hashes (`Hashable α` registers the hash
+in the JSONL output), so divergence shows up as a hash mismatch at
+a common parameter. This makes a `compare` invocation
+double-purpose: a timing report and a cross-implementation
+conformance check, in one go. A divergence triggers the same
+response as any other conformance failure: file an issue, roll back.
+
+## External comparators
+
+Where a SPEC marks an operation as architecturally important against
+an external reference, register the comparator alongside the Lean
+implementation in the same `Bench.lean` and let `compare` join them.
+Two integration patterns:
+
+- **FFI shim, preferred for hot-path comparisons.** The external
+  tool is C/C++ with a stable ABI (FLINT, fpLLL, GMP, NTL). Wrap
+  the relevant function with `@[extern]` returning a pure `α`,
+  register it as a `setup_benchmark` target, and let the
+  inner-repeat loop amortise the call cost. Per-call overhead is
+  one C call. Add the shim sources under
+  `HexFoo/ffi/<comparator>.c`; record any link arguments in
+  `lakefile.toml` (`moreLinkArgs`). The same `@[extern]` boundary
+  rules from [Conventions.md](../PLAN/Conventions.md) apply.
+- **Process call, acceptable for one-shot comparisons.** The
+  external tool is scripted (Sage, python-flint, GAP, PARI) or
+  the operation is expensive enough that process-spawn cost is
+  negligible. Use `setup_fixed_benchmark` with an `IO α` body
+  that shells out, parses the output, and returns it. The
+  parametric `setup_benchmark` form does not currently accept
+  `IO α`, so process-call comparisons with a parameter sweep are
+  not directly modellable today; if you need this, file an issue
+  against lean-bench rather than rolling a hex-local harness.
+
+Where a SPEC asks for a comparison lean-bench cannot directly model
+(e.g. a comparison whose only useful axis is wall-clock on a single
+canonical input that lean-bench's API doesn't yet support), file
+the gap as a feature request against lean-bench. Do not invent a
+parallel hex-local benchmark harness; one harness is the rule.
+
+## Fixed-problem benchmarks
+
+Some benchmarks are absolute-wall-clock measurements on canonical
+hard inputs, not parameter sweeps:
+
+- factoring `x^128 + 1` over `F_2`,
+- LLL-reducing a Lagarias–Odlyzko knapsack basis at dim 30,
+- verifying irreducibility of a committed Conway polynomial like
+  `(2, 409)`,
+- computing a `GF(p^n)` inverse for fixed `(p, n)` and chosen element.
+
+Use `setup_fixed_benchmark` for these. The bench module's docstring
+records the canonical input, the source it came from, and the
+reference timing the project considers reasonable (typically: time
+on the same canonical input in a comparator like FLINT or fpLLL).
+Comparison against the comparator is then a `compare` invocation
+across two `setup_fixed_benchmark` registrations, one per
+implementation.
+
+## Conway tier separation
+
+Conway-polynomial benchmarks reflect the three-tier design and must
+be reported separately:
+
+- **Tier 1.** Verify irreducibility of committed Conway polynomials.
+  Registered as `Hex.Conway.tier1.<p>_<n>` fixed benchmarks.
+- **Tier 2.** Full Conway-table verification (irreducibility,
+  primitivity, compatibility with divisor-degree entries) on
+  committed entries. Registered as `Hex.Conway.tier2.<p>_<n>`.
+- **Tier 3.** Search for missing Conway entries. Registered as
+  `Hex.Conway.tier3.<p>_<n>`.
+
+The tier prefix is part of the registration name; reports and CI
+gating MUST NOT aggregate tiers into a single "Conway runtime"
+number. Named cases include existing entries near the top of the
+Lübeck table (e.g. `(2, 409)`, `(3, 263)`, `(5, 251)`), entries for
+medium and large primes (e.g. `(97, 127)`, `(521, 13)`,
+`(65537, 7)`), just-beyond-table search probes (e.g. `(2, 410)`,
+`(97, 128)`), and large-degree irreducibility stress tests over
+`F_2` at degrees `512`, `1024`, `2048` and beyond when feasible.
+
+## CI integration
+
+Every library at `done_through ≥ 4` ships a CI job that runs:
+
+```sh
+lake exe hexfoo_bench list
+lake exe hexfoo_bench verify
+```
+
+The `verify` subcommand is the smoke gate: it spawns each
+registered benchmark at a tight inner-tuning budget, checks the
+child exits cleanly, and verifies hashable benchmarks emit hashes.
+It does NOT assert timing values — the gate detects bitrot of the
+bench module itself, not regressions in the implementation.
+
+For the repository-wide CI step, total wall-clock budget is `< 60 s`
+across all libraries' `verify` calls combined. A library whose
+`verify` cannot complete inside its share of that budget needs
+either tighter `setup_benchmark` config (lower `paramCeiling`) or
+a closer look at why its tiniest invocation is slow.
+
+Full timing runs (`lake exe hexfoo_bench run NAME` with a real
+budget) are not part of merge-gating CI. They run on a scheduled
+workflow or release-candidate workflow, on dedicated hardware where
+timing comparisons are meaningful. Each release names the libraries
+whose timing runs must succeed; a release is blocked by an
+inconclusive verdict or a comparator divergence even when proofs
+are complete.
 
 ## Reproducibility contract
 
-Every benchmark run must be reproducible from committed inputs and
-metadata.
+Every benchmark run is reproducible from committed inputs and
+metadata:
 
-- Each benchmark case has a stable name.
-- Randomized benchmarks use fixed committed seeds.
-- Generated inputs that matter for comparisons are either committed or
-  regenerated deterministically from the seed and recorded parameters.
-- Output artifacts record the Git commit, benchmark harness version,
-  machine description, date, Lean toolchain, and external tool versions.
-- Failures and timeouts are recorded explicitly rather than silently
-  dropped.
+- Each registered benchmark has a stable name (the
+  `setup_benchmark` declaration name); renaming or removing a
+  registration is a tracked PR-level change.
+- Randomized inputs are generated from a seed derived from the
+  benchmark name (so the seed is itself stable across runs).
+- Generated inputs that matter for a comparison are committed under
+  `HexFoo/Bench/Inputs/` or regenerated deterministically from the
+  seed plus the parameter.
+- The JSONL emitted by lean-bench is the canonical machine-readable
+  artefact. Schema (fields per row, `kind` discriminator for
+  fixed-mode rows, status enum) is defined by lean-bench; do not
+  re-specify it here.
+- Run metadata (git SHA, Lean toolchain, hostname, CPU model) is
+  recorded by the harness or by the script that invokes it.
+- Failures, timeouts, and budget skips are recorded explicitly via
+  the `status` field rather than silently dropped.
 
-## Conway benchmarks
+Rendering JSONL into HTML, posting to GitHub Pages, or building a
+benchmark dashboard are downstream concerns and not required for
+the SPEC's contract to be met.
 
-The `hex-conway` benchmark suite must reflect the three-tier design.
+## Relationship to conformance
 
-### Tier 1
+Conformance and benchmarking share one bug-finding loop:
 
-Measure verification of irreducibility for committed imported Conway
-polynomials. These runs answer: how expensive is it to certify a known
-modulus for `GF(p^n)`?
+- Conformance asks: do Lean and the oracle agree on outputs?
+- Benchmarking asks: does the implementation match its declared
+  complexity?
 
-### Tier 2
+Both failure modes route to the same response — file an issue, roll
+back `done_through`, fix at the rolled-back phase — and the same
+canonical issue body shape (with the **Symptom** section described
+in [Conventions.md](../PLAN/Conventions.md#bench-found-and-conformance-found-issues)).
+Where a SPEC names the same canonical input for both views (a
+committed hard polynomial, a committed lattice basis), the same
+`setup_benchmark`-style registration carries both signals: timing
+in the JSONL output, agreement via the result hash and `compare`.
 
-Measure full verification of committed imported Conway entries:
+## Anti-patterns
 
-- irreducible
-- primitive
-- compatibility with divisor-degree entries
+These behaviours have surfaced in past benchmarking work and are
+explicitly forbidden:
 
-These runs answer: how expensive is it to certify the imported table as
-Conway data?
-
-### Tier 3
-
-Measure explicit search for missing Conway polynomials when implemented.
-Tier 3 benchmarks must be reported separately from Tier 1 and Tier 2.
-The benchmark report must never aggregate them into a single
-"hex-conway runtime" number.
-
-Named `hex-conway` cases should include:
-
-- existing table entries near the top of the Lübeck table for small
-  primes, such as `(2, 409)`, `(3, 263)`, `(5, 251)`
-- existing table entries for medium and large primes, such as
-  `(97, 127)`, `(521, 13)`, `(65537, 7)`
-- just-beyond-table search probes, such as `(2, 410)`, `(97, 128)`,
-  `(521, 17)`, `(65537, 8)`, or updated analogues if the committed table
-  changes
-- large-degree irreducibility stress tests over `F_2`, e.g. degrees
-  `512`, `1024`, `2048`, `4096`, `8192`, and beyond when feasible
-
-## Output artifacts
-
-Benchmark runs must produce machine-readable and human-readable outputs.
-
-- machine-readable summary, e.g. JSON or CSV
-- raw logs for replay/debugging
-- rendered HTML report pages for human inspection
-
-The HTML reports are required project artifacts.
-
-## Publication contract
-
-Benchmark outputs must be published to GitHub Pages associated with the
-repository.
-
-- the repo contains a workflow or documented script that renders HTML
-  benchmark reports
-- rendered reports are published on GitHub Pages
-- the repo `README.md` links to the benchmark index page
-- the benchmark index page links to individual runs or release snapshots
-- release or milestone notes should link to the corresponding benchmark
-  pages
-
-The goal is that a reader can move from the repository front page to the
-current benchmark dashboard with one click.
-
-## CI and release expectations
-
-Not every benchmark must run on every PR, but the contract must say
-which ones run where.
-
-- smoke benchmarks may run on PRs
-- the full benchmark suite may run on a scheduled workflow or
-  release-candidate workflow
-- each release target must name the benchmark cases it must pass
-- specific cases and thresholds may evolve between releases, but every
-  such change must be accompanied by a short rationale in the PR that
-  changes the benchmark set (one paragraph per change). This keeps the
-  release gate machine-checkable without freezing the case list.
-- a release is blocked by obvious performance regressions even if proofs
-  are complete
-
-## Relationship to conformance testing
-
-Conformance and benchmarking should share harness infrastructure when
-useful, but they remain distinct:
-
-- conformance asks whether Lean and the reference agree
-- benchmarking asks how long Lean and the reference take
-
-The same named cases should usually support both views.
+- **Lowering the parameter range to make a budget-skip go away
+  without naming the implementation bug.** If a benchmark would
+  exceed its wallclock cap at the declared range, the implementation
+  is too slow at that range — file an issue, roll back, fix. Don't
+  shrink the range to dodge the verdict.
+- **Declaring a complexity model that matches the buggy current
+  code instead of textbook.** The model is the contract. Observation
+  disagreeing with textbook is a finding; observation agreeing with
+  a buggy implementation that itself disagrees with textbook is a
+  cover-up.
+- **Top-level `def` of proof-carrying context structures evaluated
+  at module init.** A module-level `def ctx : BarrettCtx p := …`
+  whose initializer transitively calls a heavy computation
+  deadlocks the bench exe at module load. Construct such contexts
+  inside the benchmarked function or inside its `with prep := …`
+  clause.
+- **Benchmarking `decide`, `#eval`, or kernel reduction.** Out of
+  scope per [§What we don't measure](#what-we-dont-measure).
+- **Runtime-`n` dispatch wrappers around dimension-typed
+  operations.** Lean accepts dependent types fine at runtime; pass
+  the dimension and its bound as parameters and let the caller
+  fill them in. A pattern-match-on-dimension ladder buried inside
+  the bench module is over-engineering and ties dimension choices
+  to Lean rather than to the bench parameter.
+- **Committed expected-output tables that the harness never reads.**
+  The hash-agreement check via `compare` is the conformance leg of
+  the harness; do not duplicate it in committed expected-output
+  fixtures.
+- **Rolling a hex-local benchmark harness.** lean-bench is the
+  harness; gaps in its API are filed against it, not papered over
+  locally.

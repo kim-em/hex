@@ -14,6 +14,18 @@ once per session.
 agents may fix SPEC clauses that are internally contradictory or
 mathematically impossible, with rationale in the PR description.
 
+### Scaffolding is for proofs only
+
+`sorry` is permitted in proofs (`theorem` bodies, propositional
+`structure` fields). It is **not** permitted as a data-level body,
+and neither is any other placeholder shape (wrong-but-plausible
+trivial returns, identity casts, `axiom` stand-ins, alternative
+implementations with the wrong complexity). Every committed `def`
+ships with its intended-final implementation. See
+[design-principles.md §7](../SPEC/design-principles.md), the rule
+restated in [PLAN/Phase1.md](Phase1.md), and the bench-discovery
+rollback path in [SPEC/benchmarking.md](../SPEC/benchmarking.md).
+
 ### PR workflow
 
 Every PR gets auto-merge at creation:
@@ -137,6 +149,35 @@ depends-on: #124
 Keep these lines literal and easy to grep. They are the only
 dependency syntax the orchestration layer should rely on by default.
 
+### Bench-found and conformance-found issues
+
+Issues filed in response to a benchmark verdict mismatch or a
+conformance failure use the [canonical issue body shape](#canonical-issue-body-shape)
+plus a **Symptom** section recording the evidence:
+
+- **Declared expectation.** For a bench finding: the complexity model
+  declared in `setup_benchmark` (e.g. `n => n * Nat.log2 (n + 1)`).
+  For a conformance finding: the property the failing `#guard` was
+  checking, or the oracle's expected output.
+- **Observed result.** For a bench finding: the verdict text emitted
+  by `lake exe ... run NAME` (e.g. `inconclusive (cMin=10.5,
+  cMax=25.3, β=0.42)`), plus a copy of the relevant JSONL rows. For
+  a conformance finding: the failing input, the Lean output, and the
+  oracle output.
+- **Root-cause hypothesis.** One paragraph: what algorithmic shape
+  produces this observation? "Quadratic on `p` because we search
+  `List.range p`," "factor of `n` slower because we rebuild
+  Gram–Schmidt instead of incremental update," etc. Best guess is
+  enough; the next agent verifies.
+
+The **Deliverables** section lists two PRs:
+
+1. The rollback PR setting `libraries.yml[L].done_through` backward
+   (per [Rollback is a normal action](#rollback-is-a-normal-action)).
+2. The implementation PR fixing the bug at the rolled-back phase.
+
+Cross-link both PRs to this issue.
+
 ### Decomposition is normal
 
 If an agent is assigned an issue and concludes that it is too large
@@ -222,6 +263,41 @@ read its output.
 - Once deps reach `dep.dt ≥ 4`, the hardest cross-lib gate is
   satisfied and L can run through all subsequent local phases (5, 6,
   7) regardless of where deps go next.
+
+### Rollback is a normal action
+
+Bumping `done_through` *backward* is a normal, encouraged action
+when conformance or benchmarking finds an implementation bug. The
+forward bump records "phases 1..K are complete"; a backward bump
+records "we discovered phase ≤K wasn't actually complete and we are
+redoing it." Both directions are first-class.
+
+Operationally, rolling library `L` back from `K` to `K-1` (or
+further) means:
+
+1. File a GitHub issue describing the bug; use the issue body shape
+   in [Issue creation](#issue-creation), with the extra **Symptom**
+   section described under [Bench-found and conformance-found
+   issues](#bench-found-and-conformance-found-issues).
+2. Close any open phase-K PRs whose work depends on the broken code
+   (or convert them to draft and add `depends-on: <issue>`).
+3. Edit `libraries.yml` to set the affected library's `done_through`
+   to the new lower value, in a small dedicated PR. The PR
+   description names the issue.
+4. Mark any cross-library work that was unblocked by `L.dt ≥ K` as
+   blocked again where appropriate. The phase-dependency table
+   (above) makes this mechanical: any `M` with `L ∈ M.deps` and a
+   dep-coupled phase ≥ K is now ineligible until L recovers.
+
+The next agent picking up `L` enters the rolled-back phase with the
+bug-finding evidence (the issue, the JSONL artefact for a bench
+finding, the failing `#guard` for a conformance finding) as its
+context.
+
+Rollback is preferable to "weaken the test" or "lower the parameter
+range to make the bench pass" — both forms of paving over the bug.
+[SPEC/benchmarking.md](../SPEC/benchmarking.md) explicitly forbids
+the latter.
 
 ### Where state lives
 

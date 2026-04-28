@@ -31,6 +31,23 @@
    collisions with Mathlib's root-namespace types (`Matrix`,
    `Polynomial`, etc.).
 
+7. **Scaffolding applies only to proofs.** A proof skeleton may carry
+   `sorry` placeholders, where allowed. Every `def`, data-carrying
+   `structure` field, `class`, and `instance` ships with its
+   intended-final implementation on the first commit — the *real*
+   algorithm with the *intended* complexity, not a wrong-but-plausible
+   stand-in. If you cannot write that implementation in the current
+   session, do not commit the declaration; leave it out of Lean
+   entirely and open a follow-up issue. This rule is enforced at
+   three points: when a library is scaffolded
+   ([PLAN/Phase1.md](../PLAN/Phase1.md)), when its scaffolding is
+   reviewed ([PLAN/Phase2.md](../PLAN/Phase2.md)), and when its
+   benchmarks run ([benchmarking.md](benchmarking.md)). If
+   benchmarking later reveals that a committed `def` was scaffolding
+   in disguise — wrong shape, wrong complexity — the response is to
+   roll back the affected library's `done_through` and re-enter the
+   relevant phase, not to weaken the benchmark.
+
 ## Fully autonomous execution
 
 The project runs without human interaction after launch. Lean, Mathlib,
