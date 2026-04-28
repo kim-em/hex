@@ -45,18 +45,6 @@ theorem congr_reduceModPow_of_congr (f g : ZPoly) (p k : Nat)
     reduceModPow f p k = reduceModPow g p k := by
   sorry
 
-theorem congr_add (f g f' g' : ZPoly) (m : Nat)
-    (hf : congr f f' m) (hg : congr g g' m) :
-    congr (f + g) (f' + g') m := by
-  intro i
-  sorry
-
-theorem congr_mul (f g f' g' : ZPoly) (m : Nat)
-    (hf : congr f f' m) (hg : congr g g' m) :
-    congr (f * g) (f' * g') m := by
-  intro i
-  sorry
-
 end ZPoly
 
 namespace FpPoly
