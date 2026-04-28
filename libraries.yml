@@ -80,7 +80,7 @@ libraries:
   HexHensel:
     deps: [HexPolyFp, HexPolyZ]
     mathlib: false
-    done_through: 0
+    done_through: 1
   HexConway:
     deps: [HexBerlekamp]
     mathlib: false
