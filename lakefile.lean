@@ -25,22 +25,22 @@ private def zmod64MulOTarget (pkg : Package) : FetchM (Job FilePath) := do
     let flags := #["-I", (← getLeanIncludeDir).toString, "-fPIC"]
     compileO oFile srcFile flags
 
+extern_lib hexgf2ffi (pkg) := do
+  let name := nameToStaticLib "hexgf2ffi"
+  let oTarget ← clmulOTarget pkg
+  buildStaticLib (pkg.staticLibDir / name) #[oTarget]
+
 private def hexArithOTarget (pkg : Package) (src : String) : FetchM (Job FilePath) := do
-  let stem := src.dropEnd 2
+  let stem := (src.dropEnd 2).toString
   let oFile := pkg.dir / defaultBuildDir / "HexArith" / "ffi" / s!"{stem}.o"
   let srcTarget ← inputTextFile <| pkg.dir / "HexArith" / "ffi" / src
   buildFileAfterDep oFile srcTarget fun srcFile => do
     let flags := #["-I", (← getLeanIncludeDir).toString, "-fPIC"]
     compileO oFile srcFile flags
 
-extern_lib hexgf2ffi (pkg) := do
-  let name := nameToStaticLib "hexgf2ffi"
-  let oTarget ← clmulOTarget pkg
-  buildStaticLib (pkg.staticLibDir / name) #[oTarget]
-
 extern_lib hexarithffi (pkg) := do
   let name := nameToStaticLib "hexarithffi"
-  let oTargets ← #["wide_arith.c", "mpz_gcdext.c"].mapM (hexArithOTarget pkg)
+  let oTargets ← #[ "wide_arith.c", "mpz_gcdext.c" ].mapM (hexArithOTarget pkg)
   buildStaticLib (pkg.staticLibDir / name) oTargets
 
 extern_lib hexmodarithffi (pkg) := do
@@ -50,7 +50,10 @@ extern_lib hexmodarithffi (pkg) := do
 
 lean_lib HexArith where
   precompileModules := true
-  moreLinkArgs := #["-lgmp"]
+  moreLinkArgs := #[
+    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexarithffi").toString}",
+    "-lgmp"
+  ]
 
 lean_lib HexPoly where
 

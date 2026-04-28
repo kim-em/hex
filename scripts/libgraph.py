@@ -160,6 +160,7 @@ def _parse_scalar(raw: str) -> object:
 
 
 LEAN_LIB_RE = re.compile(r"^\s*lean_lib\s+([A-Za-z0-9_«»]+)\s+where\s*$")
+TOML_NAME_RE = re.compile(r'^\s*name\s*=\s*"([^"]+)"\s*$')
 
 
 def load_lakefile_libs(path: Path | None = None) -> list[str]:

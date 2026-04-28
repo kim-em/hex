@@ -38,8 +38,8 @@ namespace Hex
 /--
 Pure-Lean `UInt64` extended GCD reference implementation.
 
-The scaffold computes the coefficients through the `Nat` implementation
-and repackages the gcd into a machine word.
+This remains available as a proof/reference helper. The public runtime
+`HexArith.UInt64.extGcd` API delegates through `HexArith.Int.extGcd`.
 -/
 def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
   let (g, s, t) := HexArith.extGcd a.toNat b.toNat
@@ -97,7 +97,8 @@ namespace UInt64
 
 /-- Public `UInt64` extended GCD API surface. -/
 def extGcd (a b : UInt64) : UInt64 × Int × Int :=
-  Hex.pureUInt64ExtGcd a b
+  let (g, s, t) := Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  (.ofNat g, s, t)
 
 theorem extGcd_fst (a b : UInt64) :
     (extGcd a b).1.toNat = Nat.gcd a.toNat b.toNat := by
