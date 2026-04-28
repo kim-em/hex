@@ -1,12 +1,13 @@
+import HexModArith.Prime
 import HexPolyFp.Basic
 
 /-!
-Executable square-free decomposition for `F_p[x]`.
+Executable square-free decomposition for prime-field polynomials `F_p[x]`.
 
-This module adds a Yun-style square-free decomposition scaffold for
-`Hex.FpPoly p`, recording the unit factor and the positive-multiplicity
-square-free factors obtained from repeated gcd/derivative steps and
-`p`-th-root descent in characteristic `p`.
+This module adds a Yun-style square-free decomposition for `Hex.FpPoly p`
+under an explicit `Nat.Prime p` hypothesis, recording the unit factor and
+the positive-multiplicity square-free factors obtained from repeated
+gcd/derivative steps and `p`-th-root descent in characteristic `p`.
 -/
 namespace Hex
 
@@ -65,6 +66,7 @@ Yun's inner loop: peel off the factors with multiplicities `i`, `i + 1`, ...
 from the coprime/repeated split `(c, w)`.
 -/
 private def yunFactors
+    (_hp : Nat.Prime p)
     (c w : FpPoly p) (i : Nat) (fuel : Nat)
     (acc : List (SquareFreeFactor p)) :
     List (SquareFreeFactor p) × FpPoly p :=
@@ -81,56 +83,57 @@ private def yunFactors
             acc
           else
             acc ++ [{ factor := z, multiplicity := i }]
-        yunFactors y (w / y) (i + 1) fuel acc'
+        yunFactors _hp y (w / y) (i + 1) fuel acc'
 
 /--
 Recursive square-free decomposition over `F_p[x]`. A derivative-zero branch
 descends through the formal `p`-th root and scales multiplicities by `p`.
 -/
 private def squareFreeAux (f : FpPoly p) (multiplicity : Nat) :
+    Nat.Prime p →
     Nat → List (SquareFreeFactor p)
-  | 0 => []
-  | fuel + 1 =>
+  | _, 0 => []
+  | hp, fuel + 1 =>
       if f.isZero then
         []
       else
         let df := DensePoly.derivative f
         if df.isZero then
-          squareFreeAux (pthRoot f) (multiplicity * p) fuel
+          squareFreeAux (pthRoot f) (multiplicity * p) hp fuel
         else
           let g := DensePoly.gcd f df
           let c := f / g
-          let loop := yunFactors c g multiplicity fuel []
+          let loop := yunFactors hp c g multiplicity fuel []
           let factors := loop.1
           let repeated := loop.2
           if isOne repeated then
             factors
           else
-            factors ++ squareFreeAux (pthRoot repeated) (multiplicity * p) fuel
+            factors ++ squareFreeAux (pthRoot repeated) (multiplicity * p) hp fuel
 
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
 -/
-def squareFreeDecomposition (f : FpPoly p) : SquareFreeDecomposition p :=
+def squareFreeDecomposition (hp : Nat.Prime p) (f : FpPoly p) : SquareFreeDecomposition p :=
   let normalized := normalizeMonic f
   let unit := normalized.1
   let monicPart := normalized.2
-  let factors := squareFreeAux monicPart 1 (monicPart.size + 1)
+  let factors := squareFreeAux monicPart 1 hp (monicPart.size + 1)
   { unit, factors }
 
-theorem squareFree_pairwise_coprime (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_pairwise_coprime (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   sorry
 
-theorem squareFree_weightedProduct (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_weightedProduct (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     DensePoly.C d.unit * weightedProduct d.factors = f := by
   sorry
 
-theorem squareFree_factors_squareFree (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_factors_squareFree (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     ∀ sf ∈ d.factors, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
   sorry
 
