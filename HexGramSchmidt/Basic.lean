@@ -1,12 +1,14 @@
-import HexMatrix.Basic
+import HexMatrix.RREF
 
 /-!
 Core Gram-Schmidt basis and coefficient definitions for `hex-gram-schmidt`.
 
-This module provides the initial executable basis/coefficient surface over
-the dense `Hex.Matrix` representation. Integer inputs are cast to rationals
-before applying Gram-Schmidt; rational inputs operate directly on the ambient
-matrix. The structural theorem API is scaffolded here for later proof work.
+This module provides executable Gram-Schmidt basis and coefficient
+constructions over the dense `Hex.Matrix` representation. Integer inputs are
+cast to rationals before applying Gram-Schmidt; rational inputs operate
+directly on the ambient matrix. It also states the structural theorems used by
+downstream lattice and reduction code, including the prefix-span invariance
+surface consumed by later LLL work.
 -/
 namespace Hex
 
@@ -73,6 +75,14 @@ def prefixCombination (coeffs : Matrix Rat n n) (basis : Matrix Rat n m) (i : Na
       acc + GramSchmidt.entry coeffs ⟨i, hi⟩ jn • basis.row jn)
     0
 
+/-- The row-prefix matrix containing rows `0` through `i`. -/
+def prefixRows (M : Matrix R n m) (i : Nat) (hi : i < n) : Matrix R (i + 1) m :=
+  Vector.ofFn fun j => M.row ⟨j.val, Nat.lt_of_lt_of_le j.isLt (Nat.succ_le_of_lt hi)⟩
+
+/-- Executable row-span membership in the first `i + 1` rows of a matrix. -/
+def prefixSpan (M : Matrix Rat n m) (i : Nat) (hi : i < n) (v : Vector Rat m) : Prop :=
+  ∃ c : Vector Rat (i + 1), Matrix.rowCombination (prefixRows M i hi) c = v
+
 end GramSchmidt
 
 namespace GramSchmidt.Int
@@ -109,6 +119,12 @@ theorem coeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
 theorem coeffs_upper (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
+  sorry
+
+theorem basis_span (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    ∀ v : Vector Rat m,
+      GramSchmidt.prefixSpan (basis b) i hi v ↔
+        GramSchmidt.prefixSpan (GramSchmidt.castIntMatrix b) i hi v := by
   sorry
 
 end GramSchmidt.Int
