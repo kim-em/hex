@@ -190,15 +190,24 @@ provides `UInt64.toNat_add`, `toNat_mul`, `toNat_div`, `toNat_mod`,
 via `Nat.add_mod`, `Nat.mul_mod`, `Nat.div_add_mod`. There is no
 `mulHi`, add-with-carry, or `UInt128` in core — we build those.
 
-*Layer 1 — `HexArith/UInt64/Wide.lean` (shared with Barrett).* 128-bit
-arithmetic helpers on `UInt64`:
+*Layer 1 — `HexArith/UInt64/Wide.lean` + `HexArith/ffi/wide_arith.c`
+(shared with Barrett).* 128-bit arithmetic helpers on `UInt64`. Each
+operation has a logical Nat-level body for proofs **and** a mandatory
+`@[extern]` C extern for runtime; the in-Lean `.ofNat (...)` body
+would compile to GMP arbitrary-precision multiplication and is at
+least an order of magnitude slower than the native instruction. Both
+must land together — adding the Lean definition without the extern
+is a regression, not a scaffold.
 
 ```lean
+@[extern "lean_hex_uint64_mul_hi"]
 def UInt64.mulHi (a b : UInt64) : UInt64 :=
   .ofNat (a.toNat * b.toNat / 2^64)
-  -- Logical definition; `@[implemented_by]` C extern for runtime.
 
+@[extern "lean_hex_uint64_add_carry"]
 def UInt64.addCarry (a b : UInt64) (cin : Bool) : UInt64 × Bool
+
+@[extern "lean_hex_uint64_sub_borrow"]
 def UInt64.subBorrow (a b : UInt64) (bin : Bool) : UInt64 × Bool
 
 theorem UInt64.toNat_mulHi (a b : UInt64) :
@@ -210,8 +219,26 @@ theorem UInt64.toNat_addCarry (a b : UInt64) (cin : Bool) :
     s.toNat + cout.toNat * 2^64 = a.toNat + b.toNat + cin.toNat
 ```
 
-Carries are `Bool` (not `UInt64`) — no preconditions needed. This is
-the only layer that touches overflow semantics.
+The C extern bodies live in `HexArith/ffi/wide_arith.c`:
+
+- `lean_hex_uint64_mul_hi(uint64_t a, uint64_t b)` returns
+  `(uint64_t)((__uint128_t)a * b >> 64)`. `__uint128_t` is available
+  on every Lean target (GCC/Clang on x86_64, AArch64, RISC-V).
+- `lean_hex_uint64_add_carry(uint64_t a, uint64_t b, uint8_t cin, ...)`
+  uses `__builtin_add_overflow` (or a manual two-step add) to
+  produce the wrapped low word and the outgoing carry bit.
+- `lean_hex_uint64_sub_borrow(...)` is the analogous
+  `__builtin_sub_overflow` call.
+
+The C source is wired into the `[[lean_lib]] name = "HexArith"` block
+of `lakefile.toml` via `moreLeancArgs`/`precompileModules`/`extraSrcs`
+(whichever Lake mechanism matches the current toolchain), paralleling
+the GMP linkage used by `lean_hex_mpz_gcdext`. The pure-Lean fallback
+body is the portable spec; `@[extern]` falls through to it when the C
+symbol is unavailable.
+
+Carries are `Bool` (not `UInt64`) — no preconditions needed. The
+extern boundary is the only place where overflow semantics surface.
 
 *Layer 2 — `HexArith/Nat/ModArith.lean`.* Small file of `Nat`-level
 modular lemmas that Lean 4 core lacks: exact division (`R ∣ n → n / R * R = n`),
