@@ -14,6 +14,26 @@ universe u
 /-- Dense `n × m` matrices over `R`, represented as vectors of rows. -/
 abbrev Matrix (R : Type u) (n m : Nat) := Vector (Vector R m) n
 
+namespace Vector
+
+/-- Dot product of two vectors. -/
+def dotProduct [Mul R] [Add R] [OfNat R 0] (u v : Vector R n) : R :=
+  (List.finRange n).foldl (fun acc i => acc + u[i] * v[i]) 0
+
+/-- Squared Euclidean norm of a vector. -/
+def normSq [Mul R] [Add R] [OfNat R 0] (v : Vector R n) : R :=
+  dotProduct v v
+
+/-- Squared Euclidean norm specialized to integer vectors. -/
+def intNormSq (v : Vector Int n) : Int :=
+  normSq v
+
+/-- Squared Euclidean norm specialized to rational vectors. -/
+def ratNormSq (v : Vector Rat n) : Rat :=
+  normSq v
+
+end Vector
+
 namespace Matrix
 
 /-- Build a matrix from an entry function. -/
@@ -48,7 +68,7 @@ instance [OfNat R 0] [OfNat R 1] : One (Matrix R n n) where
 
 /-- Dot product of two vectors. -/
 def dot [Mul R] [Add R] [OfNat R 0] (u v : Vector R n) : R :=
-  (List.finRange n).foldl (fun acc i => acc + u[i] * v[i]) 0
+  Hex.Vector.dotProduct u v
 
 /-- Multiply a matrix by a column vector. -/
 def mulVec [Mul R] [Add R] [OfNat R 0] (M : Matrix R n m) (v : Vector R m) :
@@ -68,15 +88,26 @@ instance [Mul R] [Add R] [OfNat R 0] : HMul (Matrix R n m) (Matrix R m k) (Matri
 
 /-- Squared Euclidean norm of a vector. -/
 def normSq [Mul R] [Add R] [OfNat R 0] (v : Vector R n) : R :=
-  dot v v
+  Hex.Vector.normSq v
 
 /-- Squared Euclidean norm specialized to integer vectors. -/
 def intNormSq (v : Vector Int n) : Int :=
-  normSq v
+  Hex.Vector.intNormSq v
 
 /-- Squared Euclidean norm specialized to rational vectors. -/
 def ratNormSq (v : Vector Rat n) : Rat :=
-  normSq v
+  Hex.Vector.ratNormSq v
+
+/-- Gram matrix of the rows of a dense matrix. -/
+def gramMatrix [Mul R] [Add R] [OfNat R 0] (M : Matrix R n m) : Matrix R n n :=
+  ofFn fun i j => Hex.Vector.dotProduct (row M i) (row M j)
+
+/-- Leading principal `(k + 1) × (k + 1)` submatrix of a square matrix. -/
+def submatrix (M : Matrix R n n) (k : Fin n) : Matrix R (k.val + 1) (k.val + 1) :=
+  ofFn fun i j =>
+    let ii : Fin n := ⟨i.val, Nat.lt_of_lt_of_le i.isLt (Nat.succ_le_of_lt k.isLt)⟩
+    let jj : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt (Nat.succ_le_of_lt k.isLt)⟩
+    M[ii][jj]
 
 end Matrix
 end Hex
