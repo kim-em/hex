@@ -1,3 +1,4 @@
+import HexArith.ExtGcd
 import HexArith.Nat.ModArith
 import HexArith.UInt64.Wide
 
@@ -6,7 +7,8 @@ Core `ZMod64` definitions for `hex-mod-arith`.
 
 This module introduces the `UInt64`-backed residue type `Hex.ZMod64 p`
 together with a project-local modulus-bounds typeclass, smart construction by
-reduction mod `p`, the initial additive API, and the default extern-backed
+reduction mod `p`, the initial additive and multiplicative API, executable
+exponentiation and inversion helpers, and the default extern-backed
 multiplication contract.
 -/
 namespace Hex
@@ -110,6 +112,36 @@ must agree with this pure Lean fallback.
 def mul (a b : ZMod64 p) : ZMod64 p :=
   ofNat p (a.toNat * b.toNat)
 
+/--
+Raise a residue to a natural power using exponentiation by squaring.
+
+The accumulator form keeps the executable path close to the intended downstream
+runtime usage while preserving a simple semantic contract.
+-/
+def pow (a : ZMod64 p) (n : Nat) : ZMod64 p :=
+  let rec go (base acc : ZMod64 p) (k : Nat) : ZMod64 p :=
+    match k with
+    | 0 => acc
+    | m + 1 =>
+        let acc' := if (m + 1) % 2 = 0 then acc else mul acc base
+        go (mul base base) acc' ((m + 1) / 2)
+  termination_by k
+  decreasing_by
+    simpa using Nat.div_lt_self (Nat.succ_pos m) (by decide : 1 < 2)
+  go a ZMod64.one n
+
+/--
+Compute a modular inverse candidate via the integer extended-GCD helper from
+`hex-arith`.
+
+When `a` is coprime to `p`, this is the canonical inverse mod `p`; otherwise it
+still exposes the executable Bezout-derived residue needed by later algebraic
+layers.
+-/
+def inv (a : ZMod64 p) : ZMod64 p :=
+  let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p)
+  ofNat p (Int.toNat (s % Int.ofNat p))
+
 @[simp] theorem toNat_zero : (ZMod64.zero : ZMod64 p).toNat = 0 := by
   rw [ZMod64.zero, toNat_ofNat]
   exact Nat.zero_mod _
@@ -128,6 +160,20 @@ def mul (a b : ZMod64 p) : ZMod64 p :=
 @[simp] theorem toNat_mul (a b : ZMod64 p) :
     (mul a b).toNat = (a.toNat * b.toNat) % p := by
   rw [mul, toNat_ofNat]
+
+@[simp] theorem toNat_inv (a : ZMod64 p) :
+    (inv a).toNat =
+      (Int.toNat ((let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p); s)
+        % Int.ofNat p)) % p := by
+  rw [inv, toNat_ofNat]
+
+theorem toNat_pow (a : ZMod64 p) (n : Nat) :
+    (pow a n).toNat = a.toNat ^ n % p := by
+  sorry
+
+theorem inv_mul_eq_one (a : ZMod64 p) (hcop : Nat.Coprime a.toNat p) :
+    (mul (inv a) a).toNat = 1 % p := by
+  sorry
 
 theorem add_lt_modulus (a b : ZMod64 p) : (add a b).toNat < p := by
   simpa [toNat_add] using normalize_lt p (a.toNat + b.toNat)
