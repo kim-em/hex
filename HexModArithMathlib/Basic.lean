@@ -4,10 +4,9 @@ import HexModArith
 /-!
 Bridge definitions between `Hex.ZMod64` and Mathlib's `ZMod`.
 
-This Phase 1 module exposes the concrete conversions between executable
-machine-word residues and Mathlib's canonical quotient ring, together with the
-ring equivalence and the immediate simp lemmas used by downstream bridge
-libraries.
+This module exposes the concrete conversions between executable machine-word
+residues and Mathlib's canonical quotient ring, together with the ring
+equivalence and the immediate simp lemmas used by downstream bridge libraries.
 -/
 
 namespace HexModArithMathlib
