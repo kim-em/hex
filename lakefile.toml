@@ -45,14 +45,6 @@ rev = "v4.30.0-rc2"
 name = "HexArith"
 moreLinkArgs = ["HexArith/ffi/mpz_gcdext.c"]
 
-[[lean_exe]]
-name = "hex_arith_bench"
-root = "HexArith.Bench.Main"
-
-[[lean_exe]]
-name = "hex_lll_bench"
-root = "HexLLL.Bench.Main"
-
 [[lean_lib]]
 name = "HexPoly"
 

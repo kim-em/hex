@@ -1,45 +1,106 @@
-# HexArith benchmarks
+# `HexArith` benchmark reference
 
-- Run: `f5c368aa10365e7722e576a92946638b5e5ad46b`
-- Machine: chungus (CPU: AMD EPYC 9455 48-Core Processor)
-- Date: 2026-04-23T12:39:47Z
-- Toolchain: `leanprover/lean4:v4.30.0-rc2`
-- Seed: `12648430`
+This page documents the committed `HexArith` benchmark surface in
+[`HexArith/Benchmark.lean`](/home/kim/hex/worktrees/858547d6/HexArith/Benchmark.lean).
+It covers the currently checked-in fixture families, their stable case
+names, and the CSV-style Lean entrypoints that materialize those cases.
+It does not record timing results or claim any rendered benchmark
+publication beyond the repository source tree.
 
-Per-family detail follows; the **Summary** table at the end aggregates.
+## Benchmark families
 
-## A1.nat-extgcd
+### `Nat` extended GCD
 
-- Mode: measured (2 runs)
-- Parameter: `65536` (origin: discovered)
-- Statuses: ok
-- Wall: median **137.18 ms**, min 137.04 ms, max 137.31 ms
-- Comparator `python-stdlib`: median 282.70 ms (2 runs)
+- Cases live in `HexArith.Benchmark.natExtGcdCases`.
+- Result rows come from `HexArith.Benchmark.runNatExtGcdCsv`.
+- CSV header: `name,gcd,s,t`
 
-## A2.nat-powmod
+Stable cases:
 
-- Mode: measured (2 runs)
-- Parameter: `15808` (origin: discovered)
-- Statuses: ok
-- Wall: median **689.56 ms**, min 688.84 ms, max 690.29 ms
-- Comparator `python-stdlib`: median 6.16 s (2 runs)
+- `nat-coprime-small`
+- `nat-composite-shared-factor`
+- `nat-power-of-two-boundary`
 
-## A3.barrett-mulmod
+### `Int` extended GCD
 
-- Mode: measured (2 runs)
-- Parameter: `100000000` (origin: discovered)
-- Statuses: ok
-- Wall: median **553.14 ms**, min 553.08 ms, max 553.20 ms
-- Comparator `python-stdlib`: median 10.10 s (2 runs)
+- Cases live in `HexArith.Benchmark.intExtGcdCases`.
+- Result rows come from `HexArith.Benchmark.runIntExtGcdCsv`.
+- CSV header: `name,gcd,s,t`
 
-## Summary
+Stable cases:
 
-| family | param | origin | wall (median) | comparator | ratio (Lean/cmp) | log-log slope |
-|---|---|---|---|---|---|---|
-| A1.nat-extgcd | 65536 | discovered | 137.18 ms | 282.70 ms | 0.49× | — |
-| A2.nat-powmod | 15808 | discovered | 689.56 ms | 6.16 s | 0.11× | — |
-| A3.barrett-mulmod | 100000000 | discovered | 553.14 ms | 10.10 s | 0.05× | — |
+- `int-mixed-sign-large`
+- `int-both-negative`
+- `int-asymmetric-magnitudes`
 
-## Honest assessment
+### `UInt64` extended GCD
 
-_Hand-edit this section after each run with what surprised you, what calibration got wrong, and what the report doesn't yet capture._
+- Cases live in `HexArith.Benchmark.uint64ExtGcdCases`.
+- Result rows come from `HexArith.Benchmark.runUInt64ExtGcdCsv`.
+- CSV header: `name,gcd,s,t`
+
+Stable cases:
+
+- `u64-coprime-near-word`
+- `u64-shared-factor`
+- `u64-fibonacci-shaped`
+
+### Modular exponentiation
+
+- Cases live in `HexArith.Benchmark.powModCases`.
+- Result rows come from `HexArith.Benchmark.runPowModCsv`.
+- CSV header: `name,value`
+
+Stable cases:
+
+- `powmod-small-prime`
+- `powmod-large-base`
+- `powmod-fermat-boundary`
+
+### Barrett vs Montgomery reduction comparison
+
+- Cases live in `HexArith.Benchmark.reductionComparisonCases`.
+- Result rows come from `HexArith.Benchmark.runReductionComparisonCsv`.
+- CSV header: `name,modulus,a,b,preference,barrett,montgomery`
+- Preference tags are rendered with `ReductionPreference.csvTag` as one
+  of `barrett`, `montgomery`, or `crossover`.
+- Unsupported paths are rendered as `NA`.
+
+Stable cases:
+
+- `reduction-barrett-tiny`
+- `reduction-barrett-upper-edge`
+- `reduction-montgomery-crossover`
+
+## Case scope
+
+The current `HexArith` Phase 4 slice covers microbenchmarks for:
+
+- extended GCD over `Nat`, `Int`, and `UInt64`
+- modular exponentiation via `HexArith.powMod`
+- the committed Barrett-versus-Montgomery crossover comparison cases
+
+The reduction comparison rows report both executable paths when the
+current implementation supports them. In the committed cases,
+`reduction-barrett-upper-edge` has no Montgomery value and therefore
+emits `NA` in the `montgomery` column.
+
+## How to regenerate
+
+The benchmark page is derived directly from the Lean runners in
+[`HexArith/Benchmark.lean`](/home/kim/hex/worktrees/858547d6/HexArith/Benchmark.lean).
+To regenerate the documented CSV-style outputs from Lean, import
+`HexArith.Benchmark` and evaluate the runner definitions:
+
+```lean
+import HexArith.Benchmark
+
+#eval HexArith.Benchmark.runNatExtGcdCsv
+#eval HexArith.Benchmark.runIntExtGcdCsv
+#eval HexArith.Benchmark.runUInt64ExtGcdCsv
+#eval HexArith.Benchmark.runPowModCsv
+#eval HexArith.Benchmark.runReductionComparisonCsv
+```
+
+Those definitions are the repository's current source of truth for the
+named `HexArith` benchmark fixtures and exported columns.
