@@ -3,6 +3,7 @@ import HexArith.Nat.Prime
 import HexArith.Barrett.ReduceNat
 import HexArith.Barrett.Reduce
 import HexArith.Barrett.Context
+import HexArith.Conformance
 import HexArith.ExtGcd
 import HexArith.Montgomery.Context
 import HexArith.Montgomery.InvNat
