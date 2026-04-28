@@ -84,7 +84,7 @@ libraries:
   HexConway:
     deps: [HexBerlekamp]
     mathlib: false
-    done_through: 0
+    done_through: 1
   HexGfq:
     deps: [HexGfqField, HexConway, HexGF2]
     mathlib: false
