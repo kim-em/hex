@@ -3,6 +3,7 @@ import HexMatrix.Determinant
 import HexMatrix.RowEchelon
 import HexMatrix.RREF
 import HexMatrix.Bareiss
+import HexMatrix.Conformance
 
 /-!
 The `HexMatrix` library exposes the dense matrix core used throughout the
