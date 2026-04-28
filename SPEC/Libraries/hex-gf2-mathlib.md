@@ -9,6 +9,11 @@ the generic finite field constructions:
   correspond to the quotient-ring field construction from hex-gfq-field.
 - `GF2nPoly f hirr ≃+* FiniteField 2 f hf hirr` — multi-word GF(2^n)
   elements (for n >= 64) similarly correspond.
+- Bridge-side finiteness/cardinality for `GF2n` and `GF2nPoly`, obtained by
+  transporting `Fintype` and cardinality facts across those equivalences.
 
 These transfer via `GF2Poly ≃+* FpPoly 2`, so Mathlib theorems about
-finite fields apply to the packed representations.
+finite fields apply to the packed representations. In particular, the
+computational `HexGF2` library stays Mathlib-free while `HexGF2Mathlib`
+owns the `Fintype` and cardinality surface promised to downstream proof
+libraries.
