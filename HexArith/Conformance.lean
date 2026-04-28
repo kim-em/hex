@@ -1,4 +1,6 @@
 import HexArith.ExtGcd
+import HexArith.Barrett.Context
+import HexArith.Montgomery.Context
 import HexArith.UInt64.Wide
 
 /-!
@@ -14,16 +16,27 @@ Covered operations:
 - `UInt64.mulFull`
 - `UInt64.addCarry`
 - `UInt64.subBorrow`
+- `BarrettCtx.mulMod`
+- `barrettReduce`
+- `MontCtx.toMont`
+- `MontCtx.fromMont`
+- `MontCtx.mulMont`
 Covered properties:
 - each extended-GCD API returns the same gcd as Lean's built-in arithmetic on committed fixtures
 - each extended-GCD API returns Bezout coefficients satisfying the advertised identity
 - `mulHi` and `mulFull` reconstruct the committed Nat-level products
 - `addCarry` and `subBorrow` satisfy the committed one-word reconstruction laws
+- `BarrettCtx.mulMod` agrees with ordinary modular multiplication on committed residues
+- `barrettReduce` follows the corrective-subtraction branch and still returns `T % p`
+- Montgomery round-trips preserve reduced residues and Montgomery multiplication agrees with `Nat`-level modular products
 Covered edge cases:
 - zero-left and zero-right extended-GCD inputs
 - signed extended-GCD inputs with mixed signs
 - wide-word products crossing the `2^64` boundary
 - add-with-carry and subtract-with-borrow cases with and without overflow
+- Barrett multiplication at the `p < 2^32` boundary
+- the Montgomery modulus-`1` degenerate case
+- a near-`2^64` odd Montgomery modulus with near-modulus residues
 -/
 
 namespace HexArith
@@ -137,5 +150,62 @@ private def maxWord : UInt64 := UInt64.ofNat (wordBase - 1)
   let b := UInt64.ofNat (2 ^ 63 - 1)
   let (d, bout) := UInt64.subBorrow a b true
   d.toNat + (b.toNat + 1) = a.toNat + bout.toNat * wordBase
+
+/-- info: 4 -/
+#guard_msgs in #eval let p := UInt64.ofNat 17
+  let ctx := BarrettCtx.mk p (by decide) (by decide)
+  (ctx.mulMod 5 11).toNat
+
+#guard let p := UInt64.ofNat (2 ^ 32 - 5)
+  let ctx := BarrettCtx.mk p (by decide) (by decide)
+  let a := UInt64.ofNat (2 ^ 32 - 6)
+  let b := UInt64.ofNat (2 ^ 32 - 7)
+  (ctx.mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat
+
+#guard let p := UInt64.ofNat 65521
+  let ctx := BarrettCtx.mk p (by decide) (by decide)
+  let a := UInt64.ofNat 65520
+  let b := UInt64.ofNat 65520
+  (ctx.mulMod a b).toNat = (a.toNat * b.toNat) % p.toNat
+
+#guard let p := UInt64.ofNat 257
+  let ctx := BarrettCtx.mk p (by decide) (by decide)
+  let T := UInt64.ofNat 64250
+  let q := UInt64.mulHi T ctx.pinv
+  let r := T - q * p
+  r ≥ p ∧ (barrettReduce ctx T).toNat = T.toNat % p.toNat
+
+-- `#eval` rejects `MontCtx.mk` because its proof fields still contain `sorry`s.
+/-- info: (17, 13, 61) -/
+#guard_msgs in #eval! let p := UInt64.ofNat 97
+  let ctx := MontCtx.mk p (by decide)
+  let a := UInt64.ofNat 13
+  let b := UInt64.ofNat 42
+  ((ctx.toMont a).toNat,
+    (ctx.fromMont (ctx.toMont a)).toNat,
+    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat)
+
+#guard let p := UInt64.ofNat 1
+  let ctx := MontCtx.mk p (by decide)
+  let z := (0 : UInt64)
+  ctx.toMont z = 0 ∧
+    ctx.fromMont (ctx.toMont z) = 0 ∧
+    (ctx.fromMont (ctx.mulMont (ctx.toMont z) (ctx.toMont z))).toNat = 0
+
+#guard let p := UInt64.ofNat 17
+  let ctx := MontCtx.mk p (by decide)
+  let a := UInt64.ofNat 5
+  let b := UInt64.ofNat 11
+  ctx.fromMont (ctx.toMont a) = a ∧
+    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
+      (a.toNat * b.toNat) % p.toNat
+
+#guard let p := UInt64.ofNat 18446744073709551557
+  let ctx := MontCtx.mk p (by decide)
+  let a := UInt64.ofNat 18446744073709551556
+  let b := UInt64.ofNat 18446744073709551555
+  ctx.fromMont (ctx.toMont a) = a ∧
+    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
+      (a.toNat * b.toNat) % p.toNat
 
 end HexArith
