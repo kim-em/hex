@@ -14,10 +14,12 @@ namespace Hex
 namespace ZPoly
 
 /-- Executable binomial coefficients for the Mignotte bound. -/
-def binom : Nat → Nat → Nat
-  | _, 0 => 1
-  | 0, _ + 1 => 0
-  | n + 1, k + 1 => binom n k + binom n (k + 1)
+def binom (n k : Nat) : Nat :=
+  if n < k then
+    0
+  else
+    let kk := min k (n - k)
+    (List.range kk).foldl (fun acc i => acc * (n - i) / (i + 1)) 1
 
 /-- A simple floor square-root on naturals, implemented by descending search. -/
 private def sqrtAux (n : Nat) : Nat → Nat
@@ -55,17 +57,13 @@ def mignotteCoeffBound (f : ZPoly) (k j : Nat) : Nat :=
   binom k j * coeffL2NormBound f
 
 @[simp] theorem binom_zero_right (n : Nat) : binom n 0 = 1 := by
-  cases n <;> rfl
+  simp [binom]
 
-@[simp] theorem binom_zero_succ (k : Nat) : binom 0 (k + 1) = 0 := rfl
+@[simp] theorem binom_zero_succ (k : Nat) : binom 0 (k + 1) = 0 := by
+  simp [binom]
 
-theorem binom_eq_zero_of_lt : ∀ {n k : Nat}, n < k → binom n k = 0
-  | _, 0, hk => absurd hk (Nat.not_lt_zero _)
-  | 0, _ + 1, _ => rfl
-  | n + 1, k + 1, hk => by
-      have hk' : n < k := Nat.lt_of_succ_lt_succ hk
-      have hk'' : n < k + 1 := Nat.lt_of_succ_lt hk
-      simp [binom, binom_eq_zero_of_lt hk', binom_eq_zero_of_lt hk'']
+theorem binom_eq_zero_of_lt {n k : Nat} (h : n < k) : binom n k = 0 := by
+  simp [binom, h]
 
 @[simp] theorem floorSqrt_zero : floorSqrt 0 = 0 := by
   rfl
