@@ -31,6 +31,22 @@ structure FiniteField
     (f : FpPoly p) (hf : 0 < FpPoly.degree f) (_hirr : FpPoly.Irreducible f) where
   toQuotient : GFqRing.PolyQuotient f hf
 
+instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
+    DecidableEq (FiniteField f hf hirr) := by
+  intro x y
+  match decEq x.toQuotient y.toQuotient with
+  | isTrue h =>
+      exact isTrue (by
+        cases x
+        cases y
+        cases h
+        rfl)
+  | isFalse h =>
+      exact isFalse (by
+        intro hxy
+        apply h
+        exact congrArg FiniteField.toQuotient hxy)
+
 /-- Wrap a quotient-ring element as a finite-field element. -/
 def ofQuotient {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x : GFqRing.PolyQuotient f hf) : FiniteField f hf hirr :=

@@ -23,6 +23,21 @@ namespace DensePoly
 
 variable {R : Type u} [Zero R] [DecidableEq R]
 
+instance : DecidableEq (DensePoly R) := by
+  intro a b
+  match decEq a.coeffs b.coeffs with
+  | isTrue h =>
+      exact isTrue (by
+        cases a
+        cases b
+        cases h
+        simp)
+  | isFalse h =>
+      exact isFalse (by
+        intro hab
+        apply h
+        exact congrArg DensePoly.coeffs hab)
+
 /-- Remove trailing zeros from a coefficient list without disturbing the remaining order. -/
 private def trimTrailingZerosList : List R → List R
   | [] => []
