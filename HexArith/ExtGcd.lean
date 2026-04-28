@@ -163,7 +163,8 @@ namespace UInt64
 
 /-- Public `UInt64` extended GCD API surface. -/
 def extGcd (a b : UInt64) : UInt64 × Int × Int :=
-  Hex.pureUInt64ExtGcd a b
+  let (g, s, t) := HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  (UInt64.ofNat g, s, t)
 
 theorem extGcd_fst (a b : UInt64) :
     (extGcd a b).1.toNat = Nat.gcd a.toNat b.toNat := by
