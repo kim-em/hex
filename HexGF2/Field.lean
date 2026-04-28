@@ -4,9 +4,9 @@ import HexGF2.Euclid
 Single-word extension-field wrappers for `hex-gf2`.
 
 This module adds the spec-named irreducible-modulus helper surface on top of
-`GF2Poly`, then packages the `n < 64` case of `GF(2^n)` as reduced `UInt64`
-representatives with XOR addition and CLMUL-backed multiplication modulo a
-fixed monic irreducible polynomial.
+`GF2Poly`, then packages both the `n < 64` single-word case and the arbitrary-
+degree packed-quotient case of `GF(2^n)` as reduced representatives with XOR
+addition and modular multiplication modulo a fixed irreducible polynomial.
 -/
 namespace Hex
 namespace GF2Poly
@@ -29,6 +29,12 @@ def Irreducible (f : GF2Poly) : Prop :=
   f ≠ 0 ∧ ∀ a b : GF2Poly, a * b = f → a.degree = 0 ∨ b.degree = 0
 
 end GF2Poly
+
+/-- `GF(2^n)` for arbitrary `n`, represented by reduced `GF2Poly` residues
+modulo an irreducible polynomial. -/
+structure GF2nPoly (f : GF2Poly) (hirr : GF2Poly.Irreducible f) where
+  val : GF2Poly
+  val_reduced : val.IsZero ∨ val.degree < f.degree
 
 /-- `GF(2^n)` packed into one machine word. The modulus stores only the lower
 `n` coefficients; the leading `x^n` term is implicit in
@@ -132,4 +138,70 @@ instance : Pow (GF2n n irr hn hn64 hirr) Nat where
   pow := pow
 
 end GF2n
+
+namespace GF2nPoly
+
+variable {f : GF2Poly} {hirr : GF2Poly.Irreducible f}
+
+/-- The defining irreducible modulus polynomial of the packed quotient field. -/
+def modulus : GF2Poly :=
+  f
+
+/-- Reduce a packed polynomial to its canonical residue class modulo `f`. -/
+def reducePoly (p : GF2Poly) : GF2nPoly f hirr :=
+  ⟨p % modulus (f := f), GF2Poly.mod_degree_lt p (modulus (f := f)) hirr.1⟩
+
+/-- Canonical additive identity. -/
+def zero : GF2nPoly f hirr :=
+  reducePoly 0
+
+instance : Zero (GF2nPoly f hirr) where
+  zero := zero
+
+/-- Canonical multiplicative identity. -/
+def one : GF2nPoly f hirr :=
+  reducePoly 1
+
+instance : One (GF2nPoly f hirr) where
+  one := one
+
+/-- Addition in characteristic two is XOR on representatives, followed by
+canonical reduction modulo `f`. -/
+def add (a b : GF2nPoly f hirr) : GF2nPoly f hirr :=
+  reducePoly (a.val + b.val)
+
+instance : Add (GF2nPoly f hirr) where
+  add := add
+
+/-- Negation is the identity in characteristic two. -/
+def neg (a : GF2nPoly f hirr) : GF2nPoly f hirr :=
+  a
+
+instance : Neg (GF2nPoly f hirr) where
+  neg := neg
+
+/-- Subtraction coincides with addition in characteristic two. -/
+def sub (a b : GF2nPoly f hirr) : GF2nPoly f hirr :=
+  add a b
+
+instance : Sub (GF2nPoly f hirr) where
+  sub := sub
+
+/-- Multiplication uses packed `GF2Poly` multiplication followed by reduction
+modulo the irreducible defining polynomial. -/
+def mul (a b : GF2nPoly f hirr) : GF2nPoly f hirr :=
+  reducePoly (a.val * b.val)
+
+instance : Mul (GF2nPoly f hirr) where
+  mul := mul
+
+/-- Natural power in the packed quotient field by repeated multiplication. -/
+def pow (a : GF2nPoly f hirr) : Nat → GF2nPoly f hirr
+  | 0 => 1
+  | exp + 1 => pow a exp * a
+
+instance : Pow (GF2nPoly f hirr) Nat where
+  pow := pow
+
+end GF2nPoly
 end Hex

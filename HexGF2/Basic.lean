@@ -81,6 +81,10 @@ def wordCount (p : GF2Poly) : Nat :=
 def isZero (p : GF2Poly) : Bool :=
   p.words.isEmpty
 
+/-- Proposition-level zero predicate used by the packed quotient wrappers. -/
+def IsZero (p : GF2Poly) : Prop :=
+  p.isZero = true
+
 /-- The coefficient of `x^n`. -/
 def coeff (p : GF2Poly) (n : Nat) : Bool :=
   let word := p.words.getD (n / 64) 0
