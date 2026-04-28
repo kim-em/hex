@@ -65,6 +65,28 @@ instance : SMul Int (ZMod64 p) where
     (nsmul n a).toNat = (n * a.toNat) % p := by
   rw [nsmul, toNat_ofNat]
 
+/-- Nat casts agree exactly when their representatives are congruent mod `p`. -/
+theorem natCast_eq_natCast_iff (x y : Nat) :
+    ((x : ZMod64 p) = y) ↔ x % p = y % p := by
+  constructor
+  · intro h
+    simpa using congrArg ZMod64.toNat h
+  · intro h
+    apply ext
+    apply UInt64.toNat_inj.mp
+    simpa [toNat_natCast] using h
+
+/-- A Nat literal vanishes in `ZMod64 p` exactly when `p` divides it. -/
+theorem natCast_eq_zero_iff_dvd (n : Nat) : ((n : ZMod64 p) = 0) ↔ p ∣ n := by
+  constructor
+  · intro h
+    exact Nat.dvd_of_mod_eq_zero ((natCast_eq_natCast_iff (p := p) n 0).mp h)
+  · intro h
+    exact (natCast_eq_natCast_iff (p := p) n 0).2 (Nat.mod_eq_zero_of_dvd h)
+
+@[simp] theorem natCast_self : ((p : Nat) : ZMod64 p) = 0 := by
+  exact (natCast_eq_natCast_iff (p := p) p 0).2 (by simp)
+
 /-- The spec-level inverse law on canonical representatives. -/
 theorem toNat_inv (a : ZMod64 p) (hcop : Nat.Coprime a.val.toNat p) :
     (a.inv * a).toNat = 1 % p := by
@@ -138,6 +160,9 @@ instance : Lean.Grind.CommRing (ZMod64 p) := by
   intro a b
   ext
   sorry
+
+instance : Lean.Grind.IsCharP (ZMod64 p) p where
+  ofNat_ext_iff {x y} := natCast_eq_natCast_iff (p := p) x y
 
 end ZMod64
 
