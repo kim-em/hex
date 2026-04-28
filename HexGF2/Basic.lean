@@ -29,6 +29,50 @@ private def trimTrailingZeroWordsList : List UInt64 → List UInt64
       let trimmed := trimTrailingZeroWordsList ws
       if trimmed = [] ∧ w = 0 then [] else w :: trimmed
 
+private theorem trimTrailingZeroWordsList_getLast?_ne_zero :
+    ∀ ws : List UInt64,
+      let trimmed := trimTrailingZeroWordsList ws
+      trimmed = [] ∨ trimmed.getLast? ≠ some (0 : UInt64)
+  | [] => by simp [trimTrailingZeroWordsList]
+  | w :: ws => by
+      dsimp
+      have htrim := trimTrailingZeroWordsList_getLast?_ne_zero ws
+      by_cases hdrop : trimTrailingZeroWordsList ws = [] ∧ w = 0
+      · simp [trimTrailingZeroWordsList, hdrop]
+      · by_cases hnil : trimTrailingZeroWordsList ws = []
+        · have hw : w ≠ 0 := by
+            intro hw0
+            apply hdrop
+            exact ⟨hnil, hw0⟩
+          simp [trimTrailingZeroWordsList, hnil, hw]
+        · have hlast : (trimTrailingZeroWordsList ws).getLast? ≠ some (0 : UInt64) := by
+            cases htrim with
+            | inl h =>
+                contradiction
+            | inr h =>
+                exact h
+          cases hrest : trimTrailingZeroWordsList ws with
+          | nil =>
+              contradiction
+          | cons x xs =>
+              simpa [trimTrailingZeroWordsList, hdrop, hrest] using hlast
+
+private theorem trimTrailingZeroWordsList_length_le (ws : List UInt64) :
+    (trimTrailingZeroWordsList ws).length ≤ ws.length := by
+  induction ws with
+  | nil =>
+      simp [trimTrailingZeroWordsList]
+  | cons w ws ih =>
+      by_cases hdrop : trimTrailingZeroWordsList ws = [] ∧ w = 0
+      · have hnil : trimTrailingZeroWordsList (w :: ws) = [] := by
+          simp [trimTrailingZeroWordsList, hdrop]
+        rw [hnil]
+        exact Nat.zero_le _
+      · have hcons : trimTrailingZeroWordsList (w :: ws) = w :: trimTrailingZeroWordsList ws := by
+          simp [trimTrailingZeroWordsList, hdrop]
+        rw [hcons]
+        simp [ih]
+
 /-- Normalize a word array by discarding trailing zero words. -/
 private def normalizeWords (words : Array UInt64) : Array UInt64 :=
   (trimTrailingZeroWordsList words.toList).toArray
@@ -43,7 +87,8 @@ def ofWords (words : Array UInt64) : GF2Poly :=
   { words := normalizedWords
     normalized := by
       classical
-      sorry }
+      simpa [normalizedWords, normalizeWords, GF2PolyNormalized] using
+        trimTrailingZeroWordsList_getLast?_ne_zero words.toList }
 
 /-- The zero polynomial. -/
 def zero : GF2Poly :=
@@ -164,6 +209,11 @@ def mulXk (p : GF2Poly) (k : Nat) : GF2Poly :=
 otherwise this drops the discarded remainder. -/
 def divXk (p : GF2Poly) (k : Nat) : GF2Poly :=
   shiftRight p k
+
+/-- Normalization never increases the number of stored machine words. -/
+theorem normalizeWords_size_le (words : Array UInt64) :
+    (normalizeWords words).size ≤ words.size := by
+  simpa [normalizeWords] using trimTrailingZeroWordsList_length_le words.toList
 
 end GF2Poly
 end Hex
