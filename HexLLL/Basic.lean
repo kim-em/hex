@@ -5,8 +5,9 @@ import HexMatrix
 Core LLL predicates and integer state for `hex-lll`.
 
 This module introduces the executable lattice-membership and independence
-predicates used by the LLL library together with the `δ`-reducedness contract
-and the all-integer `LLLState` record consumed by later algorithmic phases.
+predicates used by the LLL library together with the `δ`-reducedness contract,
+the Gram-Schmidt norm identities stated over those predicates, and the
+all-integer `LLLState` record consumed by later algorithmic phases.
 -/
 
 namespace Hex
@@ -21,6 +22,38 @@ def memLattice (b : Matrix Int n m) (v : Vector Int m) : Prop :=
 leading principal Gram determinant. -/
 def independent (b : Matrix Int n m) : Prop :=
   ∀ k : Fin n, 0 < det (submatrix (gramMatrix b) k)
+
+/-- Product of the squared Gram-Schmidt basis norms along the first `k` rows. -/
+noncomputable def gramSchmidtNormProduct (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Rat :=
+  (List.finRange k).foldl
+    (fun acc j =>
+      let jn : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt hk⟩
+      acc * Vector.normSq ((GramSchmidt.Int.basis b).row jn))
+    1
+
+theorem gramDet_eq_prod_normSq (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k ≤ n) :
+    (GramSchmidt.Int.gramDet b k hk : Rat) = gramSchmidtNormProduct b k hk := by
+  sorry
+
+theorem gramDet_pos (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k ≤ n) (hk' : 0 < k) :
+    0 < GramSchmidt.Int.gramDet b k hk := by
+  sorry
+
+theorem basis_normSq (b : Matrix Int n m)
+    (hli : b.independent) (k : Nat) (hk : k < n) :
+    Vector.normSq ((GramSchmidt.Int.basis b).row ⟨k, hk⟩) =
+      (GramSchmidt.Int.gramDet b (k + 1) (Nat.succ_le_of_lt hk) : Rat) /
+        (GramSchmidt.Int.gramDet b k (Nat.le_of_lt hk) : Rat) := by
+  sorry
+
+theorem normSq_latticeVec_ge_min_basis_normSq
+    (b : Matrix Int n m) (hli : b.independent)
+    (v : Vector Int m) (hv : b.memLattice v) (hv' : v ≠ 0) :
+    ∃ i : Fin n,
+      Vector.normSq ((GramSchmidt.Int.basis b).row i) ≤ ((Vector.normSq v : Int) : Rat) := by
+  sorry
 
 end Matrix
 
