@@ -3,7 +3,7 @@ import Init.Grind.Ring.Field
 import HexMatrix.RowEchelon
 
 /-!
-Determinant scaffolding for `hex-matrix`.
+Determinant routines for `hex-matrix`.
 
 This module adds the generic Leibniz-formula determinant for dense square
 matrices together with the determinant behavior of the elementary row

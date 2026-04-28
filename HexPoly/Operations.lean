@@ -3,7 +3,7 @@ import HexPoly.Dense
 /-!
 Executable arithmetic operations for dense array-backed polynomials.
 
-This module adds the Phase 1 algebra surface for `DensePoly`: addition,
+This module implements executable `DensePoly` operations: addition,
 subtraction, schoolbook multiplication, Horner evaluation, composition,
 and derivative. All constructors route through `ofCoeffs`, so results are
 re-normalized automatically.

@@ -1,11 +1,11 @@
 import HexMatrix.Basic
 
 /-!
-Row operations and echelon-form scaffolding for `hex-matrix`.
+Row operations and echelon-form data for `hex-matrix`.
 
 This module adds executable row-operation helpers together with the pure data
-structures and API surface used by later row-reduction, span/nullspace, and
-determinant work.
+structures and contracts used by later row-reduction, span/nullspace, and
+determinant routines.
 -/
 
 namespace Hex

@@ -36,26 +36,80 @@ end HexArith
 namespace Hex
 
 /--
+Tail-recursive `UInt64` extended Euclidean loop.
+
+The remainders stay in `UInt64`; only the Bezout coefficients live in `Int`.
+-/
+private def uint64ExtGcdLoop
+    (old_r r : UInt64) (old_s s old_t t : Int) : UInt64 × Int × Int :=
+  if h : r = 0 then
+    let _ := h
+    (old_r, old_s, old_t)
+  else
+    let q := old_r / r
+    let qz := Int.ofNat q.toNat
+    uint64ExtGcdLoop r (old_r % r) s (old_s - qz * s) t (old_t - qz * t)
+termination_by r.toNat
+decreasing_by
+  simp_wf
+  exact Nat.mod_lt _ (Nat.pos_of_ne_zero (by
+    intro hr
+    apply h
+    exact UInt64.toNat_inj.mp hr))
+
+/--
 Pure-Lean `UInt64` extended GCD reference implementation.
 
-This remains available as a proof/reference helper. The public runtime
-`HexArith.UInt64.extGcd` API delegates through `HexArith.Int.extGcd`.
+This stays entirely in native `UInt64` arithmetic for the Euclidean reduction,
+while the Bezout coefficients are tracked in `Int`.
 -/
 def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
-  let (g, s, t) := HexArith.extGcd a.toNat b.toNat
-  (.ofNat g, s, t)
+  uint64ExtGcdLoop a b 1 0 0 1
 
 /--
 Pure Lean reference implementation of extended GCD over integers.
 
-The computation reduces to the `Nat` variant on absolute values and then
-re-signs the Bezout coefficients to match the original inputs.
+This runs the Euclidean algorithm directly on `Int`, carrying Bezout
+coefficients through the usual quotient/remainder updates.
 -/
+private def pureIntExtGcd.go (old_r r old_s s old_t t : Int) : Nat × Int × Int :=
+  match r with
+  | 0 => (old_r.natAbs, old_s, old_t)
+  | .ofNat (n + 1) =>
+      let q := old_r / Int.ofNat (n + 1)
+      pureIntExtGcd.go (Int.ofNat (n + 1)) (old_r % Int.ofNat (n + 1))
+        s (old_s - q * s) t (old_t - q * t)
+  | .negSucc n =>
+      let r := Int.negSucc n
+      let q := old_r / r
+      pureIntExtGcd.go r (old_r % r) s (old_s - q * s) t (old_t - q * t)
+termination_by r.natAbs
+decreasing_by
+  · have hmod_nonneg : 0 ≤ old_r % Int.ofNat (n + 1) := by
+      exact Int.emod_nonneg _ (Int.ofNat_ne_zero.mpr (Nat.succ_ne_zero _))
+    have hpos : (0 : Int) < Int.ofNat (n + 1) := by
+      exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+    have hmod_lt : old_r % Int.ofNat (n + 1) < Int.ofNat (n + 1) := by
+      exact Int.emod_lt_of_pos _ hpos
+    have hnatAbs_lt :
+        ((old_r % Int.ofNat (n + 1)).natAbs : Int) < (Int.ofNat (n + 1)).natAbs := by
+      rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg]
+      simpa using hmod_lt
+    exact Int.ofNat_lt.mp hnatAbs_lt
+  · have hmod_nonneg : 0 ≤ old_r % Int.negSucc n := by
+      exact Int.emod_nonneg _ (by simp)
+    have hpos : (0 : Int) < Int.ofNat (n + 1) := by
+      exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+    have hmod_lt : old_r % Int.negSucc n < Int.ofNat (n + 1) := by
+      simpa [Int.negSucc_eq, Int.emod_neg] using (Int.emod_lt_of_pos old_r hpos)
+    have hnatAbs_lt :
+        ((old_r % Int.negSucc n).natAbs : Int) < (Int.negSucc n).natAbs := by
+      rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg, Int.natAbs_negSucc]
+      exact hmod_lt
+    exact Int.ofNat_lt.mp hnatAbs_lt
+
 def pureIntExtGcd (a b : Int) : Nat × Int × Int :=
-  let (g, s, t) := HexArith.extGcd a.natAbs b.natAbs
-  let s' := if a < 0 then -s else s
-  let t' := if b < 0 then -t else t
-  (g, s', t')
+  pureIntExtGcd.go a b 1 0 0 1
 
 theorem pureIntExtGcd_fst (a b : Int) :
     (pureIntExtGcd a b).1 = Int.gcd a b := by
@@ -97,8 +151,7 @@ namespace UInt64
 
 /-- Public `UInt64` extended GCD API surface. -/
 def extGcd (a b : UInt64) : UInt64 × Int × Int :=
-  let (g, s, t) := Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat)
-  (.ofNat g, s, t)
+  Hex.pureUInt64ExtGcd a b
 
 theorem extGcd_fst (a b : UInt64) :
     (extGcd a b).1.toNat = Nat.gcd a.toNat b.toNat := by
