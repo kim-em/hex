@@ -56,6 +56,12 @@ namespace FpPoly
 
 variable {p : Nat} [ZMod64.Bounds p]
 
+/-- Polynomial irreducibility over `F_p` phrased as the absence of nontrivial
+factorizations inside the executable dense-polynomial model. -/
+def Irreducible (f : FpPoly p) : Prop :=
+  f ≠ 0 ∧
+    ∀ a b : FpPoly p, a * b = f → a.degree? = some 0 ∨ b.degree? = some 0
+
 /-- Build an `FpPoly` from raw coefficients, trimming trailing zero residues. -/
 def ofCoeffs (coeffs : Array (ZMod64 p)) : FpPoly p :=
   DensePoly.ofCoeffs coeffs

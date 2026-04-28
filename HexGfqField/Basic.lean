@@ -10,17 +10,6 @@ polynomial views.
 -/
 namespace Hex
 
-namespace FpPoly
-
-variable {p : Nat} [ZMod64.Bounds p]
-
-/-- Polynomial irreducibility over `F_p` phrased as the absence of nontrivial
-factorizations inside the executable dense-polynomial model. -/
-def Irreducible (f : FpPoly p) : Prop :=
-  f ≠ 0 ∧ ∀ a b : FpPoly p, a * b = f → FpPoly.degree a = 0 ∨ FpPoly.degree b = 0
-
-end FpPoly
-
 namespace GFqField
 
 variable {p : Nat} [ZMod64.Bounds p]
