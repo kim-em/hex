@@ -9,19 +9,31 @@ used by the arithmetic library.
 namespace HexArith
 
 /--
+Quotient/remainder pairing used by `extGcd`.
+
+Lean 4.30's stdlib exposes `Nat.div` and `Nat.mod`, but not a public fused
+`Nat.divMod`; keep the pairing local so the Euclidean step can switch to a
+fused primitive once one is available.
+-/
+private def natDivMod (a b : Nat) : Nat × Nat :=
+  (a / b, a % b)
+
+/--
 Compute the greatest common divisor of `a` and `b` together with
 Bezout coefficients.
 -/
 def extGcd (a b : Nat) : Nat × Int × Int :=
-  match b with
-  | 0 => (a, 1, 0)
-  | b' + 1 =>
-      let (g, s, t) := extGcd (b' + 1) (a % (b' + 1))
-      (g, t, s - t * Int.ofNat (a / (b' + 1)))
+  if hb : b = 0 then
+    (a, 1, 0)
+  else
+    let _ := hb
+    let qr := natDivMod a b
+    let (g, s, t) := extGcd b qr.2
+    (g, t, s - t * Int.ofNat qr.1)
 termination_by b
 decreasing_by
   simp_wf
-  exact Nat.mod_lt _ (Nat.succ_pos _)
+  simpa [natDivMod] using (Nat.mod_lt a (Nat.pos_iff_ne_zero.2 hb))
 
 theorem extGcd_fst (a b : Nat) : (extGcd a b).1 = Nat.gcd a b := by
   sorry
