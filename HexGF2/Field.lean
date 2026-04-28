@@ -148,10 +148,20 @@ def mul (a b : GF2n n irr hn hn64 hirr) : GF2n n irr hn hn64 hirr :=
 instance : Mul (GF2n n irr hn hn64 hirr) where
   mul := mul
 
-/-- Natural power in `GF(2^n)` by repeated multiplication. -/
-def pow (a : GF2n n irr hn hn64 hirr) : Nat → GF2n n irr hn hn64 hirr
-  | 0 => 1
-  | exp + 1 => pow a exp * a
+/-- Natural power in `GF(2^n)` by repeated squaring. -/
+def pow (a : GF2n n irr hn hn64 hirr) (k : Nat) : GF2n n irr hn hn64 hirr :=
+  let rec go (acc base : GF2n n irr hn hn64 hirr) (k : Nat) : GF2n n irr hn hn64 hirr :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then acc * base else acc
+      let base' := base * base
+      go acc' base' (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go 1 a k
 
 instance : Pow (GF2n n irr hn hn64 hirr) Nat where
   pow := pow
@@ -359,10 +369,20 @@ def mul (a b : GF2nPoly f hirr) : GF2nPoly f hirr :=
 instance : Mul (GF2nPoly f hirr) where
   mul := mul
 
-/-- Natural power in the packed quotient field by repeated multiplication. -/
-def pow (a : GF2nPoly f hirr) : Nat → GF2nPoly f hirr
-  | 0 => 1
-  | exp + 1 => pow a exp * a
+/-- Natural power in the packed quotient field by repeated squaring. -/
+def pow (a : GF2nPoly f hirr) (k : Nat) : GF2nPoly f hirr :=
+  let rec go (acc base : GF2nPoly f hirr) (k : Nat) : GF2nPoly f hirr :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then acc * base else acc
+      let base' := base * base
+      go acc' base' (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go 1 a k
 
 instance : Pow (GF2nPoly f hirr) Nat where
   pow := pow
