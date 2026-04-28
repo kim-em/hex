@@ -230,12 +230,19 @@ The C extern bodies live in `HexArith/ffi/wide_arith.c`:
 - `lean_hex_uint64_sub_borrow(...)` is the analogous
   `__builtin_sub_overflow` call.
 
-The C source is wired into the `[[lean_lib]] name = "HexArith"` block
-of `lakefile.toml` via `moreLeancArgs`/`precompileModules`/`extraSrcs`
-(whichever Lake mechanism matches the current toolchain), paralleling
-the GMP linkage used by `lean_hex_mpz_gcdext`. The pure-Lean fallback
-body is the portable spec; `@[extern]` falls through to it when the C
-symbol is unavailable.
+The C source is wired into `lakefile.lean` via an `extern_lib`
+block (paralleling `extern_lib hexgf2ffi` for HexGF2's CLMUL). The
+block compiles the `.c` sources to `.o` via `compileO` (with
+`-I (← getLeanIncludeDir).toString -fPIC`), bundles them into a
+static library via `buildStaticLib`, and Lake links that library
+into anything depending on `lean_lib HexArith`. The same
+`extern_lib` block carries `mpz_gcdext.c` (see "Extern contract:
+`mpz_gcdext`" below). Putting `.c` paths in `moreLinkArgs` (or in
+`lakefile.toml`) does **not** work — Lake ignores `lakefile.toml`
+when `lakefile.lean` is present, and `moreLinkArgs` is for
+link-time flags, not source compilation. The pure-Lean fallback
+body is the portable spec; `@[extern]` falls through to it when
+the C symbol is unavailable.
 
 Carries are `Bool` (not `UInt64`) — no preconditions needed. The
 extern boundary is the only place where overflow semantics surface.
@@ -401,8 +408,12 @@ the portable fallback. The C wrapper
 `lean_hex_mpz_gcdext(lean_object *, lean_object *) → lean_object *`
 in `HexArith/ffi/mpz_gcdext.c` converts to `mpz_t`, calls GMP's
 `mpz_gcdext(g, s, t, a, b)`, and packs `(g.toNat, s, t)` back into
-`Nat × Int × Int`. GMP is linked via `moreLinkArgs := #["-lgmp"]` in
-`lakefile.toml`; the extern is trusted in the same way as every other
-`@[extern]` GMP binding in Lean. If GMP is unavailable, the
-attachment falls through to `Hex.pureIntExtGcd` — correct, but slow
-on large inputs.
+`Nat × Int × Int`. The C source is bundled into the same
+`extern_lib` block as Layer 1's `wide_arith.c` (see Layer 1 for the
+shape) so a single static library carries all HexArith-side
+externs; GMP itself is linked via
+`moreLinkArgs := #["-lgmp"]` on `lean_lib HexArith` in
+`lakefile.lean`. The extern is trusted in the same way as every
+other `@[extern]` GMP binding in Lean. If GMP is unavailable, the
+attachment falls through to `Hex.pureIntExtGcd` — correct, but
+slow on large inputs.

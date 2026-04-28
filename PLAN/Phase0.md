@@ -2,7 +2,7 @@
 
 **Coupling:** global. One-time repo-level bootstrap; not tracked
 per-library in `libraries.yml`. Its completion is observable by the
-existence of `lakefile.toml`, `scripts/check_dag.py`, etc.
+existence of `lakefile.lean`, `scripts/check_dag.py`, etc.
 
 One-time setup. Create the Lake monorepo infrastructure by reading the
 spec and this document.
@@ -20,17 +20,40 @@ into Phase 1 until the Phase 0 PR lands on `main`.
    `leanprover/lean4:v4.30.0-rc2`. This is the project baseline; do
    not substitute a different release.
 
-2. Create `lakefile.toml` with one `[[lean_lib]]` per library in
-   `libraries.yml` (the 27 computational + bridge libraries), plus
-   one additional `[[lean_lib]]` for `HexManual` (the Verso-based
-   documentation aggregator — see [Phase7.md](Phase7.md)). All
-   `-mathlib` bridge libraries depend on the Mathlib tag
-   `v4.30.0-rc2`. `HexManual` depends on Verso and on every `hex-*`
-   library.
+2. Create `lakefile.lean` (Lake's DSL form, **not** `lakefile.toml`)
+   with one `lean_lib` per library in `libraries.yml` (the 27
+   computational + bridge libraries), plus one additional `lean_lib`
+   for `HexManual` (the Verso-based documentation aggregator — see
+   [Phase7.md](Phase7.md)). All `-mathlib` bridge libraries depend
+   on the Mathlib tag `v4.30.0-rc2`. `HexManual` depends on Verso
+   and on every `hex-*` library, and is the `@[default_target]`.
 
-   Each computational/bridge library entry needs:
-   - `name` — PascalCase (e.g. `HexArith`, `HexPolyZMathlib`)
-   - Mathlib bridge libraries should declare `needs = ["mathlib"]`
+   **Use `lakefile.lean`, not `lakefile.toml`, even though the toml
+   form would suffice for Phase 0's "all empty libraries" state.**
+   Several libraries (`hex-arith` for `mpz_gcdext` and the wide-word
+   externs, `hex-gf2` for CLMUL) require FFI shims wired via Lake's
+   `extern_lib` DSL form, which is not expressible in
+   `lakefile.toml`. A later switch from `.toml` to `.lean` means a
+   migration step that has historically been missed (Lake silently
+   ignores `lakefile.toml` when both are present, so a later-added
+   `lakefile.lean` orphans the toml's `moreLinkArgs` without warning).
+   Establish `lakefile.lean` as the only build configuration from the
+   start.
+
+   Each computational/bridge library entry should be a bare
+   `lean_lib HexX where` (Mathlib bridge libraries do not need an
+   explicit `needs` declaration in this DSL form — Lake reads the
+   `import` lines for actual dependencies). Names are PascalCase
+   (e.g. `HexArith`, `HexPolyZMathlib`).
+
+   Phase 0 does **not** add `extern_lib` blocks. Those are
+   per-library Phase-1 deliverables, added when each FFI-using
+   library's C shim lands. The Phase 0 lakefile is FFI-free.
+
+   This repo does **not** carry a `lakefile.toml`. If any agent
+   adds one later, delete it: Lake's behaviour with both files
+   present is to silently use `.lean` and ignore `.toml`, which
+   creates dead config that confuses future workers.
 
 3. Create empty root files and source directories for every library
    listed in `libraries.yml`:
@@ -50,11 +73,17 @@ into Phase 1 until the Phase 0 PR lands on `main`.
    **Structural checks:**
    - Verify the graph is acyclic (topological sort succeeds).
    - Every dependency in `libraries.yml` names an existing entry.
-   - Every `libraries.yml` entry has a matching `[[lean_lib]]` in
-     `lakefile.toml` (parse TOML via `tomllib`, available since 3.11).
-   - Every `[[lean_lib]]` in `lakefile.toml` either has a matching
+   - Every `libraries.yml` entry has a matching `lean_lib` in
+     `lakefile.lean`. Parse via a regex that matches
+     `^\s*lean_lib\s+(\w+)\s+where` (Lake DSL has a stable shape
+     for these declarations); a 5–10-line scanner is sufficient.
+   - Every `lean_lib` in `lakefile.lean` either has a matching
      `libraries.yml` entry, or is on a known-exceptions list
      (currently: just `HexManual`).
+   - Reject `lakefile.toml` if it exists: Lake silently prefers
+     `lakefile.lean`, so a stray `lakefile.toml` is dead config that
+     misleads future workers. Exit non-zero with a message
+     instructing the agent to delete it.
    - Every library's root `.lean` file exists on disk.
 
    **Import boundary checks:**
@@ -149,7 +178,7 @@ into Phase 1 until the Phase 0 PR lands on `main`.
      and builds.
 
    - Exit non-zero on malformed `libraries.yml` or disagreement
-     between `libraries.yml` and `lakefile.toml`.
+     between `libraries.yml` and `lakefile.lean`.
 
 6. Set up CI using `leanprover/lean-action`.
 
@@ -196,8 +225,9 @@ into Phase 1 until the Phase 0 PR lands on `main`.
 Phase 0 is done when:
 
 - `lean-toolchain` is the pinned baseline;
-- `lakefile.toml` lists every library in `libraries.yml` (plus
-  `HexManual`);
+- `lakefile.lean` lists every library in `libraries.yml` (plus
+  `HexManual`) via `lean_lib` declarations; no `lakefile.toml`
+  is present in the repo root;
 - `lake-manifest.json` pins Mathlib to the resolved tag for
   `v4.30.0-rc2`;
 - every library has an empty-or-stub root `.lean` file and source
