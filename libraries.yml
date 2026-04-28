@@ -32,7 +32,7 @@ libraries:
   HexMatrix:
     deps: []
     mathlib: false
-    done_through: 2
+    done_through: 3
 
   # ---------- Depth 1 ----------
   HexModArith:
