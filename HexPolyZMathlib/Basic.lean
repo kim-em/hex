@@ -4,7 +4,7 @@ import HexPolyZ
 /-!
 Bridge definitions between `Hex.ZPoly` and Mathlib's `Polynomial ℤ`.
 
-This Phase 1 module specializes the generic dense-polynomial bridge to integer
+This module specializes the generic dense-polynomial bridge to integer
 coefficients so downstream libraries can work directly with the `ZPoly`
 abbreviation and the corresponding `Polynomial ℤ` equivalence.
 -/
