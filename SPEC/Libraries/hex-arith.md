@@ -204,6 +204,11 @@ is a regression, not a scaffold.
 def UInt64.mulHi (a b : UInt64) : UInt64 :=
   .ofNat (a.toNat * b.toNat / 2^64)
 
+@[extern "lean_hex_uint64_mul_full"]
+def UInt64.mulFull (a b : UInt64) : UInt64 × UInt64 :=
+  let p := a.toNat * b.toNat
+  (.ofNat (p / 2^64), .ofNat p)  -- (hi, lo)
+
 @[extern "lean_hex_uint64_add_carry"]
 def UInt64.addCarry (a b : UInt64) (cin : Bool) : UInt64 × Bool
 
@@ -214,16 +219,30 @@ theorem UInt64.toNat_mulHi (a b : UInt64) :
     (mulHi a b).toNat = a.toNat * b.toNat / 2^64
 theorem UInt64.mulHi_mulLo (a b : UInt64) :
     (mulHi a b).toNat * 2^64 + (a * b).toNat = a.toNat * b.toNat
+theorem UInt64.toNat_mulFull (a b : UInt64) :
+    let (hi, lo) := mulFull a b
+    hi.toNat = a.toNat * b.toNat / 2^64 ∧
+    lo.toNat = a.toNat * b.toNat % 2^64
 theorem UInt64.toNat_addCarry (a b : UInt64) (cin : Bool) :
     let (s, cout) := addCarry a b cin
     s.toNat + cout.toNat * 2^64 = a.toNat + b.toNat + cin.toNat
 ```
+
+Callers needing both halves of the product (notably `Montgomery/Redc`'s
+Layer 5, where the same `m * p` is used for both the low-word add-carry
+chain and the high-word `mulHi`) MUST use `mulFull` rather than computing
+`a * b` and `mulHi a b` separately. Two separate calls double the C-side
+extern hops and the underlying 128-bit multiply.
 
 The C extern bodies live in `HexArith/ffi/wide_arith.c`:
 
 - `lean_hex_uint64_mul_hi(uint64_t a, uint64_t b)` returns
   `(uint64_t)((__uint128_t)a * b >> 64)`. `__uint128_t` is available
   on every Lean target (GCC/Clang on x86_64, AArch64, RISC-V).
+- `lean_hex_uint64_mul_full(uint64_t a, uint64_t b)` returns the pair
+  `(hi, lo)` from a single `(__uint128_t)a * b` computation, where
+  `hi = (uint64_t)(p >> 64)` and `lo = (uint64_t)p`. One C call yields
+  both halves of the wide product.
 - `lean_hex_uint64_add_carry(uint64_t a, uint64_t b, uint8_t cin, ...)`
   uses `__builtin_add_overflow` (or a manual two-step add) to
   produce the wrapped low word and the outgoing carry bit.
@@ -294,7 +313,7 @@ theorem newton_step (hp_odd : p % 2 = 1) (k : Nat)
     p * (x * (2 - p * x)) % 2^(2*k) = 1
 
 -- Seed: for odd p, p·p ≡ 1 (mod 8)
--- 6 Newton doublings from 3-bit seed: 3 → 6 → 12 → 24 → 48 → 64+ bits
+-- 5 Newton doublings from 3-bit seed: 3 → 6 → 12 → 24 → 48 → 96 ≥ 64 bits
 def montPosInv (p : UInt64) : UInt64  -- iterate x ↦ x*(2 - p*x) in UInt64
 
 theorem montPosInv_spec (p : UInt64) (hp_odd : p.toNat % 2 = 1) :
@@ -340,8 +359,13 @@ plus derived Nat-level projections (`p_pos`, `p_lt_R`, `p_odd_nat`)
 proved once on `MontCtx`, bounds/closure lemmas (`toMont_lt`,
 `mulMont_lt`), a Montgomery domain invariant (`mulMont_repr`), and
 the three user-facing theorems (`fromMont_toMont`, `toNat_mulMont`,
-`mulMont_eq`) derived from the invariant. `r2` is computed by repeated
-doubling in `MontCtx.mk`, not via Barrett (avoids circular dependency).
+`mulMont_eq`) derived from the invariant. `r2` is computed without
+invoking Barrett (which would create a circular dependency). Two
+SPEC-permitted shapes are: (a) 128 iterations of doubling from
+`1 mod p`, or (b) 64 iterations of doubling to obtain `R mod p`,
+followed by one schoolbook `Nat`-level squaring + reduction for
+`R^2 mod p`. Implementations choose freely; the (b) path halves the
+construction cost for short-lived contexts.
 
 **When to use which:** Barrett for one-off or few modular operations.
 Montgomery for hot loops (exponentiation, Frobenius map, polynomial
@@ -383,6 +407,15 @@ def powMod (a n p : Nat) : Nat  -- uses Montgomery internally
 theorem powMod_eq (a n p : Nat) (hp : p > 0) :
     powMod a n p = a ^ n % p
 ```
+
+For inputs that don't take the Montgomery path (even `p`, or
+`p > 2^64`), the body uses `Nat`-level square-and-multiply, reducing
+modulo `p` after every multiplication. The one-liner `a ^ n % p` is
+forbidden as the fallback body: it computes `a^n` at full precision
+before reducing, so memory and time grow exponentially in the bit-size
+of `n`. This is a Phase 1 "wrong-complexity" violation
+([PLAN/Phase1.md](../../PLAN/Phase1.md)) regardless of how well the
+proof of `powMod_eq` happens to discharge.
 
 **Binomial coefficients and Fermat's little theorem:**
 
