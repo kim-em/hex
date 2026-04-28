@@ -3,9 +3,9 @@ import HexPoly
 /-!
 Core `ZPoly` definitions for `hex-poly-z`.
 
-This module specializes the generic dense-polynomial scaffold to integer
+This module specializes the generic dense-polynomial library to integer
 coefficients, adds the shared congruence predicate used by Hensel lifting,
-and exposes the content/primitive-part surface expected from the
+and exposes the content/primitive-part operations expected from the
 `hex-poly-z` root library.
 -/
 namespace Hex
