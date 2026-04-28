@@ -153,6 +153,24 @@ def imported_library(module_name: str, libraries: set[str]) -> str | None:
     return None
 
 
+def dep_closure(libraries: dict[str, dict[str, object]], name: str) -> set[str]:
+    """Transitive closure of `name`'s deps in `libraries.yml` (excludes `name` itself).
+
+    An import is allowed from `owner` to any library reachable in this
+    closure, matching Lake's actual symbol-visibility semantics. See
+    PLAN/Phase0.md "Import boundary checks".
+    """
+    seen: set[str] = set()
+    stack = list(libraries[name]["deps"])
+    while stack:
+        dep = stack.pop()
+        if dep in seen or dep not in libraries:
+            continue
+        seen.add(dep)
+        stack.extend(libraries[dep]["deps"])
+    return seen
+
+
 def collect_import_errors(libraries: dict[str, dict[str, object]]) -> list[str]:
     errors: list[str] = []
     library_names = set(libraries)
@@ -164,7 +182,7 @@ def collect_import_errors(libraries: dict[str, dict[str, object]]) -> list[str]:
         owner = library_for_path(path, library_names)
         if owner is None:
             continue
-        allowed = set(libraries[owner]["deps"]) if owner in libraries else set()
+        allowed = dep_closure(libraries, owner) if owner in libraries else set()
         if owner == "HexManual":
             allowed = set(library_names)
         allowed.add(owner)
