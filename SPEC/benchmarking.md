@@ -105,8 +105,9 @@ failures (see [testing.md](testing.md)).
 The benchmark harness is [`kim-em/lean-bench`](https://github.com/kim-em/lean-bench).
 It is the only harness; do not roll a per-library replacement.
 
-A library's Phase-4 deliverable is `HexFoo/Bench.lean`, registered
-as a Lake exe target named `hexfoo_bench`:
+A library's Phase-4 deliverable is a `HexFoo.Bench` exe rooted at
+`HexFoo/Bench.lean`. Supporting modules may live under
+`HexFoo/Bench/`. The Lake target is named `hexfoo_bench`:
 
 ```toml
 # lakefile.toml
@@ -157,6 +158,17 @@ Two registration forms:
 Both forms accept a `where { … }` clause to override fields of the
 per-benchmark config (`maxSecondsPerCall`, `repeats`, `paramCeiling`,
 slope tolerance, etc.); CLI flags layer on top.
+
+Each benchmark therefore has two settings layers:
+
+- **scientific settings** — the canonical parameter domain or fixed
+  input used for Phase 4 and scheduled timing runs;
+- **smoke settings** — the reduced `verify`-only budget used to
+  prove the registration works.
+
+Smoke settings may lower tuning budget and repeat count. They may
+not redefine the benchmark family, replace a canonical fixed input
+with an easier one, or shrink the scientific comparison domain.
 
 The CLI surface is `lake exe hexfoo_bench <subcommand>`:
 
@@ -222,6 +234,13 @@ double-purpose: a timing report and a cross-implementation
 conformance check, in one go. A divergence triggers the same
 response as any other conformance failure: file an issue, roll back.
 
+A `compare` group is valid only when the registrations cover the
+same semantic task on an intentional common domain. If that common
+domain is not obvious from the benchmark names, state it in the
+bench module docstring. A trivial accidental overlap does not count.
+If no meaningful common domain exists, leave that comparison
+requirement open and file a narrow issue rather than faking one.
+
 ## External comparators
 
 Where a SPEC marks an operation as architecturally important against
@@ -256,6 +275,21 @@ Two integration patterns:
 Where a SPEC asks for a comparison lean-bench cannot directly model,
 file the gap as a feature request against lean-bench. Do not invent
 a parallel hex-local benchmark harness; one harness is the rule.
+
+Each SPEC-required external comparator must end in exactly one of
+these states:
+
+- **implemented now** — registration and execution path land in the
+  current Phase-4 work;
+- **scheduled-only** — registration lands now, but execution is
+  deferred to scheduled/release benchmarking, with the required
+  environment stated in the bench module docstring;
+- **blocked** — a narrow repo-local issue is filed for the missing
+  capability, and the library does not claim Phase-4 completion.
+
+Do not stub comparator outputs. Do not silently omit a required
+comparator. If the blocker is a missing lean-bench feature, file
+both the upstream feature request and the repo-local blocking issue.
 
 ## Fixed-problem benchmarks
 
@@ -325,8 +359,8 @@ smallest registered input genuinely needs that long; most libraries
 should run in a few seconds. The repo-wide CI step's total budget is
 the sum, with a soft target of a few minutes — not a hard cap. A
 library exceeding 15 s on `verify` needs either tighter
-`setup_benchmark` config (lower `paramCeiling`, smaller fixed inputs)
-or a closer look at why its tiniest invocation is slow.
+smoke settings or a closer look at why its tiniest invocation is
+slow. It is not a license to weaken the scientific settings.
 
 Full timing runs (`lake exe hexfoo_bench run NAME` with a real
 budget) are not part of merge-gating CI. They run on a scheduled
@@ -388,7 +422,7 @@ explicitly forbidden:
   without naming the implementation bug.** If a benchmark would
   exceed its wallclock cap at the declared range, the implementation
   is too slow at that range — file an issue, roll back, fix. Don't
-  shrink the range to dodge the verdict.
+  shrink the scientific settings to dodge the verdict.
 - **Declaring a complexity model that matches the buggy current
   code instead of textbook.** The model is the contract. Observation
   disagreeing with textbook is a finding; observation agreeing with
@@ -416,6 +450,11 @@ explicitly forbidden:
   The hash-agreement check via `compare` is the conformance leg of
   the harness; do not duplicate it in committed expected-output
   fixtures.
+- **Calling `verify` success a Phase-4 pass.** `verify` proves
+  registration wiring, not scientific validity.
+- **Marking a comparator requirement complete after documenting that
+  the tool is missing.** Missing tool support is either
+  `scheduled-only` or `blocked`; it is not completion.
 - **Rolling a hex-local benchmark harness.** lean-bench is the
   harness; gaps in its API are filed against it, not papered over
   locally.

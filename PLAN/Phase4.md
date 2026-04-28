@@ -22,10 +22,11 @@ opening Phase 4 issues.
 
 For each library `HexFoo` advancing through Phase 4:
 
-1. **`HexFoo/Bench.lean`** — a single Lean module that imports
-   `LeanBench` and registers every advertised operation in the
-   library's SPEC API surface with `setup_benchmark` (parametric)
-   or `setup_fixed_benchmark` (canonical input). The complexity
+1. **`HexFoo.Bench` exe** — rooted at `HexFoo/Bench.lean`, with
+   helper modules under `HexFoo/Bench/` when useful. It registers
+   every advertised operation in the library's SPEC API surface
+   with `setup_benchmark` (parametric) or
+   `setup_fixed_benchmark` (canonical input). The complexity
    expression in each `setup_benchmark` is the *textbook*
    complexity, not the observed one.
 
@@ -44,7 +45,8 @@ For each library `HexFoo` advancing through Phase 4:
 3. **CI smoke step** invoking
    `lake exe hexfoo_bench list && lake exe hexfoo_bench verify`.
    `verify` is the bitrot gate; it does not assert timing values.
-   Total wall budget across all libraries' verify calls is `< 60 s`.
+   It may use reduced smoke settings, but may not weaken the
+   scientific settings used for real runs.
 
 4. **`compare` registrations** for any pair of alternative algorithms
    the library SPEC calls out (e.g. Barrett vs Montgomery, linear vs
@@ -52,14 +54,18 @@ For each library `HexFoo` advancing through Phase 4:
    recombination). The `compare` invocation joins on result hashes
    and serves as the cross-implementation conformance check; a
    divergence at a common parameter is treated as any other
-   conformance failure.
+   conformance failure. Each required `compare` group must have an
+   intentional common domain.
 
 5. **External-comparator registrations** where the library SPEC
    names an architecturally important external tool (FLINT, fpLLL,
    GMP, NTL for FFI; Sage, GAP, PARI, python-flint for process
    calls). FFI is preferred; see
    [SPEC/benchmarking.md §External comparators](../SPEC/benchmarking.md#external-comparators)
-   for the integration patterns.
+   for the integration patterns. Each required comparator must end
+   Phase 4 as either implemented now, scheduled-only with its
+   environment stated, or blocked by a narrow issue that keeps the
+   library below completion.
 
 The PR description records, in one paragraph, any case where the
 declared complexity model differs from the canonical textbook
@@ -81,26 +87,30 @@ required.
 - **Use fixed seeds and committed inputs.** Randomised inputs
   derive from a seed tied to the benchmark name; canonical hard
   inputs live under `HexFoo/Bench/Inputs/`.
+- **Keep smoke and scientific settings distinct.** `verify` is for
+  wiring; Phase 4 completion is judged on real runs.
 
 ## Exit criteria
 
 For library `hex-foo`, Phase 4 is done when:
 
 - every operation listed in the library's SPEC API surface has a
-  `setup_benchmark` or `setup_fixed_benchmark` registration in
-  `HexFoo/Bench.lean`;
+  `setup_benchmark` or `setup_fixed_benchmark` registration in the
+  `HexFoo.Bench` exe;
 - every parametric registration declares a complexity model that
   matches the SPEC's textbook complexity for that operation;
-- `lake exe hexfoo_bench verify` succeeds, and
+- `lake exe hexfoo_bench verify` succeeds under smoke settings, and
   `lake exe hexfoo_bench run NAME` returns *consistent with declared
-  complexity* for every parametric registration at the library's
-  standard sizes;
+  complexity* for every parametric registration at its scientific
+  settings;
 - every `compare` group named by the SPEC is registered and reports
-  `allAgreed` at common parameters;
+  `allAgreed` on its declared common domain;
 - every external-comparator registration named by the SPEC is wired
-  (FFI shim or process call), with link arguments / install
-  instructions recorded in `lakefile.toml` or the bench module's
-  docstring;
+  (FFI shim or process call), with its execution policy recorded in
+  the bench module docstring;
+- no registration is merely "consistent" while still orders of
+  magnitude slower than a named architectural comparator on the same
+  canonical task family;
 - the CI smoke step (`list` + `verify`) runs on every PR.
 
 If any of these fail, the right action is rollback per
