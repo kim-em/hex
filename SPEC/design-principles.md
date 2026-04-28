@@ -48,18 +48,12 @@
    roll back the affected library's `done_through` and re-enter the
    relevant phase, not to weaken the benchmark.
 
-   *"Intended complexity"* means the canonical fast algorithm for the
-   operation — square-and-multiply for `pow`, Newton iteration for
-   floor square root, the multiplicative formula for binomial
-   coefficients, Euclidean for `gcd`, and so on. A SPEC bullet that
-   names an operation without naming an algorithm does not license
-   the textbook-recursive body. The binding contract for any
-   particular operation lives in its library's SPEC file — it's the
-   per-library SPEC that says "`pow` here uses square-and-multiply"
-   or "`floorSqrt` here is Newton, not linear scan" — not this
-   document. Library SPECs are responsible for naming the canonical
-   algorithm at the SPEC bullet for any operation whose complexity
-   class isn't already obvious from the type signature.
+   *"Intended complexity"* means the canonical fast algorithm for
+   the operation — square-and-multiply for `pow`, Newton iteration
+   for floor square root, the multiplicative formula for binomial
+   coefficients, Euclidean for `gcd`. If a library SPEC doesn't
+   mention performance requirements for an operation, assume the
+   implementation needs to be optimal.
 
 ## Fully autonomous execution
 

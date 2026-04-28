@@ -16,7 +16,11 @@ API.
 - Smart constructor `ofPoly : FpPoly p → PolyQuotient p f hf`
 - Projection `repr : PolyQuotient p f hf → FpPoly p`
 - Ring operations: addition, multiplication, negation, subtraction,
-  exponentiation; every operation reduces via `reduceMod`
+  exponentiation; every operation reduces via `reduceMod`.
+  `pow x n` is square-and-multiply (`O(log n)` quotient-ring
+  multiplications). `nsmul n x` and `natCast n` use binary
+  decomposition with the same complexity; the textbook
+  `n+1 ↦ pred + 1` recursion is forbidden.
 - `Lean.Grind.CommRing (PolyQuotient p f hf)` instance
 
 Representation choice: the stored representative is always canonical.

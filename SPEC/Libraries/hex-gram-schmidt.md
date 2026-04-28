@@ -35,7 +35,13 @@ noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n
     and the public API wraps via .toNat). -/
 def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat
 
-/-- All Gram determinants as a vector. -/
+/-- All Gram determinants as a vector.
+    Computed incrementally (e.g. one Bareiss-style elimination pass
+    over the full Gram matrix that emits each leading-principal
+    minor along its diagonal): O(n^3 + n^2 m) total. Recomputing
+    `gramDet b k` independently for each k by rebuilding the
+    leading k × k Gram matrix and its determinant from scratch is
+    forbidden — that body is `O(n^4 + n^3 m)`. -/
 def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1)
 
 /-- Scaled GS coefficients (the ν-values): entry (i,j) = d_{j+1} * μ_{i,j}

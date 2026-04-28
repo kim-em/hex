@@ -16,8 +16,14 @@ field libraries.
   f.degree` and `hirr : Irreducible f`
 - Coercions or conversion functions to and from `PolyQuotient p f hf`
 - Multiplicative inverse via extended GCD in `F_p[x]`
-- Division and exponentiation
-- Frobenius map `frob : FiniteField p f hf hirr → FiniteField p f hf hirr`
+- Division and exponentiation. `pow x n` is square-and-multiply
+  (`O(log n)` field multiplications); the textbook `n+1 ↦ pow n * x`
+  recursion is forbidden because cryptographic exponents (e.g. `n =
+  p` for Frobenius, with `p ≈ 2^31`) make linear-time `pow`
+  non-terminating.
+- Frobenius map `frob : FiniteField p f hf hirr → FiniteField p f hf hirr`,
+  computed as `pow x p` (and therefore inheriting the
+  square-and-multiply complexity)
 - `Lean.Grind.Field (FiniteField p f hf hirr)` instance
 - `IsCharP (FiniteField p f hf hirr) p`
 
