@@ -42,6 +42,15 @@ implementation. For each approved extern, the corresponding library spec
 should state the intended contract, any fallback path, and any relevant
 platform assumptions.
 
+**Property all `@[extern]` declarations must satisfy.** The C body of
+every `@[extern]` declaration must do work that is not equivalent to
+calling its Lean fallback. An `@[extern]` shim whose only effect is to
+re-enter the Lean runtime — for example a `lean_hex_foo` whose body is
+`return l_Hex_pureFoo___boxed(a, b);` — is not a valid extern boundary.
+Until the C side performs work native to C (GMP call, CLMUL intrinsic,
+`__uint128_t` arithmetic, etc.), ship only the pure-Lean definition
+without `@[extern]`.
+
 ## Applications
 
 **Cryptographic field construction:** To build `GF(2^128)` for AES, you

@@ -42,6 +42,24 @@ These are not rubber-stamp coverage audits — they ask:
   gives explicit update formulas. These are "wrong-shape" scaffolds
   and are forbidden by [PLAN/Phase1.md](Phase1.md), same remedy as
   wrong-output scaffolds: fix the body, or delete the declaration.
+- **For each `@[extern]` in the library, open its C body in
+  `HexFoo/ffi/<name>.c` and confirm it does work native to C.** A C
+  body that consists of (or reduces to) `return l_Hex_*___boxed(a,
+  b);` — i.e. a trampoline back to the Lean runtime — is a fake
+  extern. Remedy: delete the `@[extern]` attribute, delete the C
+  file, drop the `moreLinkArgs`/`moreLeancArgs` entry in the
+  lakefile, and open a follow-up issue for the real extern.
+- **For each declaration whose name or signature mentions a native
+  numeric type (`UInt64`, `UInt32`, `UInt8`, `Float`, `Fin n`,
+  ...), confirm the body uses native arithmetic on that type.** A
+  body that converts to `Nat`/`Int`, runs the Nat-level algorithm,
+  and converts back is a wrong-shape scaffold even when the
+  input/output contract is satisfied: the asymptotic complexity is
+  bignum, not the native single-word cost the type promises.
+- **Grep the library for the words `scaffold`, `for now`,
+  `eventual`, `placeholder`, `Phase 1`, `bridge for` in `*.lean`
+  and `ffi/*.c` files.** Every hit is a candidate violation; flag
+  in the review issue.
 
 ## Output
 

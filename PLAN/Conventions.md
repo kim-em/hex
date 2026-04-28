@@ -14,17 +14,26 @@ once per session.
 agents may fix SPEC clauses that are internally contradictory or
 mathematically impossible, with rationale in the PR description.
 
-### Scaffolding is for proofs only
+### Placeholders are for proofs only
 
 `sorry` is permitted in proofs (`theorem` bodies, propositional
 `structure` fields). It is **not** permitted as a data-level body,
-and neither is any other placeholder shape (wrong-but-plausible
-trivial returns, identity casts, `axiom` stand-ins, alternative
-implementations with the wrong complexity). Every committed `def`
-ships with its intended-final implementation. See
+and neither is any other placeholder shape: wrong-but-plausible
+trivial returns, identity casts, `axiom` stand-ins, native-typed
+functions that detour through `Nat`/`Int`, `@[extern]` shims that
+trampoline back to a Lean fallback, alternative implementations
+with the wrong complexity. Every committed `def` ships with its
+intended-final implementation. See
 [design-principles.md §7](../SPEC/design-principles.md), the rule
 restated in [PLAN/Phase1.md](Phase1.md), and the bench-discovery
 rollback path in [SPEC/benchmarking.md](../SPEC/benchmarking.md).
+
+The word "scaffold" in this project refers to *adding a declaration
+to the Lean source*, not to filling that declaration with a stub. A
+scaffolded `def` is fully implemented; only its proofs may be
+`sorry`. Phrases like "Phase 1 scaffold returns <trivial>",
+"scaffold for the eventual <X> bridge", "honest placeholder", and
+"for now ..." are forbidden in committed code.
 
 ### PR workflow
 
