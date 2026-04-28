@@ -1,12 +1,15 @@
+import HexModArith.Prime
 import HexPolyFp.Basic
 
 /-!
 Executable square-free decomposition for `F_p[x]`.
 
-This module implements Yun-style square-free decomposition for
+This module implements a Yun-style square-free decomposition for
 `Hex.FpPoly p`, recording the unit factor and the positive-multiplicity
 square-free factors obtained from repeated gcd/derivative steps and
-`p`-th-root descent in characteristic `p`.
+`p`-th-root descent in characteristic `p`. The public API carries an
+explicit `Nat.Prime p` contract because the exported factorization and
+square-free theorems are intended for prime-field coefficients.
 -/
 namespace Hex
 
@@ -112,25 +115,26 @@ private def squareFreeAux (f : FpPoly p) (multiplicity : Nat) :
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
 -/
-def squareFreeDecomposition (f : FpPoly p) : SquareFreeDecomposition p :=
+def squareFreeDecomposition (hp : Nat.Prime p) (f : FpPoly p) : SquareFreeDecomposition p :=
+  let _ := hp
   let normalized := normalizeMonic f
   let unit := normalized.1
   let monicPart := normalized.2
   let factors := squareFreeAux monicPart 1 (monicPart.size + 1)
   { unit, factors }
 
-theorem squareFree_pairwise_coprime (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_pairwise_coprime (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   sorry
 
-theorem squareFree_weightedProduct (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_weightedProduct (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     DensePoly.C d.unit * weightedProduct d.factors = f := by
   sorry
 
-theorem squareFree_factors_squareFree (f : FpPoly p) :
-    let d := squareFreeDecomposition f
+theorem squareFree_factors_squareFree (hp : Nat.Prime p) (f : FpPoly p) :
+    let d := squareFreeDecomposition hp f
     ∀ sf ∈ d.factors, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
   sorry
 
