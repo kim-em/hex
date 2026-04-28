@@ -22,11 +22,6 @@ open Polynomial
 
 noncomputable section
 
-/-- Coefficientwise divisibility by a constant polynomial is equivalent to divisibility of each coefficient. -/
-theorem C_dvd_iff_dvd_coeff (m : ℤ) (f : Polynomial ℤ) :
-    Polynomial.C m ∣ f ↔ ∀ n, m ∣ f.coeff n := by
-  simpa using (Polynomial.C_dvd_iff_dvd_coeff m f)
-
 /-- Reducing an integer coefficient modulo `p` gives zero exactly when `p` divides it. -/
 theorem coeff_map_intCastRingHom_eq_zero_iff_dvd
     (f : Polynomial ℤ) (p n : ℕ) :
