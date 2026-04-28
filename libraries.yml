@@ -50,7 +50,7 @@ libraries:
   HexPolyZ:
     deps: [HexPoly]
     mathlib: false
-    done_through: 1
+    done_through: 2
 
   # ---------- Depth 2 ----------
   HexLLL:
