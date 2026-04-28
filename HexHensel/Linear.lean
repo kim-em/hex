@@ -29,13 +29,9 @@ structure LinearLiftResult where
 
 namespace LinearLiftResult
 
-/-- The increment added to `g` in the linear Hensel step. -/
-def deltaG (p k : Nat) [ZMod64.Bounds p] (r : FpPoly p) : ZPoly :=
+/-- The lifted-and-scaled increment used by one linear Hensel step. -/
+def liftScaledIncrement (p k : Nat) [ZMod64.Bounds p] (r : FpPoly p) : ZPoly :=
   DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r)
-
-/-- The increment added to `h` in the linear Hensel step. -/
-def deltaH (p k : Nat) [ZMod64.Bounds p] (u : FpPoly p) : ZPoly :=
-  DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ u)
 
 end LinearLiftResult
 
@@ -52,9 +48,9 @@ def linearHenselStep
   let qr := DensePoly.divMod (t * eMod) gMod
   let q := qr.1
   let r := qr.2
-  let g' := g + LinearLiftResult.deltaG p k r
+  let g' := g + LinearLiftResult.liftScaledIncrement p k r
   let hCorrection := s * eMod + q * hMod
-  let h' := h + LinearLiftResult.deltaH p k hCorrection
+  let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
   { g := reduceModPow g' p (k + 1)
     h := reduceModPow h' p (k + 1) }
 
