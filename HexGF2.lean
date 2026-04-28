@@ -1,7 +1,9 @@
 import HexGF2.Basic
+import HexGF2.Clmul
+import HexGF2.Multiply
 
 /-!
-The `HexGF2` library exposes the initial packed `GF(2)` polynomial surface:
-normalized `GF2Poly` words, bit/degree accessors, XOR addition, and shifts by
-powers of `x`.
+The `HexGF2` library exposes the packed `GF(2)` polynomial core:
+normalized `GF2Poly` words, bit/degree accessors, XOR addition, shifts by
+powers of `x`, and carry-less-multiply-backed polynomial multiplication.
 -/
