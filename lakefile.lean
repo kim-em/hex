@@ -29,6 +29,7 @@ lean_lib HexPoly where
 lean_lib HexMatrix where
 
 lean_lib HexModArith where
+  moreLinkArgs := #["HexModArith/ffi/zmod64_mul.c"]
 
 lean_lib HexGramSchmidt where
 

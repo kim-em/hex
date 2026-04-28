@@ -12,14 +12,24 @@ swap in specialized multiplication backends from `HexArith`.
 -/
 namespace Hex
 
+namespace ZMod64
+
+/-- Bounds ensuring `UInt64` faithfully stores canonical representatives mod `p`. -/
+class Bounds (p : Nat) : Prop where
+  pPos : 0 < p
+  pLeR : p ≤ UInt64.word
+
+end ZMod64
+
 /-- Residues mod `p` stored in a single machine word, with a proof of reduction. -/
-structure ZMod64 (p : Nat) where
+structure ZMod64 (p : Nat) [ZMod64.Bounds p] where
   val : UInt64
   isLt : val.toNat < p
 
 namespace ZMod64
 
 variable {p : Nat}
+variable [Bounds p]
 
 /-- View a residue as its reduced Nat representative. -/
 def toNat (a : ZMod64 p) : Nat :=
@@ -49,6 +59,7 @@ instance : CoeOut (ZMod64 p) Nat where
 def normalize (p n : Nat) : Nat :=
   n % p
 
+omit [Bounds p] in
 theorem normalize_lt (hp : 0 < p) (n : Nat) : normalize p n < p :=
   Nat.mod_lt _ hp
 
@@ -58,69 +69,100 @@ Build a reduced residue by taking the Nat representative mod `p`.
 The bound `p ≤ 2^64` ensures the reduced representative is stored faithfully in
 the backing `UInt64`.
 -/
-def ofNat (p n : Nat) (hp : 0 < p) (hword : p ≤ UInt64.word) : ZMod64 p := by
+def ofNat (p n : Nat) [Bounds p] : ZMod64 p := by
+  let hp := Bounds.pPos (p := p)
+  let hword := Bounds.pLeR (p := p)
   let reduced := normalize p n
   have hred : reduced < p := normalize_lt hp n
   have hword' : reduced < UInt64.word := Nat.lt_of_lt_of_le hred hword
   refine ⟨UInt64.ofNatLT reduced hword', ?_⟩
   simpa [UInt64.toNat_ofNatLT] using hred
 
-@[simp] theorem toNat_ofNat (n : Nat) (hp : 0 < p) (hword : p ≤ UInt64.word) :
-    (ofNat p n hp hword).toNat = n % p := by
+@[simp] theorem toNat_ofNat (n : Nat) :
+    (ofNat p n).toNat = n % p := by
+  let hp := Bounds.pPos (p := p)
+  let hword := Bounds.pLeR (p := p)
   have hred : n % p < p := Nat.mod_lt _ hp
   have hword' : n % p < UInt64.word := Nat.lt_of_lt_of_le hred hword
   simp [ofNat, normalize, UInt64.toNat_ofNatLT]
 
-@[simp] theorem val_toNat_ofNat (n : Nat) (hp : 0 < p) (hword : p ≤ UInt64.word) :
-    (ofNat p n hp hword).val.toNat = n % p := by
-  simpa using toNat_ofNat (p := p) n hp hword
-
-section BasicOps
-
-variable (hp : 0 < p) (hword : p ≤ UInt64.word)
+@[simp] theorem val_toNat_ofNat (n : Nat) :
+    (ofNat p n).val.toNat = n % p := by
+  simpa using toNat_ofNat (p := p) n
 
 /-- The zero residue class. -/
 protected def zero : ZMod64 p :=
-  ofNat p 0 hp hword
+  ofNat p 0
 
 /-- The residue class of one. -/
 protected def one : ZMod64 p :=
-  ofNat p 1 hp hword
+  ofNat p 1
 
 /-- Add two reduced residues and reduce the Nat sum mod `p`. -/
 def add (a b : ZMod64 p) : ZMod64 p :=
-  ofNat p (a.toNat + b.toNat) hp hword
+  ofNat p (a.toNat + b.toNat)
 
 /--
 Subtract two residues by adding the modular complement of the second and
 reducing mod `p`.
 -/
 def sub (a b : ZMod64 p) : ZMod64 p :=
-  ofNat p (a.toNat + (p - b.toNat)) hp hword
+  ofNat p (a.toNat + (p - b.toNat))
+
+/-- Multiply two reduced residues and reduce the Nat product mod `p`. -/
+@[extern "lean_hex_zmod64_mul"]
+def mul (a b : ZMod64 p) : ZMod64 p :=
+  ofNat p (a.toNat * b.toNat)
 
 @[simp] theorem toNat_zero :
-    (ZMod64.zero hp hword).toNat = 0 := by
+    (ZMod64.zero (p := p)).toNat = 0 := by
   rw [ZMod64.zero, toNat_ofNat]
   exact Nat.zero_mod _
 
 @[simp] theorem toNat_one :
-    (ZMod64.one hp hword).toNat = 1 % p := by
+    (ZMod64.one (p := p)).toNat = 1 % p := by
   rw [ZMod64.one, toNat_ofNat]
 
 @[simp] theorem toNat_add (a b : ZMod64 p) :
-    (add hp hword a b).toNat = (a.toNat + b.toNat) % p := by
+    (add a b).toNat = (a.toNat + b.toNat) % p := by
   rw [add, toNat_ofNat]
 
 @[simp] theorem toNat_sub (a b : ZMod64 p) :
-    (sub hp hword a b).toNat = (a.toNat + (p - b.toNat)) % p := by
+    (sub a b).toNat = (a.toNat + (p - b.toNat)) % p := by
   rw [sub, toNat_ofNat]
 
-theorem add_lt_modulus (a b : ZMod64 p) : (add hp hword a b).toNat < p := by
-  simpa [toNat_add] using normalize_lt hp (a.toNat + b.toNat)
+@[simp] theorem toNat_mul (a b : ZMod64 p) :
+    (mul a b).toNat = (a.toNat * b.toNat) % p := by
+  rw [mul, toNat_ofNat]
 
-theorem sub_lt_modulus (a b : ZMod64 p) : (sub hp hword a b).toNat < p := by
-  simpa [toNat_sub] using normalize_lt hp (a.toNat + (p - b.toNat))
+theorem add_lt_modulus (a b : ZMod64 p) : (add a b).toNat < p := by
+  simpa [toNat_add] using normalize_lt (Bounds.pPos (p := p)) (a.toNat + b.toNat)
 
-end BasicOps
+theorem sub_lt_modulus (a b : ZMod64 p) : (sub a b).toNat < p := by
+  simpa [toNat_sub] using normalize_lt (Bounds.pPos (p := p)) (a.toNat + (p - b.toNat))
+
+theorem mul_lt_modulus (a b : ZMod64 p) : (mul a b).toNat < p := by
+  simpa [toNat_mul] using normalize_lt (Bounds.pPos (p := p)) (a.toNat * b.toNat)
+
 end ZMod64
+
+section SmokeTests
+
+instance : ZMod64.Bounds (2 ^ 31 - 1) := ⟨by decide, by decide⟩
+instance : ZMod64.Bounds (2 ^ 63 + 29) := ⟨by decide, by decide⟩
+
+example :
+    (ZMod64.mul
+      (ZMod64.ofNat (2 ^ 31 - 1) 2147483646)
+      (ZMod64.ofNat (2 ^ 31 - 1) 2147483645)).toNat = 2 := by
+  decide
+
+example :
+    (ZMod64.mul
+      (ZMod64.ofNat (2 ^ 63 + 29) 9223372036854775800)
+      (ZMod64.ofNat (2 ^ 63 + 29) 9223372036854775788)).toNat = 1813 := by
+  decide
+
+end SmokeTests
+
 end Hex

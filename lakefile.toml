@@ -24,6 +24,7 @@ name = "HexMatrix"
 
 [[lean_lib]]
 name = "HexModArith"
+moreLinkArgs = ["HexModArith/ffi/zmod64_mul.c"]
 
 [[lean_lib]]
 name = "HexGramSchmidt"
