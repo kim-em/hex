@@ -1,4 +1,4 @@
-import HexMatrix.RowEchelon
+import HexMatrix.Determinant
 
 /-!
 Executable Bareiss determinant scaffolding for `hex-matrix`.
@@ -6,7 +6,8 @@ Executable Bareiss determinant scaffolding for `hex-matrix`.
 This module implements fraction-free Bareiss elimination over `Int` in two
 layers: a no-pivot recurrence that follows the standard exact-division update,
 and a public row-pivoting wrapper that swaps in a nonzero pivot when needed and
-tracks the resulting determinant sign.
+tracks the resulting determinant sign. The root library also exposes the
+theorem surface relating this executable path to the generic determinant.
 -/
 
 namespace Hex
@@ -186,6 +187,11 @@ def bareissData (M : Matrix Int n n) : BareissData n :=
 /-- Determinant computed by the row-pivoted Bareiss algorithm. -/
 def bareiss (M : Matrix Int n n) : Int :=
   (bareissData M).det
+
+/-- The Bareiss determinant agrees with the generic determinant. -/
+theorem bareiss_eq_det (M : Matrix Int n n) :
+    bareiss M = det M := by
+  sorry
 
 end Matrix
 end Hex
