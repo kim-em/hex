@@ -4,8 +4,8 @@ import Std
 Core packed polynomial definitions for `hex-gf2`.
 
 This module models polynomials over `F_2` as arrays of `UInt64` words in
-ascending degree order. The Phase 1 surface here provides normalization,
-degree/bit accessors, word-wise XOR addition, and shifts by powers of `x`.
+ascending degree order. It provides normalization, degree/bit accessors,
+word-wise XOR addition, and shifts by powers of `x`.
 -/
 namespace Hex
 
