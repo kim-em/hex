@@ -28,7 +28,7 @@ libraries:
   HexPoly:
     deps: []
     mathlib: false
-    done_through: 0
+    done_through: 1
   HexMatrix:
     deps: []
     mathlib: false
