@@ -142,6 +142,27 @@ def inv (a : ZMod64 p) : ZMod64 p :=
   let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p)
   ofNat p (Int.toNat (s % Int.ofNat p))
 
+instance : Zero (ZMod64 p) where
+  zero := ZMod64.zero
+
+instance : One (ZMod64 p) where
+  one := ZMod64.one
+
+instance : Add (ZMod64 p) where
+  add := ZMod64.add
+
+instance : Sub (ZMod64 p) where
+  sub := ZMod64.sub
+
+instance : Mul (ZMod64 p) where
+  mul := ZMod64.mul
+
+instance : Pow (ZMod64 p) Nat where
+  pow := ZMod64.pow
+
+instance : Inv (ZMod64 p) where
+  inv := ZMod64.inv
+
 @[simp] theorem toNat_zero : (ZMod64.zero : ZMod64 p).toNat = 0 := by
   rw [ZMod64.zero, toNat_ofNat]
   exact Nat.zero_mod _
