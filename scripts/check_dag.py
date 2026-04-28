@@ -47,7 +47,7 @@ def main() -> int:
 
     try:
         libraries = load_libraries(root / "libraries.yml")
-        lakefile_libs = load_lakefile_libs(root / "lakefile.toml")
+        lakefile_libs = load_lakefile_libs(root)
         topological_order(libraries)
         reachable = reachable_dependencies(libraries)
     except Exception as exc:

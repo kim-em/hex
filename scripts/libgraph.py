@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import OrderedDict, deque
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import tomllib
 
 
@@ -158,16 +159,45 @@ def _parse_scalar(raw: str) -> object:
     raise ValueError(f"unsupported scalar: {raw}")
 
 
+LEAN_LIB_RE = re.compile(r"^\s*lean_lib\s+([A-Za-z0-9_«»]+)\s+where\s*$")
+
+
 def load_lakefile_libs(path: Path | None = None) -> list[str]:
-    path = path or repo_root() / "lakefile.toml"
-    data = tomllib.loads(path.read_text(encoding="utf-8"))
-    libs = data.get("lean_lib", [])
-    result: list[str] = []
-    for entry in libs:
+    root = repo_root()
+    if path is None:
+        lean_path = root / "lakefile.lean"
+        toml_path = root / "lakefile.toml"
+    elif path.is_dir():
+        lean_path = path / "lakefile.lean"
+        toml_path = path / "lakefile.toml"
+    elif path.name == "lakefile.lean":
+        lean_path = path
+        toml_path = path.with_name("lakefile.toml")
+    else:
+        toml_path = path
+        lean_path = path.with_name("lakefile.lean")
+
+    if lean_path.exists():
+        libs: list[str] = []
+        for line in lean_path.read_text(encoding="utf-8").splitlines():
+            match = LEAN_LIB_RE.match(line)
+            if match:
+                libs.append(match.group(1))
+        if not libs:
+            raise ValueError("no lean_lib entries found in lakefile.lean")
+        return libs
+
+    if not toml_path.exists():
+        raise FileNotFoundError(f"missing Lake config: neither {lean_path} nor {toml_path} exists")
+
+    data = tomllib.loads(toml_path.read_text(encoding="utf-8"))
+    entries = data.get("lean_lib", [])
+    libs: list[str] = []
+    for entry in entries:
         if not isinstance(entry, dict) or "name" not in entry:
             raise ValueError("malformed [[lean_lib]] entry in lakefile.toml")
-        result.append(entry["name"])
-    return result
+        libs.append(entry["name"])
+    return libs
 
 
 def check_lakefile_alignment(libraries: OrderedDict[str, LibraryInfo], lakefile_libs: list[str]) -> list[str]:
@@ -175,12 +205,12 @@ def check_lakefile_alignment(libraries: OrderedDict[str, LibraryInfo], lakefile_
     library_names = set(libraries)
     lake_names = set(lakefile_libs)
     for name in sorted(library_names - lake_names):
-        errors.append(f"libraries.yml entry {name} missing from lakefile.toml")
+        errors.append(f"libraries.yml entry {name} missing from Lake config")
     for name in sorted(lake_names - library_names - KNOWN_EXCEPTIONS):
-        errors.append(f"lakefile.toml library {name} missing from libraries.yml")
+        errors.append(f"Lake config library {name} missing from libraries.yml")
     for name in sorted(KNOWN_EXCEPTIONS):
         if name not in lake_names:
-            errors.append(f"known exception {name} missing from lakefile.toml")
+            errors.append(f"known exception {name} missing from Lake config")
     return errors
 
 
