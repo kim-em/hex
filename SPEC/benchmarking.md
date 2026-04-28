@@ -16,7 +16,7 @@ Benchmarking serves three purposes, in priority order:
    `def` with the *real* algorithm at the *intended* complexity (per
    [design-principles.md §7](design-principles.md)). A Phase-4
    benchmark whose verdict disagrees with the declared model means
-   that promise was broken — the `def` is scaffolding in disguise.
+   that promise was broken, and the `def` needs to be fixed.
 2. **Measure how Lean compares to external systems** on hard
    problems. "Factoring `x^128 + 1` over `F_2` takes ~2 s in Lean
    versus ~0.8 s in FLINT" is a useful sentence even when both
@@ -222,21 +222,24 @@ Two integration patterns:
   `HexFoo/ffi/<comparator>.c`; record any link arguments in
   `lakefile.toml` (`moreLinkArgs`). The same `@[extern]` boundary
   rules from [Conventions.md](../PLAN/Conventions.md) apply.
-- **Process call, acceptable for one-shot comparisons.** The
-  external tool is scripted (Sage, python-flint, GAP, PARI) or
-  the operation is expensive enough that process-spawn cost is
-  negligible. Use `setup_fixed_benchmark` with an `IO α` body
-  that shells out, parses the output, and returns it. The
-  parametric `setup_benchmark` form does not currently accept
-  `IO α`, so process-call comparisons with a parameter sweep are
-  not directly modellable today; if you need this, file an issue
-  against lean-bench rather than rolling a hex-local harness.
+- **Process call, acceptable when FFI isn't viable.** The external
+  tool is scripted (Sage, python-flint, GAP, PARI) or the per-call
+  cost is large enough that process-spawn overhead is negligible.
+  Use `setup_fixed_benchmark` with an `IO α` body that shells out,
+  parses the output, and returns it. This covers both single
+  canonical-input comparisons *and* "swept" process-call
+  comparisons, by registering one `setup_fixed_benchmark` per
+  parameter value (e.g. `Hex.LLL.fpLLL.dim10`,
+  `Hex.LLL.fpLLL.dim20`, `Hex.LLL.fpLLL.dim30`) — the parametric
+  `setup_benchmark` form itself takes `Nat → α`, not `Nat → IO α`,
+  so the per-rung-fixed pattern is the canonical workaround. If a
+  true `Nat → IO α` parametric form matters more than the
+  per-rung-fixed encoding, file an issue against lean-bench rather
+  than rolling a hex-local harness.
 
-Where a SPEC asks for a comparison lean-bench cannot directly model
-(e.g. a comparison whose only useful axis is wall-clock on a single
-canonical input that lean-bench's API doesn't yet support), file
-the gap as a feature request against lean-bench. Do not invent a
-parallel hex-local benchmark harness; one harness is the rule.
+Where a SPEC asks for a comparison lean-bench cannot directly model,
+file the gap as a feature request against lean-bench. Do not invent
+a parallel hex-local benchmark harness; one harness is the rule.
 
 ## Fixed-problem benchmarks
 
