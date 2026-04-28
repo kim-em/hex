@@ -1,4 +1,5 @@
 import HexBerlekamp
+import HexGfqRing.Basic
 
 /-!
 Tier 1 Conway-polynomial lookup support for `hex-conway`.
@@ -53,6 +54,11 @@ theorem luebeckConwayPolynomial_2_1_monic :
     DensePoly.Monic luebeckConwayPolynomial_2_1 := by
   rfl
 
+/-- The committed `C(2, 1)` entry has positive degree. -/
+theorem luebeckConwayPolynomial_2_1_degree_pos :
+    0 < FpPoly.degree luebeckConwayPolynomial_2_1 := by
+  decide
+
 /-- The committed `C(2, 1)` entry is irreducible. -/
 theorem luebeckConwayPolynomial_2_1_irreducible :
     FpPoly.Irreducible luebeckConwayPolynomial_2_1 := by
@@ -80,6 +86,61 @@ theorem luebeckConwayPolynomial?_irreducible
         | succ j =>
             simp [luebeckConwayPolynomial?_miss_two_succ_succ] at h
   · simp [luebeckConwayPolynomial?, hp] at h
+
+/-- A committed Conway entry packages the current Tier 1 lookup hit for a
+supported `(p, n)` pair. -/
+structure SupportedEntry (p n : Nat) [ZMod64.Bounds p] where
+  poly : FpPoly p
+  isSupported : luebeckConwayPolynomial? p n = some poly
+
+/-- The current committed table supports `C(2, 1)`. -/
+def supportedEntry_2_1 : SupportedEntry 2 1 :=
+  ⟨luebeckConwayPolynomial_2_1, rfl⟩
+
+/-- Recover the committed Conway modulus for a supported entry. -/
+def conwayPoly (p n : Nat) [ZMod64.Bounds p] (h : SupportedEntry p n) : FpPoly p :=
+  h.poly
+
+@[simp] theorem luebeckConwayPolynomial?_conwayPoly
+    {p n : Nat} [ZMod64.Bounds p] (h : SupportedEntry p n) :
+    luebeckConwayPolynomial? p n = some (conwayPoly p n h) :=
+  h.isSupported
+
+/-- Every committed Tier 1 Conway entry in the current table is nonconstant. -/
+theorem luebeckConwayPolynomial?_degree_pos
+    {p n : Nat} [ZMod64.Bounds p] {f : FpPoly p}
+    (h : luebeckConwayPolynomial? p n = some f) :
+    0 < FpPoly.degree f := by
+  by_cases hp : p = 2
+  · subst hp
+    cases n with
+    | zero =>
+        simp at h
+    | succ k =>
+        cases k with
+        | zero =>
+            have hf : f = luebeckConwayPolynomial_2_1 := by
+              symm
+              simpa [luebeckConwayPolynomial?_hit_2_1] using h
+            subst hf
+            exact luebeckConwayPolynomial_2_1_degree_pos
+        | succ j =>
+            simp [luebeckConwayPolynomial?_miss_two_succ_succ] at h
+  · simp [luebeckConwayPolynomial?, hp] at h
+
+/-- Supported Conway entries produce nonconstant moduli. -/
+theorem conwayPoly_nonconstant
+    (p n : Nat) [ZMod64.Bounds p] (h : SupportedEntry p n) :
+    0 < FpPoly.degree (conwayPoly p n h) := by
+  exact luebeckConwayPolynomial?_degree_pos
+    (f := conwayPoly p n h) (luebeckConwayPolynomial?_conwayPoly h)
+
+/-- Supported Conway entries carry the imported irreducibility witness. -/
+theorem conwayPoly_irreducible
+    (p n : Nat) [ZMod64.Bounds p] (h : SupportedEntry p n) :
+    FpPoly.Irreducible (conwayPoly p n h) := by
+  exact luebeckConwayPolynomial?_irreducible
+    (f := conwayPoly p n h) (luebeckConwayPolynomial?_conwayPoly h)
 
 end Conway
 
