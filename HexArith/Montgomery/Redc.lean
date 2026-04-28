@@ -23,8 +23,9 @@ base `2^64`.
 -/
 def redc (ctx : MontCtx p) (Thi Tlo : UInt64) : UInt64 :=
   let m := Tlo * ctx.p'
-  let (_, c1) := UInt64.addCarry Tlo (m * p) false
-  let (addHi, c2) := UInt64.addCarry Thi (UInt64.mulHi m p) c1
+  let (mhi, mlo) := UInt64.mulFull m p
+  let (_, c1) := UInt64.addCarry Tlo mlo false
+  let (addHi, c2) := UInt64.addCarry Thi mhi c1
   if c2 then
     addHi - p
   else if addHi ≥ p then
