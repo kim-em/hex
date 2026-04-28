@@ -10,17 +10,25 @@ when the modulus is an odd `UInt64`.
 
 namespace MontCtx
 
-/-- Compute `R^2 mod p` by repeated doubling at the Nat level. -/
-private def r2Loop (p : Nat) : Nat → Nat → Nat
+/-- Double a reduced residue without leaving `UInt64` arithmetic. -/
+private def doubleMod (p acc : UInt64) : UInt64 :=
+  let gap := p - acc
+  if acc ≥ gap then
+    acc - gap
+  else
+    acc + acc
+
+/-- Compute `R^2 mod p` by repeated doubling in native-word arithmetic. -/
+private def r2Loop (p : UInt64) : Nat → UInt64 → UInt64
   | 0, acc => acc
-  | n + 1, acc => r2Loop p n ((acc + acc) % p)
+  | n + 1, acc => r2Loop p n (doubleMod p acc)
 
 /-- The `R^2 mod p` constant used to enter Montgomery form. -/
 private def r2OfModulus (p : UInt64) : UInt64 :=
-  if _hp : p.toNat = 0 then
+  if p ≤ 1 then
     0
   else
-    UInt64.ofNat (r2Loop p.toNat 128 (1 % p.toNat))
+    r2Loop p 128 1
 
 /-- Build the executable Montgomery context for an odd `UInt64` modulus. -/
 def mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p :=
