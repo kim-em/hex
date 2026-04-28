@@ -48,6 +48,18 @@ theorem congr_trans (f g h : ZPoly) (m : Nat) (hfg : congr f g m) (hgh : congr g
     congr f h m := by
   sorry
 
+theorem congr_add (f g f' g' : ZPoly) (m : Nat)
+    (hf : congr f f' m) (hg : congr g g' m) :
+    congr (f + g) (f' + g') m := by
+  intro i
+  sorry
+
+theorem congr_mul (f g f' g' : ZPoly) (m : Nat)
+    (hf : congr f f' m) (hg : congr g g' m) :
+    congr (f * g) (f' * g') m := by
+  intro i
+  sorry
+
 theorem content_mul_primitivePart (f : ZPoly) :
     DensePoly.scale (content f) (primitivePart f) = f := by
   simpa [content, primitivePart] using DensePoly.content_mul_primitivePart f
