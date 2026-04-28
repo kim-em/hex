@@ -1,3 +1,4 @@
+import HexLLL.Bench
 import HexLLL.Core
 import HexLLL.Reducedness
 import HexLLL.State

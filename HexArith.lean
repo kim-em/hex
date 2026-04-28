@@ -1,6 +1,7 @@
 import HexArith.Barrett.Context
 import HexArith.Barrett.Reduce
 import HexArith.Barrett.ReduceNat
+import HexArith.Bench
 import HexArith.Benchmark
 import HexArith.Binomial
 import HexArith.Conformance
