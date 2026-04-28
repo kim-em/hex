@@ -35,8 +35,8 @@ Dense matrices as `Vector (Vector R m) n`.
     above_pivot_zero : ∀ (i : Fin D.rank) (j : Fin n),
         j.val < i.val → D.echelon[j][D.pivotCols[i]] = 0
 
-  def rref [Field R] (M : Matrix R n m) : RowEchelonData R n m
-  theorem rref_isRREF [Field R] (M : Matrix R n m) : IsRREF M (rref M)
+  def rref [Field R] [DecidableEq R] (M : Matrix R n m) : RowEchelonData R n m
+  theorem rref_isRREF [Field R] [DecidableEq R] (M : Matrix R n m) : IsRREF M (rref M)
   ```
 
   **Column partition.** The sorted complement of `pivotCols` in
@@ -68,15 +68,15 @@ Dense matrices as `Vector (Vector R m) n`.
   coefficients or test membership. Works for both RREF and HNF.
 
   ```lean
-  def IsEchelonForm.spanCoeffs (F : IsEchelonForm M D)
+  def IsEchelonForm.spanCoeffs [Field R] [DecidableEq R] (F : IsEchelonForm M D)
       (v : Vector R m) : Option (Vector R n)
-  def IsEchelonForm.spanContains (F : IsEchelonForm M D)
+  def IsEchelonForm.spanContains [Field R] [DecidableEq R] (F : IsEchelonForm M D)
       (v : Vector R m) : Bool
 
   /-- Convenience: compute RREF internally. -/
-  def Matrix.spanCoeffs (M : Matrix R n m) (v : Vector R m) :
+  def Matrix.spanCoeffs [Field R] [DecidableEq R] (M : Matrix R n m) (v : Vector R m) :
       Option (Vector R n)
-  def Matrix.spanContains (M : Matrix R n m) (v : Vector R m) : Bool
+  def Matrix.spanContains [Field R] [DecidableEq R] (M : Matrix R n m) (v : Vector R m) : Bool
   ```
 
   **Nullspace** via RREF. Each free variable gives one basis vector.
@@ -96,7 +96,7 @@ Dense matrices as `Vector (Vector R m) n`.
       Vector (Vector R m) (m - D.rank)
 
   /-- Convenience: compute RREF internally. -/
-  def Matrix.nullspace [Field R] (M : Matrix R n m) :
+  def Matrix.nullspace [Field R] [DecidableEq R] (M : Matrix R n m) :
       Vector (Vector R m) (m - rref_rank)
   ```
 
@@ -150,9 +150,9 @@ for RREF and pivot sign tracking.
 - `det_rowScale : det (rowScale M i c) = c * det M`
 - `det_rowAdd : i ≠ j → det (rowAdd M i j c) = det M`
 - `bareiss_eq_det : bareiss M = det M`
-- `spanCoeffs_sound : E.spanCoeffs v = some c → M * c = v`
-- `spanCoeffs_complete : (∃ c, M * c = v) → (E.spanCoeffs v).isSome`
-- `spanContains_iff : E.spanContains v = true ↔ ∃ c, M * c = v`
+- `spanCoeffs_sound : E.spanCoeffs v = some c → rowCombination M c = v`
+- `spanCoeffs_complete : (∃ c, rowCombination M c = v) → (E.spanCoeffs v).isSome`
+- `spanContains_iff : E.spanContains v = true ↔ ∃ c, rowCombination M c = v`
 - `transform_mul_inv : ∃ Tinv, D.transform * Tinv = 1` (left inv → right inv for square matrices)
 - `freeCols_sorted`, `colPartition`, `colPartition_exclusive` (see column partition above)
 - `pivotCols_injective`, `freeCols_injective` (from `_sorted`)
