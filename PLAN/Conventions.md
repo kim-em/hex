@@ -97,8 +97,17 @@ acronyms. Do not silently introduce a mixed-case spelling.
 
 Libraries that use `@[extern]` (e.g. `hex-arith` for GMP wrappers,
 `hex-gf2` for CLMUL) keep their C shims in a `ffi/` subdirectory
-within the library (e.g. `HexArith/ffi/wide_arith.c`). The lakefile's
-`moreLinkArgs` or `moreLeancArgs` fields connect them to the build.
+within the library (e.g. `HexArith/ffi/wide_arith.c`). Compile those
+sources in `lakefile.lean` via an `extern_lib` block; use
+`moreLinkArgs` only for system linker flags such as `-lgmp`, never for
+listing `.c` sources.
+
+For ad hoc interpreter smoke tests of extern-backed declarations, use
+`lake lean <file>` (or pass the module dynlibs explicitly via
+`--load-dynlib`). Plain `lake env lean <file>` imports the workspace's
+`.olean` files but does not auto-load per-module dynlibs, so `#eval`
+of `@[extern]` declarations can fail with `Could not find native
+implementation`.
 
 ---
 
