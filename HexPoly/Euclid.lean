@@ -87,19 +87,13 @@ def div [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R :=
   (divMod p q).1
 
-/-- A commutative-ring remainder scaffold that uses monic division when available. -/
-def mod [One R] [Add R] [Sub R] [Mul R]
-    (p q : DensePoly R) : DensePoly R :=
-  if hmonic : q.leadingCoeff = 1 then
-    (divModMonic p q hmonic).2
-  else
-    p
+/-- Remainder from long division by a monic polynomial over a commutative ring. -/
+def modByMonic [One R] [Add R] [Sub R] [Mul R]
+    (p q : DensePoly R) (hmonic : Monic q) : DensePoly R :=
+  (divModMonic p q hmonic).2
 
 instance [One R] [Add R] [Sub R] [Mul R] [Div R] : Div (DensePoly R) where
   div := div
-
-instance [One R] [Add R] [Sub R] [Mul R] : Mod (DensePoly R) where
-  mod := mod
 
 /-- Commutative-ring divisibility for dense polynomials. -/
 instance [Add R] [Mul R] : Dvd (DensePoly R) where
@@ -162,12 +156,10 @@ theorem xgcd_bezout [One R] [Add R] [Sub R] [Mul R] [Div R]
     r.left * p + r.right * q = r.gcd := by
   sorry
 
-theorem mod_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
+theorem modByMonic_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
     (p q : DensePoly R) (hq : Monic q) :
-    p % q = (divModMonic p q hq).2 := by
-  have hq' : q.leadingCoeff = 1 := hq
-  show DensePoly.mod p q = (divModMonic p q hq).2
-  simp [DensePoly.mod, hq']
+    modByMonic p q hq = (divModMonic p q hq).2 := by
+  rfl
 
 end DensePoly
 
@@ -206,15 +198,15 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
 /-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
 theorem polyCRT_mod_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
-    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
-    (polyCRT a b u v s t) % a = u % a := by
+    (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
+    modByMonic (polyCRT a b u v s t) a ha = modByMonic u a ha := by
   sorry
 
 /-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
 theorem polyCRT_mod_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
-    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
-    (polyCRT a b u v s t) % b = v % b := by
+    (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
+    modByMonic (polyCRT a b u v s t) b hb = modByMonic v b hb := by
   sorry
 
 end DensePoly
