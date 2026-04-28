@@ -54,6 +54,12 @@ def ofPoly (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
 def repr {f : FpPoly p} {hf : 0 < FpPoly.degree f} (x : PolyQuotient f hf) : FpPoly p :=
   x.1
 
+instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : DecidableEq (PolyQuotient f hf) := by
+  intro x y
+  match decEq x.1 y.1 with
+  | isTrue h => exact isTrue (Subtype.ext h)
+  | isFalse h => exact isFalse (fun hxy => h (congrArg Subtype.val hxy))
+
 @[simp] theorem repr_ofPoly (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
     repr (ofPoly f hf g) = reduceMod f g :=
   rfl
