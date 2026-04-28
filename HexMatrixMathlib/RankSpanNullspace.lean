@@ -1,4 +1,5 @@
-import HexMatrix
+import HexMatrixMathlib.Basic
+import HexMatrix.RREF
 import Mathlib.LinearAlgebra.Finsupp.LinearCombination
 import Mathlib.LinearAlgebra.Matrix.Rank
 
@@ -11,8 +12,7 @@ relating computed rank, span membership, and nullspace bases to Mathlib's
 noncomputable linear-algebra definitions.
 -/
 
-namespace Hex
-namespace MatrixMathlib
+namespace HexMatrixMathlib
 
 universe u
 
@@ -31,36 +31,13 @@ def vectorEquiv : Vector R n ≃ (Fin n → R) where
     funext i
     simp
 
-/-- Convert an executable `Hex.Matrix` into Mathlib's matrix representation. -/
-def matrixEquiv : Hex.Matrix R n m ≃ _root_.Matrix (Fin n) (Fin m) R where
-  toFun := fun M i j => M[i][j]
-  invFun := fun A => Vector.ofFn fun i => Vector.ofFn fun j => A i j
-  left_inv := by
-    intro M
-    ext i j
-    simp
-  right_inv := by
-    intro A
-    funext i j
-    simp
-
 @[simp] theorem vectorEquiv_apply (v : Vector R n) (i : Fin n) :
     vectorEquiv v i = v[i] :=
   rfl
 
 @[simp] theorem vectorEquiv_symm_apply (f : Fin n → R) (i : Fin n) :
     (vectorEquiv.symm f)[i] = f i := by
-  simpa [vectorEquiv] using Vector.get_ofFn f i
-
-@[simp] theorem matrixEquiv_apply (M : Hex.Matrix R n m) (i : Fin n) (j : Fin m) :
-    matrixEquiv M i j = M[i][j] :=
-  rfl
-
-@[simp] theorem matrixEquiv_symm_apply
-    (A : _root_.Matrix (Fin n) (Fin m) R) (i : Fin n) (j : Fin m) :
-    (matrixEquiv.symm A)[i][j] = A i j := by
-  simpa [matrixEquiv] using Vector.get_ofFn (f := fun i => Vector.ofFn fun j => A i j) i ▸
-    Vector.get_ofFn (f := fun j => A i j) j
+  simp [vectorEquiv]
 
 @[simp] theorem matrixEquiv_row (M : Hex.Matrix R n m) (i : Fin n) :
     _root_.Matrix.row (matrixEquiv M) i = vectorEquiv (Hex.Matrix.row M i) := by
@@ -101,5 +78,4 @@ theorem nullspace_span_eq_ker [Field R]
       LinearMap.ker (_root_.Matrix.mulVecLin (matrixEquiv M)) := by
   sorry
 
-end MatrixMathlib
-end Hex
+end HexMatrixMathlib
