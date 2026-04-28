@@ -37,10 +37,19 @@ private def isOne (f : FpPoly p) : Bool :=
         false
   | _ => false
 
-/-- Naive polynomial exponentiation used to reconstruct decomposition products. -/
-private def pow (f : FpPoly p) : Nat → FpPoly p
-  | 0 => 1
-  | n + 1 => f * pow f n
+/-- Polynomial exponentiation uses square-and-multiply on the exponent bits. -/
+private def pow (f : FpPoly p) (n : Nat) : FpPoly p :=
+  let rec go (acc base : FpPoly p) (k : Nat) : FpPoly p :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then acc * base else acc
+      go acc' (base * base) (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go 1 f n
 
 /-- Multiply the factors in a square-free decomposition with their multiplicities. -/
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
