@@ -3,10 +3,11 @@ import HexMatrix.Basic
 /-!
 Core Gram-Schmidt basis and coefficient definitions for `hex-gram-schmidt`.
 
-This module provides the initial executable basis/coefficient surface over
-the dense `Hex.Matrix` representation. Integer inputs are cast to rationals
-before applying Gram-Schmidt; rational inputs operate directly on the ambient
-matrix. The structural theorem API is scaffolded here for later proof work.
+This module provides executable Gram-Schmidt basis and coefficient
+constructions over the dense `Hex.Matrix` representation. Integer inputs are
+cast to rationals before applying Gram-Schmidt; rational inputs operate
+directly on the ambient matrix. It also states the structural theorems used by
+downstream lattice and reduction code.
 -/
 namespace Hex
 

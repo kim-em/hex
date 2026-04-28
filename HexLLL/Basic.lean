@@ -2,7 +2,7 @@ import HexGramSchmidt
 import HexMatrix
 
 /-!
-Core LLL predicates and integer state scaffolding for `hex-lll`.
+Core LLL predicates and integer state for `hex-lll`.
 
 This module introduces the executable lattice-membership and independence
 predicates used by the LLL library together with the `δ`-reducedness contract
