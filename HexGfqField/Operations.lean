@@ -224,13 +224,15 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
 @[simp] theorem inv_zero
     (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
     ((0 : FiniteField f hf hirr) : FiniteField f hf hirr)⁻¹ = 0 := by
-  sorry
+  change (if ((0 : FiniteField f hf hirr) : FiniteField f hf hirr) = 0 then 0 else
+    ofPoly f hf hirr (invPoly ((0 : FiniteField f hf hirr).toQuotient))) = 0
+  simp
 
 theorem div_eq_mul_inv
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x y : FiniteField f hf hirr) :
     x / y = x * y⁻¹ := by
-  sorry
+  rfl
 
 theorem mul_inv_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
@@ -271,90 +273,92 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     Lean.Grind.Semiring (FiniteField f hf hirr) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.add_zero a.toQuotient
   · intro a b
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.add_comm a.toQuotient b.toQuotient
   · intro a b c
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.add_assoc a.toQuotient b.toQuotient c.toQuotient
   · intro a b c
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.mul_assoc a.toQuotient b.toQuotient c.toQuotient
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.mul_one a.toQuotient
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.one_mul a.toQuotient
   · intro a b c
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.left_distrib a.toQuotient b.toQuotient c.toQuotient
   · intro a b c
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.right_distrib a.toQuotient b.toQuotient c.toQuotient
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.zero_mul a.toQuotient
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.mul_zero a.toQuotient
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.pow_zero a.toQuotient
   · intro a n
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.pow_succ a.toQuotient n
   · intro n
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.ofNat_succ (α := GFqRing.PolyQuotient f hf) n
   · intro n
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Semiring.ofNat_eq_natCast (α := GFqRing.PolyQuotient f hf) n
   · intro n a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using
+      Lean.Grind.Semiring.nsmul_eq_natCast_mul (α := GFqRing.PolyQuotient f hf) n a.toQuotient
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.Ring (FiniteField f hf hirr) := by
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.neg_add_cancel a.toQuotient
   · intro a b
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.sub_eq_add_neg a.toQuotient b.toQuotient
   · intro i a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.neg_zsmul i a.toQuotient
   · intro n a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.zsmul_natCast_eq_nsmul (α := GFqRing.PolyQuotient f hf) n a.toQuotient
   · intro n
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.intCast_ofNat (α := GFqRing.PolyQuotient f hf) n
   · intro i
-    ext
-    sorry
+    apply GFqField.ext
+    simpa using Lean.Grind.Ring.intCast_neg (α := GFqRing.PolyQuotient f hf) i
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.CommRing (FiniteField f hf hirr) := by
   refine Lean.Grind.CommRing.mk ?_
   intro a b
-  ext
-  sorry
+  apply GFqField.ext
+  simpa using Lean.Grind.CommSemiring.mul_comm a.toQuotient b.toQuotient
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.Field (FiniteField f hf hirr) := by
   refine Lean.Grind.Field.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a b
-    exact div_eq_mul_inv a b
+    simpa using div_eq_mul_inv a b
   · intro h
     sorry
-  · simp [inv_zero]
+  · simpa using inv_zero f hf hirr
   · intro a ha
-    exact mul_inv_cancel (x := a) ha
+    have ha' : a ≠ (0 : FiniteField f hf hirr) := ha
+    exact mul_inv_cancel (x := a) ha'
   · intro a
     ext
     sorry
