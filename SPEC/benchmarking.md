@@ -50,8 +50,9 @@ came back inconclusive and the slope is `+0.4` over `n`" is the run
 that earned its keep.
 
 When a verdict is `inconclusive`, or when the verdict is consistent
-but the constant is wildly off an external reference (more than
-about 100×), the response is mandatory and uniform:
+but the constant is wildly off an external reference — orders of
+magnitude, not a small constant factor — the response is mandatory
+and uniform:
 
 1. **File a GitHub issue.** Use the bench-found-bug template in
    [PLAN/Conventions.md](../PLAN/Conventions.md#bench-found-and-conformance-found-issues).
@@ -61,19 +62,23 @@ about 100×), the response is mandatory and uniform:
 3. **Re-enter the rolled-back phase** to fix the implementation;
    the benchmark stays as written.
 
-Worked examples:
+Worked examples (the bugs are real; the verdicts are predicted, not
+observed — the prototype that found these bugs ran a hand-rolled
+harness, not lean-bench):
 
-- HexArith Montgomery `mulMont` was declared `O(log p)` per call but
-  observed `O(p)` because `montgomeryRadixInvNat` did
+- HexArith Montgomery `mulMont` declared as `O(log p)` per call but
+  effectively `O(p)` because `montgomeryRadixInvNat` did
   `(List.range p.toNat).find?` instead of using the existing
-  Bezout-based `extGcd`. Verdict: `inconclusive` with a slope of
-  `+1.0`. Response: file issue, roll HexArith back, replace the
-  brute-force inverse.
-- HexLLL `swapStep` was declared `O(n²)` (incremental Gram–Schmidt
-  update) but observed `O(n³)` because the implementation rebuilt
-  Gram–Schmidt from scratch on every swap. Verdict: `inconclusive`
-  with a slope of `+1.0` versus the declared model. Response: file
-  issue, roll HexLLL back, implement the incremental update.
+  Bezout-based `extGcd`. A lean-bench run would yield an
+  `inconclusive` verdict with a residual log-log slope around `+1.0`.
+  Response: file issue, roll HexArith back, replace the brute-force
+  inverse.
+- HexLLL `swapStep` declared as `O(n²)` (incremental Gram–Schmidt
+  update) but effectively `O(n³)` because the implementation
+  rebuilt Gram–Schmidt from scratch on every swap. A lean-bench run
+  would yield an `inconclusive` verdict with a residual slope around
+  `+1.0` versus the declared model. Response: file issue, roll
+  HexLLL back, implement the incremental update.
 
 These are not retrospectives; they are the canonical shape of a
 benchmark finding.
@@ -108,6 +113,11 @@ rev = "main"
 name = "hexfoo_bench"
 root = "HexFoo.Bench"
 ```
+
+Reproducibility comes from committing `lake-manifest.json` alongside
+the lakefile, not from the `rev` field; `lake update` resolves
+`rev = "main"` to a specific commit and records that commit in the
+manifest. Pin to a tag instead once lean-bench publishes them.
 
 ```lean
 -- HexFoo/Bench.lean
@@ -266,12 +276,19 @@ Conway-polynomial benchmarks reflect the three-tier design and must
 be reported separately:
 
 - **Tier 1.** Verify irreducibility of committed Conway polynomials.
-  Registered as `Hex.Conway.tier1.<p>_<n>` fixed benchmarks.
+  One `setup_fixed_benchmark Hex.Conway.tier1.<p>_<n>` per
+  committed entry being measured.
 - **Tier 2.** Full Conway-table verification (irreducibility,
   primitivity, compatibility with divisor-degree entries) on
-  committed entries. Registered as `Hex.Conway.tier2.<p>_<n>`.
-- **Tier 3.** Search for missing Conway entries. Registered as
-  `Hex.Conway.tier3.<p>_<n>`.
+  committed entries. One `setup_fixed_benchmark Hex.Conway.tier2.<p>_<n>`
+  per committed entry being measured.
+- **Tier 3.** Search for missing Conway entries. Naturally
+  parametric: `setup_benchmark Hex.Conway.tier3.gf2 n => ...`
+  (sweep search-degree at fixed prime), or analogous registrations
+  per prime family. Individual canonical search probes (e.g. the
+  smallest unsolved degree at a given prime, like `(2, 410)`) may
+  also be registered as `setup_fixed_benchmark
+  Hex.Conway.tier3.gf2_410`.
 
 The tier prefix is part of the registration name; reports and CI
 gating MUST NOT aggregate tiers into a single "Conway runtime"
@@ -297,11 +314,13 @@ child exits cleanly, and verifies hashable benchmarks emit hashes.
 It does NOT assert timing values — the gate detects bitrot of the
 bench module itself, not regressions in the implementation.
 
-For the repository-wide CI step, total wall-clock budget is `< 60 s`
-across all libraries' `verify` calls combined. A library whose
-`verify` cannot complete inside its share of that budget needs
-either tighter `setup_benchmark` config (lower `paramCeiling`) or
-a closer look at why its tiniest invocation is slow.
+Per-library `verify` budget is up to ~15 s for libraries whose
+smallest registered input genuinely needs that long; most libraries
+should run in a few seconds. The repo-wide CI step's total budget is
+the sum, with a soft target of a few minutes — not a hard cap. A
+library exceeding 15 s on `verify` needs either tighter
+`setup_benchmark` config (lower `paramCeiling`, smaller fixed inputs)
+or a closer look at why its tiniest invocation is slow.
 
 Full timing runs (`lake exe hexfoo_bench run NAME` with a real
 budget) are not part of merge-gating CI. They run on a scheduled
@@ -373,8 +392,12 @@ explicitly forbidden:
   at module init.** A module-level `def ctx : BarrettCtx p := …`
   whose initializer transitively calls a heavy computation
   deadlocks the bench exe at module load. Construct such contexts
-  inside the benchmarked function or inside its `with prep := …`
-  clause.
+  inside the benchmarked function or, preferably, hoist them out
+  of the timed loop via `setup_benchmark`'s `with prep := …`
+  clause (see [§Harness](#harness-lean-bench)) — `prep` runs once
+  per child-process spawn and its result is `blackBox`'d before
+  timing starts, which is exactly the lifetime an expensive
+  context wants.
 - **Benchmarking `decide`, `#eval`, or kernel reduction.** Out of
   scope per [§What we don't measure](#what-we-dont-measure).
 - **Runtime-`n` dispatch wrappers around dimension-typed
