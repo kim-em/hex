@@ -39,7 +39,7 @@ private def hexArithOTarget (pkg : Package) (src : String) : FetchM (Job FilePat
 
 extern_lib hexarithffi (pkg) := do
   let name := nameToStaticLib "hexarithffi"
-  let oTargets ← #[ "wide_arith.c", "mpz_gcdext.c" ].mapM (hexArithOTarget pkg)
+  let oTargets ← #[ "wide_arith.c" ].mapM (hexArithOTarget pkg)
   buildStaticLib (pkg.staticLibDir / name) oTargets
 
 extern_lib hexmodarithffi (pkg) := do
@@ -49,10 +49,7 @@ extern_lib hexmodarithffi (pkg) := do
 
 lean_lib HexArith where
   precompileModules := true
-  moreLinkArgs := #[
-    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexarithffi").toString}",
-    "-lgmp"
-  ]
+  moreLinkArgs := #[s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexarithffi").toString}"]
 
 lean_lib HexPoly where
 

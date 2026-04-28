@@ -38,7 +38,7 @@ namespace Hex
 /--
 Pure-Lean `UInt64` extended GCD reference implementation.
 
-This remains available as a proof/reference helper. The public runtime
+This remains available as a proof/reference helper. The public
 `HexArith.UInt64.extGcd` API delegates through `HexArith.Int.extGcd`.
 -/
 def pureUInt64ExtGcd (a b : UInt64) : UInt64 × Int × Int :=
@@ -75,11 +75,9 @@ namespace Int
 /--
 Extended GCD on integers.
 
-Trusted runtime contract: the `lean_hex_mpz_gcdext` attachment may replace this
-pure Lean reference with a GMP-backed implementation that returns the same
-`(g, s, t)` triple, where `g = Int.gcd a b` and `s * a + t * b = g`.
+This is the pure-Lean reference definition returning a triple `(g, s, t)`
+with `g = Int.gcd a b` and `s * a + t * b = g`.
 -/
-@[extern "lean_hex_mpz_gcdext"]
 def extGcd (a b : @& Int) : Nat × Int × Int :=
   Hex.pureIntExtGcd a b
 
