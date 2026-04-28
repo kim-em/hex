@@ -34,15 +34,31 @@ unless it explicitly fixes the public API or theorem split.
   correctly implements the SPEC contract for that declaration.
   There is no acceptable placeholder form:
   - NOT wrong-but-plausible bodies
-    (`def rref M := { rank := 0, echelon := M, transform := 1 }`),
-  - NOT `sorry` bodies (`noncomputable def rref ... := sorry`),
-  - NOT `axiom rref : ...`,
+    (`def rref M := { rank := 0, echelon := M, transform := 1 }`).
+  - NOT `sorry` bodies (`noncomputable def rref ... := sorry`).
+  - NOT `axiom rref : ...`.
   - NOT trivial returns (`Matrix.identity`, `none`, the input
-    unchanged, an identity cast),
+    unchanged, an identity cast).
   - NOT alternative implementations with the wrong algorithmic
-    complexity,
-  - NOT a body marked "honest placeholder" or "Phase 1 scaffold
-    returns <trivial>" in its docstring.
+    complexity. **In particular**: a function whose name or
+    signature promises a *native-typed* algorithm (`UInt64`,
+    `UInt32`, `Float`, `Fin n`, ...) but whose body is `f a.toNat
+    b.toNat` followed by `.ofNat` of the result is a wrong-shape
+    scaffold — it moves all the work into bignum `Nat` arithmetic,
+    which is the wrong asymptotic and the wrong algorithm. Native
+    type signatures must perform native arithmetic.
+  - NOT a body marked "honest placeholder", "Phase 1 scaffold
+    returns <trivial>", "scaffold for the eventual <X> bridge",
+    "for now", or any equivalent phrase in its docstring or
+    comments. Such phrases are meta-commentary about implementation
+    history, not documentation; their presence is itself the bug.
+  - NOT a fake `@[extern "name"]` whose C body delegates straight
+    back to the Lean fallback. An `@[extern]` whose only effect is
+    to call `l_Hex_*___boxed` (or otherwise re-enter the Lean
+    runtime to do the actual work) is not a valid extern boundary.
+    Either the C side does work native to C (calling GMP, CLMUL,
+    `__uint128_t`, etc.), or the `@[extern]` attribute and its C
+    file must not be committed yet.
 
   If you cannot implement the function correctly in this PR: **do
   not commit the declaration**. Leave it out of Lean entirely. The
