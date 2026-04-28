@@ -42,7 +42,7 @@ libraries:
   HexGramSchmidt:
     deps: [HexMatrix]
     mathlib: false
-    done_through: 0
+    done_through: 1
   HexGF2:
     deps: [HexPoly]
     mathlib: false
