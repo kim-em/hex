@@ -38,11 +38,4 @@ theorem twoPow_dvd_mul_add_one_of_mod_eq_pred {p p' k : Nat}
     2 ^ k ∣ p * p' + 1 := by
   sorry
 
-/--
-If `R ∣ n`, then dividing by `R` and multiplying back by `R` recovers `n`.
-This specialization is convenient in REDC-style exact division proofs.
--/
-theorem exact_div_mul_eq {n R : Nat} (hR : R ∣ n) : n / R * R = n := by
-  exact div_mul_of_dvd hR
-
 end Nat
