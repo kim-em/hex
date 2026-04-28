@@ -16,10 +16,6 @@ theorem div_mul_of_dvd {n d : Nat} (hd : d ∣ n) : (n / d) * d = n := by
 theorem mod_add_div_eq (n d : Nat) : n % d + (n / d) * d = n := by
   simpa [Nat.mul_comm] using Nat.mod_add_div n d
 
-/-- Cancelling a common modulus factor on the right preserves the remainder. -/
-theorem mod_mul_right_sub_mod (a b m : Nat) : (a + b * m) % m = a % m := by
-  sorry
-
 /--
 An odd number is coprime to every power of two; this is the shape needed for
 Montgomery inversion over `R = 2^k`.
