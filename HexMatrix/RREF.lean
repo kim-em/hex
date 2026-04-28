@@ -2,12 +2,13 @@ import Std
 import HexMatrix.RowEchelon
 
 /-!
-Executable RREF, row-span, and nullspace scaffolding for `hex-matrix`.
+Executable RREF, row-span, and nullspace routines for `hex-matrix`.
 
 This module implements a simple Gaussian-elimination-based `rref` routine over
 decidable fields, then exposes the row-span and nullspace APIs layered on top of
-the resulting echelon data. Correctness theorems are scaffolded for later proof
-work.
+the resulting echelon data. It also states the theorem surface connecting the
+computed data to the `IsRREF` contract and the derived span/nullspace
+characterizations.
 -/
 
 namespace Hex
