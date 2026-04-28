@@ -38,22 +38,12 @@ scaffolded `def` is fully implemented; only its proofs may be
 ### Read the SPEC, not just the issue body
 
 When you pick up an issue, re-read every SPEC file linked in its
-**Context** section, in full, before starting implementation. Issue
-bodies summarise and paraphrase: they trade fidelity for brevity,
-and previous review rounds have turned up several cases where worker
-agents implemented an issue's misstated condensation rather than the
-SPEC clause it referenced. The SPEC is the source of truth.
+**Context** section in full before starting. Issue bodies paraphrase;
+the SPEC is the source of truth.
 
-If a contradiction surfaces between the issue body and the SPEC,
-follow the SPEC and comment on the issue noting the discrepancy —
-don't silently re-interpret the SPEC to match the issue.
-
-Read adjacent SPEC and PLAN files when they look plausibly relevant:
-sibling library SPECs you depend on, `SPEC/design-principles.md`
-when complexity or extern policy is in play, the Phase K conventions
-for the phase you're in, the convention sections that govern the
-artefacts you're producing. The extra tokens are cheap relative to
-the cost of implementing a misunderstood contract.
+Read adjacent SPEC and PLAN files when they look plausibly relevant —
+sibling library SPECs, `SPEC/design-principles.md`, the Phase K
+conventions for your phase. The extra tokens are cheap.
 
 ### PR workflow
 
@@ -172,18 +162,12 @@ shape:
 - **Current state** — what is already true, and what assumptions the
   worker should begin from.
 - **Deliverables** — the concrete outputs expected from this issue.
-- **Context** — explicit links to the SPEC files (and section
-  anchors where helpful) the worker should re-read in full before
-  starting. Issue bodies summarise and paraphrase, and previous
-  rounds have turned up cases where workers implemented the issue's
-  condensation rather than the SPEC clause it referenced; the SPEC
-  is the source of truth. List every SPEC file that constrains the
-  task, including adjacent ones the worker is likely to want — the
-  SPEC for the library being touched, plus any sibling library
-  SPECs whose contracts cross the boundary, plus
-  `SPEC/design-principles.md` when complexity or extern policy is
-  in play. Also link related issues, PRs, conformance/bench
-  artefacts, and any PLAN sections that govern the phase.
+- **Context** — links to every SPEC file the worker should re-read,
+  including adjacent ones likely to be relevant (the library being
+  touched, sibling library SPECs whose contracts cross the boundary,
+  `SPEC/design-principles.md` when complexity or extern policy is in
+  play). Plus related issues, PRs, conformance/bench artefacts, and
+  any PLAN sections that govern the phase.
 - **Verification** — the checks to run for this issue.
 - **Out of scope** — nearby work that should not be folded into this
   issue.
