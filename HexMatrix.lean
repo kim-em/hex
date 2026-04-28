@@ -8,6 +8,6 @@ import HexMatrix.Conformance
 /-!
 The `HexMatrix` library exposes the dense matrix core used throughout the
 project's linear-algebra stack, including dense matrix operations,
-row-echelon scaffolding, determinant APIs, and the executable Bareiss
-determinant path over `Int`.
+row-echelon transforms, determinant APIs, and the executable Bareiss
+determinant algorithm over `Int`.
 -/

@@ -1,7 +1,7 @@
 import HexMatrix.Determinant
 
 /-!
-Executable Bareiss determinant scaffolding for `hex-matrix`.
+Executable Bareiss determinant algorithm for `hex-matrix`.
 
 This module implements fraction-free Bareiss elimination over `Int` in two
 layers: a no-pivot recurrence that follows the standard exact-division update,
