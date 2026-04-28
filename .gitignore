@@ -3,3 +3,4 @@ build/
 *.olean
 *.ilean
 *.trace
+.claude/.pod-checksums
