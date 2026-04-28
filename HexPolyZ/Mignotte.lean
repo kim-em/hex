@@ -19,18 +19,26 @@ def binom : Nat → Nat → Nat
   | 0, _ + 1 => 0
   | n + 1, k + 1 => binom n k + binom n (k + 1)
 
-/-- A simple floor square-root on naturals, implemented by descending search. -/
-private def sqrtAux (n : Nat) : Nat → Nat
-  | 0 => 0
-  | guess + 1 =>
-      if (guess + 1) * (guess + 1) ≤ n then
-        guess + 1
+/-- One Newton step for the natural-number square-root iteration. -/
+private def sqrtStep (n x : Nat) : Nat :=
+  (x + n / x) / 2
+
+/-- A fuel-bounded Newton iteration for the natural floor square root. -/
+private def sqrtAux (n : Nat) : Nat → Nat → Nat
+  | 0, x => x
+  | fuel + 1, x =>
+      let next := sqrtStep n x
+      if next ≥ x then
+        x
       else
-        sqrtAux n guess
+        sqrtAux n fuel next
 
 /-- The floor of the square root of `n`. -/
 def floorSqrt (n : Nat) : Nat :=
-  sqrtAux n n
+  if n = 0 then
+    0
+  else
+    sqrtAux n (2 * n.log2 + 1) n
 
 /-- The least natural number whose square is at least `n`. -/
 def ceilSqrt (n : Nat) : Nat :=
@@ -68,7 +76,7 @@ theorem binom_eq_zero_of_lt : ∀ {n k : Nat}, n < k → binom n k = 0
       simp [binom, binom_eq_zero_of_lt hk', binom_eq_zero_of_lt hk'']
 
 @[simp] theorem floorSqrt_zero : floorSqrt 0 = 0 := by
-  rfl
+  simp [floorSqrt]
 
 @[simp] theorem ceilSqrt_zero : ceilSqrt 0 = 0 := by
   simp [ceilSqrt]
