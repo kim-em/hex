@@ -1,4 +1,3 @@
-import Mathlib.Data.Nat.BinaryRec
 import HexArith.Montgomery.Redc
 
 /-!
@@ -96,12 +95,17 @@ theorem mulMont_eq (ctx : MontCtx p) (a b : UInt64)
 end MontCtx
 
 /-- Tail-recursive exponentiation by repeated squaring in Montgomery form. -/
-private def powMontGo (ctx : MontCtx p) (k : Nat) : UInt64 → UInt64 → UInt64 :=
-  Nat.binaryRec
-    (fun acc _ => acc)
-    (fun bit _ rec acc base =>
-      rec (cond bit (ctx.mulMont acc base) acc) (ctx.mulMont base base))
-    k
+private def powMontGo (ctx : MontCtx p) (k : Nat) (acc base : UInt64) : UInt64 :=
+  if hk : k = 0 then
+    acc
+  else
+    let acc' := if k % 2 = 1 then ctx.mulMont acc base else acc
+    let base' := ctx.mulMont base base
+    powMontGo ctx (k / 2) acc' base'
+termination_by k
+decreasing_by
+  simp_wf
+  exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
 
 /-- Exponentiate a Montgomery-form base by repeated squaring. -/
 private def powMont (ctx : MontCtx p) (base : UInt64) (n : Nat) : UInt64 :=
