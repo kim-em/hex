@@ -2,7 +2,7 @@ import HexMatrix
 import HexPolyFp
 
 /-!
-Executable Berlekamp-matrix scaffolding for `hex-berlekamp`.
+Executable Berlekamp-matrix support for `hex-berlekamp`.
 
 This module builds the Berlekamp matrix `Q_f` for a monic polynomial
 `f : FpPoly p` by expressing the Frobenius image of each monomial basis vector

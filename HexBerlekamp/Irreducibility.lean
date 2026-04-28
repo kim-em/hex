@@ -3,7 +3,7 @@ import HexBerlekamp.Basic
 /-!
 Executable irreducibility tests for `hex-berlekamp`.
 
-This module exposes two Phase 1 decision procedures over `FpPoly p`:
+This module exposes two executable decision procedures over `FpPoly p`:
 Berlekamp's rank criterion, phrased via the fixed-space matrix `Q_f - I`, and
 Rabin's test, phrased via Frobenius remainders and gcd checks at the maximal
 proper divisors of `deg f`.
