@@ -3,7 +3,7 @@ import HexPolyFp.Basic
 /-!
 Executable square-free decomposition for `F_p[x]`.
 
-This module adds a Yun-style square-free decomposition scaffold for
+This module implements Yun-style square-free decomposition for
 `Hex.FpPoly p`, recording the unit factor and the positive-multiplicity
 square-free factors obtained from repeated gcd/derivative steps and
 `p`-th-root descent in characteristic `p`.

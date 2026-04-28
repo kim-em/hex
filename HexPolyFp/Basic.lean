@@ -4,9 +4,9 @@ import HexPoly.Euclid
 /-!
 Core definitions for executable polynomials over `F_p`.
 
-This module specializes the generic dense-polynomial scaffold to
+This module specializes the generic dense-polynomial API to
 `Hex.ZMod64 p`, exposing the `FpPoly p` abbreviation together with the
-minimal constructors and instances needed by downstream finite-field
+constructors and instances needed by downstream finite-field
 algorithms.
 -/
 namespace Hex
