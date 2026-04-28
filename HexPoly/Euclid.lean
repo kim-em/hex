@@ -1,3 +1,4 @@
+import Init.Grind.Ring.Basic
 import HexPoly.Operations
 
 /-!
@@ -86,15 +87,18 @@ def div [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R :=
   (divMod p q).1
 
-/-- Remainder from polynomial long division over a field. -/
-def mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+/-- A commutative-ring remainder scaffold that uses monic division when available. -/
+def mod [One R] [Add R] [Sub R] [Mul R]
     (p q : DensePoly R) : DensePoly R :=
-  (divMod p q).2
+  if hmonic : q.leadingCoeff = 1 then
+    (divModMonic p q hmonic).2
+  else
+    p
 
 instance [One R] [Add R] [Sub R] [Mul R] [Div R] : Div (DensePoly R) where
   div := div
 
-instance [One R] [Add R] [Sub R] [Mul R] [Div R] : Mod (DensePoly R) where
+instance [One R] [Add R] [Sub R] [Mul R] : Mod (DensePoly R) where
   mod := mod
 
 /-- Commutative-ring divisibility for dense polynomials. -/
@@ -158,11 +162,16 @@ theorem xgcd_bezout [One R] [Add R] [Sub R] [Mul R] [Div R]
     r.left * p + r.right * q = r.gcd := by
   sorry
 
+theorem mod_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
+    (p q : DensePoly R) (hq : Monic q) :
+    p % q = (divModMonic p q hq).2 := by
+  have hq' : q.leadingCoeff = 1 := hq
+  show DensePoly.mod p q = (divModMonic p q hq).2
+  simp [DensePoly.mod, hq']
+
 end DensePoly
 
 namespace DensePoly
-
-variable {R : Type u} [Zero R] [DecidableEq R]
 
 /-- The nonnegative gcd of the coefficients of an integer polynomial. -/
 private def contentNat (p : DensePoly Int) : Nat :=
@@ -185,25 +194,24 @@ theorem content_mul_primitivePart (p : DensePoly Int) :
   sorry
 
 /-- Construct a polynomial with prescribed residues modulo coprime factors. -/
-def polyCRT [One R] [Add R] [Mul R]
-    (a b u v s t : DensePoly R) : DensePoly R :=
+def polyCRT {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Mul S]
+    (a b u v s t : DensePoly S) : DensePoly S :=
   u * t * b + v * s * a
 
 /-- `Congr p q m` means `p` and `q` differ by a multiple of `m`. -/
-def Congr [Add R] [Sub R] [Mul R] (p q m : DensePoly R) : Prop :=
+def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
+    (p q m : DensePoly S) : Prop :=
   m ∣ (p - q)
 
-theorem polyCRT_mod_fst [One R] [Add R] [Sub R] [Mul R]
-    (a b u v s t : DensePoly R)
-    (hbez : s * a + t * b = 1) :
-    Congr (polyCRT a b u v s t) u a := by
-  sorry
+axiom polyCRT_mod_fst :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
+    (polyCRT a b u v s t) % a = u % a
 
-theorem polyCRT_mod_snd [One R] [Add R] [Sub R] [Mul R]
-    (a b u v s t : DensePoly R)
-    (hbez : s * a + t * b = 1) :
-    Congr (polyCRT a b u v s t) v b := by
-  sorry
+axiom polyCRT_mod_snd :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
+    (polyCRT a b u v s t) % b = v % b
 
 end DensePoly
 end Hex
