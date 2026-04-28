@@ -5,11 +5,14 @@ open System Lake DSL
 package Hex where
   precompileModules := true
 
-require mathlib from git
-  "https://github.com/leanprover-community/mathlib4.git" @ "v4.30.0-rc2"
-
 require verso from git
   "https://github.com/leanprover/verso.git" @ "v4.30.0-rc2"
+
+require «lean-bench» from git
+  "https://github.com/kim-em/lean-bench.git" @ "master"
+
+require mathlib from git
+  "https://github.com/leanprover-community/mathlib4.git" @ "v4.30.0-rc2"
 
 private def clmulOTarget (pkg : Package) : FetchM (Job FilePath) := do
   let oFile := pkg.dir / defaultBuildDir / "HexGF2" / "ffi" / "clmul.o"
@@ -107,6 +110,9 @@ lean_lib HexGF2Mathlib where
 lean_lib HexGfqMathlib where
 
 lean_lib HexBerlekampZassenhausMathlib where
+
+lean_exe hexmatrix_bench where
+  root := `HexMatrix.Bench
 
 @[default_target]
 lean_lib HexManual where
