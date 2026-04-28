@@ -71,7 +71,7 @@ theorem degree_repr_lt_degree {f : FpPoly p} {hf : 0 < FpPoly.degree f}
 
 theorem reduceMod_idem (f : FpPoly p) (g : FpPoly p) :
     reduceMod f (reduceMod f g) = reduceMod f g := by
-  sorry
+  simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_mod g f)
 
 theorem ofPoly_reduceMod (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
     ofPoly f hf (reduceMod f g) = ofPoly f hf g := by
