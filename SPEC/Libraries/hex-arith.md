@@ -353,7 +353,24 @@ theorem extGcd_bezout (a b : Nat) :
     let (g, s, t) := extGcd a b
     s * a + t * b = g
 ```
-Also for `Int` and `UInt64` variants.
+Also for `Int` and `UInt64` variants. The `Int` variant carries
+`@[extern "lean_hex_mpz_gcdext"]` (see "Extern contract:
+`mpz_gcdext`" below). **The `UInt64` variant must delegate through
+`Int.extGcd`**, not through the pure-Lean `Nat` recursion:
+
+```lean
+def UInt64.extGcd (a b : UInt64) : UInt64 × Int × Int :=
+  let (g, s, t) := Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  (.ofNat g, s, t)
+```
+
+Routing through `Int.extGcd` means a `UInt64` extended-GCD is one
+GMP `mpz_gcdext` call. Routing through the pure-Nat recursion
+instead (the obvious "stay in Nat" implementation) is ~64 levels
+of boxed-Nat arithmetic per call — the same regression class as
+omitting `@[extern]` on `mulHi`. The pure-`Nat` `HexArith.extGcd`
+is the proof reference, not the runtime path; runtime `UInt64`
+callers go through GMP.
 
 **Modular exponentiation:**
 ```lean
