@@ -98,6 +98,141 @@ structure LLLState (n m : Nat) where
 
 namespace LLLState
 
+/-- Integer nearest-quotient used by the LLL size-reduction test. -/
+private def nearestQuotient (νjk : Int) (dj1 : Nat) : Int :=
+  Int.fdiv (2 * νjk + Int.ofNat dj1) (2 * Int.ofNat dj1)
+
+/-- Single-column size reduction update for row `k` against row `j`. -/
+def sizeReduceColumn (s : LLLState n m) (j k : Fin n) (hjk : j.val < k.val) :
+    LLLState n m :=
+  let νjk := (s.ν.get k).get j
+  let dj1 := s.d.get ⟨j.val + 1, Nat.succ_lt_succ j.isLt⟩
+  if hreduce : 2 * Int.natAbs νjk > dj1 then
+    let r := nearestQuotient νjk dj1
+    let b' := GramSchmidt.Int.sizeReduce s.b j k r
+    let ν' : Matrix Int n n :=
+      Matrix.ofFn fun i l =>
+        if hik : i = k then
+          if hlj : l.val < j.val then
+            (s.ν.get i).get l - r * (s.ν.get j).get l
+          else if hljEq : l = j then
+            (s.ν.get i).get l - r * Int.ofNat dj1
+          else
+            (s.ν.get i).get l
+        else
+          (s.ν.get i).get l
+    { b := b'
+      ν := ν'
+      d := s.d
+      ν_eq := by
+        intro i l hi hl hli
+        sorry
+      d_eq := by
+        intro i hi
+        sorry }
+  else
+    s
+
+/-- Size-reduce row `k` against each earlier row using the stored integer
+scaled coefficients. -/
+def sizeReduce (s : LLLState n m) (k : Nat) : LLLState n m :=
+  if hk : k < n then
+    let kFin : Fin n := ⟨k, hk⟩
+    ((List.finRange k).reverse).foldl
+      (fun state j =>
+        let jFin : Fin n := ⟨j.val, Nat.lt_trans j.isLt hk⟩
+        LLLState.sizeReduceColumn state jFin kFin j.isLt)
+      s
+  else
+    s
+
+/-- Swap adjacent rows `k - 1` and `k`, updating the stored scaled coefficients
+and Gram determinants with the integer formulas from the LLL specification. -/
+def swapStep (s : LLLState n m) (k : Nat) : LLLState n m :=
+  if hk : k < n then
+    if hk0 : 0 < k then
+      let kFin : Fin n := ⟨k, hk⟩
+      let km1 : Fin n := GramSchmidt.prevRow kFin hk0
+      let B := (s.ν.get kFin).get km1
+      let dkPrev := s.d.get ⟨km1.val, Nat.lt_succ_of_lt km1.isLt⟩
+      let dk := s.d.get ⟨k, Nat.lt_succ_of_lt hk⟩
+      let dkNext := s.d.get ⟨k + 1, Nat.succ_lt_succ hk⟩
+      let dk' : Nat :=
+        Int.toNat (((Int.ofNat dkNext * Int.ofNat dkPrev + B ^ 2) / Int.ofNat dk))
+      let b' := GramSchmidt.Int.adjacentSwap s.b kFin hk0
+      let d' : Vector Nat (n + 1) :=
+        Vector.ofFn fun i => if i.val = k then dk' else s.d.get i
+      let ν' : Matrix Int n n :=
+        Matrix.ofFn fun i j =>
+          if hikm1 : i = km1 then
+            if hjlt : j.val < km1.val then
+              (s.ν.get kFin).get j
+            else
+              (s.ν.get i).get j
+          else if hik : i = kFin then
+            if hjEq : j = km1 then
+              B
+            else if hjlt : j.val < km1.val then
+              (s.ν.get km1).get j
+            else
+              (s.ν.get i).get j
+          else if hklt : k < i.val then
+            if hjEq : j = km1 then
+              (((s.ν.get i).get km1 * Int.ofNat dk') + ((s.ν.get i).get kFin * B)) /
+                Int.ofNat dk
+            else if hjEq' : j = kFin then
+              (((s.ν.get i).get kFin * Int.ofNat dkPrev) - ((s.ν.get i).get km1 * B)) /
+                Int.ofNat dk
+            else
+              (s.ν.get i).get j
+          else
+            (s.ν.get i).get j
+      { b := b'
+        ν := ν'
+        d := d'
+        ν_eq := by
+          intro i j hi hj hij
+          sorry
+        d_eq := by
+          intro i hi
+          sorry }
+    else
+      s
+  else
+    s
+
+/-- Size reduction leaves the stored Gram determinants unchanged. -/
+theorem sizeReduce_d (s : LLLState n m) (k : Nat) :
+    (s.sizeReduce k).d = s.d := by
+  sorry
+
+/-- Size reduction preserves the Gram-Schmidt basis of the state basis matrix. -/
+theorem sizeReduce_basis (s : LLLState n m) (k : Nat) :
+    GramSchmidt.Int.basis (s.sizeReduce k).b = GramSchmidt.Int.basis s.b := by
+  sorry
+
+/-- Adjacent swaps preserve the generated lattice. -/
+theorem swapStep_memLattice_iff (s : LLLState n m) (k : Nat) (v : Vector Int m) :
+    Matrix.memLattice (s.swapStep k).b v ↔ Matrix.memLattice s.b v := by
+  sorry
+
+/-- The updated swap state still packages the intended scaled coefficient
+representation for its basis. -/
+theorem swapStep_ν_eq
+    (s : LLLState n m) (k : Nat)
+    (i j : Nat) (hi : i < n) (hj : j < n) (hji : j < i) :
+    (((s.swapStep k).ν.get ⟨i, hi⟩).get ⟨j, hj⟩ : Rat) =
+      (((s.swapStep k).d.get ⟨j + 1, Nat.succ_lt_succ hj⟩ : Nat) : Rat) *
+        (((GramSchmidt.Int.coeffs (s.swapStep k).b).get ⟨i, hi⟩).get ⟨j, hj⟩) := by
+  simpa using (s.swapStep k).ν_eq i j hi hj hji
+
+/-- The updated swap state still packages the intended Gram-determinant
+representation for its basis. -/
+theorem swapStep_d_eq (s : LLLState n m) (k i : Nat) (hi : i < n + 1) :
+    (s.swapStep k).d.get ⟨i, hi⟩ =
+      GramSchmidt.Int.gramDet (s.swapStep k).b i (Nat.le_of_lt_succ hi) := by
+  simpa using (s.swapStep k).d_eq i hi
+
 /-- Recover a single rational Gram-Schmidt coefficient from the integer state.
 This exists for the proof layer; later executable code continues to work over
 the stored integer data. -/
