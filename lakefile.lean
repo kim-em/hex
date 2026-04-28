@@ -29,12 +29,27 @@ extern_lib hexgf2ffi (pkg) := do
   let oTarget ← clmulOTarget pkg
   buildStaticLib (pkg.staticLibDir / name) #[oTarget]
 
+private def nixEvalRaw (attr : String) : IO String := do
+  let out ← IO.Process.output {
+    cmd := "nix"
+    args := #["eval", "--raw", attr]
+  }
+  if out.exitCode == 0 then
+    pure out.stdout.trimAscii.toString
+  else
+    throw <| IO.userError s!"nix eval failed for {attr}: {out.stderr.trimAscii.toString}"
+
 private def hexArithOTarget (pkg : Package) (src : String) : FetchM (Job FilePath) := do
   let stem := (src.dropEnd 2).toString
   let oFile := pkg.dir / defaultBuildDir / "HexArith" / "ffi" / s!"{stem}.o"
   let srcTarget ← inputTextFile <| pkg.dir / "HexArith" / "ffi" / src
   buildFileAfterDep oFile srcTarget fun srcFile => do
-    let flags := #["-I", (← getLeanIncludeDir).toString, "-fPIC"]
+    let gmpDev := (← nixEvalRaw "nixpkgs#gmp.dev.outPath").trimAscii.toString
+    let flags := #[
+      "-I", (← getLeanIncludeDir).toString,
+      "-I", s!"{gmpDev}/include",
+      "-fPIC"
+    ]
     compileO oFile srcFile flags
 
 extern_lib hexarithffi (pkg) := do
