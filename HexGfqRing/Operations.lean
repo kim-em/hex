@@ -47,11 +47,20 @@ def sub {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x y : PolyQuotient f hf) : PolyQuotient f hf :=
   ofPoly f hf (repr x - repr y)
 
-/-- Quotient exponentiation by repeated multiplication. -/
+/-- Quotient exponentiation uses square-and-multiply on the exponent bits. -/
 def pow {f : FpPoly p} {hf : 0 < FpPoly.degree f}
-    (x : PolyQuotient f hf) : Nat → PolyQuotient f hf
-  | 0 => one f hf
-  | n + 1 => mul (pow x n) x
+    (x : PolyQuotient f hf) (n : Nat) : PolyQuotient f hf :=
+  let rec go (acc base : PolyQuotient f hf) (k : Nat) : PolyQuotient f hf :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then mul acc base else acc
+      go acc' (mul base base) (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go (one f hf) x n
 
 /-- Natural-number literals in the quotient ring. -/
 def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) : Nat → PolyQuotient f hf
