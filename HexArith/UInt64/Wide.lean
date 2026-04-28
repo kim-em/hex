@@ -1,10 +1,10 @@
 /-!
 Wide-word helper operations for `UInt64`.
 
-This module provides the executable logical definitions of the high half of a
-`UInt64 × UInt64` product together with add-with-carry and subtract-with-borrow
-operations. Later Barrett and Montgomery reductions use these operations as the
-only interface to machine-word overflow behavior.
+This module provides the executable logical definitions of fused and projected
+`UInt64 × UInt64` products together with add-with-carry and
+subtract-with-borrow operations. Later Barrett and Montgomery reductions use
+these operations as the only interface to machine-word overflow behavior.
 -/
 namespace UInt64
 
@@ -15,6 +15,12 @@ def word : Nat := 2 ^ 64
 @[extern "lean_hex_uint64_mul_hi"]
 def mulHi (a b : UInt64) : UInt64 :=
   .ofNat (a.toNat * b.toNat / word)
+
+/-- The full `UInt64 × UInt64` product, split into high and low radix-`2^64` words. -/
+@[extern "lean_hex_uint64_mul_full"]
+def mulFull (a b : UInt64) : UInt64 × UInt64 :=
+  let p := a.toNat * b.toNat
+  (.ofNat (p / word), .ofNat p)
 
 /--
 Add `a`, `b`, and an incoming carry bit, returning the wrapped low word and the
@@ -40,6 +46,13 @@ def subBorrow (a b : UInt64) (bin : Bool) : UInt64 × Bool :=
 /-- `mulHi` agrees with Nat-level division by `2^64`. -/
 theorem toNat_mulHi (a b : UInt64) :
     (mulHi a b).toNat = a.toNat * b.toNat / word := by
+  sorry
+
+/-- `mulFull` agrees with Nat-level division and remainder by `2^64`. -/
+theorem toNat_mulFull (a b : UInt64) :
+    let (hi, lo) := mulFull a b
+    hi.toNat = a.toNat * b.toNat / word ∧
+    lo.toNat = a.toNat * b.toNat % word := by
   sorry
 
 /--
