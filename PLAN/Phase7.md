@@ -20,8 +20,8 @@ the actual Lean API.
 
 ## Structure: `HexManual` lean_lib
 
-The manual is a single `[[lean_lib]]` named `HexManual` in the root
-`lakefile.toml` (set up during Phase 0). It depends on Verso and on
+The manual is a single `lean_lib HexManual` in the root
+`lakefile.lean` (set up during Phase 0). It depends on Verso and on
 every `hex-*` library.
 
 - Verso's dependency on Mathlib (if any) flows only through

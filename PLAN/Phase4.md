@@ -30,16 +30,15 @@ For each library `HexFoo` advancing through Phase 4:
    expression in each `setup_benchmark` is the *textbook*
    complexity, not the observed one.
 
-2. **`lakefile.toml` exe entry**:
+2. **`lakefile.lean` exe entry**:
 
-   ```toml
-   [[lean_exe]]
-   name = "hexfoo_bench"
-   root = "HexFoo.Bench"
+   ```lean
+   lean_exe hexfoo_bench where
+     root := `HexFoo.Bench
    ```
 
    On the first library to enter Phase 4, also add the lean-bench
-   `[[require]]` (per the snippet in
+   `require` (per the snippet in
    [SPEC/benchmarking.md §Harness](../SPEC/benchmarking.md#harness-lean-bench)).
 
 3. **CI smoke step** invoking

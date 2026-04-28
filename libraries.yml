@@ -11,11 +11,11 @@
 #   ready to start Phase 1 once Phase 0's global bootstrap is done.
 # - done_through: 7 means L is fully done.
 # - Phase 0 (monorepo bootstrap) is global; its completion is observable
-#   by the existence of lakefile.toml, scripts/check_dag.py, etc., not
+#   by the existence of lakefile.lean, scripts/check_dag.py, etc., not
 #   by any field in this file.
 #
 # This file is the single source of truth for the library graph.
-# lakefile.toml entries are cross-checked against libraries.yml in CI via
+# lakefile.lean entries are cross-checked against libraries.yml in CI via
 # scripts/check_dag.py.
 
 libraries:
@@ -42,7 +42,7 @@ libraries:
   HexGramSchmidt:
     deps: [HexMatrix]
     mathlib: false
-    done_through: 0
+    done_through: 1
   HexGF2:
     deps: [HexPoly]
     mathlib: false

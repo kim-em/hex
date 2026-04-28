@@ -17,6 +17,13 @@ private def clmulOTarget (pkg : Package) : FetchM (Job FilePath) := do
     let flags := #["-I", (← getLeanIncludeDir).toString, "-fPIC"]
     compileO oFile srcFile flags
 
+private def zmod64MulOTarget (pkg : Package) : FetchM (Job FilePath) := do
+  let oFile := pkg.dir / defaultBuildDir / "HexModArith" / "ffi" / "zmod64_mul.o"
+  let srcTarget ← inputTextFile <| pkg.dir / "HexModArith" / "ffi" / "zmod64_mul.c"
+  buildFileAfterDep oFile srcTarget fun srcFile => do
+    let flags := #["-I", (← getLeanIncludeDir).toString, "-fPIC"]
+    compileO oFile srcFile flags
+
 extern_lib hexgf2ffi (pkg) := do
   let name := nameToStaticLib "hexgf2ffi"
   let oTarget ← clmulOTarget pkg
@@ -35,6 +42,11 @@ extern_lib hexarithffi (pkg) := do
   let oTargets ← #[ "wide_arith.c", "mpz_gcdext.c" ].mapM (hexArithOTarget pkg)
   buildStaticLib (pkg.staticLibDir / name) oTargets
 
+extern_lib hexmodarithffi (pkg) := do
+  let name := nameToStaticLib "hexmodarithffi"
+  let oTarget ← zmod64MulOTarget pkg
+  buildStaticLib (pkg.staticLibDir / name) #[oTarget]
+
 lean_lib HexArith where
   precompileModules := true
   moreLinkArgs := #["-lgmp"]
@@ -44,6 +56,7 @@ lean_lib HexPoly where
 lean_lib HexMatrix where
 
 lean_lib HexModArith where
+  precompileModules := true
 
 lean_lib HexGramSchmidt where
 

@@ -5,8 +5,9 @@ Executable Mignotte-bound helpers for `hex-poly-z`.
 
 This module packages the integer computations that appear in the classical
 Mignotte coefficient bound: binomial coefficients together with the Euclidean
-norm of the ambient polynomial's coefficient vector. The mathematical proof
-that these quantities bound factors lives in `HexPolyZMathlib`.
+norm upper bound of the ambient polynomial's coefficient vector. The
+mathematical proof that these quantities bound factors lives in
+`HexPolyZMathlib`.
 -/
 namespace Hex
 
@@ -31,18 +32,27 @@ private def sqrtAux (n : Nat) : Nat → Nat
 def floorSqrt (n : Nat) : Nat :=
   sqrtAux n n
 
+/-- The least natural number whose square is at least `n`. -/
+def ceilSqrt (n : Nat) : Nat :=
+  let r := floorSqrt n
+  if r * r = n then
+    r
+  else
+    r + 1
+
 /-- The squared Euclidean norm of the coefficient vector of `f`. -/
 def coeffNormSq (f : ZPoly) : Nat :=
   (List.range f.size).foldl (fun acc i => acc + (f.coeff i).natAbs ^ 2) 0
 
-/-- The integer square-root of the coefficient Euclidean norm. -/
-def coeffNorm (f : ZPoly) : Nat :=
-  floorSqrt (coeffNormSq f)
+/-- A conservative natural-number upper bound on the Euclidean norm of the
+coefficient vector of `f`. -/
+def coeffL2NormBound (f : ZPoly) : Nat :=
+  ceilSqrt (coeffNormSq f)
 
 /-- The executable Mignotte bound for the `j`-th coefficient of a degree-`k`
-factor of `f`. -/
+factor of `f`, using the conservative `coeffL2NormBound`. -/
 def mignotteCoeffBound (f : ZPoly) (k j : Nat) : Nat :=
-  binom k j * coeffNorm f
+  binom k j * coeffL2NormBound f
 
 @[simp] theorem binom_zero_right (n : Nat) : binom n 0 = 1 := by
   cases n <;> rfl
@@ -60,21 +70,24 @@ theorem binom_eq_zero_of_lt : ∀ {n k : Nat}, n < k → binom n k = 0
 @[simp] theorem floorSqrt_zero : floorSqrt 0 = 0 := by
   rfl
 
+@[simp] theorem ceilSqrt_zero : ceilSqrt 0 = 0 := by
+  simp [ceilSqrt]
+
 theorem coeffNormSq_eq_sum (f : ZPoly) :
     coeffNormSq f =
       (List.range f.size).foldl (fun acc i => acc + (f.coeff i).natAbs ^ 2) 0 := rfl
 
-theorem coeffNorm_eq_sqrt_coeffNormSq (f : ZPoly) :
-    coeffNorm f = floorSqrt (coeffNormSq f) := rfl
+theorem coeffL2NormBound_eq_ceilSqrt_coeffNormSq (f : ZPoly) :
+    coeffL2NormBound f = ceilSqrt (coeffNormSq f) := rfl
 
 theorem mignotteCoeffBound_eq (f : ZPoly) (k j : Nat) :
-    mignotteCoeffBound f k j = binom k j * coeffNorm f := rfl
+    mignotteCoeffBound f k j = binom k j * coeffL2NormBound f := rfl
 
 @[simp] theorem coeffNormSq_zero : coeffNormSq (0 : ZPoly) = 0 := by
   rfl
 
-@[simp] theorem coeffNorm_zero : coeffNorm (0 : ZPoly) = 0 := by
-  simp [coeffNorm]
+@[simp] theorem coeffL2NormBound_zero : coeffL2NormBound (0 : ZPoly) = 0 := by
+  simp [coeffL2NormBound]
 
 @[simp] theorem mignotteCoeffBound_zero (k j : Nat) :
     mignotteCoeffBound (0 : ZPoly) k j = 0 := by
