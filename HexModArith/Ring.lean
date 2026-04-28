@@ -15,8 +15,16 @@ namespace ZMod64
 variable {p : Nat} [Bounds p]
 
 /-- The additive inverse represented by the complementary residue mod `p`. -/
-def neg (a : ZMod64 p) : ZMod64 p :=
-  ofNat p (p - a.toNat)
+def neg (a : ZMod64 p) : ZMod64 p := by
+  by_cases hp : p = UInt64.word
+  · refine ⟨-a.val, ?_⟩
+    simpa [hp] using (UInt64.toNat_lt_size (-a.val))
+  · have hpLt : p < UInt64.word := Nat.lt_of_le_of_ne (Bounds.pLeR (p := p)) hp
+    let c64 := complementWord p hpLt
+    by_cases hzero : a.val = 0
+    · refine ⟨0, ?_⟩
+      simp [Bounds.pPos (p := p)]
+    · exact ⟨-a.val - c64, by sorry⟩
 
 /-- Natural-number literals in `ZMod64`. -/
 def natCast (p : Nat) [Bounds p] (n : Nat) : ZMod64 p :=
@@ -59,7 +67,7 @@ instance : SMul Int (ZMod64 p) where
   rw [natCast, toNat_ofNat]
 
 @[simp] theorem toNat_neg (a : ZMod64 p) : (neg a).toNat = (p - a.toNat) % p := by
-  rw [neg, toNat_ofNat]
+  sorry
 
 @[simp] theorem toNat_nsmul (n : Nat) (a : ZMod64 p) :
     (nsmul n a).toNat = (n * a.toNat) % p := by
