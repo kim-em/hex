@@ -37,10 +37,16 @@ Mathlib dependency.
 Operations are stated as semantic contracts on the canonical
 representative. Only `mul` carries a mandatory `@[extern]` for
 runtime; `add`/`sub`/`zero`/`one`/`pow` lower to native `UInt64`
-arithmetic in pure Lean already, and `inv` routes through
-`Hex.Int.extGcd` which is itself the `mpz_gcdext` extern at the
-hex-arith level (see "Extern contract: `mpz_gcdext`" in
-`SPEC/Libraries/hex-arith.md`).
+arithmetic in pure Lean already, and `inv` routes through the
+`@[extern "lean_hex_mpz_gcdext"]`-bearing `extGcd` declared in
+`HexArith.Int` (see "Extern contract: `mpz_gcdext`" in
+`SPEC/Libraries/hex-arith.md`). **`inv` must NOT call
+`Hex.pureIntExtGcd` directly** — that's the pure-Lean reference
+body the extern falls through to as a portable fallback, and is
+intended for proofs only. Calling it bypasses GMP and runs the
+recursive `Nat` reference at runtime, which allocates a fresh `Nat`
+blob per recursive step (the same regression class as omitting
+`@[extern]` on `mulHi`).
 
 ```lean
 @[extern "lean_hex_zmod64_mul"]
