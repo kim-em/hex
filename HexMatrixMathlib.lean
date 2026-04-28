@@ -1,7 +1,13 @@
+import HexMatrixMathlib.Basic
 import HexMatrixMathlib.RankSpanNullspace
 
 /-!
-The `HexMatrixMathlib` library states bridge theorems connecting the executable
-`HexMatrix` row-reduction surface to Mathlib's abstract linear-algebra
-definitions.
+The `HexMatrixMathlib` library bridges the executable `HexMatrix` core to
+Mathlib's matrix API and linear-algebra definitions.
+
+The initial Phase 1 surface exposes the concrete equivalence between the two
+matrix representations and the row-operation lemmas relating our executable
+`rowSwap`, `rowScale`, and `rowAdd` helpers to Mathlib's standard elementary
+matrix operations, together with rank/span/nullspace bridge theorems for the
+row-reduction surface.
 -/
