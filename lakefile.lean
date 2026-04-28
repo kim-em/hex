@@ -49,7 +49,10 @@ extern_lib hexmodarithffi (pkg) := do
 
 lean_lib HexArith where
   precompileModules := true
-  moreLinkArgs := #["-lgmp"]
+  moreLinkArgs := #[
+    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexarithffi").toString}",
+    "-lgmp"
+  ]
 
 lean_lib HexPoly where
 
