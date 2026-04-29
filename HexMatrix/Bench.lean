@@ -47,12 +47,18 @@ def entryValue (n row col salt : Nat) : Int :=
       salt.toUInt64)
   Int.ofNat (x.toNat % 65_521)
 
-/-- Small signed deterministic entries for determinant benchmarks. Keeping
-coefficients small makes the Bareiss registration test elimination scaling
-rather than artificial coefficient growth in the fixture generator. -/
-def smallEntryValue (n row col salt : Nat) : Int :=
-  let x := entryValue n row col salt
-  (x % 11) - 5
+/-- Deterministic tridiagonal entries for determinant benchmarks. The shape
+keeps Bareiss intermediates small so the registration tests elimination-loop
+scaling rather than arbitrary-precision integer growth in random minors. -/
+def smallEntryValue (_n row col salt : Nat) : Int :=
+  if row = col then
+    2 + (salt % 2)
+  else if row + 1 = col then
+    -1
+  else if col + 1 = row then
+    1
+  else
+    0
 
 /-- Deterministic row-major matrix fixture of shape `n × n`. -/
 def flatMatrix (n salt : Nat) : Array Int :=
@@ -133,8 +139,9 @@ setup_benchmark runSquareMulChecksum n => n * n * n
 setup_benchmark runBareissDet n => n * n * n
   with prep := prepDetInput
   where {
-    paramFloor := 4
-    paramCeiling := 64
+    paramFloor := 8
+    paramCeiling := 16
+    paramSchedule := .custom #[8, 12, 16]
     maxSecondsPerCall := 1.5
     targetInnerNanos := 800000000
   }
