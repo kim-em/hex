@@ -508,6 +508,88 @@ private theorem fold_distrib_acc
     rw [hacc]
     exact ih (a + term₁ i) (b + term₂ i)
 
+private theorem fold_mul_right
+    (xs : List Nat) (term : Nat → ZMod64 p) (c : ZMod64 p) :
+    xs.foldl (fun acc i => acc + term i) 0 * c =
+      xs.foldl (fun acc i => acc + term i * c) 0 := by
+  induction xs with
+  | nil =>
+      grind
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hfold :
+          xs.foldl (fun acc j => acc + term j) (0 + term i) =
+            xs.foldl (fun acc j => acc + term j) 0 + term i := by
+        simpa [List.foldl_map] using
+          fold_add_right (p := p) (xs.map term) 0 (term i)
+      have hfold' :
+          xs.foldl (fun acc j => acc + term j * c) (0 + term i * c) =
+            xs.foldl (fun acc j => acc + term j * c) 0 + term i * c := by
+        simpa [List.foldl_map] using
+          fold_add_right (p := p) (xs.map (fun j => term j * c)) 0 (term i * c)
+      calc
+        xs.foldl (fun acc j => acc + term j) (0 + term i) * c
+            = (xs.foldl (fun acc j => acc + term j) 0 + term i) * c := by
+                rw [hfold]
+        _ = xs.foldl (fun acc j => acc + term j) 0 * c + term i * c := by
+                grind
+        _ = xs.foldl (fun acc j => acc + term j * c) 0 + term i * c := by
+                rw [ih]
+        _ = xs.foldl (fun acc j => acc + term j * c) (0 + term i * c) := by
+                rw [hfold']
+
+private theorem fold_mul_left
+    (xs : List Nat) (term : Nat → ZMod64 p) (c : ZMod64 p) :
+    c * xs.foldl (fun acc i => acc + term i) 0 =
+      xs.foldl (fun acc i => acc + c * term i) 0 := by
+  induction xs with
+  | nil =>
+      grind
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hfold :
+          xs.foldl (fun acc j => acc + term j) (0 + term i) =
+            xs.foldl (fun acc j => acc + term j) 0 + term i := by
+        simpa [List.foldl_map] using
+          fold_add_right (p := p) (xs.map term) 0 (term i)
+      have hfold' :
+          xs.foldl (fun acc j => acc + c * term j) (0 + c * term i) =
+            xs.foldl (fun acc j => acc + c * term j) 0 + c * term i := by
+        simpa [List.foldl_map] using
+          fold_add_right (p := p) (xs.map (fun j => c * term j)) 0 (c * term i)
+      calc
+        c * xs.foldl (fun acc j => acc + term j) (0 + term i)
+            = c * (xs.foldl (fun acc j => acc + term j) 0 + term i) := by
+                rw [hfold]
+        _ = c * xs.foldl (fun acc j => acc + term j) 0 + c * term i := by
+                grind
+        _ = xs.foldl (fun acc j => acc + c * term j) 0 + c * term i := by
+                rw [ih]
+        _ = xs.foldl (fun acc j => acc + c * term j) (0 + c * term i) := by
+                rw [hfold']
+
+private theorem mulCoeffTerm_mul_left_expand
+    (f g h : FpPoly p) (n i : Nat) (hi : ¬ n < i) :
+    mulCoeffTerm (f * g) h n i =
+      (List.range (i + 1)).foldl
+        (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0 := by
+  unfold mulCoeffTerm
+  simp [hi]
+  rw [coeff_mul, mulCoeffSum_eq_degree_bound f g i]
+  exact fold_mul_right (p := p) (List.range (i + 1))
+    (fun j => mulCoeffTerm f g i j) (h.coeff (n - i))
+
+private theorem mulCoeffTerm_mul_right_expand
+    (f g h : FpPoly p) (n i : Nat) (hi : ¬ n < i) :
+    mulCoeffTerm f (g * h) n i =
+      (List.range (n - i + 1)).foldl
+        (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0 := by
+  unfold mulCoeffTerm
+  simp [hi]
+  rw [coeff_mul, mulCoeffSum_eq_degree_bound g h (n - i)]
+  exact fold_mul_left (p := p) (List.range (n - i + 1))
+    (fun j => mulCoeffTerm g h (n - i) j) (f.coeff i)
+
 private theorem fold_left_distrib (xs : List Nat) (f g h : FpPoly p) (n : Nat) :
     xs.foldl (fun acc i => acc + mulCoeffTerm f (g + h) n i) 0 =
       xs.foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 +
