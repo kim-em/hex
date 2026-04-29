@@ -251,6 +251,40 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     ((n : FiniteField f hf hirr).toQuotient) = (n : GFqRing.PolyQuotient f hf) :=
   rfl
 
+@[simp] theorem repr_natCast
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (n : Nat) :
+    repr (n : FiniteField f hf hirr) =
+      GFqRing.reduceMod f (FpPoly.C (n : ZMod64 p)) :=
+  rfl
+
+theorem natCast_eq_of_zmod64_natCast_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    {m n : Nat} (h : (m : ZMod64 p) = (n : ZMod64 p)) :
+    (m : FiniteField f hf hirr) = n := by
+  apply GFqField.ext
+  exact GFqRing.natCast_eq_of_zmod64_natCast_eq f hf h
+
+theorem natCast_eq_of_mod_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    {m n : Nat} (h : m % p = n % p) :
+    (m : FiniteField f hf hirr) = n := by
+  apply GFqField.ext
+  exact GFqRing.natCast_eq_of_mod_eq f hf h
+
+theorem natCast_eq_natCast_iff_reduceMod_const_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (m n : Nat) :
+    ((m : FiniteField f hf hirr) = n) ↔
+      GFqRing.reduceMod f (FpPoly.C (m : ZMod64 p)) =
+        GFqRing.reduceMod f (FpPoly.C (n : ZMod64 p)) := by
+  constructor
+  · intro h
+    simpa [repr_natCast] using congrArg repr h
+  · intro h
+    apply GFqField.ext
+    apply GFqRing.ext
+    simpa [repr_natCast] using h
+
 @[simp] theorem toQuotient_add
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x y : FiniteField f hf hirr) :
@@ -316,12 +350,7 @@ theorem mul_inv_cancel
   have honeQuotient :
       (1 : GFqRing.PolyQuotient f hf) = GFqRing.one f hf := by
     change GFqRing.natCast f hf 1 = GFqRing.one f hf
-    change GFqRing.add (GFqRing.zero f hf) (GFqRing.one f hf) = GFqRing.one f hf
-    calc
-      GFqRing.add (GFqRing.zero f hf) (GFqRing.one f hf)
-          = GFqRing.add (GFqRing.one f hf) (GFqRing.zero f hf) :=
-            Lean.Grind.Semiring.add_comm (GFqRing.zero f hf) (GFqRing.one f hf)
-      _ = GFqRing.one f hf := Lean.Grind.Semiring.add_zero (GFqRing.one f hf)
+    rfl
   have hmulReduce :
       GFqRing.reduceMod f
           (GFqRing.repr x.toQuotient * GFqRing.reduceMod f (invPoly x.toQuotient)) =

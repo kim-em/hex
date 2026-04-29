@@ -1,4 +1,5 @@
 import Init.Grind.Ring.Basic
+import HexModArith.Ring
 import HexGfqRing.Basic
 
 /-!
@@ -26,6 +27,11 @@ def zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) : PolyQuotient f hf :=
 /-- The quotient one element. -/
 def one (f : FpPoly p) (hf : 0 < FpPoly.degree f) : PolyQuotient f hf :=
   ofPoly f hf 1
+
+/-- Embed a prime-field constant as a quotient-ring constant polynomial. -/
+def const (f : FpPoly p) (hf : 0 < FpPoly.degree f) (c : ZMod64 p) :
+    PolyQuotient f hf :=
+  ofPoly f hf (FpPoly.C c)
 
 /-- Quotient addition reduces the sum of representatives. -/
 def add {f : FpPoly p} {hf : 0 < FpPoly.degree f}
@@ -62,10 +68,9 @@ def pow {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
   go (one f hf) x n
 
-/-- Natural-number literals in the quotient ring. -/
-def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) : Nat → PolyQuotient f hf
-  | 0 => zero f hf
-  | n + 1 => add (natCast f hf n) (one f hf)
+/-- Natural-number literals in the quotient ring are reduced constant polynomials. -/
+def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) : PolyQuotient f hf :=
+  const f hf (n : ZMod64 p)
 
 /-- Natural scalar multiplication in the quotient ring. -/
 def nsmul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
@@ -124,6 +129,46 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : SMul Int (PolyQuotient f hf
 @[simp] theorem repr_zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) :
     repr (0 : PolyQuotient f hf) = reduceMod f 0 :=
   rfl
+
+@[simp] theorem repr_const (f : FpPoly p) (hf : 0 < FpPoly.degree f) (c : ZMod64 p) :
+    repr (const f hf c) = reduceMod f (FpPoly.C c) :=
+  rfl
+
+@[simp] theorem natCast_eq_const
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) :
+    natCast f hf n = const f hf (n : ZMod64 p) :=
+  rfl
+
+@[simp] theorem repr_natCast
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) :
+    repr (natCast f hf n) = reduceMod f (FpPoly.C (n : ZMod64 p)) :=
+  rfl
+
+theorem natCast_eq_of_zmod64_natCast_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) {m n : Nat}
+    (h : (m : ZMod64 p) = (n : ZMod64 p)) :
+    (m : PolyQuotient f hf) = n := by
+  change const f hf (m : ZMod64 p) = const f hf (n : ZMod64 p)
+  rw [h]
+
+theorem natCast_eq_of_mod_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) {m n : Nat}
+    (h : m % p = n % p) :
+    (m : PolyQuotient f hf) = n :=
+  natCast_eq_of_zmod64_natCast_eq f hf
+    ((ZMod64.natCast_eq_natCast_iff (p := p) m n).2 h)
+
+theorem natCast_eq_natCast_iff_reduceMod_const_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (m n : Nat) :
+    ((m : PolyQuotient f hf) = n) ↔
+      reduceMod f (FpPoly.C (m : ZMod64 p)) =
+        reduceMod f (FpPoly.C (n : ZMod64 p)) := by
+  constructor
+  · intro h
+    simpa [repr_natCast] using congrArg repr h
+  · intro h
+    apply ext
+    simpa [repr_natCast] using h
 
 @[simp] theorem repr_add {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x y : PolyQuotient f hf) :
