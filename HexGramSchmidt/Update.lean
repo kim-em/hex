@@ -32,6 +32,45 @@ def sizeReduce (b : Matrix Int n m) (j k : Fin n) (r : Int) : Matrix Int n m :=
 def adjacentSwap (b : Matrix Int n m) (k : Fin n) (hk : 0 < k.val) : Matrix Int n m :=
   Matrix.rowSwap b (GramSchmidt.prevRow k hk) k
 
+/-- The old `d[k]` denominator used by exact adjacent-swap updates. -/
+def adjacentSwapDenom (b : Matrix Int n m) (k : Fin n) : Int :=
+  ((gramDet b k.val (Nat.le_of_lt k.isLt) : Nat) : Int)
+
+/-- The old `B = nu[k][k-1]` pivot coefficient used by adjacent swaps. -/
+def adjacentSwapPivotCoeff (b : Matrix Int n m) (k : Fin n) (hk : 0 < k.val) : Int :=
+  let km1 := GramSchmidt.prevRow k hk
+  GramSchmidt.entry (scaledCoeffs b) k km1
+
+/-- Numerator of the adjacent-swap `d[k]'` update. -/
+def adjacentSwapGramDetNumerator (b : Matrix Int n m) (k : Fin n) (hk : 0 < k.val) :
+    Int :=
+  let km1 := GramSchmidt.prevRow k hk
+  let B := adjacentSwapPivotCoeff b k hk
+  ((gramDet b (k.val + 1) (Nat.succ_le_of_lt k.isLt) : Nat) : Int) *
+      ((gramDet b km1.val (Nat.le_of_lt km1.isLt) : Nat) : Int) + B ^ 2
+
+/-- The integer quotient used as `d[k]'` in the adjacent-swap update formulas. -/
+def adjacentSwapGramDetQuotient (b : Matrix Int n m) (k : Fin n) (hk : 0 < k.val) :
+    Int :=
+  adjacentSwapGramDetNumerator b k hk / adjacentSwapDenom b k
+
+/-- Numerator of the adjacent-swap `nu[i][k-1]'` update for rows above `k`. -/
+def adjacentSwapScaledCoeffAbovePrevNumerator (b : Matrix Int n m)
+    (k : Fin n) (hk : 0 < k.val) (i : Fin n) : Int :=
+  let km1 := GramSchmidt.prevRow k hk
+  let B := adjacentSwapPivotCoeff b k hk
+  GramSchmidt.entry (scaledCoeffs b) i km1 * adjacentSwapGramDetQuotient b k hk +
+    GramSchmidt.entry (scaledCoeffs b) i k * B
+
+/-- Numerator of the adjacent-swap `nu[i][k]'` update for rows above `k`. -/
+def adjacentSwapScaledCoeffAboveCurrNumerator (b : Matrix Int n m)
+    (k : Fin n) (hk : 0 < k.val) (i : Fin n) : Int :=
+  let km1 := GramSchmidt.prevRow k hk
+  let B := adjacentSwapPivotCoeff b k hk
+  GramSchmidt.entry (scaledCoeffs b) i k *
+      ((gramDet b km1.val (Nat.le_of_lt km1.isLt) : Nat) : Int) -
+    GramSchmidt.entry (scaledCoeffs b) i km1 * B
+
 theorem basis_sizeReduce (b : Matrix Int n m) (j k : Fin n) (hjk : j.val < k.val)
     (r : Int) :
     basis (sizeReduce b j k r) = basis b := by
@@ -147,6 +186,12 @@ theorem gramDet_adjacentSwap_pivot (b : Matrix Int n m) (k : Fin n) (hk : 0 < k.
         ((gramDet b k.val (Nat.le_of_lt k.isLt) : Nat) : Int) := by
   sorry
 
+theorem adjacentSwap_gramDetNumerator_dvd (b : Matrix Int n m)
+    (k : Fin n) (hk : 0 < k.val)
+    (hdet : gramDet b k.val (Nat.le_of_lt k.isLt) ≠ 0) :
+    adjacentSwapDenom b k ∣ adjacentSwapGramDetNumerator b k hk := by
+  sorry
+
 theorem scaledCoeffs_adjacentSwap_lower_prev (b : Matrix Int n m)
     (k : Fin n) (hk : 0 < k.val) (j : Fin n) (hj : j.val + 1 < k.val) :
     let km1 := GramSchmidt.prevRow k hk
@@ -183,6 +228,12 @@ theorem scaledCoeffs_adjacentSwap_above_prev (b : Matrix Int n m)
         ((gramDet b k.val (Nat.le_of_lt k.isLt) : Nat) : Int) := by
   sorry
 
+theorem adjacentSwap_scaledCoeffAbovePrevNumerator_dvd (b : Matrix Int n m)
+    (k : Fin n) (hk : 0 < k.val) (i : Fin n) (hik : k.val < i.val)
+    (hdet : gramDet b k.val (Nat.le_of_lt k.isLt) ≠ 0) :
+    adjacentSwapDenom b k ∣ adjacentSwapScaledCoeffAbovePrevNumerator b k hk i := by
+  sorry
+
 theorem scaledCoeffs_adjacentSwap_above_curr (b : Matrix Int n m)
     (k : Fin n) (hk : 0 < k.val) (i : Fin n) (hik : k.val < i.val)
     (hdet : gramDet b k.val (Nat.le_of_lt k.isLt) ≠ 0) :
@@ -193,6 +244,12 @@ theorem scaledCoeffs_adjacentSwap_above_curr (b : Matrix Int n m)
           ((gramDet b km1.val (Nat.le_of_lt km1.isLt) : Nat) : Int) -
         GramSchmidt.entry (scaledCoeffs b) i km1 * B) /
       ((gramDet b k.val (Nat.le_of_lt k.isLt) : Nat) : Int) := by
+  sorry
+
+theorem adjacentSwap_scaledCoeffAboveCurrNumerator_dvd (b : Matrix Int n m)
+    (k : Fin n) (hk : 0 < k.val) (i : Fin n) (hik : k.val < i.val)
+    (hdet : gramDet b k.val (Nat.le_of_lt k.isLt) ≠ 0) :
+    adjacentSwapDenom b k ∣ adjacentSwapScaledCoeffAboveCurrNumerator b k hk i := by
   sorry
 
 end GramSchmidt.Int
