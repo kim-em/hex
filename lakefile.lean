@@ -114,5 +114,8 @@ lean_lib HexBerlekampZassenhausMathlib where
 lean_exe hexmatrix_bench where
   root := `HexMatrix.Bench
 
+lean_exe hexarith_bench where
+  root := `HexArith.Bench
+
 @[default_target]
 lean_lib HexManual where
