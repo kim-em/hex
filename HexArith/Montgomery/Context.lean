@@ -105,22 +105,22 @@ end MontCtx
 
 namespace HexArith
 
+/-- Number of binary digits in a natural number. -/
+private def bitLength (n : Nat) : Nat :=
+  if n = 0 then 0 else n.log2 + 1
+
 /-- Tail-recursive exponentiation by repeated squaring in Montgomery form. -/
-private def powMontGo (ctx : MontCtx p) (k : Nat) (acc base : UInt64) : UInt64 :=
-  if hk : k = 0 then
-    acc
-  else
-    let acc' := if k % 2 = 1 then ctx.mulMont acc base else acc
-    let base' := ctx.mulMont base base
-    powMontGo ctx (k / 2) acc' base'
-termination_by k
-decreasing_by
-  simp_wf
-  exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+private def powMontBitsGo (ctx : MontCtx p) (k : Nat) :
+    Nat → Nat → UInt64 → UInt64 → UInt64
+  | 0, _, acc, _ => acc
+  | remaining + 1, bit, acc, base =>
+      let acc' := if k.testBit bit then ctx.mulMont acc base else acc
+      let base' := ctx.mulMont base base
+      powMontBitsGo ctx k remaining (bit + 1) acc' base'
 
 /-- Exponentiate a Montgomery-form base by repeated squaring. -/
 private def powMont (ctx : MontCtx p) (base : UInt64) (n : Nat) : UInt64 :=
-  powMontGo ctx n (ctx.toMont 1) base
+  powMontBitsGo ctx n (bitLength n) 0 (ctx.toMont 1) base
 
 /-- Word-sized odd-modulus modular exponentiation via Montgomery arithmetic. -/
 private def powModWordOdd (a n : Nat) (p : UInt64) (hp : p % 2 = 1) : Nat :=
@@ -130,18 +130,14 @@ private def powModWordOdd (a n : Nat) (p : UInt64) (hp : p % 2 = 1) : Nat :=
 
 /-- Nat-level fallback modular exponentiation by repeated squaring. -/
 private def powModNat (a n p : Nat) : Nat :=
-  let rec go (acc base k : Nat) : Nat :=
-    if hk : k = 0 then
-      acc
-    else
-      let acc' := if k % 2 = 1 then (acc * base) % p else acc
-      let base' := (base * base) % p
-      go acc' base' (k / 2)
-  termination_by k
-  decreasing_by
-    simp_wf
-    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
-  go (1 % p) (a % p) n
+  let rec go (remaining bit acc base : Nat) : Nat :=
+    match remaining with
+    | 0 => acc
+    | remaining' + 1 =>
+        let acc' := if n.testBit bit then (acc * base) % p else acc
+        let base' := (base * base) % p
+        go remaining' (bit + 1) acc' base'
+  go (bitLength n) 0 (1 % p) (a % p)
 
 /--
 Modular exponentiation by repeated squaring, using Montgomery arithmetic for
