@@ -1,4 +1,5 @@
 import HexGramSchmidt.Basic
+import HexMatrix.Bareiss
 import HexMatrix.Determinant
 
 /-!
@@ -51,10 +52,34 @@ principal Gram matrix of the integer input. -/
 def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat :=
   (Matrix.det (GramSchmidt.leadingGramMatrixInt b k hk)).toNat
 
+/-- Read a diagonal entry from a Bareiss elimination matrix as a natural
+determinant value. -/
+private def bareissDiagNat (data : Matrix.BareissData n) (r : Nat) (hr : r < n) : Nat :=
+  let i : Fin n := ⟨r, hr⟩
+  ((data.matrix.get i).get i).toNat
+
+/-- Read the `k`-th leading-principal determinant from one no-pivot Bareiss
+elimination pass over the full Gram matrix. This helper is only used for Gram
+matrices: once a leading row prefix is singular, every larger leading prefix is
+also singular, so all later leading determinants are zero. -/
+private def gramDetVecEntry (data : Matrix.BareissData n) (k : Fin (n + 1)) : Nat :=
+  match hk : k.val with
+  | 0 => 1
+  | r + 1 =>
+      have hrSucc : r + 1 < n + 1 := by
+        simpa [hk] using k.isLt
+      have hr : r < n := Nat.succ_lt_succ_iff.mp hrSucc
+      match data.singularStep with
+      | some s => if s < r + 1 then 0 else
+          bareissDiagNat data r hr
+      | none => bareissDiagNat data r hr
+
 /-- All leading Gram determinants, starting with the empty-prefix value
 `d₀ = 1`. -/
 def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1) :=
-  Vector.ofFn fun k => gramDet b k.val (Nat.le_of_lt_succ k.isLt)
+  let gram := Matrix.gramMatrix b
+  let data := Matrix.bareissNoPivotData gram
+  Vector.ofFn fun k => gramDetVecEntry data k
 
 /-- Integral scaled Gram-Schmidt coefficients. For `j < i`, the entry is the
 determinant formula corresponding to `d_{j+1} * μ_{i,j}`; on the diagonal we
