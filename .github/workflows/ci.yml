@@ -24,3 +24,6 @@ jobs:
       - run: |
           lake exe hexgramschmidt_bench list
           lake exe hexgramschmidt_bench verify
+      - run: |
+          lake exe hexmodarith_bench list
+          lake exe hexmodarith_bench verify
