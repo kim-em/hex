@@ -15,7 +15,7 @@ namespace HexGF2Mathlib
 
 open Hex
 
-universe u v
+universe u v w
 
 /-! A minimal project-local equivalence structure for bridge support that does
 not need Mathlib's heavier equivalence hierarchy. -/
@@ -24,6 +24,23 @@ structure TypeEquiv (α : Type u) (β : Type v) where
   invFun : β → α
   left_inv : Function.LeftInverse invFun toFun
   right_inv : Function.RightInverse invFun toFun
+
+namespace TypeEquiv
+
+variable {α : Type u} {β : Type v} {γ : Type w}
+
+/-- Compose project-local type equivalences. -/
+def trans (e₁ : TypeEquiv α β) (e₂ : TypeEquiv β γ) : TypeEquiv α γ where
+  toFun := e₂.toFun ∘ e₁.toFun
+  invFun := e₁.invFun ∘ e₂.invFun
+  left_inv := by
+    intro x
+    exact (congrArg e₁.invFun (e₂.left_inv (e₁.toFun x))).trans (e₁.left_inv x)
+  right_inv := by
+    intro x
+    exact (congrArg e₂.toFun (e₁.right_inv (e₂.invFun x))).trans (e₂.right_inv x)
+
+end TypeEquiv
 
 /-! A minimal project-local ring equivalence structure for executable algebra
 types that have not imported Mathlib's heavier equivalence hierarchy. -/
