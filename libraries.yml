@@ -38,7 +38,7 @@ libraries:
   HexModArith:
     deps: [HexArith]
     mathlib: false
-    done_through: 2
+    done_through: 3
   HexGramSchmidt:
     deps: [HexMatrix]
     mathlib: false
@@ -102,7 +102,7 @@ libraries:
   HexMatrixMathlib:
     deps: [HexMatrix]
     mathlib: true
-    done_through: 2
+    done_through: 3
   HexModArithMathlib:
     deps: [HexModArith]
     mathlib: true
