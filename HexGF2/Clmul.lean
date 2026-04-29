@@ -46,6 +46,91 @@ private theorem clmulAccumulateBit_zero (a : UInt64) (bit : Nat) :
       if bit = 0 then (0, a) else (a >>> (64 - bit).toUInt64, a <<< bit.toUInt64) := by
   by_cases h : bit = 0 <;> simp [clmulAccumulateBit, h]
 
+private theorem oneHot_shiftLeft_of_sum_lt {hot bitIdx : Nat}
+    (hhot : hot < 64) (hbitIdx : bitIdx < 64) (hsum : hot + bitIdx < 64) :
+    (((1 : UInt64) <<< hot.toUInt64) <<< bitIdx.toUInt64) =
+      ((1 : UInt64) <<< (hot + bitIdx).toUInt64) := by
+  apply UInt64.toNat_inj.mp
+  have hpowHot : 2 ^ hot < 2 ^ 64 := Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hhot
+  have hpowSum : 2 ^ (hot + bitIdx) < 2 ^ 64 :=
+    Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hsum
+  simp [UInt64.toNat_shiftLeft, Nat.mod_eq_of_lt hhot,
+    Nat.mod_eq_of_lt hbitIdx, Nat.mod_eq_of_lt hsum, Nat.mod_eq_of_lt hpowHot,
+    Nat.mod_eq_of_lt hpowSum, Nat.shiftLeft_eq]
+  rw [← Nat.pow_add]
+  exact Nat.mod_eq_of_lt hpowSum
+
+private theorem oneHot_shiftLeft_of_sum_ge {hot bitIdx : Nat}
+    (hhot : hot < 64) (hbitIdx : bitIdx < 64) (hsum : 64 ≤ hot + bitIdx) :
+    (((1 : UInt64) <<< hot.toUInt64) <<< bitIdx.toUInt64) = 0 := by
+  apply UInt64.toNat_inj.mp
+  have hpowHot : 2 ^ hot < 2 ^ 64 := Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hhot
+  simp [UInt64.toNat_shiftLeft, Nat.mod_eq_of_lt hhot,
+    Nat.mod_eq_of_lt hbitIdx, Nat.mod_eq_of_lt hpowHot, Nat.shiftLeft_eq]
+  have hdiv : 2 ^ 64 ∣ 2 ^ hot * 2 ^ bitIdx := by
+    rw [← Nat.pow_add]
+    exact Nat.pow_dvd_pow 2 hsum
+  exact Nat.mod_eq_zero_of_dvd hdiv
+
+private theorem oneHot_shiftRight_of_sum_lt {hot bitIdx : Nat}
+    (hhot : hot < 64) (hbitIdx : bitIdx < 64) (hbitIdxPos : 0 < bitIdx)
+    (hsum : hot + bitIdx < 64) :
+    (((1 : UInt64) <<< hot.toUInt64) >>> (64 - bitIdx).toUInt64) = 0 := by
+  apply UInt64.toNat_inj.mp
+  have hpowHot : 2 ^ hot < 2 ^ 64 := Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hhot
+  have hshift : 64 - bitIdx < 64 := by omega
+  simp [UInt64.toNat_shiftLeft, UInt64.toNat_shiftRight,
+    Nat.mod_eq_of_lt hhot, Nat.mod_eq_of_lt hshift, Nat.mod_eq_of_lt hpowHot,
+    Nat.shiftLeft_eq]
+  rw [Nat.shiftRight_eq_div_pow]
+  exact Nat.div_eq_of_lt
+    (Nat.pow_lt_pow_of_lt (by decide : 1 < 2) (by omega))
+
+private theorem oneHot_shiftRight_of_sum_ge {hot bitIdx : Nat}
+    (hhot : hot < 64) (hbitIdx : bitIdx < 64) (hsum : 64 ≤ hot + bitIdx) :
+    (((1 : UInt64) <<< hot.toUInt64) >>> (64 - bitIdx).toUInt64) =
+      ((1 : UInt64) <<< (hot + bitIdx - 64).toUInt64) := by
+  apply UInt64.toNat_inj.mp
+  have hpowHot : 2 ^ hot < 2 ^ 64 := Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hhot
+  have hshift : 64 - bitIdx < 64 := by omega
+  have htarget : hot + bitIdx - 64 < 64 := by omega
+  have hpowTarget : 2 ^ (hot + bitIdx - 64) < 2 ^ 64 :=
+    Nat.pow_lt_pow_of_lt (by decide : 1 < 2) htarget
+  have hexp : hot = (64 - bitIdx) + (hot + bitIdx - 64) := by omega
+  simp [UInt64.toNat_shiftLeft, UInt64.toNat_shiftRight,
+    Nat.mod_eq_of_lt hhot, Nat.mod_eq_of_lt hshift, Nat.mod_eq_of_lt htarget,
+    Nat.mod_eq_of_lt hpowHot, Nat.mod_eq_of_lt hpowTarget, Nat.shiftLeft_eq]
+  rw [hexp, Nat.pow_add]
+  rw [Nat.shiftRight_eq_div_pow]
+  have hrhs : 64 - bitIdx + (hot + bitIdx - 64) + bitIdx - 64 =
+      hot + bitIdx - 64 := by
+    omega
+  rw [hrhs]
+  have hpos : 0 < 2 ^ (64 - bitIdx) := Nat.pow_pos (by decide : 0 < 2)
+  exact Nat.mul_div_right _ hpos
+
+private theorem clmulAccumulateBit_oneHot_low {hot bitIdx : Nat}
+    (acc : UInt64 × UInt64) (hhot : hot < 64) (hbitIdx : bitIdx < 64)
+    (hsum : hot + bitIdx < 64) :
+    clmulAccumulateBit acc ((1 : UInt64) <<< hot.toUInt64) bitIdx =
+      (acc.1, acc.2 ^^^ ((1 : UInt64) <<< (hot + bitIdx).toUInt64)) := by
+  by_cases hzero : bitIdx = 0
+  · subst bitIdx
+    simp [clmulAccumulateBit]
+  · have hbitIdxPos : 0 < bitIdx := Nat.pos_of_ne_zero hzero
+    simp [clmulAccumulateBit, hzero,
+      oneHot_shiftLeft_of_sum_lt hhot hbitIdx hsum,
+      oneHot_shiftRight_of_sum_lt hhot hbitIdx hbitIdxPos hsum]
+
+private theorem clmulAccumulateBit_oneHot_high {hot bitIdx : Nat}
+    (acc : UInt64 × UInt64) (hhot : hot < 64) (hbitIdx : bitIdx < 64)
+    (hsum : 64 ≤ hot + bitIdx) :
+    clmulAccumulateBit acc ((1 : UInt64) <<< hot.toUInt64) bitIdx =
+      (acc.1 ^^^ ((1 : UInt64) <<< (hot + bitIdx - 64).toUInt64), acc.2) := by
+  have hzero : bitIdx ≠ 0 := by omega
+  simp [clmulAccumulateBit, hzero, oneHot_shiftLeft_of_sum_ge hhot hbitIdx hsum,
+    oneHot_shiftRight_of_sum_ge hhot hbitIdx hsum]
+
 private def clmulOneHotStep (a : UInt64) (hot : Nat) (acc : UInt64 × UInt64)
     (bitIdx : Nat) : UInt64 × UInt64 :=
   if (((((1 : UInt64) <<< hot.toUInt64) >>> bitIdx.toUInt64) &&& 1) != 0) then
