@@ -689,6 +689,61 @@ theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     repr (zsmul (.negSucc n) x) = reduceMod f (-repr (nsmul (n + 1) x)) :=
   rfl
 
+theorem neg_zero_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f} :
+    -(0 : PolyQuotient f hf) = 0 := by
+  apply ext
+  rw [repr_neg, repr_zero, reduceMod_zero, FpPoly.neg_zero, reduceMod_zero]
+
+theorem neg_neg_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    -(-x) = x := by
+  calc
+    -(-x) = -(-x) + 0 := by
+      apply ext
+      exact (repr_add_zero (-(-x))).symm
+    _ = -(-x) + (-x + x) := by
+      have h : -x + x = 0 := by
+        apply ext
+        exact repr_neg_add_self x
+      rw [h]
+    _ = (-(-x) + -x) + x := by
+      apply ext
+      exact (repr_add_assoc (-(-x)) (-x) x).symm
+    _ = 0 + x := by
+      have h : -(-x) + -x = 0 := by
+        apply ext
+        exact repr_neg_add_self (-x)
+      rw [h]
+    _ = x := by
+      apply ext
+      exact repr_zero_add x
+
+theorem neg_zsmul_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (i : Int) (a : PolyQuotient f hf) :
+    -i • a = -(i • a) := by
+  cases i with
+  | ofNat n =>
+      cases n with
+      | zero =>
+          exact (neg_zero_eq (f := f) (hf := hf)).symm
+      | succ n =>
+          rfl
+  | negSucc n =>
+      exact (neg_neg_eq (nsmul (n + 1) a)).symm
+
+theorem intCast_neg_eq (f : FpPoly p) (hf : 0 < FpPoly.degree f)
+    (i : Int) :
+    ↑(-i) = -(↑i : PolyQuotient f hf) := by
+  cases i with
+  | ofNat n =>
+      cases n with
+      | zero =>
+          exact (neg_zero_eq (f := f) (hf := hf)).symm
+      | succ n =>
+          rfl
+  | negSucc n =>
+      exact (neg_neg_eq (natCast f hf (n + 1))).symm
+
 private def linearPow {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) : Nat → PolyQuotient f hf
   | 0 => 1
@@ -857,20 +912,18 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQu
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Ring (PolyQuotient f hf) := by
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_neg_add_self a
   · intro a b
-    apply Subtype.ext
-    sorry
+    exact sub_eq_add_neg a b
   · intro i a
-    apply Subtype.ext
-    sorry
+    exact neg_zsmul_eq i a
   · intro n a
-    sorry
+    rfl
   · intro n
-    sorry
+    rfl
   · intro i
-    sorry
+    exact intCast_neg_eq f hf i
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.CommRing (PolyQuotient f hf) := by
   refine Lean.Grind.CommRing.mk ?_
