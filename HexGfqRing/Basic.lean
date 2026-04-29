@@ -76,7 +76,7 @@ theorem eq_zero_iff_repr_eq_zero
     x = ofPoly f hf 0 ↔ repr x = reduceMod f 0 := by
   constructor
   · intro hx
-    simpa [hx] using repr_ofPoly f hf (0 : FpPoly p)
+    simp [hx]
   · intro hx
     apply ext
     simpa using hx
@@ -94,7 +94,9 @@ theorem ne_zero_iff_repr_ne_zero
 theorem degree_repr_lt_degree {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
     FpPoly.degree (repr x) < FpPoly.degree f := by
-  sorry
+  rcases x.2 with ⟨g, hx⟩
+  simpa [repr, hx, IsReduced, reduceMod, FpPoly.degree, DensePoly.mod_eq_divMod]
+    using DensePoly.mod_degree_lt_of_pos_degree g f hf
 
 theorem reduceMod_idem (f : FpPoly p) (g : FpPoly p) :
     reduceMod f (reduceMod f g) = reduceMod f g := by
