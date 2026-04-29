@@ -280,11 +280,13 @@ def content (p : DensePoly Int) : Int :=
 
 /-- The primitive part obtained by dividing every coefficient by the content. -/
 def primitivePart (p : DensePoly Int) : DensePoly Int :=
-  if contentNat p = 0 then
+  let cNat := contentNat p
+  if cNat = 0 then
     0
   else
+    let c := Int.ofNat cNat
     ofCoeffs <|
-      (List.range p.size).map (fun i => p.coeff i / content p) |>.toArray
+      p.toArray.toList.map (fun coeff => coeff / c) |>.toArray
 
 theorem content_mul_primitivePart (p : DensePoly Int) :
     scale (content p) (primitivePart p) = p := by
