@@ -41,6 +41,129 @@ def isGoodPrime (f : ZPoly) (p : Nat) [ZMod64.Bounds p] : Bool :=
     ZPoly.leadingCoeffModP f p != 0 &&
     DensePoly.gcd fModP (DensePoly.derivative fModP) == 1
 
+private theorem bounds_two : ZMod64.Bounds 2 := by
+  constructor <;> decide
+
+private theorem bounds_three : ZMod64.Bounds 3 := by
+  constructor <;> decide
+
+private theorem bounds_five : ZMod64.Bounds 5 := by
+  constructor <;> decide
+
+private theorem bounds_seven : ZMod64.Bounds 7 := by
+  constructor <;> decide
+
+private theorem bounds_eleven : ZMod64.Bounds 11 := by
+  constructor <;> decide
+
+private theorem bounds_thirteen : ZMod64.Bounds 13 := by
+  constructor <;> decide
+
+private theorem bounds_seventeen : ZMod64.Bounds 17 := by
+  constructor <;> decide
+
+private theorem bounds_nineteen : ZMod64.Bounds 19 := by
+  constructor <;> decide
+
+private theorem prime_two : Nat.Prime 2 := by
+  sorry
+
+private theorem prime_three : Nat.Prime 3 := by
+  sorry
+
+private theorem prime_five : Nat.Prime 5 := by
+  sorry
+
+private theorem prime_seven : Nat.Prime 7 := by
+  sorry
+
+private theorem prime_eleven : Nat.Prime 11 := by
+  sorry
+
+private theorem prime_thirteen : Nat.Prime 13 := by
+  sorry
+
+private theorem prime_seventeen : Nat.Prime 17 := by
+  sorry
+
+private theorem prime_nineteen : Nat.Prime 19 := by
+  sorry
+
+private structure SmallPrimeCandidate where
+  p : Nat
+  bounds : ZMod64.Bounds p
+  prime : Nat.Prime p
+
+/-- A scored admissible small-prime candidate for default prime selection. -/
+structure PrimeCandidateScore where
+  /-- Candidate prime. -/
+  p : Nat
+  /-- Smaller scores are preferred; equal scores retain the earlier smaller prime. -/
+  factorCount : Nat
+
+private def smallPrimeCandidates : List SmallPrimeCandidate :=
+  [ { p := 2, bounds := bounds_two, prime := prime_two },
+    { p := 3, bounds := bounds_three, prime := prime_three },
+    { p := 5, bounds := bounds_five, prime := prime_five },
+    { p := 7, bounds := bounds_seven, prime := prime_seven },
+    { p := 11, bounds := bounds_eleven, prime := prime_eleven },
+    { p := 13, bounds := bounds_thirteen, prime := prime_thirteen },
+    { p := 17, bounds := bounds_seventeen, prime := prime_seventeen },
+    { p := 19, bounds := bounds_nineteen, prime := prime_nineteen } ]
+
+private def scoreCandidate (f : ZPoly) (c : SmallPrimeCandidate) : Option PrimeCandidateScore :=
+  letI := c.bounds
+  if isGoodPrime f c.p then
+    let fModP := ZPoly.modP c.p f
+    let factors := (FpPoly.squareFreeDecomposition c.prime fModP).factors
+    some { p := c.p, factorCount := factors.length }
+  else
+    none
+
+private def betterScore (old new : PrimeCandidateScore) : PrimeCandidateScore :=
+  if new.factorCount < old.factorCount then
+    new
+  else
+    old
+
+/-- Scan the fixed small-prime list and return the best admissible scored candidate, if any. -/
+def choosePrimeScore? (f : ZPoly) : Option PrimeCandidateScore :=
+  smallPrimeCandidates.foldl
+    (fun best c =>
+      match best, scoreCandidate f c with
+      | none, score => score
+      | some old, none => some old
+      | some old, some new => some (betterScore old new))
+    none
+
+/--
+Choose a small admissible prime for the Berlekamp-Zassenhaus pipeline.
+
+The search is bounded to a fixed ascending list of small primes. Candidate
+scores use the currently available executable modular factor surface; strict
+score improvement replaces the incumbent, so equal scores keep the smaller
+earlier prime.
+-/
+def choosePrime (f : ZPoly) : Nat :=
+  match choosePrimeScore? f with
+  | some score => score.p
+  | none => 2
+
+theorem choosePrimeScore?_isGoodPrime
+    (f : ZPoly) (score : PrimeCandidateScore)
+    (hscore : choosePrimeScore? f = some score) :
+    ∃ hbounds : ZMod64.Bounds score.p,
+      @isGoodPrime f score.p hbounds = true := by
+  sorry
+
+theorem choosePrime_isGoodPrime_of_selected
+    (f : ZPoly) (score : PrimeCandidateScore)
+    (hscore : choosePrimeScore? f = some score)
+    (hchoose : choosePrime f = score.p) :
+    ∃ hbounds : ZMod64.Bounds (choosePrime f),
+      @isGoodPrime f (choosePrime f) hbounds = true := by
+  sorry
+
 /-- A successful good-prime check certifies leading-coefficient admissibility. -/
 theorem isGoodPrime_leadingCoeffAdmissible
     (f : ZPoly) (p : Nat) [ZMod64.Bounds p]
