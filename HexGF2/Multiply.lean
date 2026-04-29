@@ -133,6 +133,35 @@ private theorem clmul_oneHot_low_bit_same_word (x : UInt64) {shift old : Nat}
     Nat.testBit_shiftLeft]
   simp [hbit]
 
+private theorem clmul_oneHot_low_bit_before_shift_false (x : UInt64) {shift bit : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64) (hbit : bit < shift) :
+    ((((clmul x ((1 : UInt64) <<< shift.toUInt64)).2 >>>
+        bit.toUInt64) &&& 1) != 0) = false := by
+  rw [clmul_oneHot_snd x hshift]
+  have hshiftNe : shift ≠ 0 := Nat.ne_of_gt hshiftPos
+  have hbit64 : bit < 64 := by omega
+  simp [hshiftNe, UInt64.bne_zero_eq_toNat_bne_zero, UInt64.toNat_shiftLeft,
+    UInt64.toNat_shiftRight, UInt64.toNat_and, Nat.mod_eq_of_lt hshift,
+    Nat.mod_eq_of_lt hbit64, bit_eq_one_eq_testBit]
+  change (((x.toNat <<< shift) % 18446744073709551616).testBit bit) = false
+  rw [show 18446744073709551616 = 2 ^ 64 by rfl, Nat.testBit_mod_two_pow,
+    Nat.testBit_shiftLeft]
+  simp
+  intro _ hle
+  omega
+
+private theorem clmul_oneHot_low_bit_shifted (x : UInt64) {shift bit : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64) (hbit : bit < 64)
+    (hle : shift ≤ bit) :
+    ((((clmul x ((1 : UInt64) <<< shift.toUInt64)).2 >>>
+        bit.toUInt64) &&& 1) != 0) =
+      (((x >>> (bit - shift).toUInt64) &&& 1) != 0) := by
+  have hsource : bit - shift < 64 := by omega
+  have hsourceShift : bit - shift + shift < 64 := by omega
+  have hsum : bit - shift + shift = bit := by omega
+  simpa [hsum] using
+    clmul_oneHot_low_bit_same_word x hshiftPos hshift hsource hsourceShift
+
 private theorem clmul_oneHot_high_bit_carry_word (x : UInt64) {shift old : Nat}
     (hshiftPos : 0 < shift) (hshift : shift < 64) (hold : old < 64)
     (hbit : 64 ≤ old + shift) :
