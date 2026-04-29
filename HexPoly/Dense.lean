@@ -120,6 +120,15 @@ theorem coeff_ofCoeffs (coeffs : Array R) (n : Nat) :
   unfold ofCoeffs coeff trimTrailingZeros
   simpa using trimTrailingZerosList_getD (R := R) coeffs.toList n
 
+theorem coeff_C (c : R) (n : Nat) :
+    (C c).coeff n = if n = 0 then c else (Zero.zero : R) := by
+  rw [C, coeff_ofCoeffs]
+  cases n with
+  | zero =>
+      simp
+  | succ n =>
+      simp
+
 theorem coeff_ofCoeffs_list (coeffs : List R) (n : Nat) :
     (ofCoeffs coeffs.toArray).coeff n = coeffs.getD n (Zero.zero : R) := by
   simpa using coeff_ofCoeffs (R := R) coeffs.toArray n
