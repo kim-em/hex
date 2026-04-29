@@ -1376,6 +1376,65 @@ theorem coeffWords_replicate_append_shiftLeftBitsList_add_of_not_word
       simpa using hout
     simp [coeffWords, hdiv, hmod, hgetAppend, hnone]
 
+theorem coeffWords_replicate_append_shiftLeftBitsList_lt
+    (words : Array UInt64) {k n : Nat}
+    (_hbitShift : k % 64 ≠ 0) (hn : n < k) :
+    coeffWords
+        ((Array.replicate (k / 64) (0 : UInt64)) ++
+          (shiftLeftBitsList (k % 64) 0 words.toList).toArray)
+        n =
+      false := by
+  have hshift : k % 64 < 64 := Nat.mod_lt k (by decide : 0 < 64)
+  by_cases hword : n / 64 < k / 64
+  · rw [coeffWords]
+    have hget :
+        (((Array.replicate (k / 64) (0 : UInt64)) ++
+            (shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64]?).getD 0 = 0 := by
+      rw [Array.getElem?_append_left]
+      · simp [hword]
+      · simp [hword]
+    rw [hget, UInt64.bne_zero_eq_toNat_bne_zero]
+    simp
+  · have hdiv : n / 64 = k / 64 := by
+      have hnSplit := Nat.div_add_mod n 64
+      have hkSplit := Nat.div_add_mod k 64
+      have hnBit := Nat.mod_lt n (by decide : 0 < 64)
+      have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+      omega
+    have hbit : n % 64 < k % 64 := by
+      have hnSplit := Nat.div_add_mod n 64
+      have hkSplit := Nat.div_add_mod k 64
+      have hnBit := Nat.mod_lt n (by decide : 0 < 64)
+      have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+      omega
+    have hnBit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+    rw [coeffWords, hdiv]
+    have hgetAppend :
+        (((Array.replicate (k / 64) (0 : UInt64)) ++
+            (shiftLeftBitsList (k % 64) 0 words.toList).toArray)[k / 64]?).getD 0 =
+          (((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[0]?).getD 0 := by
+      rw [Array.getElem?_append_right]
+      · simp
+      · simp
+    rw [hgetAppend]
+    cases hws : words.toList with
+    | nil =>
+        simp [shiftLeftBitsList]
+    | cons w ws =>
+        have hbitClear :
+            (((((w <<< (k % 64).toUInt64) ||| (0 : UInt64)) >>>
+                (n % 64).toUInt64) &&& 1) != 0) = false := by
+          rw [UInt64.bne_zero_eq_toNat_bne_zero]
+          simp [UInt64.toNat_shiftLeft, UInt64.toNat_shiftRight,
+            UInt64.toNat_and, Nat.mod_eq_of_lt hshift, Nat.mod_eq_of_lt hnBit,
+            bit_eq_one_eq_testBit]
+          change (((w.toNat <<< (k % 64)) % 18446744073709551616).testBit (n % 64)) =
+            false
+          rw [show 18446744073709551616 = 2 ^ 64 by rfl, Nat.testBit_mod_two_pow,
+            Nat.testBit_shiftLeft]
+          simp [hnBit, Nat.not_le.mpr hbit]
+        simpa [shiftLeftBitsList, hws] using hbitClear
+
 /-- Shift packed words right by `bitShift ∈ [1, 63]`, reading the input from
 high degree to low degree. -/
 private def shiftRightBitsRevList (bitShift : Nat) (carry : UInt64) :
