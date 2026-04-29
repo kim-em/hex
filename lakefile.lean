@@ -117,5 +117,8 @@ lean_exe hexmatrix_bench where
 lean_exe hexarith_bench where
   root := `HexArith.Bench
 
+lean_exe hexpoly_bench where
+  root := `HexPoly.Bench
+
 @[default_target]
 lean_lib HexManual where

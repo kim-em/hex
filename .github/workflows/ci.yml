@@ -18,3 +18,6 @@ jobs:
       - run: |
           lake exe hexarith_bench list
           lake exe hexarith_bench verify
+      - run: |
+          lake exe hexpoly_bench list
+          lake exe hexpoly_bench verify
