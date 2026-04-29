@@ -17,6 +17,14 @@ open Hex
 
 universe u v
 
+/-! A minimal project-local equivalence structure for bridge support that does
+not need Mathlib's heavier equivalence hierarchy. -/
+structure TypeEquiv (α : Type u) (β : Type v) where
+  toFun : α → β
+  invFun : β → α
+  left_inv : Function.LeftInverse invFun toFun
+  right_inv : Function.RightInverse invFun toFun
+
 /-! A minimal project-local ring equivalence structure for executable algebra
 types that have not imported Mathlib's heavier equivalence hierarchy. -/
 structure RingEquiv (R : Type u) (S : Type v) [Mul R] [Mul S] [Add R] [Add S] where
@@ -145,6 +153,51 @@ theorem equiv_apply (p : Hex.GF2Poly) :
 theorem equiv_symm_apply (p : Hex.FpPoly 2) :
     RingEquiv.symm equiv p = ofFpPoly p := by
   rfl
+
+/-- Interpret a packed polynomial as the natural number with the same binary
+coefficient bits. This gives bridge modules a finite index for bounded-degree
+representatives without changing the executable `HexGF2` representation. -/
+private def wordsToNatAux : List UInt64 → Nat → Nat
+  | [], _ => 0
+  | w :: ws, i => w.toNat * 2 ^ (64 * i) + wordsToNatAux ws (i + 1)
+
+def toNat (p : Hex.GF2Poly) : Nat :=
+  wordsToNatAux p.toWords.toList 0
+
+/-- Rebuild the low `degree` bits of a natural number as a packed polynomial.
+The input is expected to be bounded by `2 ^ degree` by callers that need a
+canonical finite representative. -/
+def ofNatBelowDegree (degree : Nat) (n : Nat) : Hex.GF2Poly :=
+  let wordCount := (degree + 63) / 64
+  Hex.GF2Poly.ofWords <|
+    Array.ofFn fun i : Fin wordCount =>
+      UInt64.ofNat (n / 2 ^ (64 * i.1))
+
+/-- A polynomial known to have degree `< degree` has an index below
+`2 ^ degree` under the packed binary interpretation. -/
+theorem toNat_lt_of_degree_lt {p : Hex.GF2Poly} {degree : Nat}
+    (h : p.IsZero ∨ p.degree < degree) :
+    toNat p < 2 ^ degree := by
+  sorry
+
+/-- Decoding a bounded index as low binary bits produces a reduced packed
+representative for that degree bound. -/
+theorem ofNatBelowDegree_reduced (degree : Nat) (i : Fin (2 ^ degree)) :
+    (ofNatBelowDegree degree i.1).IsZero ∨
+      (ofNatBelowDegree degree i.1).degree < degree := by
+  sorry
+
+/-- Encoding after decoding a bounded packed index preserves the index. -/
+theorem toNat_ofNatBelowDegree (degree : Nat) (i : Fin (2 ^ degree)) :
+    toNat (ofNatBelowDegree degree i.1) = i.1 := by
+  sorry
+
+/-- Decoding after encoding a reduced packed representative preserves the
+polynomial. -/
+theorem ofNatBelowDegree_toNat {p : Hex.GF2Poly} {degree : Nat}
+    (h : p.IsZero ∨ p.degree < degree) :
+    ofNatBelowDegree degree (toNat p) = p := by
+  sorry
 
 end GF2Poly
 
