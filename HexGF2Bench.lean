@@ -18,7 +18,10 @@ Additional scientific registrations:
   coefficient family, `O(n^2)`.
 * `runPackedBerlekampCompareChecksum` and `runFp2BerlekampCompareChecksum`:
   packed versus generic Berlekamp-matrix-style Frobenius-column construction
-  over the same monic modulus family, `O(n^3)`.
+  over the same monic modulus family. This comparison schedule maps parameter
+  `n` to degree `16 * n + 3`; on that word-parallel packed schedule the
+  packed construction is declared as `O(n^2)`, while the generic
+  dense-coefficient construction is declared as `O(n^3)`.
 -/
 
 namespace Hex.GF2Bench
@@ -135,7 +138,7 @@ def prepCompareInput (n : Nat) : CompareInput :=
 
 /-- Per-parameter fixture for packed/generic Berlekamp-style comparisons. -/
 def prepBerlekampCompareInput (n : Nat) : BerlekampCompareInput :=
-  let degree := n + 2
+  let degree := 16 * n + 3
   { packedModulus := packedCoeffPoly degree 613
     genericModulus := fp2CoeffPoly degree 613
     columnCount := degree }
@@ -150,21 +153,24 @@ def runFp2GcdCompareChecksum (input : CompareInput) : UInt64 :=
 
 /-- Benchmark target: packed Berlekamp-style Frobenius-column construction. -/
 def runPackedBerlekampCompareChecksum (input : BerlekampCompareInput) : UInt64 :=
-  (Array.range input.columnCount).foldl
-    (fun acc j =>
-      let col := packedPowMod (GF2Poly.monomial 1) input.packedModulus (2 * j)
-        ((GF2Poly.monomial 1) % input.packedModulus) 1
-      mixWord acc (checksumPackedCoeffs col))
-    0
+  let step := (GF2Poly.monomial 2) % input.packedModulus
+  let rec go : Nat → GF2Poly → UInt64 → UInt64
+    | 0, _, acc => acc
+    | k + 1, col, acc =>
+        go k ((col * step) % input.packedModulus)
+          (mixWord acc (checksumPackedCoeffs col))
+  go input.columnCount 1 0
 
 /-- Benchmark target: generic `FpPoly 2` Berlekamp-style Frobenius-column construction. -/
 def runFp2BerlekampCompareChecksum (input : BerlekampCompareInput) : UInt64 :=
-  (Array.range input.columnCount).foldl
-    (fun acc j =>
-      let col := fp2PowMod (FpPoly.X : F2Poly) input.genericModulus (2 * j)
-        ((FpPoly.X : F2Poly) % input.genericModulus) (1 : F2Poly)
-      mixWord acc (checksumFp2Coeffs col))
-    0
+  let x := (FpPoly.X : F2Poly)
+  let step := (x * x) % input.genericModulus
+  let rec go : Nat → F2Poly → UInt64 → UInt64
+    | 0, _, acc => acc
+    | k + 1, col, acc =>
+        go k ((col * step) % input.genericModulus)
+          (mixWord acc (checksumFp2Coeffs col))
+  go input.columnCount 1 0
 
 setup_benchmark runPackedGcdCompareChecksum n => n * n
   with prep := prepCompareInput
@@ -190,14 +196,15 @@ setup_benchmark runFp2GcdCompareChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runPackedBerlekampCompareChecksum n => n * n * n
+setup_benchmark runPackedBerlekampCompareChecksum n => n * n
   with prep := prepBerlekampCompareInput
   where {
     paramFloor := 8
     paramCeiling := 64
-    paramSchedule := .custom #[8, 12, 16, 24, 32, 48, 64]
+    paramSchedule := .custom #[8, 12, 16, 24, 32, 40, 64]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    verdictWarmupFraction := 0.35
     signalFloorMultiplier := 1.0
   }
 
@@ -206,9 +213,10 @@ setup_benchmark runFp2BerlekampCompareChecksum n => n * n * n
   where {
     paramFloor := 8
     paramCeiling := 64
-    paramSchedule := .custom #[8, 12, 16, 24, 32, 48, 64]
+    paramSchedule := .custom #[8, 12, 16, 24, 32, 40, 64]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    verdictWarmupFraction := 0.35
     signalFloorMultiplier := 1.0
   }
 
