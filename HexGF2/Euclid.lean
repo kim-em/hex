@@ -59,6 +59,15 @@ private theorem add_cancel_middle (a b c : GF2Poly) :
   rw [coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne]
   cases a.coeff n <;> cases b.coeff n <;> cases c.coeff n <;> rfl
 
+private theorem add_pair_swap (a b c d : GF2Poly) :
+    (a + b) + (c + d) = (a + c) + (b + d) := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne,
+    coeff_add_eq_bne, coeff_add_eq_bne]
+  cases a.coeff n <;> cases b.coeff n <;> cases c.coeff n <;>
+    cases d.coeff n <;> rfl
+
 /-- A single long-division update preserves quotient/remainder
 reconstruction. -/
 theorem quotient_step_reconstruct (quot rem q : GF2Poly) (k : Nat) :
@@ -197,6 +206,71 @@ theorem divMod_spec (p q : GF2Poly) :
   unfold divMod
   simpa using divModAux_reconstruct q (p.degree + 1) 0 p
 
+private theorem one_eq_monomial_zero : (1 : GF2Poly) = monomial 0 := by
+  change one = monomial 0
+  simp [one, monomial]
+
+private theorem mulXk_zero (p : GF2Poly) :
+    p.mulXk 0 = p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mulXk, coeff_shiftLeft]
+  simp [coeff]
+
+private theorem one_mul (p : GF2Poly) :
+    (1 : GF2Poly) * p = p := by
+  rw [one_eq_monomial_zero, monomial_mul, mulXk_zero]
+
+private theorem mul_one (p : GF2Poly) :
+    p * (1 : GF2Poly) = p := by
+  rw [one_eq_monomial_zero, mul_monomial, mulXk_zero]
+
+private theorem xgcd_step_bezout
+    (p q r₀ s₀ t₀ r₁ s₁ t₁ div rem : GF2Poly)
+    (h₀ : s₀ * p + t₀ * q = r₀)
+    (h₁ : s₁ * p + t₁ * q = r₁)
+    (hdiv : div * r₁ + rem = r₀) :
+    (s₀ + div * s₁) * p + (t₀ + div * t₁) * q = rem := by
+  calc
+    (s₀ + div * s₁) * p + (t₀ + div * t₁) * q
+        = (s₀ * p + (div * s₁) * p) + (t₀ * q + (div * t₁) * q) := by
+          rw [left_distrib, left_distrib]
+    _ = (s₀ * p + div * (s₁ * p)) + (t₀ * q + div * (t₁ * q)) := by
+          rw [mul_assoc, mul_assoc]
+    _ = (s₀ * p + t₀ * q) + (div * (s₁ * p) + div * (t₁ * q)) := by
+          exact add_pair_swap (s₀ * p) (div * (s₁ * p)) (t₀ * q) (div * (t₁ * q))
+    _ = (s₀ * p + t₀ * q) + div * (s₁ * p + t₁ * q) := by
+          rw [right_distrib]
+    _ = r₀ + div * r₁ := by
+          rw [h₀, h₁]
+    _ = rem := by
+          rw [← hdiv, add_comm (div * r₁) rem]
+          simp
+
+private theorem xgcdAux_bezout
+    (p q r₀ s₀ t₀ r₁ s₁ t₁ : GF2Poly) (fuel : Nat)
+    (h₀ : s₀ * p + t₀ * q = r₀)
+    (h₁ : s₁ * p + t₁ * q = r₁) :
+    let result := xgcdAux r₀ s₀ t₀ r₁ s₁ t₁ fuel
+    result.left * p + result.right * q = result.gcd := by
+  induction fuel generalizing r₀ s₀ t₀ r₁ s₁ t₁ with
+  | zero =>
+      simp [xgcdAux, h₀]
+  | succ fuel ih =>
+      simp only [xgcdAux]
+      by_cases hzero : r₁.isZero = true
+      · simp [hzero, h₀]
+      · have hzeroFalse : r₁.isZero = false := by
+          cases h : r₁.isZero <;> simp [h] at hzero ⊢
+        simp [hzeroFalse]
+        let qr := divMod r₀ r₁
+        let div := qr.1
+        let rem := qr.2
+        have hdiv : div * r₁ + rem = r₀ := by
+          simpa [qr, div, rem] using divMod_spec r₀ r₁
+        exact ih r₁ s₁ t₁ rem (s₀ + div * s₁) (t₀ + div * t₁)
+          h₁ (xgcd_step_bezout p q r₀ s₀ t₀ r₁ s₁ t₁ div rem h₀ h₁ hdiv)
+
 /-- The computed remainder has smaller degree than a nonzero divisor. -/
 theorem mod_degree_lt (p q : GF2Poly) :
     q ≠ 0 → (p % q).isZero = true ∨ (p % q).degree < q.degree := by
@@ -233,7 +307,10 @@ theorem dvd_gcd (d p q : GF2Poly) :
 theorem xgcd_bezout (p q : GF2Poly) :
     let r := xgcd p q
     r.left * p + r.right * q = r.gcd := by
-  sorry
+  unfold xgcd
+  apply xgcdAux_bezout
+  · rw [one_mul, zero_mul, add_zero]
+  · rw [zero_mul, one_mul, zero_add]
 
 end GF2Poly
 end Hex
