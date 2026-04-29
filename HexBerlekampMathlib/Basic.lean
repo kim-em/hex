@@ -2,6 +2,7 @@ import HexBerlekamp.Factor
 import HexBerlekamp.Irreducibility
 import HexModArithMathlib
 import HexPolyMathlib
+import Mathlib.FieldTheory.Finite.GaloisField
 
 /-!
 Mathlib-facing correctness surface for `HexBerlekamp`.
@@ -16,6 +17,8 @@ namespace HexBerlekampMathlib
 universe u
 
 noncomputable section
+
+open Polynomial
 
 variable {p : Nat} [Hex.ZMod64.Bounds p]
 
@@ -57,6 +60,107 @@ theorem toMathlibPolynomial_derivative (f : Hex.FpPoly p) :
       Polynomial.derivative (toMathlibPolynomial f) := by
   sorry
 
+namespace Rabin
+
+/-- The Mathlib polynomial `X^(p^n) - X` used by Rabin's divisibility leg. -/
+abbrev frobeniusPolynomial (p n : Nat) : Polynomial (ZMod p) :=
+  X ^ (p ^ n) - X
+
+/-
+Divisibility by the modulus is exactly vanishing in the corresponding
+`AdjoinRoot` quotient.
+-/
+omit [Hex.ZMod64.Bounds p] in
+theorem adjoinRoot_mk_eq_zero_of_dvd
+    (g P : Polynomial (ZMod p)) :
+    AdjoinRoot.mk g P = 0 ↔ g ∣ P := by
+  exact AdjoinRoot.mk_eq_zero
+
+/--
+If an irreducible `g` divides `X^(p^n) - X`, its quotient root maps into the
+degree-`n` Galois field over `ZMod p`.
+-/
+theorem exists_algHom_adjoinRoot_to_galoisField
+    [Fact (Nat.Prime p)] {n : Nat} (hn : n ≠ 0)
+    {g : Polynomial (ZMod p)}
+    (hg_irreducible : Irreducible g)
+    (hg_dvd : g ∣ frobeniusPolynomial p n) :
+    Nonempty (AdjoinRoot g →ₐ[ZMod p] GaloisField p n) := by
+  sorry
+
+/--
+The finite-dimensional rank of an `AdjoinRoot` quotient by a nonzero
+polynomial is its natural degree.
+-/
+theorem finrank_adjoinRoot_eq_natDegree
+    [Fact (Nat.Prime p)] {g : Polynomial (ZMod p)} (hg : g ≠ 0) :
+    Module.finrank (ZMod p) (AdjoinRoot g) = g.natDegree := by
+  sorry
+
+/--
+The Rabin finite-field degree lemma in the local `ZMod p` form used by the
+contrapositive proof.
+-/
+theorem natDegree_dvd_of_irreducible_dvd_frobeniusPolynomial
+    [Fact (Nat.Prime p)] {n : Nat} {g : Polynomial (ZMod p)}
+    (hg_irreducible : Irreducible g)
+    (hg_dvd : g ∣ frobeniusPolynomial p n) :
+    g.natDegree ∣ n := by
+  sorry
+
+/--
+For an irreducible polynomial, any nontrivial gcd/coprimality failure with
+`P` forces divisibility by `P`.
+-/
+theorem irreducible_dvd_of_not_isCoprime
+    [Fact (Nat.Prime p)] {g P : Polynomial (ZMod p)}
+    (hg_irreducible : Irreducible g)
+    (hnot_coprime : ¬ IsCoprime g P) :
+    g ∣ P := by
+  sorry
+
+/--
+Divisor arithmetic used by Rabin's reducible contrapositive: a proper divisor
+`d` of `n` yields a prime `q` such that `q ∣ n` and `d ∣ n / q`.
+-/
+theorem exists_prime_divisor_with_divisor_quotient
+    {d n : Nat} (hd_pos : 0 < d) (hd_dvd : d ∣ n) (hd_lt : d < n) :
+    ∃ q : Nat, Nat.Prime q ∧ q ∣ n / d ∧ q ∣ n ∧ d ∣ n / q := by
+  sorry
+
+/--
+The executable Rabin test passing entails the exact Mathlib divisibility and
+coprimality checks appearing in Rabin's criterion.
+-/
+theorem rabinTest_true_to_mathlib_checks
+    (f : Hex.FpPoly p) (hmonic : Hex.DensePoly.Monic f)
+    [Fact (Nat.Prime p)] {n : Nat}
+    (hdegree : Hex.Berlekamp.basisSize f = n)
+    (htest : Hex.Berlekamp.rabinTest f hmonic = true) :
+    0 < n ∧
+      toMathlibPolynomial f ∣ frobeniusPolynomial p n ∧
+      ∀ d ∈ Hex.Berlekamp.maximalProperDivisors n,
+        IsCoprime (toMathlibPolynomial f) (frobeniusPolynomial p d) := by
+  sorry
+
+/--
+The Mathlib Rabin checks imply the executable test surface once the transport
+lemmas connect executable remainders and gcds to `Polynomial (ZMod p)`.
+-/
+theorem rabinTest_true_of_mathlib_checks
+    (f : Hex.FpPoly p) (hmonic : Hex.DensePoly.Monic f)
+    [Fact (Nat.Prime p)] {n : Nat}
+    (hdegree : Hex.Berlekamp.basisSize f = n)
+    (hchecks :
+      0 < n ∧
+        toMathlibPolynomial f ∣ frobeniusPolynomial p n ∧
+        ∀ d ∈ Hex.Berlekamp.maximalProperDivisors n,
+          IsCoprime (toMathlibPolynomial f) (frobeniusPolynomial p d)) :
+    Hex.Berlekamp.rabinTest f hmonic = true := by
+  sorry
+
+end Rabin
+
 /-- Executable gcd transfers to Mathlib's gcd after coefficient transport. -/
 theorem toMathlibPolynomial_gcd
     [Field (Hex.ZMod64 p)] [Fact (Nat.Prime p)]
@@ -96,6 +200,17 @@ transported polynomial.
 theorem rabin_irreducible
     (f : Hex.FpPoly p) (hmonic : Hex.DensePoly.Monic f)
     [Fact (Nat.Prime p)] (n : Nat) (_hdegree : Hex.Berlekamp.basisSize f = n) :
+    Hex.Berlekamp.rabinTest f hmonic = true ↔ Irreducible (toMathlibPolynomial f) := by
+  sorry
+
+/--
+Rabin's executable test is equivalent to Mathlib irreducibility with the
+explicit positive-degree hypothesis used by the finite-field proof.
+-/
+theorem rabin_irreducible_of_positive_degree
+    (f : Hex.FpPoly p) (hmonic : Hex.DensePoly.Monic f)
+    [Fact (Nat.Prime p)] {n : Nat}
+    (_hdegree : Hex.Berlekamp.basisSize f = n) (_hpos : 0 < n) :
     Hex.Berlekamp.rabinTest f hmonic = true ↔ Irreducible (toMathlibPolynomial f) := by
   sorry
 
