@@ -69,6 +69,20 @@ private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
   rw [bit_eq_one_eq_testBit]
   simp [Nat.testBit_xor]
 
+private theorem clmul_xor_left_snd_bit (x y z : UInt64) (i : Nat) :
+    ((((clmul (x ^^^ y) z).2 >>> i.toUInt64) &&& 1) != 0) =
+      (((((clmul x z).2 >>> i.toUInt64) &&& 1) != 0) !=
+        ((((clmul y z).2 >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [clmul_xor_left]
+  exact UInt64.bit_xor_bne (clmul x z).2 (clmul y z).2 i
+
+private theorem clmul_xor_left_fst_bit (x y z : UInt64) (i : Nat) :
+    ((((clmul (x ^^^ y) z).1 >>> i.toUInt64) &&& 1) != 0) =
+      (((((clmul x z).1 >>> i.toUInt64) &&& 1) != 0) !=
+        ((((clmul y z).1 >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [clmul_xor_left]
+  exact UInt64.bit_xor_bne (clmul x z).1 (clmul y z).1 i
+
 private theorem coeffWords_xorClmulAt_low (acc : Array UInt64) {idx n : Nat}
     (x y : UInt64) (hidx : idx < acc.size) (hn : n / 64 = idx) :
     coeffWords (xorClmulAt acc idx x y) n =
@@ -90,6 +104,33 @@ private theorem coeffWords_xorClmulAt_ne (acc : Array UInt64) {idx n : Nat}
   have hLow : idx ≠ n / 64 := Ne.symm hnLow
   have hHigh : idx + 1 ≠ n / 64 := Ne.symm hnHigh
   simp [xorClmulAt, coeffWords, hLow, hHigh]
+
+private theorem coeffWords_xorClmulAt_low_xor_left (acc : Array UInt64) {idx n : Nat}
+    (x y z : UInt64) (hidx : idx < acc.size) (hn : n / 64 = idx) :
+    coeffWords (xorClmulAt acc idx (x ^^^ y) z) n =
+      (coeffWords (xorClmulAt acc idx x z) n !=
+        ((((clmul y z).2 >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  rw [coeffWords_xorClmulAt_low acc (x ^^^ y) z hidx hn]
+  rw [coeffWords_xorClmulAt_low acc x z hidx hn]
+  rw [clmul_xor_left_snd_bit]
+  cases coeffWords acc n <;>
+    cases ((((clmul x z).2 >>> (n % 64).toUInt64) &&& 1) != 0) <;>
+    cases ((((clmul y z).2 >>> (n % 64).toUInt64) &&& 1) != 0) <;>
+    rfl
+
+private theorem coeffWords_xorClmulAt_high_xor_left (acc : Array UInt64) {idx n : Nat}
+    (x y z : UInt64) (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size)
+    (hn : n / 64 = idx + 1) :
+    coeffWords (xorClmulAt acc idx (x ^^^ y) z) n =
+      (coeffWords (xorClmulAt acc idx x z) n !=
+        ((((clmul y z).1 >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  rw [coeffWords_xorClmulAt_high acc (x ^^^ y) z hidx hidxNext hn]
+  rw [coeffWords_xorClmulAt_high acc x z hidx hidxNext hn]
+  rw [clmul_xor_left_fst_bit]
+  cases coeffWords acc n <;>
+    cases ((((clmul x z).1 >>> (n % 64).toUInt64) &&& 1) != 0) <;>
+    cases ((((clmul y z).1 >>> (n % 64).toUInt64) &&& 1) != 0) <;>
+    rfl
 
 private theorem foldl_keep {α β : Type} (xs : List β) (acc : α) :
     xs.foldl (fun acc _ => acc) acc = acc := by

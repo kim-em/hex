@@ -38,6 +38,56 @@ private theorem clmulAccumulateBit_zero_left (acc : UInt64 × UInt64) (bitIdx : 
     clmulAccumulateBit acc 0 bitIdx = acc := by
   by_cases h : bitIdx = 0 <;> simp [clmulAccumulateBit, h]
 
+private theorem clmulAccumulateBit_xor_left
+    (accX accY : UInt64 × UInt64) (x y : UInt64) (bitIdx : Nat) :
+    clmulAccumulateBit (accX.1 ^^^ accY.1, accX.2 ^^^ accY.2) (x ^^^ y) bitIdx =
+      ((clmulAccumulateBit accX x bitIdx).1 ^^^ (clmulAccumulateBit accY y bitIdx).1,
+        (clmulAccumulateBit accX x bitIdx).2 ^^^ (clmulAccumulateBit accY y bitIdx).2) := by
+  by_cases h : bitIdx = 0 <;> simp [clmulAccumulateBit, h] <;> bv_decide
+
+private theorem foldl_clmul_xor_left (bits : List Nat)
+    (accX accY : UInt64 × UInt64) (x y z : UInt64) :
+    bits.foldl
+        (fun acc bitIdx =>
+          if ((z >>> bitIdx.toUInt64) &&& 1) != 0 then
+            clmulAccumulateBit acc (x ^^^ y) bitIdx
+          else
+            acc)
+        (accX.1 ^^^ accY.1, accX.2 ^^^ accY.2) =
+      let outX := bits.foldl
+        (fun acc bitIdx =>
+          if ((z >>> bitIdx.toUInt64) &&& 1) != 0 then
+            clmulAccumulateBit acc x bitIdx
+          else
+            acc)
+        accX
+      let outY := bits.foldl
+        (fun acc bitIdx =>
+          if ((z >>> bitIdx.toUInt64) &&& 1) != 0 then
+            clmulAccumulateBit acc y bitIdx
+          else
+            acc)
+        accY
+      (outX.1 ^^^ outY.1, outX.2 ^^^ outY.2) := by
+  induction bits generalizing accX accY with
+  | nil =>
+      simp
+  | cons bitIdx bits ih =>
+      simp only [List.foldl_cons]
+      by_cases hbit : ((z >>> bitIdx.toUInt64) &&& 1) != 0
+      · simp [hbit]
+        rw [clmulAccumulateBit_xor_left]
+        simpa using ih (clmulAccumulateBit accX x bitIdx) (clmulAccumulateBit accY y bitIdx)
+      · simp [hbit]
+        simpa using ih accX accY
+
+theorem pureClmul_xor_left (x y z : UInt64) :
+    pureClmul (x ^^^ y) z =
+      ((pureClmul x z).1 ^^^ (pureClmul y z).1,
+        (pureClmul x z).2 ^^^ (pureClmul y z).2) := by
+  unfold pureClmul
+  simpa using foldl_clmul_xor_left (List.range 64) (0, 0) (0, 0) x y z
+
 private theorem foldl_keep {α β : Type} (xs : List β) (acc : α) :
     xs.foldl (fun acc _ => acc) acc = acc := by
   induction xs generalizing acc with
@@ -450,6 +500,11 @@ theorem clmul_oneHot (a : UInt64) {bit : Nat} (hbit : bit < 64) :
     clmul a ((1 : UInt64) <<< bit.toUInt64) =
       if bit = 0 then (0, a) else (a >>> (64 - bit).toUInt64, a <<< bit.toUInt64) := by
   rw [clmul, pureClmul_oneHot a hbit]
+
+theorem clmul_xor_left (x y z : UInt64) :
+    clmul (x ^^^ y) z =
+      ((clmul x z).1 ^^^ (clmul y z).1, (clmul x z).2 ^^^ (clmul y z).2) := by
+  rw [clmul, clmul, clmul, pureClmul_xor_left]
 
 /-- High word of carry-less multiplication by an in-word monomial. -/
 theorem clmul_oneHot_fst (a : UInt64) {bit : Nat} (hbit : bit < 64) :
