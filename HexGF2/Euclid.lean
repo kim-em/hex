@@ -454,25 +454,50 @@ theorem dvd_gcd (d p q : GF2Poly) :
   rw [hbezout] at hsum
   simpa [r] using hsum
 
+private theorem irreducible_common_divisor_eq_one_of_reduced
+    {a f d : GF2Poly} (hf : Irreducible f) (ha : a ≠ 0)
+    (hred : a.IsZero ∨ a.degree < f.degree)
+    (hda : d ∣ a) (hdf : d ∣ f) :
+    d = 1 := by
+  sorry
+
+private theorem mod_eq_of_add_right_multiple (a c f : GF2Poly) :
+    (a + c * f) % f = a % f := by
+  sorry
+
 /-- Any nonzero reduced residue modulo an irreducible packed polynomial is
 coprime to the modulus, as computed by the packed Euclidean algorithm. -/
 theorem gcd_eq_one_of_irreducible_of_nonzero_reduced {a f : GF2Poly}
     (hf : Irreducible f) (ha : a ≠ 0)
     (hred : a.IsZero ∨ a.degree < f.degree) :
     gcd a f = 1 := by
-  sorry
+  exact irreducible_common_divisor_eq_one_of_reduced hf ha hred
+    (gcd_dvd_left a f) (gcd_dvd_right a f)
 
 /-- Adding a right multiple of the modulus does not change the computed
 remainder. This is the quotient-congruence bridge used with Bezout witnesses. -/
 theorem mod_add_mul_right_eq_mod (a c f : GF2Poly) :
     (a + c * f) % f = a % f := by
-  sorry
+  exact mod_eq_of_add_right_multiple a c f
 
 /-- The Bezout identity for `xgcd` gives a congruence between the left inverse
 candidate and the computed gcd modulo the right input. -/
 theorem xgcd_left_mul_mod_eq_gcd_mod (a f : GF2Poly) :
     (a * (xgcd a f).left) % f = (gcd a f) % f := by
-  sorry
+  let r := xgcd a f
+  have hbezout : r.left * a + r.right * f = r.gcd := by
+    simpa [r] using xgcd_bezout a f
+  have hcongr : a * r.left = r.gcd + r.right * f := by
+    calc
+      a * r.left = r.left * a := by rw [mul_comm]
+      _ = (r.left * a + r.right * f) + r.right * f := by
+            rw [add_add_cancel_right]
+      _ = r.gcd + r.right * f := by rw [hbezout]
+  calc
+    (a * (xgcd a f).left) % f = (a * r.left) % f := by rfl
+    _ = (r.gcd + r.right * f) % f := by rw [hcongr]
+    _ = r.gcd % f := mod_add_mul_right_eq_mod r.gcd r.right f
+    _ = (gcd a f) % f := by rfl
 
 /-- For a nonzero reduced residue modulo an irreducible packed polynomial, the
 left Bezout coefficient computed by `xgcd` is a multiplicative inverse modulo
