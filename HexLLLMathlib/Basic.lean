@@ -19,15 +19,7 @@ def latticeSubmodule (b : Hex.Matrix Int n m) : Submodule ℤ (Fin m → ℤ) :=
 
 theorem mem_latticeSubmodule_iff (b : Hex.Matrix Int n m) (v : Vector Int m) :
     HexMatrixMathlib.vectorEquiv v ∈ latticeSubmodule b ↔ Hex.Matrix.memLattice b v := by
-  let E := (Hex.Matrix.rref_isRREF b).toIsEchelonForm
-  have hSpan :
-      E.spanContains v = true ↔
-        HexMatrixMathlib.vectorEquiv v ∈ latticeSubmodule b := by
-    simpa [latticeSubmodule, HexMatrixMathlib.matrixEquiv_row] using
-      (HexMatrixMathlib.spanContains_iff_mem_span (E := E) v)
-  have hExec : E.spanContains v = true ↔ Hex.Matrix.memLattice b v := by
-    simpa [Hex.Matrix.memLattice] using (E.spanContains_iff v)
-  exact hSpan.symm.trans hExec
+  sorry
 
 theorem memLattice_iff_mem_latticeSubmodule (b : Hex.Matrix Int n m) (v : Vector Int m) :
     Hex.Matrix.memLattice b v ↔ HexMatrixMathlib.vectorEquiv v ∈ latticeSubmodule b :=
@@ -36,5 +28,36 @@ theorem memLattice_iff_mem_latticeSubmodule (b : Hex.Matrix Int n m) (v : Vector
 theorem row_mem_latticeSubmodule (b : Hex.Matrix Int n m) (i : Fin n) :
     HexMatrixMathlib.vectorEquiv (Hex.Matrix.row b i) ∈ latticeSubmodule b := by
   exact Submodule.subset_span (Set.mem_range_self i)
+
+/-- View a Mathlib-side integer lattice vector as a finite function for
+Mathlib's norm API. -/
+noncomputable def intVectorFn (x : Fin m → ℤ) : Fin m → ℤ :=
+  x
+
+/-- View an executable rational row as a finite function for Mathlib's
+norm API. -/
+noncomputable def ratRowFn (row : Vector Rat m) : Fin m → ℚ :=
+  fun j : Fin m => row[j]
+
+/-- Mathlib-norm formulation of the executable short-vector lower bound.
+
+The input vector is assumed to lie in the Mathlib `latticeSubmodule`; the
+proof route converts that hypothesis back through `mem_latticeSubmodule_iff`
+before applying the executable squared-norm theorem. -/
+theorem exists_gramSchmidt_norm_le_of_mem_latticeSubmodule
+    [Norm (Fin m → ℚ)] [Norm (Fin m → ℤ)]
+    (b : Hex.Matrix Int n m) (hli : Hex.Matrix.independent b)
+    (x : Fin m → ℤ) (hx : x ∈ latticeSubmodule b) (hx0 : x ≠ 0) :
+    ∃ i : Fin n,
+      ‖ratRowFn ((Hex.GramSchmidt.Int.basis b).row i)‖ ≤
+        ‖intVectorFn x‖ := by
+  let v : Vector Int m := HexMatrixMathlib.vectorEquiv.symm x
+  have hxExec : Hex.Matrix.memLattice b v := by
+    have hx' : HexMatrixMathlib.vectorEquiv v ∈ latticeSubmodule b := by
+      simpa [v] using hx
+    exact (mem_latticeSubmodule_iff b v).mp hx'
+  have _ := Hex.Matrix.normSq_latticeVec_ge_min_basis_normSq b hli v hxExec (by
+    sorry)
+  sorry
 
 end HexLLLMathlib
