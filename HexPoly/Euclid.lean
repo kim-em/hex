@@ -28,6 +28,56 @@ instance [One R] : One (DensePoly R) where
 def Monic [One R] (p : DensePoly R) : Prop :=
   p.leadingCoeff = 1
 
+private def arrayDegreeAux (coeffs : Array R) : Nat → Option Nat
+  | 0 => none
+  | fuel + 1 =>
+      let i := fuel
+      if coeffs.getD i (Zero.zero : R) = (Zero.zero : R) then
+        arrayDegreeAux coeffs fuel
+      else
+        some i
+
+private def arrayDegree? (coeffs : Array R) : Option Nat :=
+  arrayDegreeAux coeffs coeffs.size
+
+private def subtractScaledShift [Sub R] [Mul R]
+    (rem q : Array R) (shift : Nat) (coeff : R) : Array R :=
+  Id.run do
+    let mut next := rem
+    for j in [0:q.size] do
+      let idx := shift + j
+      next := next.set! idx (next.getD idx (Zero.zero : R) - coeff * q.getD j (Zero.zero : R))
+    return next
+
+private def divModArrayAux [Sub R] [Mul R]
+    (q : Array R) (qDegree : Nat) (scaleLead : R → R)
+    (fuel : Nat) (quot rem : Array R) : Array R × Array R :=
+  match fuel with
+  | 0 => (quot, rem)
+  | fuel + 1 =>
+      match arrayDegree? rem with
+      | none => (quot, rem)
+      | some rd =>
+          if _hdeg : rd < qDegree then
+            (quot, rem)
+          else
+            let shift := rd - qDegree
+            let coeff := scaleLead (rem.getD rd (Zero.zero : R))
+            let quot := quot.set! shift coeff
+            let rem := subtractScaledShift rem q shift coeff
+            divModArrayAux q qDegree scaleLead fuel quot rem
+
+private def divModArray [Sub R] [Mul R]
+    (p q : DensePoly R) (scaleLead : R → R) : DensePoly R × DensePoly R :=
+  if q.isZero then
+    (0, p)
+  else
+    let qDegree := q.size - 1
+    let quotientSize := p.size - qDegree
+    let quot := Array.replicate quotientSize (Zero.zero : R)
+    let qr := divModArrayAux q.toArray qDegree scaleLead p.size quot p.toArray
+    (ofCoeffs qr.1, ofCoeffs qr.2)
+
 /-- Long division by a monic divisor over a commutative ring. -/
 private def divModMonicAux [One R] [Add R] [Sub R] [Mul R]
     (q : DensePoly R) (fuel : Nat)
@@ -54,7 +104,7 @@ is sufficient, which is the case for normalized dense polynomials. -/
 def divModMonic [One R] [Add R] [Sub R] [Mul R]
     (p q : DensePoly R) (_hmonic : Monic q) :
     DensePoly R × DensePoly R :=
-  divModMonicAux q p.size 0 p
+  divModArray p q id
 
 /-- Field-based long division with remainder. Division by `0` returns `(0, p)`. -/
 private def divModAux [One R] [Add R] [Sub R] [Mul R] [Div R]
@@ -80,7 +130,10 @@ private def divModAux [One R] [Add R] [Sub R] [Mul R] [Div R]
 /-- Polynomial division with remainder over a field. -/
 def divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R × DensePoly R :=
-  divModAux q p.size 0 p
+  if p.degree?.getD 0 < q.degree?.getD 0 then
+    (0, p)
+  else
+    divModArray p q (fun coeff => coeff / q.leadingCoeff)
 
 /-- Quotient from polynomial long division over a field. -/
 def div [One R] [Add R] [Sub R] [Mul R] [Div R]
@@ -178,26 +231,7 @@ theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     p.degree?.getD 0 < q.degree?.getD 0 → divMod p q = (0, p) := by
   intro hdeg
-  unfold divMod
-  cases hsize : p.size with
-  | zero =>
-      simp [divModAux]
-  | succ n =>
-      by_cases hq : q.isZero
-      · simp [divModAux, hq]
-      · cases hqdeg : q.degree? with
-        | none =>
-            have hfalse : ¬ p.degree?.getD 0 < q.degree?.getD 0 := by
-              simp [hqdeg]
-            exact False.elim (hfalse hdeg)
-        | some qd =>
-            have hpdeg : p.degree?.getD 0 = n := by
-              simp [DensePoly.degree?, hsize]
-            have hqdeg' : (if q.size = 0 then none else some (q.size - 1)) = some qd := by
-              simpa [DensePoly.degree?] using hqdeg
-            have hlt : n < qd := by
-              simpa [hpdeg, hqdeg] using hdeg
-            simp [divModAux, hq, DensePoly.degree?, hsize, hqdeg', hlt]
+  simp [divMod, hdeg]
 
 /-- The computed remainder has degree below a positive-degree divisor. -/
 theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
