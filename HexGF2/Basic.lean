@@ -270,6 +270,26 @@ theorem UInt64.bne_zero_eq_toNat_bne_zero (w : UInt64) :
     subst hw
     exact (bne_iff_ne.mp hnat) rfl
 
+private theorem bit_eq_one_eq_testBit (x i : Nat) :
+    (x >>> i % 2 == 1) = x.testBit i := by
+  rw [Nat.testBit_eq_decide_div_mod_eq]
+  rw [Nat.shiftRight_eq_div_pow]
+  apply decide_eq_decide.mpr
+  exact Iff.rfl
+
+private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
+    ((((a ^^^ b) >>> i.toUInt64) &&& 1) != 0) =
+      ((((a >>> i.toUInt64) &&& 1) != 0) !=
+        (((b >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  simp [UInt64.toNat_xor, UInt64.toNat_shiftRight, UInt64.toNat_and]
+  rw [bit_eq_one_eq_testBit]
+  rw [bit_eq_one_eq_testBit]
+  rw [bit_eq_one_eq_testBit]
+  simp [Nat.testBit_xor]
+
 private theorem oneHotWord_bit_toNat {hot bit : Nat} (hhot : hot < 64) (hbit : bit < 64) :
     (((((1 : UInt64) <<< hot.toUInt64) >>> bit.toUInt64) &&& 1).toNat) =
       ((2 ^ hot >>> bit) &&& 1) := by
@@ -603,7 +623,8 @@ theorem coeff_add (p q : GF2Poly) (n : Nat) :
 /-- Addition over packed `GF(2)` polynomials is coefficientwise XOR. -/
 theorem coeff_add_eq_bne (p q : GF2Poly) (n : Nat) :
     (p + q).coeff n = (p.coeff n != q.coeff n) := by
-  sorry
+  rw [coeff_add]
+  simp [coeffWords, xorWords_get?_getD, coeff, UInt64.bit_xor_bne]
 
 /-- Equal set coefficients cancel under `GF(2)` addition. -/
 theorem coeff_add_of_true_true {p q : GF2Poly} {n : Nat}
