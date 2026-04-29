@@ -123,6 +123,9 @@ lean_exe hexarith_bench where
 lean_exe hexpoly_bench where
   root := `HexPoly.Bench
 
+lean_exe hexpolyz_bench where
+  root := `HexPolyZ.Bench
+
 lean_exe hexgramschmidt_bench where
   root := `HexGramSchmidt.Bench
 
