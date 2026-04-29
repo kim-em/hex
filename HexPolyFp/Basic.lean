@@ -775,6 +775,132 @@ private theorem fold_triangular_assoc_reindex
     (fun i j => term i j (n - i - j)) 0]
   simpa [leftAssocTriples, rightAssocTriples, List.map_flatMap] using hfold
 
+private theorem fold_add_congr
+    (xs : List Nat) {term₁ term₂ : Nat → ZMod64 p}
+    (hterm : ∀ i, i ∈ xs → term₁ i = term₂ i) (acc : ZMod64 p) :
+    xs.foldl (fun acc i => acc + term₁ i) acc =
+      xs.foldl (fun acc i => acc + term₂ i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [hterm i (by simp)]
+      exact ih (by
+        intro j hj
+        exact hterm j (by simp [hj])) (acc + term₂ i)
+
+private theorem fold_mulCoeff_assoc_left_expand
+    (f g h : FpPoly p) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i => acc + mulCoeffTerm (f * g) h n i) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0) 0 := by
+  apply fold_add_congr
+  intro i hi
+  exact mulCoeffTerm_mul_left_expand f g h n i (by
+    have hi' : i < n + 1 := List.mem_range.mp hi
+    omega)
+
+private theorem fold_mulCoeff_assoc_right_expand
+    (f g h : FpPoly p) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i => acc + mulCoeffTerm f (g * h) n i) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0) 0 := by
+  apply fold_add_congr
+  intro i hi
+  exact mulCoeffTerm_mul_right_expand f g h n i (by
+    have hi' : i < n + 1 := List.mem_range.mp hi
+    omega)
+
+private theorem fold_mulCoeff_assoc_left_normalize
+    (f g h : FpPoly p) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + (f.coeff j * g.coeff (i - j)) * h.coeff (n - i)) 0) 0 := by
+  apply fold_add_congr
+  intro i _hi
+  apply fold_add_congr
+  intro j hj
+  have hji : ¬ i < j := by
+    have hj' : j < i + 1 := List.mem_range.mp hj
+    omega
+  simp [mulCoeffTerm, hji]
+
+private theorem fold_mulCoeff_assoc_right_normalize
+    (f g h : FpPoly p) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + (f.coeff i * g.coeff j) * h.coeff (n - i - j)) 0) 0 := by
+  apply fold_add_congr
+  intro i _hi
+  apply fold_add_congr
+  intro j hj
+  have hji : ¬ n - i < j := by
+    have hj' : j < n - i + 1 := List.mem_range.mp hj
+    omega
+  simp [mulCoeffTerm, hji]
+  grind
+
+private theorem mulCoeff_assoc_reindex
+    (f g h : FpPoly p) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0) 0 := by
+  calc
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0) 0
+        = (List.range (n + 1)).foldl
+            (fun acc i =>
+              acc +
+                (List.range (i + 1)).foldl
+                  (fun acc j => acc + (f.coeff j * g.coeff (i - j)) * h.coeff (n - i)) 0) 0 := by
+            exact fold_mulCoeff_assoc_left_normalize f g h n
+    _ = (List.range (n + 1)).foldl
+            (fun acc i =>
+              acc +
+                (List.range (n - i + 1)).foldl
+                  (fun acc j => acc + (f.coeff i * g.coeff j) * h.coeff (n - i - j)) 0) 0 := by
+            exact fold_triangular_assoc_reindex n
+              (fun a b c => (f.coeff a * g.coeff b) * h.coeff c)
+    _ = (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0) 0 := by
+            exact (fold_mulCoeff_assoc_right_normalize f g h n).symm
+
 private theorem fold_left_distrib (xs : List Nat) (f g h : FpPoly p) (n : Nat) :
     xs.foldl (fun acc i => acc + mulCoeffTerm f (g + h) n i) 0 =
       xs.foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 +
@@ -813,5 +939,31 @@ theorem right_distrib (f g h : FpPoly p) :
   rw [coeff_mul_of_size_le f h n m (by dsimp [m]; omega)]
   rw [coeff_mul_of_size_le g h n m (by dsimp [m]; omega)]
   exact fold_right_distrib (List.range m) f g h n
+
+theorem mul_assoc (f g h : FpPoly p) :
+    (f * g) * h = f * (g * h) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mul]
+  rw [mulCoeffSum_eq_degree_bound (f * g) h n]
+  rw [mulCoeffSum_eq_degree_bound f (g * h) n]
+  calc
+    (List.range (n + 1)).foldl
+        (fun acc i => acc + mulCoeffTerm (f * g) h n i) 0
+        = (List.range (n + 1)).foldl
+            (fun acc i =>
+              acc +
+                (List.range (i + 1)).foldl
+                  (fun acc j => acc + mulCoeffTerm f g i j * h.coeff (n - i)) 0) 0 := by
+            exact fold_mulCoeff_assoc_left_expand f g h n
+    _ = (List.range (n + 1)).foldl
+            (fun acc i =>
+              acc +
+                (List.range (n - i + 1)).foldl
+                  (fun acc j => acc + f.coeff i * mulCoeffTerm g h (n - i) j) 0) 0 := by
+            exact mulCoeff_assoc_reindex f g h n
+    _ = (List.range (n + 1)).foldl
+        (fun acc i => acc + mulCoeffTerm f (g * h) n i) 0 := by
+            exact (fold_mulCoeff_assoc_right_expand f g h n).symm
 end FpPoly
 end Hex
