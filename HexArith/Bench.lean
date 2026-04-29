@@ -218,7 +218,7 @@ setup_benchmark runBarrettMulChain n => n
     paramCeiling := 131072
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
-    targetInnerNanos := 200000000
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runMontgomeryMulChain n => n
@@ -228,7 +228,7 @@ setup_benchmark runMontgomeryMulChain n => n
     paramCeiling := 131072
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
-    targetInnerNanos := 200000000
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runPowMod n => n
@@ -238,7 +238,7 @@ setup_benchmark runPowMod n => n
     paramCeiling := 16384
     paramSchedule := .custom #[1024, 2048, 4096, 8192, 16384]
     maxSecondsPerCall := 2.0
-    targetInnerNanos := 200000000
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runNatExtGcdShapes n => n
