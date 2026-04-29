@@ -501,16 +501,16 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     simpa using div_eq_mul_inv a b
   · intro h
     sorry
-  · simpa using inv_zero f hf hirr
+  · exact inv_zero f hf hirr
   · intro a ha
     have ha' : a ≠ (0 : FiniteField f hf hirr) := ha
     exact mul_inv_cancel (x := a) ha'
   · intro a
-    ext
-    sorry
+    apply GFqField.ext
+    simpa [zpow] using Lean.Grind.Semiring.pow_zero a.toQuotient
   · intro a n
-    ext
-    sorry
+    apply GFqField.ext
+    simpa [zpow] using Lean.Grind.Semiring.pow_succ a.toQuotient n
   · intro a n
     ext
     sorry
