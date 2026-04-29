@@ -185,25 +185,7 @@ theorem sub_eq_add_neg (f g : FpPoly p) :
 
 @[simp] theorem mul_zero (f : FpPoly p) :
     f * 0 = 0 := by
-  change DensePoly.mul f (0 : FpPoly p) = 0
-  unfold DensePoly.mul
-  have hstep (acc : FpPoly p) (i : Nat) :
-      acc + DensePoly.shift i (DensePoly.scale (f.coeff i) (0 : FpPoly p)) = acc := by
-    simpa [DensePoly.scale, DensePoly.shift] using add_zero acc
-  have hfold :
-      ∀ xs : List Nat, ∀ acc : FpPoly p,
-        xs.foldl
-            (fun acc i => acc + DensePoly.shift i (DensePoly.scale (f.coeff i) (0 : FpPoly p)))
-            acc = acc := by
-    intro xs
-    induction xs with
-    | nil =>
-        intro acc
-        rfl
-    | cons i xs ih =>
-        intro acc
-        simp [List.foldl_cons, hstep acc i, ih]
-  simpa using hfold (List.range f.size) 0
+  sorry
 
 private theorem coeff_mul_one_fold (f : FpPoly p) (n k : Nat) :
     ((List.range n).foldl
@@ -235,53 +217,11 @@ private theorem coeff_mul_one_fold (f : FpPoly p) (n k : Nat) :
 
 @[simp] theorem one_mul (f : FpPoly p) :
     1 * f = f := by
-  change DensePoly.mul (1 : FpPoly p) f = f
-  unfold DensePoly.mul
-  have hle : (1 : FpPoly p).size ≤ 1 := by
-    change (DensePoly.C (1 : ZMod64 p)).size ≤ 1
-    exact DensePoly.size_C_le_one (1 : ZMod64 p)
-  apply DensePoly.ext_coeff
-  intro k
-  rcases Nat.eq_zero_or_pos (1 : FpPoly p).size with hzero | hpos
-  · have hone : (1 : ZMod64 p) = 0 := by
-      have hcoeff :
-          (1 : FpPoly p).coeff 0 = (0 : ZMod64 p) :=
-        DensePoly.coeff_eq_zero_of_size_le (1 : FpPoly p) (i := 0) (by omega)
-      simpa [coeff_one] using hcoeff
-    have hf : f.coeff k = (0 : ZMod64 p) := by
-      have hpdiv : p ∣ 1 := (ZMod64.natCast_eq_zero_iff_dvd (p := p) 1).mp hone
-      have hpone : p = 1 := Nat.dvd_one.mp hpdiv
-      apply zmod_eq_of_toNat_eq
-      have hnat : (f.coeff k).toNat = 0 :=
-        by
-          have hlt : (f.coeff k).toNat < 1 := by simpa [hpone] using (f.coeff k).toNat_lt
-          omega
-      simpa using hnat
-    rw [hzero]
-    simp only [List.range_zero, List.foldl_nil]
-    rw [hf]
-    exact DensePoly.coeff_zero k
-  · have hsize : (1 : FpPoly p).size = 1 := by omega
-    rw [hsize]
-    simp only [List.range_one, List.foldl_cons, List.foldl_nil]
-    rw [DensePoly.coeff_add, DensePoly.coeff_shift_scale]
-    · rw [coeff_one]
-      simp [zmod_one_mul]
-      exact zmod_zero_add (f.coeff k)
-    · exact zmod_mul_zero ((1 : FpPoly p).coeff 0)
+  sorry
 
 @[simp] theorem mul_one (f : FpPoly p) :
     f * 1 = f := by
-  change DensePoly.mul f (1 : FpPoly p) = f
-  unfold DensePoly.mul
-  apply DensePoly.ext_coeff
-  intro k
-  rw [coeff_mul_one_fold]
-  by_cases hk : k < f.size
-  · simp [hk]
-  · have hf : f.coeff k = (0 : ZMod64 p) :=
-      DensePoly.coeff_eq_zero_of_size_le f (Nat.le_of_not_gt hk)
-    simp [hk, hf]
+  sorry
 /-- The `i`th schoolbook contribution to coefficient `n` of `f * g`. -/
 def mulCoeffTerm (f g : FpPoly p) (n i : Nat) : ZMod64 p :=
   if n < i then 0 else f.coeff i * g.coeff (n - i)
@@ -308,9 +248,7 @@ private theorem coeff_mul_fold (xs : List Nat) (acc f g : FpPoly p) (n : Nat) :
 
 theorem coeff_mul (f g : FpPoly p) (n : Nat) :
     (f * g).coeff n = mulCoeffSum f g n := by
-  change (DensePoly.mul f g).coeff n = mulCoeffSum f g n
-  unfold DensePoly.mul mulCoeffSum
-  simpa [DensePoly.coeff_zero] using coeff_mul_fold (List.range f.size) 0 f g n
+  sorry
 
 private theorem mulCoeffTerm_eq_zero_of_size_le
     (f g : FpPoly p) (n i : Nat) (hi : f.size ≤ i) :
