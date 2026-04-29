@@ -463,3 +463,20 @@ explicitly forbidden:
 - **Rolling a hex-local benchmark harness.** lean-bench is the
   harness; gaps in its API are filed against it, not papered over
   locally.
+- **Shipping a registration that produces no verdict-eligible rows.**
+  A parametric `run` whose every rung is filtered out by the
+  warmup-trim or signal-floor filter exits with code `2` and reports
+  `only 0 verdict-eligible row(s) survived…`. That is the harness
+  telling you the schedule, the per-call cap, or the target inner
+  nanos was set too low for the host the benchmark is supposed to
+  run on. CI treats exit 2 the same as a verdict mismatch: file an
+  issue, roll back, fix. Don't shrink scientific settings to dodge
+  the verdict.
+- **Treating an "inconclusive" verdict as a passing scientific run.**
+  Phase-4 exit criteria require either "consistent with declared
+  complexity" or a tracked finding-issue explaining the mismatch
+  ([PLAN/Phase4.md](../PLAN/Phase4.md) §Exit criteria). An
+  inconclusive verdict whose root cause is a too-narrow schedule
+  (rungs too close to the per-spawn floor, even when some survive
+  the filter) is miscalibration, not a finding, and the registration
+  must be re-tuned before the library advances through Phase 4.
