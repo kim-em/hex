@@ -16,7 +16,7 @@ Scientific registrations:
 * `runMulChecksum`: schoolbook dense multiplication, `O(n^2)`.
 * `runEval`: Horner evaluation, `O(n)`.
 * `runComposeChecksum`: Horner composition using schoolbook multiplication,
-  `O(n^3)` for same-size dense inputs.
+  `O(n^4)` for same-size dense inputs.
 * `runDerivativeChecksum`: formal derivative, `O(n)`.
 * `runDivModChecksum`: field-polynomial long division returning quotient and
   remainder, `O(n^2)`.
@@ -289,7 +289,7 @@ setup_benchmark runEval n => n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runComposeChecksum n => n * n * n
+setup_benchmark runComposeChecksum n => n * n * n * n
   with prep := prepComposeInput
   where {
     paramFloor := 16
