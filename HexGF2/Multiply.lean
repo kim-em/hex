@@ -102,5 +102,12 @@ theorem wordCount_mul_monomial_le (p : GF2Poly) (k : Nat) :
   exact Nat.le_trans (wordCount_mul_le p (monomial k))
     (Nat.add_le_add_left (wordCount_monomial_le k) p.wordCount)
 
+/-- Multiplication coefficients reduce to the raw carry-less word product. -/
+theorem coeff_mul (p q : GF2Poly) (n : Nat) :
+    (p * q).coeff n = coeffWords (mulWords p.words q.words) n := by
+  change (ofWords (mulWords p.words q.words)).coeff n =
+    coeffWords (mulWords p.words q.words) n
+  simp
+
 end GF2Poly
 end Hex
