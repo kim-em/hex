@@ -1,4 +1,4 @@
-import HexHensel.Basic
+import HexHensel.Multifactor
 
 /-!
 Executable data records for the Berlekamp-Zassenhaus factorization pipeline.
@@ -196,5 +196,97 @@ structure LiftData where
   p : Nat
   k : Nat
   liftedFactors : Array ZPoly
+
+private structure PrimeChoiceDataScore where
+  data : PrimeChoiceData
+  factorCount : Nat
+
+private def primeChoiceDataScore (f : ZPoly) (c : SmallPrimeCandidate) :
+    Option PrimeChoiceDataScore :=
+  letI := c.bounds
+  if isGoodPrime f c.p then
+    let fModP := ZPoly.modP c.p f
+    let decomposition := FpPoly.squareFreeDecomposition c.prime fModP
+    let factorsModP := decomposition.factors.map (fun factor => factor.factor) |>.toArray
+    some
+      { data := { p := c.p, fModP, factorsModP }
+        factorCount := factorsModP.size }
+  else
+    none
+
+private def betterPrimeChoiceDataScore
+    (old new : PrimeChoiceDataScore) : PrimeChoiceDataScore :=
+  if new.factorCount < old.factorCount then
+    new
+  else
+    old
+
+private def choosePrimeData? (f : ZPoly) : Option PrimeChoiceData :=
+  smallPrimeCandidates.foldl
+    (fun best c =>
+      match best, primeChoiceDataScore f c with
+      | none, score => score
+      | some old, none => some old
+      | some old, some new => some (betterPrimeChoiceDataScore old new))
+    none
+  |>.map (fun score => score.data)
+
+private def fallbackPrimeChoiceData (f : ZPoly) : PrimeChoiceData :=
+  letI := bounds_two
+  let fModP := ZPoly.modP 2 f
+  let decomposition := FpPoly.squareFreeDecomposition prime_two fModP
+  let factorsModP := decomposition.factors.map (fun factor => factor.factor) |>.toArray
+  { p := 2, fModP, factorsModP }
+
+/--
+Choose an admissible small prime and package the modular image together with
+its square-free factor data for the rest of the pipeline.
+-/
+def choosePrimeData (f : ZPoly) : PrimeChoiceData :=
+  match choosePrimeData? f with
+  | some data => data
+  | none => fallbackPrimeChoiceData f
+
+/--
+Lift the chosen modular factors to the requested precision for integer
+recombination.
+-/
+def henselLiftData (f : ZPoly) (B : Nat) (d : PrimeChoiceData) : LiftData :=
+  letI := d.bounds
+  let factors := d.factorsModP.map (fun factor => FpPoly.liftToZ factor)
+  { p := d.p
+    k := B
+    liftedFactors := ZPoly.multifactorLift d.p B f factors }
+
+/--
+Conservative integer recombination. Lifted local factors are accepted exactly
+when their ordered product is already the input; otherwise the input remains as
+one irreducible-for-this-pass factor.
+-/
+def recombine (f : ZPoly) (d : LiftData) : Array ZPoly :=
+  if Array.polyProduct d.liftedFactors = f then
+    d.liftedFactors
+  else
+    #[f]
+
+/-- Factor with an explicit coefficient bound for the recombination stage. -/
+def factorWithBound (f : ZPoly) (B : Nat) : Array ZPoly :=
+  let primeData := choosePrimeData f
+  let liftData := henselLiftData f B primeData
+  recombine f liftData
+
+/-- Factor using the library's conservative executable coefficient bound. -/
+def factor (f : ZPoly) : Array ZPoly :=
+  factorWithBound f (ZPoly.coeffL2NormBound f)
+
+/--
+Conditional product contract for the bounded factorization entry point.
+The bound hypothesis is the computational correctness assumption supplied by
+the later proof layer.
+-/
+theorem factor_product_of_bound (f : ZPoly) (B : Nat)
+    (hB : ∀ g : ZPoly, g ∣ f → ∀ i, (g.coeff i).natAbs ≤ B) :
+    Array.foldl (· * ·) 1 (factorWithBound f B) = f := by
+  sorry
 
 end Hex
