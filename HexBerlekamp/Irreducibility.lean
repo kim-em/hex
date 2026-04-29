@@ -82,30 +82,52 @@ structure RabinBezoutWitness (p : Nat) [ZMod64.Bounds p] where
 /--
 Self-describing certificate data for Rabin irreducibility checking.
 
-The `bezout` array is indexed in the same order as `maximalProperDivisors
-degree`.  Each witness proves coprimality of `f` and
+The `bezout` array is indexed in the same order as `maximalProperDivisors n`.
+Each witness proves coprimality of `f` and
 `X^(p^d) - X mod f` by the executable identity
 `left * f + right * (X^(p^d) - X) = 1`.
 -/
-structure IrreducibilityCertificate (p : Nat) [ZMod64.Bounds p] where
-  prime : Nat
-  degree : Nat
+structure IrreducibilityCertificate where
+  p : Nat
+  [bounds : ZMod64.Bounds p]
+  n : Nat
   powChain : Array (FpPoly p)
   bezout : Array (RabinBezoutWitness p)
 
 namespace IrreducibilityCertificate
 
-variable (cert : IrreducibilityCertificate p)
+variable (cert : IrreducibilityCertificate)
 
 /-- Read the certified `X^(p^k) mod f` witness, if present. -/
-def powWitness? (k : Nat) : Option (FpPoly p) :=
+def powWitness? (k : Nat) : Option (@FpPoly cert.p cert.bounds) :=
   cert.powChain[k]?
 
 /-- Read the Bezout witness for the `i`-th maximal proper divisor, if present. -/
-def bezoutWitness? (i : Nat) : Option (RabinBezoutWitness p) :=
+def bezoutWitness? (i : Nat) : Option (@RabinBezoutWitness cert.p cert.bounds) :=
   cert.bezout[i]?
 
 end IrreducibilityCertificate
+
+/--
+Same-prime view of a self-contained certificate after its stored `p` has been
+matched against the ambient field.
+-/
+structure SamePrimeIrreducibilityCertificate (p : Nat) [ZMod64.Bounds p] where
+  n : Nat
+  powChain : Array (FpPoly p)
+  bezout : Array (RabinBezoutWitness p)
+
+private def IrreducibilityCertificate.toAmbient?
+    (cert : IrreducibilityCertificate) (p : Nat) [ZMod64.Bounds p] :
+    Option (SamePrimeIrreducibilityCertificate p) := by
+  match cert with
+  | { p := certP, bounds := certBounds, n := n, powChain := powChain, bezout := bezout } =>
+      if h : certP = p then
+        subst h
+        letI := certBounds
+        exact some { n := n, powChain := powChain, bezout := bezout }
+      else
+        exact none
 
 /-- The Rabin difference polynomial represented by a certificate pow-chain entry. -/
 def certifiedFrobeniusDiffMod (f : FpPoly p) (hmonic : DensePoly.Monic f)
@@ -114,24 +136,24 @@ def certifiedFrobeniusDiffMod (f : FpPoly p) (hmonic : DensePoly.Monic f)
 
 /-- Check that a certificate's pow chain matches the committed Frobenius routine. -/
 def checkPowChain (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) : Bool :=
-  cert.powChain.size == cert.degree + 1 &&
-    (List.range (cert.degree + 1)).all fun k =>
+    (cert : SamePrimeIrreducibilityCertificate p) : Bool :=
+  cert.powChain.size == cert.n + 1 &&
+    (List.range (cert.n + 1)).all fun k =>
       cert.powChain[k]? == some (FpPoly.frobeniusXPowMod f hmonic k)
 
 /-- Check one Bezout witness for a Rabin maximal-proper-divisor leg. -/
 def checkRabinBezoutWitness (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) (i d : Nat) : Bool :=
+    (cert : SamePrimeIrreducibilityCertificate p) (i d : Nat) : Bool :=
   match cert.powChain[d]?, cert.bezout[i]? with
   | some powWitness, some witness =>
       let diff := certifiedFrobeniusDiffMod f hmonic powWitness
       witness.left * f + witness.right * diff == 1
   | _, _ => false
 
-/-- Check all Bezout witnesses against `maximalProperDivisors cert.degree`. -/
+/-- Check all Bezout witnesses against `maximalProperDivisors cert.n`. -/
 def checkRabinBezoutWitnesses (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) : Bool :=
-  let divisors := maximalProperDivisors cert.degree
+    (cert : SamePrimeIrreducibilityCertificate p) : Bool :=
+  let divisors := maximalProperDivisors cert.n
   cert.bezout.size == divisors.length &&
     (divisors.zipIdx).all fun pair =>
       checkRabinBezoutWitness f hmonic cert pair.2 pair.1
@@ -139,18 +161,20 @@ def checkRabinBezoutWitnesses (f : FpPoly p) (hmonic : DensePoly.Monic f)
 /--
 Executable checker for a Rabin irreducibility certificate.
 
-It validates the self-described prime and degree, recomputes every pow-chain
+It validates the self-described `p` and `n`, recomputes every pow-chain
 entry, checks the divisibility leg `X^(p^n) = X mod f`, and verifies each
 Bezout identity for the maximal proper divisors of `n`.
 -/
 def checkIrreducibilityCertificate (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) : Bool :=
-  decide (cert.prime = p) &&
-    decide (0 < cert.degree) &&
-    decide (cert.degree = basisSize f) &&
-    checkPowChain f hmonic cert &&
-    (cert.powChain[cert.degree]? == some (FpPoly.modByMonic f FpPoly.X hmonic)) &&
-    checkRabinBezoutWitnesses f hmonic cert
+    (cert : IrreducibilityCertificate) : Bool :=
+  match cert.toAmbient? p with
+  | none => false
+  | some samePrimeCert =>
+      decide (0 < samePrimeCert.n) &&
+        decide (samePrimeCert.n = basisSize f) &&
+        checkPowChain f hmonic samePrimeCert &&
+        (samePrimeCert.powChain[samePrimeCert.n]? == some (FpPoly.modByMonic f FpPoly.X hmonic)) &&
+        checkRabinBezoutWitnesses f hmonic samePrimeCert
 
 /--
 Rabin's executable irreducibility test: `f` must be nonconstant, divide
@@ -177,22 +201,22 @@ theorem rabinDividesTest_spec (f : FpPoly p) (hmonic : DensePoly.Monic f) :
 
 theorem checkPowChain_spec
     (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) :
+    (cert : SamePrimeIrreducibilityCertificate p) :
     checkPowChain f hmonic cert = true →
-      ∀ k, k ≤ cert.degree →
+      ∀ k, k ≤ cert.n →
         cert.powChain[k]? = some (FpPoly.frobeniusXPowMod f hmonic k) := by
   sorry
 
 theorem checkIrreducibilityCertificate_rabinTest
     (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) :
+    (cert : IrreducibilityCertificate) :
     checkIrreducibilityCertificate f hmonic cert = true →
       rabinTest f hmonic = true := by
   sorry
 
 theorem checkIrreducibilityCertificate_irreducible_predicate
     (f : FpPoly p) (hmonic : DensePoly.Monic f)
-    (cert : IrreducibilityCertificate p) :
+    (cert : IrreducibilityCertificate) :
     checkIrreducibilityCertificate f hmonic cert = true →
       FpPoly.Irreducible f := by
   sorry
