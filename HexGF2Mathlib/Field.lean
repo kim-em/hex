@@ -109,6 +109,58 @@ instance : Hex.ZMod64.Bounds 2 := ⟨by decide, by decide⟩
 
 variable {f : Hex.GF2Poly} {hirr : Hex.GF2Poly.Irreducible f}
 
+/-- Reduced packed representatives modulo `f`, isolated from the field wrapper
+so Mathlib-side finite support can be transported before the final public
+`GF2nPoly` cardinality statements are proved. -/
+abbrev ReducedPackedRep (f : Hex.GF2Poly) : Type :=
+  { p : Hex.GF2Poly // p.IsZero ∨ p.degree < f.degree }
+
+/-- The executable packed quotient wrapper is exactly the reduced-representative
+subtype used for finite support. -/
+def reducedPackedRepEquiv : TypeEquiv (Hex.GF2nPoly f hirr) (ReducedPackedRep f) where
+  toFun x := ⟨x.val, x.val_reduced⟩
+  invFun x := ⟨x.1, x.2⟩
+  left_inv := by
+    intro x
+    cases x
+    rfl
+  right_inv := by
+    intro x
+    cases x
+    rfl
+
+/-- Encode a reduced packed representative as a bounded binary index. -/
+def reducedPackedRepIndex (x : ReducedPackedRep f) : Fin (2 ^ f.degree) :=
+  ⟨HexGF2Mathlib.GF2Poly.toNat x.1, HexGF2Mathlib.GF2Poly.toNat_lt_of_degree_lt x.2⟩
+
+/-- Decode a bounded binary index into the corresponding reduced packed
+representative. -/
+def reducedPackedRepOfIndex (i : Fin (2 ^ f.degree)) : ReducedPackedRep f :=
+  ⟨HexGF2Mathlib.GF2Poly.ofNatBelowDegree f.degree i.1,
+    HexGF2Mathlib.GF2Poly.ofNatBelowDegree_reduced f.degree i⟩
+
+@[simp]
+theorem reducedPackedRepIndex_ofIndex (i : Fin (2 ^ f.degree)) :
+    reducedPackedRepIndex (f := f) (reducedPackedRepOfIndex (f := f) i) = i := by
+  apply Fin.ext
+  exact HexGF2Mathlib.GF2Poly.toNat_ofNatBelowDegree f.degree i
+
+@[simp]
+theorem reducedPackedRepOfIndex_index (x : ReducedPackedRep f) :
+    reducedPackedRepOfIndex (f := f) (reducedPackedRepIndex (f := f) x) = x := by
+  cases x with
+  | mk p hp =>
+      apply Subtype.ext
+      exact HexGF2Mathlib.GF2Poly.ofNatBelowDegree_toNat hp
+
+/-- Reduced packed representatives are equivalent to the finite binary index
+space determined by the modulus degree. -/
+def reducedPackedRepFinEquiv : TypeEquiv (ReducedPackedRep f) (Fin (2 ^ f.degree)) where
+  toFun := reducedPackedRepIndex (f := f)
+  invFun := reducedPackedRepOfIndex (f := f)
+  left_inv := reducedPackedRepOfIndex_index (f := f)
+  right_inv := reducedPackedRepIndex_ofIndex (f := f)
+
 /-- The packed irreducible modulus viewed inside the generic `FpPoly 2`
 representation. -/
 def modulusFpPoly : Hex.FpPoly 2 :=
