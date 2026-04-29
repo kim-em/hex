@@ -1437,6 +1437,19 @@ theorem coeff_monomial_self (n : Nat) :
   rw [coeffWords, hget]
   exact oneHotWord_bit_self hbit
 
+/-- The normalized storage of a monomial is its zero prefix plus one nonzero
+one-hot word. -/
+theorem words_monomial (n : Nat) :
+    (monomial n).words =
+      (Array.replicate (n / 64) (0 : UInt64)).push
+        ((1 : UInt64) <<< (n % 64).toUInt64) := by
+  have hbit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+  have hne : ((1 : UInt64) <<< (n % 64).toUInt64) ≠ 0 :=
+    oneHotWord_ne_zero hbit
+  unfold monomial ofWords normalizeWords
+  apply Array.toList_inj.mp
+  simp [trimTrailingZeroWordsList_replicate_zero_append_nonzero (n / 64) hne]
+
 /-- Coefficients away from the defining degree of a monomial are clear. -/
 theorem coeff_monomial_ne {n m : Nat} (h : m ≠ n) :
     (monomial n).coeff m = false := by
