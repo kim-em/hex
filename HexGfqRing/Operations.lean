@@ -689,6 +689,123 @@ theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     repr (zsmul (.negSucc n) x) = reduceMod f (-repr (nsmul (n + 1) x)) :=
   rfl
 
+private def linearPow {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) : Nat → PolyQuotient f hf
+  | 0 => 1
+  | n + 1 => linearPow x n * x
+
+@[simp] private theorem linearPow_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    linearPow x 0 = 1 :=
+  rfl
+
+@[simp] private theorem linearPow_succ {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearPow x (n + 1) = linearPow x n * x :=
+  rfl
+
+private theorem linearPow_mul_assoc {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a b c : PolyQuotient f hf) :
+    a * b * c = a * (b * c) := by
+  apply ext
+  exact repr_mul_assoc a b c
+
+private theorem linearPow_mul_assoc_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a b c : PolyQuotient f hf) :
+    mul (mul a b) c = mul a (mul b c) := by
+  apply ext
+  exact repr_mul_assoc a b c
+
+private theorem linearPow_mul_comm {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a b : PolyQuotient f hf) :
+    a * b = b * a := by
+  apply ext
+  exact repr_mul_comm a b
+
+private theorem linearPow_mul_one_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a : PolyQuotient f hf) :
+    mul a 1 = a := by
+  apply ext
+  exact repr_mul_one a
+
+private theorem linearPow_one_mul_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a : PolyQuotient f hf) :
+    mul (one f hf) a = a := by
+  apply ext
+  exact repr_one_mul a
+
+private theorem linearPow_double {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearPow x (2 * n) = linearPow (mul x x) n := by
+  induction n with
+  | zero =>
+      rfl
+  | succ n ih =>
+      have htwo : 2 * (n + 1) = 2 * n + 2 := by omega
+      rw [htwo]
+      change linearPow x ((2 * n + 1) + 1) =
+        linearPow (mul x x) n * mul x x
+      rw [linearPow_succ, linearPow_succ, ih]
+      exact linearPow_mul_assoc (linearPow (x * x) n) x x
+
+private theorem linearPow_double_add_one {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearPow x (2 * n + 1) = mul x (linearPow (mul x x) n) := by
+  rw [linearPow_succ, linearPow_double]
+  exact linearPow_mul_comm (linearPow (x * x) n) x
+
+private theorem pow_go_eq_acc_mul_linearPow
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (acc base : PolyQuotient f hf) (k : Nat) :
+    pow.go acc base k = mul acc (linearPow base k) := by
+  induction k using Nat.strongRecOn generalizing acc base with
+  | ind k ih =>
+      rw [pow.go.eq_def]
+      by_cases hk : k = 0
+      · simp [hk, linearPow_mul_one_raw]
+      · rw [dif_neg hk]
+        have hlt : k / 2 < k :=
+          Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide : 1 < 2)
+        cases Nat.mod_two_eq_zero_or_one k with
+        | inl hmod0 =>
+            have hk_eq : k = 2 * (k / 2) := by
+              have h := Nat.mod_add_div k 2
+              omega
+            have hnot : ¬k % 2 = 1 := by omega
+            have hdiv : 2 * (k / 2) / 2 = k / 2 :=
+              Nat.mul_div_right (k / 2) (by decide : 0 < 2)
+            rw [if_neg hnot]
+            calc
+              pow.go acc (mul base base) (k / 2)
+                  = mul acc (linearPow (mul base base) (k / 2)) := by
+                    exact ih (k / 2) hlt acc (mul base base)
+              _ = mul acc (linearPow base k) := by
+                    rw [hk_eq, hdiv, linearPow_double]
+        | inr hmod1 =>
+            have hk_eq : k = 2 * (k / 2) + 1 := by
+              have h := Nat.mod_add_div k 2
+              omega
+            rw [if_pos hmod1]
+            calc
+              pow.go (mul acc base) (mul base base) (k / 2)
+                  = mul (mul acc base) (linearPow (mul base base) (k / 2)) := by
+                    exact ih (k / 2) hlt (mul acc base) (mul base base)
+              _ = mul acc (mul base (linearPow (mul base base) (k / 2))) := by
+                    exact @linearPow_mul_assoc_raw p _ f hf acc base
+                      (linearPow (mul base base) (k / 2))
+              _ = mul acc (linearPow base (2 * (k / 2) + 1)) := by
+                    rw [linearPow_double_add_one]
+              _ = mul acc (linearPow base k) := by
+                    rw [← hk_eq]
+
+private theorem pow_eq_linearPow
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    pow x n = linearPow x n := by
+  change pow.go (one f hf) x n = linearPow x n
+  rw [pow_go_eq_acc_mul_linearPow]
+  exact linearPow_one_mul_raw (linearPow x n)
+
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQuotient f hf) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
@@ -727,7 +844,9 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQu
     unfold pow.go
     rfl
   · intro a n
-    sorry
+    change pow a (n + 1) = pow a n * a
+    rw [pow_eq_linearPow, pow_eq_linearPow]
+    rfl
   · intro n
     exact natCast_succ f hf n
   · intro n
