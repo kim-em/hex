@@ -16,10 +16,6 @@ namespace DensePoly
 
 variable {R : Type u} [Zero R] [DecidableEq R]
 
-/-- Repeated addition by a natural number, implemented without extra algebra imports. -/
-private def natScale [Add R] (n : Nat) (x : R) : R :=
-  Nat.rec (Zero.zero : R) (fun _ acc => acc + x) n
-
 /-- Multiply every coefficient by `c`. -/
 def scale [Mul R] (c : R) (p : DensePoly R) : DensePoly R :=
   ofCoeffs <| p.toArray.toList.map (fun a => c * a) |>.toArray
@@ -145,9 +141,9 @@ def compose [Add R] [Mul R] (p q : DensePoly R) : DensePoly R :=
   p.toArray.toList.reverse.foldl (fun acc coeff => acc * q + C coeff) (0 : DensePoly R)
 
 /-- Formal derivative. The coefficient of `x^i` becomes `(i + 1) * a_(i+1)`. -/
-def derivative [Add R] (p : DensePoly R) : DensePoly R :=
+def derivative [NatCast R] [Mul R] (p : DensePoly R) : DensePoly R :=
   ofCoeffs <|
-    (List.range (p.size - 1)).map (fun i => natScale (i + 1) <| p.coeff (i + 1)) |>.toArray
+    (List.range (p.size - 1)).map (fun i => ((i + 1 : Nat) : R) * p.coeff (i + 1)) |>.toArray
 
 theorem coeff_add [Add R] (p q : DensePoly R) (n : Nat) :
     (p + q).coeff n = (p.coeff n + q.coeff n) := by
@@ -174,7 +170,7 @@ theorem eval_C [Add R] [Mul R] (c x : R) :
     eval (C c) x = c := by
   sorry
 
-theorem derivative_zero [Add R] :
+theorem derivative_zero [NatCast R] [Mul R] :
     derivative (0 : DensePoly R) = 0 := by
   sorry
 
