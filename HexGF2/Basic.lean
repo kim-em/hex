@@ -204,6 +204,62 @@ def degree? (p : GF2Poly) : Option Nat :=
 def degree (p : GF2Poly) : Nat :=
   p.degree?.getD 0
 
+@[simp] theorem isZero_eq_true_iff_words_eq_empty (p : GF2Poly) :
+    p.isZero = true ↔ p.words = #[] := by
+  simp [isZero]
+
+@[simp] theorem isZero_eq_false_iff_words_ne_empty (p : GF2Poly) :
+    p.isZero = false ↔ p.words ≠ #[] := by
+  simp [isZero]
+
+@[simp] theorem isZero_iff_eq_zero (p : GF2Poly) :
+    p.isZero = true ↔ p = 0 := by
+  constructor
+  · intro h
+    apply ext_words
+    simpa using (isZero_eq_true_iff_words_eq_empty p).mp h
+  · intro h
+    subst h
+    rfl
+
+theorem eq_zero_of_isZero {p : GF2Poly} (h : p.isZero = true) :
+    p = 0 :=
+  (isZero_iff_eq_zero p).mp h
+
+theorem isZero_of_eq_zero {p : GF2Poly} (h : p = 0) :
+    p.isZero = true :=
+  (isZero_iff_eq_zero p).mpr h
+
+theorem degree?_eq_none_of_isZero {p : GF2Poly} (h : p.isZero = true) :
+    p.degree? = none := by
+  have hp : p = 0 := eq_zero_of_isZero h
+  subst hp
+  rfl
+
+theorem isZero_false_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p.isZero = false := by
+  rw [isZero_eq_false_iff_words_ne_empty]
+  intro hwords
+  have hnone : p.degree? = none := by
+    simp [degree?, hwords]
+  rw [h] at hnone
+  contradiction
+
+theorem ne_zero_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p ≠ 0 := by
+  intro hp
+  have hzero : p.isZero = true := isZero_of_eq_zero hp
+  have hfalse : p.isZero = false := isZero_false_of_degree?_eq_some h
+  rw [hzero] at hfalse
+  contradiction
+
+@[simp] theorem degree_eq_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p.degree = d := by
+  simp [degree, h]
+
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
 
@@ -298,6 +354,37 @@ theorem coeffWords_xorWords_self (xs : Array UInt64) (n : Nat) :
 theorem coeff_add_self (p : GF2Poly) (n : Nat) :
     (p + p).coeff n = false := by
   rw [coeff_add, coeffWords_xorWords_self]
+
+private theorem trimTrailingZeroWordsList_replicate_zero (n : Nat) :
+    trimTrailingZeroWordsList (List.replicate n (0 : UInt64)) = [] := by
+  induction n with
+  | zero =>
+      simp [trimTrailingZeroWordsList]
+  | succ n ih =>
+      change trimTrailingZeroWordsList ((0 : UInt64) :: List.replicate n 0) = []
+      simp [trimTrailingZeroWordsList, ih]
+
+theorem normalizeWords_replicate_zero (n : Nat) :
+    normalizeWords (Array.replicate n (0 : UInt64)) = #[] := by
+  simp [normalizeWords, trimTrailingZeroWordsList_replicate_zero]
+
+theorem xorWords_self (xs : Array UInt64) :
+    xorWords xs xs = Array.replicate xs.size (0 : UInt64) := by
+  apply Array.ext
+  · simp [xorWords]
+  · intro i _ _
+    simp [xorWords]
+
+@[simp] theorem add_self (p : GF2Poly) :
+    p + p = 0 := by
+  apply ext_words
+  change (ofWords (xorWords p.words p.words)).words = #[]
+  calc
+    (ofWords (xorWords p.words p.words)).words
+        = (ofWords (Array.replicate p.words.size (0 : UInt64))).words := by
+          exact congrArg (fun words => (ofWords words).words) (xorWords_self p.words)
+    _ = #[] := by
+          simp [ofWords, normalizeWords_replicate_zero]
 
 /-- Shift a normalized word list left by `bitShift ∈ [1, 63]`. -/
 def shiftLeftBitsList (bitShift : Nat) (carry : UInt64) : List UInt64 → List UInt64
