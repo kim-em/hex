@@ -93,6 +93,82 @@ def isZero (p : DensePoly R) : Bool :=
 def coeff (p : DensePoly R) (n : Nat) : R :=
   p.coeffs.getD n (Zero.zero : R)
 
+/-- Extensionality for normalized dense polynomials when the stored sizes agree. -/
+@[ext] theorem ext_of_size_eq {p q : DensePoly R}
+    (hsize : p.size = q.size)
+    (hcoeff : ∀ i, i < p.size → p.coeff i = q.coeff i) :
+    p = q := by
+  cases p with
+  | mk pc pn =>
+    cases q with
+    | mk qc qn =>
+      congr
+      apply Array.ext hsize
+      intro i hi₁ hi₂
+      calc
+        pc[i] = pc.getD i (Zero.zero : R) := Array.getElem_eq_getD (Zero.zero : R)
+        _ = qc.getD i (Zero.zero : R) := hcoeff i hi₁
+        _ = qc[i] := (Array.getElem_eq_getD (Zero.zero : R)).symm
+
+/-- Coefficients outside the stored support are zero. -/
+theorem coeff_eq_zero_of_size_le (p : DensePoly R) {i : Nat} (h : p.size ≤ i) :
+    p.coeff i = (Zero.zero : R) := by
+  unfold coeff Array.getD
+  have hcoeffs : p.coeffs.size ≤ i := by
+    simpa [size] using h
+  rw [dif_neg (Nat.not_lt.mpr hcoeffs)]
+
+/-- The last stored coefficient of a nonzero normalized dense polynomial is nonzero. -/
+theorem coeff_last_ne_zero_of_pos_size (p : DensePoly R) (hpos : 0 < p.size) :
+    p.coeff (p.size - 1) ≠ (Zero.zero : R) := by
+  rcases p.normalized with hzero | hback
+  · simp [size, hzero] at hpos
+  · intro hcoeff
+    apply hback
+    rw [Array.back?_eq_getElem?]
+    have hi : p.size - 1 < p.size := by omega
+    have hi' : p.coeffs.size - 1 < p.coeffs.size := by
+      simpa [size] using hi
+    rw [Array.getElem?_eq_getElem hi']
+    have hget :
+        p.coeffs[p.coeffs.size - 1] = p.coeff (p.size - 1) := by
+      rw [show p.size = p.coeffs.size by rfl]
+      exact Array.getElem_eq_getD (Zero.zero : R)
+    simp [hget, hcoeff]
+
+/-- Coefficientwise equality of normalized dense polynomials forces equal stored sizes. -/
+theorem size_eq_of_coeff_eq {p q : DensePoly R}
+    (hcoeff : ∀ i, p.coeff i = q.coeff i) :
+    p.size = q.size := by
+  rcases Nat.lt_trichotomy p.size q.size with hpq | hpq | hqp
+  · let i := q.size - 1
+    have hp_le : p.size ≤ i := by omega
+    have hp_zero : p.coeff i = (Zero.zero : R) :=
+      coeff_eq_zero_of_size_le p hp_le
+    have hq_ne : q.coeff i ≠ (Zero.zero : R) :=
+      coeff_last_ne_zero_of_pos_size q (by omega)
+    have h := hcoeff i
+    rw [hp_zero] at h
+    exact False.elim (hq_ne h.symm)
+  · exact hpq
+  · let i := p.size - 1
+    have hq_le : q.size ≤ i := by omega
+    have hq_zero : q.coeff i = (Zero.zero : R) :=
+      coeff_eq_zero_of_size_le q hq_le
+    have hp_ne : p.coeff i ≠ (Zero.zero : R) :=
+      coeff_last_ne_zero_of_pos_size p (by omega)
+    have h := hcoeff i
+    rw [hq_zero] at h
+    exact False.elim (hp_ne h)
+
+/-- Extensionality for normalized dense polynomials by their coefficient functions. -/
+theorem ext_coeff {p q : DensePoly R}
+    (hcoeff : ∀ i, p.coeff i = q.coeff i) :
+    p = q := by
+  apply ext_of_size_eq (size_eq_of_coeff_eq hcoeff)
+  intro i _hi
+  exact hcoeff i
+
 /-- The largest exponent with a stored coefficient, or `none` for the zero polynomial. -/
 def degree? (p : DensePoly R) : Option Nat :=
   if _h : p.size = 0 then none else some (p.size - 1)
