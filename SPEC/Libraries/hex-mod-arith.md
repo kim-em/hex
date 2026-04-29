@@ -35,9 +35,9 @@ Mathlib dependency.
 ## Default operations
 
 Operations are stated as semantic contracts on the canonical
-representative. Only `mul` carries a mandatory `@[extern]` for
-runtime; `add`/`sub`/`zero`/`one`/`pow` lower to native `UInt64`
-arithmetic in pure Lean already, and `inv` routes through the
+representative. `mul` and `pow` carry mandatory `@[extern]` runtime
+paths; `add`/`sub`/`zero`/`one` lower to native `UInt64` arithmetic
+in pure Lean already, and `inv` routes through the
 `@[extern "lean_hex_mpz_gcdext"]`-bearing `extGcd` declared in
 `HexArith.Int` (see "Extern contract: `mpz_gcdext`" in
 `SPEC/Libraries/hex-arith.md`). **`inv` must NOT call
@@ -56,6 +56,7 @@ def ZMod64.sub (a b : ZMod64 p) : ZMod64 p          -- pure Lean
 def ZMod64.zero : ZMod64 p
 def ZMod64.one  : ZMod64 p                          -- equals zero when p = 1
 def ZMod64.inv  (a : ZMod64 p) : ZMod64 p           -- via Hex.Int.extGcd
+@[extern "lean_hex_zmod64_pow"]
 def ZMod64.pow  (a : ZMod64 p) (n : Nat) : ZMod64 p
 ```
 
@@ -105,6 +106,22 @@ The Phase-1 deliverable is the strategy-1 reference body plus the
 `p`-dispatched Barrett/Montgomery implementation behind the same
 extern symbol. Whichever strategy is used, it must agree with the
 logical body — the SPEC mandates the contract, not the strategy.
+
+### `ZMod64.pow` runtime contract
+
+Logical body (used by Lean for proofs and as the portable semantic
+contract): exponentiation by squaring over `ZMod64.mul`, reading the
+natural exponent from low bits to high bits.
+
+The runtime implementation is supplied by `lean_hex_zmod64_pow` in
+`HexModArith/ffi/zmod64_mul.c`. It exports large Lean `Nat` exponents
+to 64-bit limbs once, then scans those limbs from high bits to low
+bits while performing the same square-and-multiply recurrence on
+`UInt64` residues. This keeps exponent-bit traversal linear in the
+bit length instead of repeatedly dividing a shrinking arbitrary-
+precision `Nat` by two. The runtime result must agree with the
+logical body for every bounded modulus, including the degenerate
+modulus `1` and the word modulus `2^64`.
 
 ## Hot-loop optimization (opt-in)
 
