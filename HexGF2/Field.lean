@@ -251,9 +251,19 @@ variable {f : GF2Poly} {hirr : GF2Poly.Irreducible f}
 def modulus : GF2Poly :=
   f
 
+/-- Zero is a reduced representative modulo any packed irreducible. -/
+private theorem zero_reduced : (0 : GF2Poly).IsZero ∨ (0 : GF2Poly).degree < f.degree := by
+  exact Or.inl rfl
+
 /-- Reduce a packed polynomial to its canonical residue class modulo `f`. -/
 def reducePoly (p : GF2Poly) : GF2nPoly f hirr :=
-  ⟨p % modulus (f := f), GF2Poly.mod_degree_lt p (modulus (f := f)) hirr.1⟩
+  let r := p % modulus (f := f)
+  if hzero : r.isZero = true then
+    ⟨r, Or.inl hzero⟩
+  else if hdegree : r.degree < f.degree then
+    ⟨r, Or.inr hdegree⟩
+  else
+    ⟨0, zero_reduced (f := f)⟩
 
 /-- Canonical additive identity. -/
 def zero : GF2nPoly f hirr :=

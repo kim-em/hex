@@ -8,10 +8,11 @@ irreducibility proof is a trusted fixture so the module can focus on ordinary
 evaluation through proof-carrying wrapper constructors.
 -/
 namespace Hex
-namespace GF2n
 
 private axiom aesIrreducible :
   GF2Poly.Irreducible (GF2Poly.ofUInt64Monic 0x1B 8)
+
+namespace GF2n
 
 private abbrev AESField : Type :=
   GF2n 8 0x1B (by decide) (by decide) aesIrreducible
@@ -33,4 +34,27 @@ private def aes (w : UInt64) : AESField :=
 #guard ((aes 0x53) * (aes 0xCA)).val = 1
 
 end GF2n
+
+namespace GF2nPoly
+
+private abbrev AESPolyField : Type :=
+  GF2nPoly (GF2Poly.ofUInt64Monic 0x1B 8) aesIrreducible
+
+private def aesPoly (w : UInt64) : AESPolyField :=
+  reducePoly (GF2Poly.ofUInt64 w)
+
+/-- info: #[202] -/
+#guard_msgs in #eval (((aesPoly 0x53)⁻¹).val.toWords)
+
+/-- info: #[202] -/
+#guard_msgs in #eval (((aesPoly 1) / (aesPoly 0x53)).val.toWords)
+
+/-- info: #[1] -/
+#guard_msgs in #eval (((aesPoly 0x53) * (aesPoly 0xCA)).val.toWords)
+
+#guard (((aesPoly 0x53)⁻¹).val.toWords) = #[0xCA]
+#guard (((aesPoly 1) / (aesPoly 0x53)).val.toWords) = #[0xCA]
+#guard (((aesPoly 0x53) * (aesPoly 0xCA)).val.toWords) = #[1]
+
+end GF2nPoly
 end Hex
