@@ -120,5 +120,8 @@ lean_exe hexarith_bench where
 lean_exe hexpoly_bench where
   root := `HexPoly.Bench
 
+lean_exe hexgramschmidt_bench where
+  root := `HexGramSchmidt.Bench
+
 @[default_target]
 lean_lib HexManual where
