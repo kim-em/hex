@@ -291,6 +291,97 @@ theorem reduceMod_mul_reduceMod (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a * b) = reduceMod f (reduceMod f a * reduceMod f b) := by
   exact reduceMod_mul_reduceMod_congr f a b
 
+@[simp] theorem ofPoly_zero_eq_zero
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) :
+    ofPoly f hf 0 = (0 : PolyQuotient f hf) :=
+  rfl
+
+@[simp] theorem ofPoly_one_eq_one
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) :
+    ofPoly f hf 1 = (1 : PolyQuotient f hf) :=
+  rfl
+
+@[simp] theorem ofPoly_const_eq_const
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (c : ZMod64 p) :
+    ofPoly f hf (FpPoly.C c) = const f hf c :=
+  rfl
+
+theorem ofPoly_add_reduceMod
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (a b : FpPoly p) :
+    ofPoly f hf (a + b) = ofPoly f hf (reduceMod f a + reduceMod f b) := by
+  apply ext
+  change reduceMod f (a + b) =
+    reduceMod f (reduceMod f a + reduceMod f b)
+  exact reduceMod_add_reduceMod_congr f a b
+
+theorem ofPoly_mul_reduceMod
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (a b : FpPoly p) :
+    ofPoly f hf (a * b) = ofPoly f hf (reduceMod f a * reduceMod f b) := by
+  apply ext
+  change reduceMod f (a * b) =
+    reduceMod f (reduceMod f a * reduceMod f b)
+  exact reduceMod_mul_reduceMod_congr f a b
+
+@[simp] theorem repr_add_ofPoly
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (a b : FpPoly p) :
+    repr (ofPoly f hf a + ofPoly f hf b) = reduceMod f (a + b) := by
+  change reduceMod f (reduceMod f a + reduceMod f b) = reduceMod f (a + b)
+  exact (reduceMod_add_reduceMod_congr f a b).symm
+
+@[simp] theorem repr_mul_ofPoly
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (a b : FpPoly p) :
+    repr (ofPoly f hf a * ofPoly f hf b) = reduceMod f (a * b) := by
+  change reduceMod f (reduceMod f a * reduceMod f b) = reduceMod f (a * b)
+  exact (reduceMod_mul_reduceMod_congr f a b).symm
+
+theorem repr_neg_add_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    repr (-x + x) = 0 := by
+  rw [repr_add, repr_neg]
+  calc
+    reduceMod f (reduceMod f (-repr x) + repr x)
+        = reduceMod f (-repr x + repr x) := by
+          exact reduceMod_add_left_reduceMod f (-repr x) (repr x)
+    _ = reduceMod f 0 := by
+          rw [FpPoly.add_left_neg]
+    _ = 0 := by
+          exact reduceMod_zero f
+
+theorem repr_add_neg_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    repr (x + -x) = 0 := by
+  rw [repr_add, repr_neg]
+  calc
+    reduceMod f (repr x + reduceMod f (-repr x))
+        = reduceMod f (repr x + -repr x) := by
+          exact reduceMod_add_right_reduceMod f (repr x) (-repr x)
+    _ = reduceMod f 0 := by
+          rw [FpPoly.add_right_neg]
+    _ = 0 := by
+          exact reduceMod_zero f
+
+theorem repr_sub_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    repr (x - x) = 0 := by
+  rw [repr_sub]
+  calc
+    reduceMod f (repr x - repr x) = reduceMod f 0 := by
+      rw [FpPoly.sub_self]
+    _ = 0 := by
+      exact reduceMod_zero f
+
+theorem sub_eq_add_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x y : PolyQuotient f hf) :
+    x - y = x + -y := by
+  apply ext
+  rw [repr_sub, repr_add, repr_neg]
+  calc
+    reduceMod f (repr x - repr y)
+        = reduceMod f (repr x + -repr y) := by
+          rw [FpPoly.sub_eq_add_neg]
+    _ = reduceMod f (repr x + reduceMod f (-repr y)) := by
+          exact (reduceMod_add_right_reduceMod f (repr x) (-repr y)).symm
+
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQuotient f hf) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a

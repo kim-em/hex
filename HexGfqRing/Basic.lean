@@ -126,10 +126,58 @@ theorem reduceMod_add_reduceMod_congr (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a + b) = reduceMod f (reduceMod f a + reduceMod f b) := by
   simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_add_mod a b f)
 
+/-- Reducing the left summand before quotient reduction preserves the representative. -/
+theorem reduceMod_add_left_reduceMod (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (reduceMod f a + b) = reduceMod f (a + b) := by
+  calc
+    reduceMod f (reduceMod f a + b)
+        = reduceMod f (reduceMod f (reduceMod f a) + reduceMod f b) := by
+          exact reduceMod_add_reduceMod_congr f (reduceMod f a) b
+    _ = reduceMod f (reduceMod f a + reduceMod f b) := by
+          simp [reduceMod_idem]
+    _ = reduceMod f (a + b) := by
+          exact (reduceMod_add_reduceMod_congr f a b).symm
+
+/-- Reducing the right summand before quotient reduction preserves the representative. -/
+theorem reduceMod_add_right_reduceMod (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (a + reduceMod f b) = reduceMod f (a + b) := by
+  calc
+    reduceMod f (a + reduceMod f b)
+        = reduceMod f (reduceMod f a + reduceMod f (reduceMod f b)) := by
+          exact reduceMod_add_reduceMod_congr f a (reduceMod f b)
+    _ = reduceMod f (reduceMod f a + reduceMod f b) := by
+          simp [reduceMod_idem]
+    _ = reduceMod f (a + b) := by
+          exact (reduceMod_add_reduceMod_congr f a b).symm
+
 /-- Reducing both factors before quotient reduction preserves the canonical representative. -/
 theorem reduceMod_mul_reduceMod_congr (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a * b) = reduceMod f (reduceMod f a * reduceMod f b) := by
   simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_mul_mod a b f)
+
+/-- Reducing the left factor before quotient reduction preserves the representative. -/
+theorem reduceMod_mul_left_reduceMod (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (reduceMod f a * b) = reduceMod f (a * b) := by
+  calc
+    reduceMod f (reduceMod f a * b)
+        = reduceMod f (reduceMod f (reduceMod f a) * reduceMod f b) := by
+          exact reduceMod_mul_reduceMod_congr f (reduceMod f a) b
+    _ = reduceMod f (reduceMod f a * reduceMod f b) := by
+          simp [reduceMod_idem]
+    _ = reduceMod f (a * b) := by
+          exact (reduceMod_mul_reduceMod_congr f a b).symm
+
+/-- Reducing the right factor before quotient reduction preserves the representative. -/
+theorem reduceMod_mul_right_reduceMod (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (a * reduceMod f b) = reduceMod f (a * b) := by
+  calc
+    reduceMod f (a * reduceMod f b)
+        = reduceMod f (reduceMod f a * reduceMod f (reduceMod f b)) := by
+          exact reduceMod_mul_reduceMod_congr f a (reduceMod f b)
+    _ = reduceMod f (reduceMod f a * reduceMod f b) := by
+          simp [reduceMod_idem]
+    _ = reduceMod f (a * b) := by
+          exact (reduceMod_mul_reduceMod_congr f a b).symm
 
 theorem ofPoly_reduceMod (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
     ofPoly f hf (reduceMod f g) = ofPoly f hf g := by
