@@ -111,6 +111,26 @@ theorem div_le_barrettQuotient_add_one (hp : 1 < p)
     rw [hdiv]
     exact Nat.zero_le _
 
+private theorem barrett_remainder_eq_mod_of_quotient_eq (p T q : Nat)
+    (hq : q = T / p) :
+    T - q * p = T % p := by
+  have hdecomp : T % p + q * p = T := by
+    simpa [hq, Nat.mul_comm] using Nat.mod_add_div T p
+  omega
+
+private theorem barrett_remainder_eq_mod_add_p_of_quotient_succ (p T q : Nat)
+    (hq : T / p = q + 1) :
+    T - q * p = T % p + p := by
+  have hdecomp : T % p + p * (q + 1) = T := by
+    simpa [hq] using Nat.mod_add_div T p
+  have hsum : q * p + (T % p + p) = T := by
+    calc
+      q * p + (T % p + p) = T % p + p * (q + 1) := by
+        simp [Nat.mul_add, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm,
+          Nat.mul_comm]
+      _ = T := hdecomp
+  omega
+
 /--
 With `pinv = floor(R / p)` and `T < R`, Nat-level Barrett reduction returns the
 same value as `% p`.
@@ -118,10 +138,28 @@ same value as `% p`.
 theorem barrettReduceNat_eq_mod (hp : 1 < p) (hpinv : pinv = barrettRadix / p)
     (hT : T < barrettRadix) :
     barrettReduceNat p pinv T = T % p := by
-  sorry
+  have hp0 : 0 < p := by omega
+  let q := T * pinv / barrettRadix
+  have hq_le : q ≤ T / p := by
+    simpa [q] using barrettQuotient_le_div (p := p) (pinv := pinv) (T := T) hp hpinv
+  have hdiv_le : T / p ≤ q + 1 := by
+    simpa [q] using div_le_barrettQuotient_add_one
+      (p := p) (pinv := pinv) (T := T) hp hpinv hT
+  have hq_cases : q = T / p ∨ T / p = q + 1 := by
+    omega
+  rcases hq_cases with hq | hq
+  · have hr : T - q * p = T % p :=
+      barrett_remainder_eq_mod_of_quotient_eq p T q hq
+    have hlt : T % p < p := Nat.mod_lt T hp0
+    simp [barrettReduceNat, q, hr, Nat.not_le_of_lt hlt]
+  · have hr : T - q * p = T % p + p :=
+      barrett_remainder_eq_mod_add_p_of_quotient_succ p T q hq
+    have hcond : p ≤ T % p + p := Nat.le_add_left p (T % p)
+    simp [barrettReduceNat, q, hr, hcond]
 
 /-- Nat-level Barrett reduction always returns a canonical residue. -/
 theorem barrettReduceNat_lt (hp : 1 < p) (hpinv : pinv = barrettRadix / p)
     (hT : T < barrettRadix) :
     barrettReduceNat p pinv T < p := by
-  sorry
+  rw [barrettReduceNat_eq_mod hp hpinv hT]
+  exact Nat.mod_lt T (by omega)
