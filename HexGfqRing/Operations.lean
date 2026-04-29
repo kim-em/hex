@@ -197,11 +197,11 @@ theorem natCast_eq_natCast_iff_reduceMod_const_eq
 
 theorem reduceMod_add_reduceMod (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a + b) = reduceMod f (reduceMod f a + reduceMod f b) := by
-  sorry
+  exact reduceMod_add_reduceMod_congr f a b
 
 theorem reduceMod_mul_reduceMod (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a * b) = reduceMod f (reduceMod f a * reduceMod f b) := by
-  sorry
+  exact reduceMod_mul_reduceMod_congr f a b
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQuotient f hf) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
