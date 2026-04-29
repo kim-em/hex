@@ -1,5 +1,6 @@
 import HexGF2Mathlib.Basic
 import HexGfqField
+import Mathlib.Data.Fintype.Card
 
 /-!
 Bridge definitions between the packed `HexGF2` extension-field wrappers and the
@@ -14,6 +15,17 @@ generic `Hex.GFqField.FiniteField` model over `Hex.FpPoly 2`.
 namespace HexGF2Mathlib
 
 open Hex
+
+namespace TypeEquiv
+
+/-- Convert the project-local equivalence record to Mathlib's `Equiv`. -/
+def toEquiv {α : Type u} {β : Type v} (e : TypeEquiv α β) : α ≃ β where
+  toFun := e.toFun
+  invFun := e.invFun
+  left_inv := e.left_inv
+  right_inv := e.right_inv
+
+end TypeEquiv
 
 namespace GF2n
 
@@ -100,6 +112,33 @@ def equiv : Hex.GF2n n irr hn hn64 hirr ≃+*
   right_inv := toGeneric_ofGeneric
   map_mul' := toGeneric_mul
   map_add' := toGeneric_add
+
+/-- Single-word packed field elements are indexed by their bounded canonical
+word representatives. -/
+def finEquiv : Hex.GF2n n irr hn hn64 hirr ≃ Fin (2 ^ n) where
+  toFun x := ⟨x.val.toNat, x.val_lt⟩
+  invFun i :=
+    ⟨UInt64.ofNatLT i.1
+        (Nat.lt_of_lt_of_le i.2
+          (Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_lt hn64))),
+      by simp⟩
+  left_inv := by
+    intro x
+    cases x
+    simp
+  right_inv := by
+    intro i
+    cases i
+    simp
+
+noncomputable instance : Fintype (Hex.GF2n n irr hn hn64 hirr) :=
+  Fintype.ofEquiv (Fin (2 ^ n)) (finEquiv (n := n) (irr := irr)
+    (hn := hn) (hn64 := hn64) (hirr := hirr)).symm
+
+theorem fintype_card :
+    Fintype.card (Hex.GF2n n irr hn hn64 hirr) = 2 ^ n := by
+  simpa using Fintype.card_congr (finEquiv (n := n) (irr := irr)
+    (hn := hn) (hn64 := hn64) (hirr := hirr))
 
 end GF2n
 
@@ -230,6 +269,21 @@ def equiv : Hex.GF2nPoly f hirr ≃+* GenericFiniteField (f := f) where
   right_inv := toGeneric_ofGeneric
   map_mul' := toGeneric_mul
   map_add' := toGeneric_add
+
+/-- Packed arbitrary-degree field elements are indexed by reduced packed
+representatives below the modulus degree. -/
+def finEquiv : Hex.GF2nPoly f hirr ≃ Fin (2 ^ f.degree) :=
+  TypeEquiv.toEquiv <|
+    TypeEquiv.trans
+      (reducedPackedRepEquiv (f := f) (hirr := hirr))
+      (reducedPackedRepFinEquiv (f := f))
+
+noncomputable instance : Fintype (Hex.GF2nPoly f hirr) :=
+  Fintype.ofEquiv (Fin (2 ^ f.degree)) (finEquiv (f := f) (hirr := hirr)).symm
+
+theorem fintype_card :
+    Fintype.card (Hex.GF2nPoly f hirr) = 2 ^ f.degree := by
+  simpa using Fintype.card_congr (finEquiv (f := f) (hirr := hirr))
 
 end GF2nPoly
 
