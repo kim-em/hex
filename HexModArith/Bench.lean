@@ -112,9 +112,13 @@ def mixWord (acc x : UInt64) : UInt64 :=
 def checksumInnerRepeats : Nat :=
   2048
 
+/-- Hot-loop multiplier for addition checksums. -/
+def addInnerRepeats : Nat :=
+  512
+
 /-- Hot-loop multiplier for extern-backed multiplication checksums. -/
 def mulInnerRepeats : Nat :=
-  128
+  32
 
 /-- Hot-loop multiplier for repeated exponentiation by squaring. -/
 def powInnerRepeats : Nat :=
@@ -189,18 +193,18 @@ def runCastChecksum (input : CastInput) : UInt64 :=
     acc
 
 /-- One checksum pass for batched addition. -/
-def addChecksumOnce (input : BinaryInput) (seed : UInt64) : UInt64 :=
-  input.samples.foldl
-    (fun acc sample => checksumZMod acc (sample.lhs + sample.rhs))
-    seed
-
-/-- Benchmark target: batched addition. -/
-def runAddChecksum (input : BinaryInput) : UInt64 :=
+def addSampleChecksum (sample : BinarySample) (seed : UInt64) : UInt64 :=
   let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
     match remaining with
     | 0 => acc
-    | k + 1 => go k (addChecksumOnce input acc)
-  go checksumInnerRepeats 0
+    | k + 1 => go k (checksumZMod acc (sample.lhs + sample.rhs))
+  go addInnerRepeats seed
+
+/-- Benchmark target: batched addition. -/
+def runAddChecksum (input : BinaryInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => addSampleChecksum sample acc)
+    0
 
 /-- One checksum pass for batched subtraction. -/
 def subChecksumOnce (input : BinaryInput) (seed : UInt64) : UInt64 :=
@@ -304,9 +308,9 @@ setup_benchmark runCastChecksum n => n
 setup_benchmark runAddChecksum n => n
   with prep := prepBinaryInput
   where {
-    paramFloor := 131072
-    paramCeiling := 524288
-    paramSchedule := .custom #[131072, 262144, 524288]
+    paramFloor := 65536
+    paramCeiling := 262144
+    paramSchedule := .custom #[65536, 131072, 262144]
     maxSecondsPerCall := 8.0
     targetInnerNanos := 500000000
   }
