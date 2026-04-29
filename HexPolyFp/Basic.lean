@@ -1,5 +1,7 @@
 import HexModArith.Ring
 import HexPoly.Euclid
+import Init.Data.List.Lemmas
+import Init.Data.List.Perm
 
 /-!
 Core definitions for executable polynomials over `F_p`.
@@ -589,6 +591,189 @@ private theorem mulCoeffTerm_mul_right_expand
   rw [coeff_mul, mulCoeffSum_eq_degree_bound g h (n - i)]
   exact fold_mul_left (p := p) (List.range (n - i + 1))
     (fun j => mulCoeffTerm g h (n - i) j) (f.coeff i)
+
+private def leftAssocTriples (n : Nat) : List ((Nat × Nat) × Nat) :=
+  (List.range (n + 1)).flatMap fun i =>
+    (List.range (i + 1)).map fun j => ((j, i - j), n - i)
+
+private def rightAssocTriples (n : Nat) : List ((Nat × Nat) × Nat) :=
+  (List.range (n + 1)).flatMap fun i =>
+    (List.range (n - i + 1)).map fun j => ((i, j), n - i - j)
+
+private theorem nodup_map_of_injective
+    {α β : Type} {xs : List α} {f : α → β}
+    (hxs : xs.Nodup)
+    (hinj : ∀ a, a ∈ xs → ∀ b, b ∈ xs → f a = f b → a = b) :
+    (xs.map f).Nodup := by
+  induction xs with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      simp only [List.map_cons]
+      rw [List.nodup_cons] at hxs ⊢
+      constructor
+      · intro hx
+        rcases List.mem_map.mp hx with ⟨y, hy, hxy⟩
+        have hxy' : x = y := hinj x (by simp) y (by simp [hy]) hxy.symm
+        exact hxs.1 (by simpa [hxy'] using hy)
+      · exact ih hxs.2 (by
+          intro a ha b hb hab
+          exact hinj a (by simp [ha]) b (by simp [hb]) hab)
+
+private theorem nodup_flatMap_of_disjoint
+    {α β : Type} {xs : List α} {f : α → List β}
+    (hxs : xs.Nodup)
+    (hrow : ∀ x, x ∈ xs → (f x).Nodup)
+    (hdisj :
+      ∀ x, x ∈ xs → ∀ y, y ∈ xs → x ≠ y →
+        ∀ z, z ∈ f x → z ∈ f y → False) :
+    (xs.flatMap f).Nodup := by
+  induction xs with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      rw [List.nodup_cons] at hxs
+      rw [List.flatMap_cons, List.nodup_append]
+      refine ⟨hrow x (by simp), ?_, ?_⟩
+      · exact ih hxs.2
+          (by intro y hy; exact hrow y (by simp [hy]))
+          (by
+            intro y hy z hz hyz t hty htz
+            exact hdisj y (by simp [hy]) z (by simp [hz]) hyz t hty htz)
+      · intro a ha b hb hab
+        rcases List.mem_flatMap.mp hb with ⟨y, hy, hby⟩
+        exact hdisj x (by simp) y (by simp [hy]) (by
+          intro hxy
+          exact hxs.1 (hxy ▸ hy)) a ha (hab ▸ hby)
+
+private theorem leftAssocTriples_nodup (n : Nat) :
+    (leftAssocTriples n).Nodup := by
+  unfold leftAssocTriples
+  apply nodup_flatMap_of_disjoint List.nodup_range
+  · intro i hi
+    apply nodup_map_of_injective List.nodup_range
+    intro a ha b hb hab
+    injection hab with hfst _
+    exact Prod.ext_iff.mp hfst |>.1
+  · intro i hi k hk hik z hzi hzk
+    rcases List.mem_map.mp hzi with ⟨a, ha, rfl⟩
+    rcases List.mem_map.mp hzk with ⟨b, hb, hEq⟩
+    injection hEq with hpair hlast
+    injection hpair with hfirst hsecond
+    have hi' : i < n + 1 := List.mem_range.mp hi
+    have hk' : k < n + 1 := List.mem_range.mp hk
+    omega
+
+private theorem rightAssocTriples_nodup (n : Nat) :
+    (rightAssocTriples n).Nodup := by
+  unfold rightAssocTriples
+  apply nodup_flatMap_of_disjoint List.nodup_range
+  · intro i hi
+    apply nodup_map_of_injective List.nodup_range
+    intro a ha b hb hab
+    injection hab with hfst _
+    exact Prod.ext_iff.mp hfst |>.2
+  · intro i hi k hk hik z hzi hzk
+    rcases List.mem_map.mp hzi with ⟨a, ha, rfl⟩
+    rcases List.mem_map.mp hzk with ⟨b, hb, hEq⟩
+    injection hEq with hpair _
+    exact hik (Prod.ext_iff.mp hpair |>.1).symm
+
+private theorem leftAssocTriples_mem_iff (n : Nat) (abc : (Nat × Nat) × Nat) :
+    abc ∈ leftAssocTriples n ↔ abc.1.1 + abc.1.2 + abc.2 = n := by
+  rcases abc with ⟨⟨a, b⟩, c⟩
+  simp [leftAssocTriples]
+  constructor
+  · intro h
+    omega
+  · intro h
+    refine ⟨a + b, ?_, a, ?_, ?_⟩ <;> omega
+
+private theorem rightAssocTriples_mem_iff (n : Nat) (abc : (Nat × Nat) × Nat) :
+    abc ∈ rightAssocTriples n ↔ abc.1.1 + abc.1.2 + abc.2 = n := by
+  rcases abc with ⟨⟨a, b⟩, c⟩
+  simp [rightAssocTriples]
+  constructor
+  · intro h
+    omega
+  · intro h
+    refine ⟨a, ?_, b, ?_, ?_⟩ <;> omega
+
+private theorem leftAssocTriples_perm_rightAssocTriples (n : Nat) :
+    List.Perm (leftAssocTriples n) (rightAssocTriples n) := by
+  rw [List.perm_iff_count]
+  intro abc
+  rw [(leftAssocTriples_nodup n).count, (rightAssocTriples_nodup n).count]
+  simp [leftAssocTriples_mem_iff, rightAssocTriples_mem_iff]
+
+private theorem fold_add_perm {xs ys : List (ZMod64 p)}
+    (h : List.Perm xs ys) (acc : ZMod64 p) :
+    xs.foldl (fun acc x => acc + x) acc =
+      ys.foldl (fun acc x => acc + x) acc := by
+  induction h generalizing acc with
+  | nil =>
+      rfl
+  | cons x _ ih =>
+      simp only [List.foldl_cons]
+      exact ih (acc + x)
+  | swap x y _ =>
+      simp only [List.foldl_cons]
+      have hxy : acc + x + y = acc + y + x := by grind
+      rw [hxy]
+  | trans _ _ ih₁ ih₂ =>
+      exact Eq.trans (ih₁ acc) (ih₂ acc)
+
+private theorem fold_add_acc
+    (xs : List (ZMod64 p)) (acc : ZMod64 p) :
+    xs.foldl (fun acc x => acc + x) acc =
+      acc + xs.foldl (fun acc x => acc + x) 0 := by
+  have h := fold_add_right (p := p) xs 0 acc
+  simp only [zmod_zero_add] at h
+  rw [h]
+  grind
+
+private theorem fold_flatMap_map_add
+    {α β : Type} (xs : List α) (row : α → List β)
+    (term : α → β → ZMod64 p) (acc : ZMod64 p) :
+    (xs.flatMap fun x => (row x).map (term x)).foldl
+        (fun acc x => acc + x) acc =
+      xs.foldl
+        (fun acc x =>
+          acc + (row x).foldl (fun acc y => acc + term x y) 0) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons x xs ih =>
+      rw [List.flatMap_cons, List.foldl_append]
+      rw [fold_add_acc (p := p) ((row x).map (term x)) acc]
+      rw [ih]
+      simp [List.foldl_map]
+
+private theorem fold_triangular_assoc_reindex
+    (n : Nat) (term : Nat → Nat → Nat → ZMod64 p) :
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (i + 1)).foldl
+              (fun acc j => acc + term j (i - j) (n - i)) 0) 0 =
+      (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc +
+            (List.range (n - i + 1)).foldl
+              (fun acc j => acc + term i j (n - i - j)) 0) 0 := by
+  have hperm :
+      List.Perm
+        ((leftAssocTriples n).map (fun abc => term abc.1.1 abc.1.2 abc.2))
+        ((rightAssocTriples n).map (fun abc => term abc.1.1 abc.1.2 abc.2)) :=
+    (leftAssocTriples_perm_rightAssocTriples n).map _
+  have hfold := fold_add_perm (p := p) hperm 0
+  rw [← fold_flatMap_map_add (p := p) (List.range (n + 1))
+    (fun i => List.range (i + 1))
+    (fun i j => term j (i - j) (n - i)) 0]
+  rw [← fold_flatMap_map_add (p := p) (List.range (n + 1))
+    (fun i => List.range (n - i + 1))
+    (fun i j => term i j (n - i - j)) 0]
+  simpa [leftAssocTriples, rightAssocTriples, List.map_flatMap] using hfold
 
 private theorem fold_left_distrib (xs : List Nat) (f g h : FpPoly p) (n : Nat) :
     xs.foldl (fun acc i => acc + mulCoeffTerm f (g + h) n i) 0 =
