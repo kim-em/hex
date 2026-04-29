@@ -226,6 +226,49 @@ def degree (p : GF2Poly) : Nat :=
 def xorWords (xs ys : Array UInt64) : Array UInt64 :=
   Array.ofFn fun i : Fin (max xs.size ys.size) => xs.getD i.1 0 ^^^ ys.getD i.1 0
 
+/-- Raw XOR output has one word for every word position present in either
+input. -/
+@[simp] theorem xorWords_size (xs ys : Array UInt64) :
+    (xorWords xs ys).size = max xs.size ys.size := by
+  simp [xorWords]
+
+/-- In-bounds `getD` from an `Array.ofFn` recovers the function value. -/
+theorem Array.getD_ofFn_lt {α : Type u} [Inhabited α] {n : Nat}
+    (f : Fin n → α) {i : Nat} (hi : i < n) :
+    (Array.ofFn f).getD i default = f ⟨i, hi⟩ := by
+  simp [Array.getD, hi]
+
+/-- Out-of-bounds `getD` from an `Array.ofFn` returns the default value. -/
+theorem Array.getD_ofFn_ge {α : Type u} [Inhabited α] {n : Nat}
+    (f : Fin n → α) {i : Nat} (hi : n ≤ i) :
+    (Array.ofFn f).getD i default = default := by
+  simp [Array.getD, Nat.not_lt.mpr hi]
+
+/-- Raw XOR word lookup agrees with defaulted lookup from the two inputs. -/
+theorem xorWords_getD (xs ys : Array UInt64) (i : Nat) :
+    (xorWords xs ys).getD i 0 = xs.getD i 0 ^^^ ys.getD i 0 := by
+  by_cases hi : i < max xs.size ys.size
+  · simpa [xorWords] using
+      (Array.getD_ofFn_lt
+        (fun i : Fin (max xs.size ys.size) => xs.getD i.1 0 ^^^ ys.getD i.1 0)
+        hi)
+  · have hge : max xs.size ys.size ≤ i := Nat.le_of_not_gt hi
+    have hxs : xs.size ≤ i := Nat.le_trans (Nat.le_max_left xs.size ys.size) hge
+    have hys : ys.size ≤ i := Nat.le_trans (Nat.le_max_right xs.size ys.size) hge
+    simp [xorWords, Array.getD, Nat.not_lt.mpr hxs, Nat.not_lt.mpr hys]
+
+/-- Optional raw XOR word lookup agrees with optional lookup from the two
+inputs. -/
+theorem xorWords_get?_getD (xs ys : Array UInt64) (i : Nat) :
+    ((xorWords xs ys)[i]?).getD 0 = (xs[i]?).getD 0 ^^^ (ys[i]?).getD 0 := by
+  by_cases hi : i < max xs.size ys.size
+  · by_cases hxs : i < xs.size <;> by_cases hys : i < ys.size <;>
+      simp [xorWords, hi, hxs, hys, Array.getD]
+  · have hge : max xs.size ys.size ≤ i := Nat.le_of_not_gt hi
+    have hxs : xs.size ≤ i := Nat.le_trans (Nat.le_max_left xs.size ys.size) hge
+    have hys : ys.size ≤ i := Nat.le_trans (Nat.le_max_right xs.size ys.size) hge
+    simp [xorWords, hi, Nat.not_lt.mpr hxs, Nat.not_lt.mpr hys]
+
 /-- Addition in `F_2[x]` is coefficientwise XOR. -/
 def add (p q : GF2Poly) : GF2Poly :=
   ofWords (xorWords p.words q.words)
@@ -238,6 +281,23 @@ theorem coeff_add (p q : GF2Poly) (n : Nat) :
     (p + q).coeff n = coeffWords (xorWords p.words q.words) n := by
   change (add p q).coeff n = coeffWords (xorWords p.words q.words) n
   simp [add]
+
+/-- Raw packed addition cancels each word against itself. -/
+theorem xorWords_self_getD (xs : Array UInt64) (i : Nat) :
+    (xorWords xs xs).getD i 0 = 0 := by
+  rw [xorWords_getD]
+  simp
+
+/-- Coefficient lookup sees the raw packed sum of an array with itself as
+zero. -/
+theorem coeffWords_xorWords_self (xs : Array UInt64) (n : Nat) :
+    coeffWords (xorWords xs xs) n = false := by
+  simp [coeffWords, xorWords_get?_getD]
+
+/-- Every packed coefficient of `p + p` is zero in characteristic two. -/
+theorem coeff_add_self (p : GF2Poly) (n : Nat) :
+    (p + p).coeff n = false := by
+  rw [coeff_add, coeffWords_xorWords_self]
 
 /-- Shift a normalized word list left by `bitShift ∈ [1, 63]`. -/
 def shiftLeftBitsList (bitShift : Nat) (carry : UInt64) : List UInt64 → List UInt64
