@@ -3,6 +3,7 @@ import HexGF2.Clmul
 import HexGF2.Euclid
 import HexGF2.Field
 import HexGF2.Multiply
+import HexGF2.Smoke
 
 /-!
 The `HexGF2` library exposes the packed `GF(2)` polynomial core:

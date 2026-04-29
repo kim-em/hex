@@ -73,16 +73,33 @@ def reducePoly (p : GF2Poly) : UInt64 :=
   (((p % modulus (n := n) (irr := irr)).toWords).getD 0 0) &&&
     mask (n := n)
 
+/-- Repackage a word as a canonical representative below `2^n`. -/
+private def canonicalWord (w : UInt64) : UInt64 :=
+  UInt64.ofNatLT (w.toNat % 2 ^ n) <| by
+    exact Nat.lt_of_lt_of_le (Nat.mod_lt _ (by
+      show 0 < 2 ^ n
+      exact Nat.pow_pos (by decide : 0 < 2))) <|
+      Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_lt hn64)
+
+/-- Canonical words are bounded by the extension degree. -/
+private theorem canonicalWord_lt (w : UInt64) :
+    (canonicalWord (n := n) (hn64 := hn64) w).toNat < 2 ^ n := by
+  unfold canonicalWord
+  simpa [UInt64.toNat_ofNatLT] using
+    (Nat.mod_lt w.toNat (by
+      show 0 < 2 ^ n
+      exact Nat.pow_pos (by decide : 0 < 2)))
+
 /-- Canonical constructor from a raw word by reduction modulo the field
 modulus. -/
 def reduce (w : UInt64) : GF2n n irr hn hn64 hirr :=
-  ⟨reducePoly (n := n) (irr := irr) (toPolyWord w), by
-    sorry⟩
+  ⟨canonicalWord (n := n) (reducePoly (n := n) (irr := irr) (toPolyWord w)),
+    canonicalWord_lt (hn64 := hn64) _⟩
 
 /-- Canonical constructor from a packed 128-bit carry-less product. -/
 def reduceWide (hi lo : UInt64) : GF2n n irr hn hn64 hirr :=
-  ⟨reducePoly (n := n) (irr := irr) (toPolyWide hi lo), by
-    sorry⟩
+  ⟨canonicalWord (n := n) (reducePoly (n := n) (irr := irr) (toPolyWide hi lo)),
+    canonicalWord_lt (hn64 := hn64) _⟩
 
 /-- Natural-number literals in characteristic two reduce to their parity. -/
 def natCast (k : Nat) : GF2n n irr hn hn64 hirr :=
@@ -192,8 +209,8 @@ def inv (a : GF2n n irr hn hn64 hirr) : GF2n n irr hn hn64 hirr :=
   if a.val == 0 then
     0
   else
-    ⟨invWord (n := n) (irr := irr) a.val, by
-      sorry⟩
+    ⟨canonicalWord (n := n) (invWord (n := n) (irr := irr) a.val),
+      canonicalWord_lt (hn64 := hn64) _⟩
 
 instance : Inv (GF2n n irr hn hn64 hirr) where
   inv := inv
