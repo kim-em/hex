@@ -695,6 +695,114 @@ theorem degree?_eq_some_of_coeff_eq_true_of_forall_gt_false {p : GF2Poly} {n : N
   have hdn : d = n := by omega
   simpa [hdn] using hd
 
+/-- Coefficients outside the stored word range are clear. -/
+theorem coeff_eq_false_of_wordCount_le (p : GF2Poly) {n : Nat}
+    (h : p.wordCount ≤ n / 64) :
+    p.coeff n = false := by
+  have hnone : p.words[n / 64]? = none := by
+    rw [Array.getElem?_eq_none_iff]
+    simpa [wordCount] using h
+  simp [coeff, coeffWords, hnone]
+
+/-- Coefficientwise equality of normalized packed polynomials forces equal
+stored word counts. -/
+theorem wordCount_eq_of_coeff_eq {p q : GF2Poly}
+    (hcoeff : ∀ n, p.coeff n = q.coeff n) :
+    p.wordCount = q.wordCount := by
+  rcases Nat.lt_trichotomy p.wordCount q.wordCount with hpq | hpq | hqp
+  · have hqNonzero : q.isZero = false := by
+      rw [isZero_eq_false_iff_words_ne_empty]
+      intro hwords
+      have hqCount : q.wordCount = 0 := by simp [wordCount, hwords]
+      omega
+    obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hqNonzero
+    obtain ⟨_last, bit, _hback, hbit, hdEq⟩ := degree?_eq_some_highestSetBit hd
+    have hbitLt : bit < 64 := highestSetBit?_lt hbit
+    have hdword : d / 64 = q.words.size - 1 := by
+      rw [hdEq, Nat.mul_add_div (by decide : 64 > 0)]
+      rw [Nat.div_eq_of_lt hbitLt, Nat.add_zero]
+    have hpClear : p.coeff d = false := by
+      apply coeff_eq_false_of_wordCount_le
+      have hpSize : p.words.size < q.words.size := by
+        simpa [wordCount] using hpq
+      rw [wordCount, hdword]
+      omega
+    have hqSet : q.coeff d = true := coeff_eq_true_of_degree?_eq_some hd
+    have h := hcoeff d
+    rw [hpClear, hqSet] at h
+    contradiction
+  · exact hpq
+  · have hpNonzero : p.isZero = false := by
+      rw [isZero_eq_false_iff_words_ne_empty]
+      intro hwords
+      have hpCount : p.wordCount = 0 := by simp [wordCount, hwords]
+      omega
+    obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hpNonzero
+    obtain ⟨_last, bit, _hback, hbit, hdEq⟩ := degree?_eq_some_highestSetBit hd
+    have hbitLt : bit < 64 := highestSetBit?_lt hbit
+    have hdword : d / 64 = p.words.size - 1 := by
+      rw [hdEq, Nat.mul_add_div (by decide : 64 > 0)]
+      rw [Nat.div_eq_of_lt hbitLt, Nat.add_zero]
+    have hqClear : q.coeff d = false := by
+      apply coeff_eq_false_of_wordCount_le
+      have hqSize : q.words.size < p.words.size := by
+        simpa [wordCount] using hqp
+      rw [wordCount, hdword]
+      omega
+    have hpSet : p.coeff d = true := coeff_eq_true_of_degree?_eq_some hd
+    have h := hcoeff d
+    rw [hpSet, hqClear] at h
+    contradiction
+
+/-- Extensionality for normalized packed polynomials when stored word counts
+agree and every packed coefficient agrees. -/
+@[ext] theorem ext_of_wordCount_eq {p q : GF2Poly}
+    (hsize : p.wordCount = q.wordCount)
+    (hcoeff : ∀ n, p.coeff n = q.coeff n) :
+    p = q := by
+  apply ext_words
+  apply Array.ext
+  · simpa [wordCount] using hsize
+  · intro i hi₁ hi₂
+    apply UInt64.toNat_inj.mp
+    apply Nat.eq_of_testBit_eq
+    intro j
+    by_cases hj : j < 64
+    · have hdiv : (64 * i + j) / 64 = i := by
+        rw [Nat.mul_add_div (by decide : 64 > 0)]
+        rw [Nat.div_eq_of_lt hj, Nat.add_zero]
+      have hmod : (64 * i + j) % 64 = j := by
+        rw [Nat.mul_add_mod]
+        exact Nat.mod_eq_of_lt hj
+      have hpget : p.words[i]? = some p.words[i] := by simp [hi₁]
+      have hqget : q.words[i]? = some q.words[i] := by simp [hi₂]
+      have hbit :
+          wordBitIsSet p.words[i] j = wordBitIsSet q.words[i] j := by
+        simpa [coeff, coeffWords, wordBitIsSet, hdiv, hmod, hpget, hqget] using
+          hcoeff (64 * i + j)
+      simpa [UInt64.wordBitIsSet_eq_testBit _ hj] using hbit
+    · have hpFalse : p.words[i].toNat.testBit j = false := by
+        apply Nat.testBit_eq_false_of_lt
+        have hlt : p.words[i].toNat < 2 ^ 64 := by
+          simpa [UInt64.size] using UInt64.toNat_lt_size p.words[i]
+        exact Nat.lt_of_lt_of_le hlt
+          (Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_not_gt hj))
+      have hqFalse : q.words[i].toNat.testBit j = false := by
+        apply Nat.testBit_eq_false_of_lt
+        have hlt : q.words[i].toNat < 2 ^ 64 := by
+          simpa [UInt64.size] using UInt64.toNat_lt_size q.words[i]
+        exact Nat.lt_of_lt_of_le hlt
+          (Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_not_gt hj))
+      simp [hpFalse, hqFalse]
+
+/-- Extensionality for normalized packed polynomials by their coefficient
+functions. -/
+theorem ext_coeff {p q : GF2Poly}
+    (hcoeff : ∀ n, p.coeff n = q.coeff n) :
+    p = q := by
+  apply ext_of_wordCount_eq (wordCount_eq_of_coeff_eq hcoeff)
+  exact hcoeff
+
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
 
@@ -847,6 +955,48 @@ theorem xorWords_self (xs : Array UInt64) :
           exact congrArg (fun words => (ofWords words).words) (xorWords_self p.words)
     _ = #[] := by
           simp [ofWords, normalizeWords_replicate_zero]
+
+@[simp] theorem zero_add (p : GF2Poly) :
+    0 + p = p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_zero]
+  cases p.coeff n <;> rfl
+
+@[simp] theorem add_zero (p : GF2Poly) :
+    p + 0 = p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_zero]
+  cases p.coeff n <;> rfl
+
+theorem add_comm (p q : GF2Poly) :
+    p + q = q + p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne]
+  cases p.coeff n <;> cases q.coeff n <;> rfl
+
+theorem add_assoc (p q r : GF2Poly) :
+    (p + q) + r = p + (q + r) := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne]
+  cases p.coeff n <;> cases q.coeff n <;> cases r.coeff n <;> rfl
+
+@[simp] theorem add_add_cancel_left (p q : GF2Poly) :
+    p + (p + q) = q := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne]
+  cases p.coeff n <;> cases q.coeff n <;> rfl
+
+@[simp] theorem add_add_cancel_right (p q : GF2Poly) :
+    (p + q) + q = p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne]
+  cases p.coeff n <;> cases q.coeff n <;> rfl
 
 /-- Shift a normalized word list left by `bitShift ∈ [1, 63]`. -/
 def shiftLeftBitsList (bitShift : Nat) (carry : UInt64) : List UInt64 → List UInt64
