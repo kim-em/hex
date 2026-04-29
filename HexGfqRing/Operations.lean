@@ -178,7 +178,7 @@ theorem zero_ne_one (f : FpPoly p) (hf : 0 < FpPoly.degree f) :
   have hpoly : (0 : FpPoly p) = 1 := by
     calc
       (0 : FpPoly p) = repr (0 : PolyQuotient f hf) := by
-        simp [repr_zero]
+        simp [repr_zero, reduceMod_zero f hf]
       _ = repr (1 : PolyQuotient f hf) := by
         simp [h]
       _ = (1 : FpPoly p) := by
@@ -379,7 +379,7 @@ theorem repr_zero_add {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   calc
     reduceMod f (reduceMod f 0 + repr x)
         = reduceMod f (0 + repr x) := by
-          rw [reduceMod_zero]
+          rw [reduceMod_zero f hf]
     _ = reduceMod f (repr x) := by
           rw [FpPoly.zero_add]
     _ = repr x := reduceMod_repr x
@@ -391,7 +391,7 @@ theorem repr_add_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   calc
     reduceMod f (repr x + reduceMod f 0)
         = reduceMod f (repr x + 0) := by
-          rw [reduceMod_zero]
+          rw [reduceMod_zero f hf]
     _ = reduceMod f (repr x) := by
           rw [FpPoly.add_zero]
     _ = repr x := reduceMod_repr x
@@ -421,10 +421,10 @@ theorem repr_zero_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   calc
     reduceMod f (reduceMod f 0 * repr x)
         = reduceMod f (0 * repr x) := by
-          rw [reduceMod_zero]
+          rw [reduceMod_zero f hf]
     _ = reduceMod f 0 := by
           rw [FpPoly.zero_mul]
-    _ = 0 := reduceMod_zero f
+    _ = 0 := reduceMod_zero f hf
 
 theorem repr_mul_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
@@ -433,10 +433,10 @@ theorem repr_mul_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   calc
     reduceMod f (repr x * reduceMod f 0)
         = reduceMod f (repr x * 0) := by
-          rw [reduceMod_zero]
+          rw [reduceMod_zero f hf]
     _ = reduceMod f 0 := by
           rw [FpPoly.mul_zero]
-    _ = 0 := reduceMod_zero f
+    _ = 0 := reduceMod_zero f hf
 
 theorem repr_one_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
@@ -521,7 +521,7 @@ theorem repr_neg_add_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     _ = reduceMod f 0 := by
           rw [FpPoly.add_left_neg]
     _ = 0 := by
-          exact reduceMod_zero f
+          exact reduceMod_zero f hf
 
 theorem repr_add_neg_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
@@ -534,7 +534,7 @@ theorem repr_add_neg_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     _ = reduceMod f 0 := by
           rw [FpPoly.add_right_neg]
     _ = 0 := by
-          exact reduceMod_zero f
+          exact reduceMod_zero f hf
 
 theorem repr_sub_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
@@ -544,7 +544,7 @@ theorem repr_sub_self {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     reduceMod f (repr x - repr x) = reduceMod f 0 := by
       rw [FpPoly.sub_self]
     _ = 0 := by
-      exact reduceMod_zero f
+      exact reduceMod_zero f hf
 
 theorem sub_eq_add_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x y : PolyQuotient f hf) :
@@ -752,7 +752,7 @@ theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
       apply ext
       change repr (nsmul 0 x) = repr ((0 : PolyQuotient f hf) * x)
       rw [repr_nsmul_zero, repr_zero_mul]
-      exact reduceMod_zero f
+      exact reduceMod_zero f hf
   | succ n ih =>
       calc
         (n + 1) • x = n • x + x := by exact nsmul_succ n x
@@ -816,7 +816,7 @@ theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
 theorem neg_zero_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f} :
     -(0 : PolyQuotient f hf) = 0 := by
   apply ext
-  rw [repr_neg, repr_zero, reduceMod_zero, FpPoly.neg_zero, reduceMod_zero]
+  rw [repr_neg, repr_zero, reduceMod_zero f hf, FpPoly.neg_zero, reduceMod_zero f hf]
 
 theorem neg_neg_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
@@ -828,7 +828,7 @@ theorem neg_neg_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     _ = -(-x) + (-x + x) := by
       have h : -x + x = 0 := by
         apply ext
-        exact repr_neg_add_self x
+        simpa [repr_zero, reduceMod_zero f hf] using repr_neg_add_self x
       rw [h]
     _ = (-(-x) + -x) + x := by
       apply ext
@@ -836,7 +836,7 @@ theorem neg_neg_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     _ = 0 + x := by
       have h : -(-x) + -x = 0 := by
         apply ext
-        exact repr_neg_add_self (-x)
+        simpa [repr_zero, reduceMod_zero f hf] using repr_neg_add_self (-x)
       rw [h]
     _ = x := by
       apply ext
@@ -1015,10 +1015,10 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQu
     exact repr_right_distrib a b c
   · intro a
     apply ext
-    exact repr_zero_mul a
+    simp [repr_zero, reduceMod_zero f hf, repr_zero_mul a]
   · intro a
     apply ext
-    exact repr_mul_zero a
+    simp [repr_zero, reduceMod_zero f hf, repr_mul_zero a]
   · intro a
     apply ext
     change repr (pow.go (one f hf) a 0) = repr (1 : PolyQuotient f hf)
@@ -1039,7 +1039,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Ring (PolyQuotie
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
     apply ext
-    exact repr_neg_add_self a
+    simpa [repr_zero, reduceMod_zero f hf] using repr_neg_add_self a
   · intro a b
     exact sub_eq_add_neg a b
   · intro i a
