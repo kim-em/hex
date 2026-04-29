@@ -281,6 +281,35 @@ private theorem Nat.testBit_eq_false_of_lt {n i : Nat} (h : n < 2 ^ i) :
     n.testBit i = false := by
   simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.div_eq_of_lt h]
 
+private theorem UInt64.wordBitIsSet_eq_testBit (w : UInt64) {i : Nat} (hi : i < 64) :
+    wordBitIsSet w i = w.toNat.testBit i := by
+  simp [wordBitIsSet, UInt64.bne_zero_eq_toNat_bne_zero, UInt64.toNat_shiftRight,
+    UInt64.toNat_and, Nat.mod_eq_of_lt hi, bit_eq_one_eq_testBit]
+
+private theorem highestSetBit?_isSome_of_ne_zero {w : UInt64} (hw : w ≠ 0) :
+    ∃ bit, highestSetBit? w = some bit := by
+  cases hbit : highestSetBit? w with
+  | some bit =>
+      exact ⟨bit, rfl⟩
+  | none =>
+      have hzeroNat : w.toNat = 0 := by
+        apply Nat.eq_of_testBit_eq
+        intro i
+        by_cases hi : i < 64
+        · have hwbit : wordBitIsSet w i = false := by
+            simpa [wordBitIsSet] using highestSetBit?_eq_none_bit hbit hi
+          simpa [UInt64.wordBitIsSet_eq_testBit w hi] using hwbit
+        · have hfalse : w.toNat.testBit i = false := by
+            apply Nat.testBit_eq_false_of_lt
+            have hwlt : w.toNat < 2 ^ 64 := by
+              simpa [UInt64.size] using UInt64.toNat_lt_size w
+            exact Nat.lt_of_lt_of_le hwlt (Nat.pow_le_pow_right (by decide : 0 < 2)
+              (Nat.le_of_not_gt hi))
+          simp [hfalse]
+      apply False.elim
+      apply hw
+      exact UInt64.toNat_inj.mp (by simpa using hzeroNat)
+
 private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
     ((((a ^^^ b) >>> i.toUInt64) &&& 1) != 0) =
       ((((a >>> i.toUInt64) &&& 1) != 0) !=
@@ -539,6 +568,32 @@ theorem degree?_eq_some_high_bit {p : GF2Poly} {d : Nat}
   obtain ⟨last, bit, hback, hbit, hd⟩ := degree?_eq_some_highestSetBit h
   exact ⟨last, bit, hback, hbit, highestSetBit?_bit hbit, hd⟩
 
+/-- A nonzero normalized packed polynomial has a successful degree search. -/
+theorem degree?_isSome_of_isZero_false {p : GF2Poly}
+    (h : p.isZero = false) :
+    ∃ d, p.degree? = some d := by
+  have hwords : p.words ≠ #[] := (isZero_eq_false_iff_words_ne_empty p).mp h
+  cases hback : p.words.back? with
+  | none =>
+      exact False.elim (hwords (Array.back?_eq_none_iff.mp hback))
+  | some last =>
+      have hlast_ne : last ≠ 0 := by
+        have hnorm : GF2PolyNormalized p.words := p.normalized
+        unfold GF2PolyNormalized at hnorm
+        cases hnorm with
+        | inl hsize =>
+            have hnone : p.words.back? = none := by
+              rw [Array.back?_eq_none_iff]
+              exact Array.eq_empty_of_size_eq_zero hsize
+            rw [hnone] at hback
+            contradiction
+        | inr hlast =>
+            intro hzero
+            subst hzero
+            exact hlast hback
+      obtain ⟨bit, hbit⟩ := highestSetBit?_isSome_of_ne_zero hlast_ne
+      exact ⟨64 * (p.words.size - 1) + bit, by simp [degree?, hback, hbit]⟩
+
 /-- A successful `degree?` computation points at a set global coefficient. -/
 theorem coeff_eq_true_of_degree?_eq_some {p : GF2Poly} {d : Nat}
     (h : p.degree? = some d) :
@@ -583,6 +638,33 @@ theorem coeff_eq_false_of_degree?_lt {p : GF2Poly} {d n : Nat}
   · have hout : ¬ n / 64 < p.words.size := by
       omega
     simp [coeff, coeffWords, hout]
+
+/-- If a coefficient is set and every higher coefficient is clear, the packed
+degree search returns exactly that coefficient index. -/
+theorem degree?_eq_some_of_coeff_eq_true_of_forall_gt_false {p : GF2Poly} {n : Nat}
+    (hset : p.coeff n = true) (hclear : ∀ m, n < m → p.coeff m = false) :
+    p.degree? = some n := by
+  have hwords : p.words ≠ #[] := by
+    intro hzero
+    have hcoeff : p.coeff n = false := by
+      simp [coeff, coeffWords, hzero]
+    rw [hcoeff] at hset
+    contradiction
+  have hnonzero : p.isZero = false := (isZero_eq_false_iff_words_ne_empty p).mpr hwords
+  obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hnonzero
+  have hdset : p.coeff d = true := coeff_eq_true_of_degree?_eq_some hd
+  have hnot_lt : ¬ d < n := by
+    intro hdn
+    have hnfalse := coeff_eq_false_of_degree?_lt hd hdn
+    rw [hset] at hnfalse
+    contradiction
+  have hnot_gt : ¬ n < d := by
+    intro hnd
+    have hdfalse := hclear d hnd
+    rw [hdset] at hdfalse
+    contradiction
+  have hdn : d = n := by omega
+  simpa [hdn] using hd
 
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
