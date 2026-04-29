@@ -10,7 +10,8 @@ Covered operations:
 - `ZPoly` as the integer specialization of `DensePoly`
 - coefficientwise modular congruence via `ZPoly.congr`
 - Bezout-style modular coprimality via `ZPoly.coprimeModP`
-- `content`, `primitivePart`, and `Primitive`
+- `content`, `primitivePart`, `Primitive`, and primitive square-free
+  decomposition
 - Mignotte helpers: `binom`, `floorSqrt`, `ceilSqrt`, `coeffNormSq`,
   `coeffL2NormBound`, and `mignotteCoeffBound`
 Covered properties:
@@ -22,12 +23,16 @@ Covered properties:
   coefficients
 - `content * primitivePart` reconstructs committed integer polynomials
 - primitive-part fixtures with nonzero content have content `1`
+- primitive square-free decomposition removes repeated rational factors after
+  primitive-part extraction
 - Mignotte coefficient bounds equal `binom k j * coeffL2NormBound f`
 Covered edge cases:
 - zero polynomials and all-zero coefficient arrays
 - trailing-zero and internal-zero polynomial representations
 - modulus `1` congruence and out-of-support coefficient checks
 - already primitive and nontrivial-content integer polynomials
+- powers of `X`, repeated factors, and nontrivial content before square-free
+  normalization
 - square-root inputs `0`, nonsquares, and one-below-square adversarial values
 - binomial requests with `k = 0` and `k > n`
 -/
@@ -76,6 +81,10 @@ private def contentPrimitive : ZPoly := DensePoly.ofCoeffs #[1, -2, 3]
 private def contentNontrivial : ZPoly := DensePoly.ofCoeffs #[-6, 0, 12]
 private def contentNontrivialPrimitive : ZPoly := DensePoly.ofCoeffs #[-1, 0, 2]
 private def contentAdversarial : ZPoly := DensePoly.ofCoeffs #[-14, 21, 0, -7, 0, 0]
+private def squareFreeRepeated : ZPoly := DensePoly.ofCoeffs #[1, -2, 1]
+private def squareFreeWithContent : ZPoly := DensePoly.ofCoeffs #[2, -4, 2]
+private def squareFreePowerOfX : ZPoly := DensePoly.ofCoeffs #[0, 0, 1]
+private def squareFreeAlreadyCore : ZPoly := DensePoly.ofCoeffs #[-1, 0, 1]
 
 #guard zpolyTypical.toArray.toList = [3, 0, -2]
 #guard zpolyEdge = (0 : ZPoly)
@@ -125,6 +134,24 @@ example : coprimeModP coprimeEdgeF coprimeEdgeG 7 :=
 #guard content (primitivePart contentPrimitive) = 1
 #guard content (primitivePart contentNontrivial) = 1
 #guard content (primitivePart contentAdversarial) = 1
+
+#guard ratPolyPrimitivePart (DensePoly.ofCoeffs (#[(1 : Rat) / 2, (-1 : Rat) / 2])) =
+  DensePoly.ofCoeffs #[-1, 1]
+#guard (primitiveSquareFreeDecomposition squareFreeRepeated).primitive =
+  squareFreeRepeated
+#guard (primitiveSquareFreeDecomposition squareFreeRepeated).squareFreeCore =
+  DensePoly.ofCoeffs #[-1, 1]
+#guard (primitiveSquareFreeDecomposition squareFreeRepeated).repeatedPart =
+  DensePoly.ofCoeffs #[-1, 1]
+#guard (primitiveSquareFreeDecomposition squareFreeWithContent).primitive =
+  squareFreeRepeated
+#guard (primitiveSquareFreeDecomposition squareFreeWithContent).squareFreeCore =
+  DensePoly.ofCoeffs #[-1, 1]
+#guard (primitiveSquareFreeDecomposition squareFreePowerOfX).squareFreeCore =
+  DensePoly.ofCoeffs #[0, 1]
+#guard (primitiveSquareFreeDecomposition squareFreeAlreadyCore).squareFreeCore =
+  squareFreeAlreadyCore
+#guard squareFreeCore squareFreeRepeated = DensePoly.ofCoeffs #[-1, 1]
 
 example : Primitive (primitivePart contentPrimitive) := by
   change content (primitivePart contentPrimitive) = 1
