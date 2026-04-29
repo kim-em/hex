@@ -116,6 +116,151 @@ private theorem coeffWords_xorClmulAt_zero_right (acc : Array UInt64) (idx n : N
     coeffWords (xorClmulAt acc idx x 0) n = coeffWords acc n := by
   rw [xorClmulAt_zero_right]
 
+private theorem clmul_oneHot_low_bit_same_word (x : UInt64) {shift old : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64) (hold : old < 64)
+    (hbit : old + shift < 64) :
+    ((((clmul x ((1 : UInt64) <<< shift.toUInt64)).2 >>>
+        (old + shift).toUInt64) &&& 1) != 0) =
+      (((x >>> old.toUInt64) &&& 1) != 0) := by
+  rw [clmul_oneHot_snd x hshift]
+  have hshiftNe : shift ≠ 0 := Nat.ne_of_gt hshiftPos
+  simp [hshiftNe, UInt64.bne_zero_eq_toNat_bne_zero, UInt64.toNat_shiftLeft,
+    UInt64.toNat_shiftRight, UInt64.toNat_and, Nat.mod_eq_of_lt hshift,
+    Nat.mod_eq_of_lt hold, Nat.mod_eq_of_lt hbit, bit_eq_one_eq_testBit]
+  change (((x.toNat <<< shift) % 18446744073709551616).testBit (old + shift)) =
+    x.toNat.testBit old
+  rw [show 18446744073709551616 = 2 ^ 64 by rfl, Nat.testBit_mod_two_pow,
+    Nat.testBit_shiftLeft]
+  simp [hbit]
+
+private theorem clmul_oneHot_high_bit_carry_word (x : UInt64) {shift old : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64) (hold : old < 64)
+    (hbit : 64 ≤ old + shift) :
+    ((((clmul x ((1 : UInt64) <<< shift.toUInt64)).1 >>>
+        (old + shift - 64).toUInt64) &&& 1) != 0) =
+      (((x >>> old.toUInt64) &&& 1) != 0) := by
+  have htargetLt : old + shift - 64 < 64 := by omega
+  have hshiftCompl : 64 - shift < 64 := by omega
+  rw [clmul_oneHot_fst x hshift]
+  have hshiftNe : shift ≠ 0 := Nat.ne_of_gt hshiftPos
+  have hold_eq : 64 - shift + (old + shift - 64) = old := by omega
+  simp [hshiftNe, UInt64.bne_zero_eq_toNat_bne_zero, UInt64.toNat_shiftRight,
+    UInt64.toNat_and, Nat.mod_eq_of_lt hshiftCompl, Nat.mod_eq_of_lt hold,
+    Nat.mod_eq_of_lt htargetLt, bit_eq_one_eq_testBit, Nat.testBit_shiftRight,
+    hold_eq]
+
+private theorem coeffWords_xorClmulAt_oneHot_low_same_word
+    (acc : Array UInt64) {idx n shift : Nat} (x : UInt64)
+    (hidx : idx < acc.size) (hshiftPos : 0 < shift) (hshift : shift < 64)
+    (hn : n / 64 = idx) (hbit : n % 64 + shift < 64) :
+    coeffWords (xorClmulAt acc idx x ((1 : UInt64) <<< shift.toUInt64)) (n + shift) =
+      (coeffWords acc (n + shift) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  have hold : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+  have htargetDiv : (n + shift) / 64 = idx := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  have htargetMod : (n + shift) % 64 = n % 64 + shift := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  rw [coeffWords_xorClmulAt_low acc x ((1 : UInt64) <<< shift.toUInt64) hidx
+    htargetDiv]
+  rw [htargetMod]
+  rw [clmul_oneHot_low_bit_same_word x hshiftPos hshift hold hbit]
+
+private theorem coeffWords_xorClmulAt_oneHot_high_carry_word
+    (acc : Array UInt64) {idx n shift : Nat} (x : UInt64)
+    (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size)
+    (hshiftPos : 0 < shift) (hshift : shift < 64)
+    (hn : n / 64 = idx) (hbit : 64 ≤ n % 64 + shift) :
+    coeffWords (xorClmulAt acc idx x ((1 : UInt64) <<< shift.toUInt64)) (n + shift) =
+      (coeffWords acc (n + shift) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  have hold : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+  have htargetDiv : (n + shift) / 64 = idx + 1 := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  have htargetMod : (n + shift) % 64 = n % 64 + shift - 64 := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  rw [coeffWords_xorClmulAt_high acc x ((1 : UInt64) <<< shift.toUInt64) hidx
+    hidxNext htargetDiv]
+  rw [htargetMod]
+  rw [clmul_oneHot_high_bit_carry_word x hshiftPos hshift hold hbit]
+
+private theorem words_monomial_getElem!_active (k : Nat) :
+    (monomial k).words[k / 64]! =
+      ((1 : UInt64) <<< (k % 64).toUInt64) := by
+  rw [words_monomial]
+  rw [Array.getElem!_eq_getD]
+  unfold Array.getD
+  rw [dif_pos (by simp)]
+  change ((Array.replicate (k / 64) (0 : UInt64)).push
+    ((1 : UInt64) <<< (k % 64).toUInt64))[k / 64] =
+      ((1 : UInt64) <<< (k % 64).toUInt64)
+  rw [Array.getElem_push]
+  simp
+
+private theorem coeffWords_xorClmulAt_monomial_active_low
+    (acc : Array UInt64) {i k n : Nat} (x : UInt64)
+    (hidx : i + k / 64 < acc.size) (hn : n / 64 = i)
+    (hbitShift : k % 64 ≠ 0) (hbit : n % 64 + k % 64 < 64) :
+    coeffWords
+        (xorClmulAt acc (i + k / 64) x (monomial k).words[k / 64]!)
+        (n + k) =
+      (coeffWords acc (n + k) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  have hshiftPos : 0 < k % 64 := Nat.pos_of_ne_zero hbitShift
+  have hshift : k % 64 < 64 := Nat.mod_lt k (by decide : 0 < 64)
+  have htarget : n + k = (n + k / 64 * 64) + k % 64 := by
+    have hk := Nat.div_add_mod k 64
+    omega
+  have hsourceMod : (n + k / 64 * 64) % 64 = n % 64 := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  rw [words_monomial_getElem!_active k, htarget]
+  simpa [hsourceMod] using
+    coeffWords_xorClmulAt_oneHot_low_same_word
+      (acc := acc) (idx := i + k / 64) (n := n + k / 64 * 64)
+      (shift := k % 64) x hidx hshiftPos hshift
+      (by
+        have hnSplit := Nat.div_add_mod n 64
+        omega)
+      (by
+        have hnSplit := Nat.div_add_mod n 64
+        omega)
+
+private theorem coeffWords_xorClmulAt_monomial_active_high
+    (acc : Array UInt64) {i k n : Nat} (x : UInt64)
+    (hidx : i + k / 64 < acc.size) (hidxNext : i + k / 64 + 1 < acc.size)
+    (hn : n / 64 = i) (hbit : 64 ≤ n % 64 + k % 64) :
+    coeffWords
+        (xorClmulAt acc (i + k / 64) x (monomial k).words[k / 64]!)
+        (n + k) =
+      (coeffWords acc (n + k) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  have hshiftPos : 0 < k % 64 := by
+    have hnbit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+    omega
+  have hshift : k % 64 < 64 := Nat.mod_lt k (by decide : 0 < 64)
+  have htarget : n + k = (n + k / 64 * 64) + k % 64 := by
+    have hk := Nat.div_add_mod k 64
+    omega
+  have hsourceMod : (n + k / 64 * 64) % 64 = n % 64 := by
+    have hnSplit := Nat.div_add_mod n 64
+    omega
+  rw [words_monomial_getElem!_active k, htarget]
+  simpa [hsourceMod] using
+    coeffWords_xorClmulAt_oneHot_high_carry_word
+      (acc := acc) (idx := i + k / 64) (n := n + k / 64 * 64)
+      (shift := k % 64) x hidx hidxNext hshiftPos hshift
+      (by
+        have hnSplit := Nat.div_add_mod n 64
+        omega)
+      (by
+        have hnSplit := Nat.div_add_mod n 64
+        omega)
+
 private theorem foldl_xorClmulAt_zero_right_coeff (js : List Nat) (acc : Array UInt64)
     (idx n : Nat) (x : UInt64) (ys : Array UInt64)
     (hzero : ∀ j ∈ js, ys[j]! = 0) :
