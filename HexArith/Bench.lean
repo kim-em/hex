@@ -16,11 +16,9 @@ surface on a shared nonnegative input family. The `run*ExtGcdShapes`
 registrations return a compact summary of normalized `(g, s*a + t*b)`
 observations rather than raw Bezout coefficients, because valid extended-GCD
 implementations may choose different coefficients while still proving the same
-gcd certificate. Thus
-`compare runNatExtGcdShapes runIntExtGcdShapes runUInt64ExtGcdShapes` checks
-agreement on the gcd/Bezout output shape over the common domain.
+gcd certificate.
 
-Scientific registrations:
+Scientific benchmark registrations:
 
 * `runBarrettMulChain`: repeated modular multiplication with `BarrettCtx.mulMod`,
   `O(n)`.
@@ -34,6 +32,12 @@ Scientific registrations:
   over the same samples, `O(n)`.
 * `runUInt64ExtGcdShapes`: `HexArith.UInt64.extGcd`, batched over the same
   samples, `O(n)`.
+
+Compare groups:
+
+* `compare runNatExtGcdShapes runIntExtGcdShapes runUInt64ExtGcdShapes` checks
+  agreement on the normalized gcd/Bezout output shape over the shared prepared
+  nonnegative bounded-word input domain.
 -/
 
 namespace Hex.ArithBench
