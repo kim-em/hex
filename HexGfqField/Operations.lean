@@ -307,14 +307,61 @@ theorem mul_inv_cancel
     {x : FiniteField f hf hirr} (hx : x ≠ 0) :
     x * x⁻¹ = 1 := by
   have hreduced := reduceMod_repr_mul_invPoly_eq_one (x := x) hx
-  sorry
+  have hxrepr :
+      GFqRing.reduceMod f (GFqRing.repr x.toQuotient) = GFqRing.repr x.toQuotient := by
+    rcases x.toQuotient.property with ⟨g, hg⟩
+    change GFqRing.reduceMod f x.toQuotient.val = x.toQuotient.val
+    rw [hg, GFqRing.reduceMod_idem]
+  have hinv := toQuotient_inv_of_ne_zero (x := x) hx
+  have honeQuotient :
+      (1 : GFqRing.PolyQuotient f hf) = GFqRing.one f hf := by
+    change GFqRing.natCast f hf 1 = GFqRing.one f hf
+    change GFqRing.add (GFqRing.zero f hf) (GFqRing.one f hf) = GFqRing.one f hf
+    calc
+      GFqRing.add (GFqRing.zero f hf) (GFqRing.one f hf)
+          = GFqRing.add (GFqRing.one f hf) (GFqRing.zero f hf) :=
+            Lean.Grind.Semiring.add_comm (GFqRing.zero f hf) (GFqRing.one f hf)
+      _ = GFqRing.one f hf := Lean.Grind.Semiring.add_zero (GFqRing.one f hf)
+  have hmulReduce :
+      GFqRing.reduceMod f
+          (GFqRing.repr x.toQuotient * GFqRing.reduceMod f (invPoly x.toQuotient)) =
+        GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) := by
+    simpa [hxrepr] using
+      (GFqRing.reduceMod_mul_reduceMod f (GFqRing.repr x.toQuotient)
+        (invPoly x.toQuotient)).symm
+  apply GFqField.ext
+  apply GFqRing.ext
+  calc
+    GFqRing.repr ((x * x⁻¹ : FiniteField f hf hirr).toQuotient)
+        = GFqRing.repr (x.toQuotient * GFqRing.ofPoly f hf (invPoly x.toQuotient)) := by
+            rw [toQuotient_mul]
+            change GFqRing.repr (x.toQuotient * (inv x).toQuotient) =
+              GFqRing.repr (x.toQuotient * GFqRing.ofPoly f hf (invPoly x.toQuotient))
+            rw [hinv]
+    _ = GFqRing.reduceMod f
+            (GFqRing.repr x.toQuotient * GFqRing.reduceMod f (invPoly x.toQuotient)) := by
+            rfl
+    _ = GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) :=
+        hmulReduce
+    _ = GFqRing.reduceMod f 1 := hreduced
+    _ = GFqRing.repr ((1 : FiniteField f hf hirr).toQuotient) := by
+        rw [toQuotient_one]
+        rw [honeQuotient]
+        rfl
 
 theorem inv_mul_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     {x : FiniteField f hf hirr} (hx : x ≠ 0) :
     x⁻¹ * x = 1 := by
   have hleft := mul_inv_cancel (x := x) hx
-  sorry
+  apply GFqField.ext
+  calc
+    (x⁻¹ * x : FiniteField f hf hirr).toQuotient
+        = (x⁻¹).toQuotient * x.toQuotient := rfl
+    _ = x.toQuotient * (x⁻¹).toQuotient :=
+        Lean.Grind.CommSemiring.mul_comm (x⁻¹).toQuotient x.toQuotient
+    _ = (x * x⁻¹ : FiniteField f hf hirr).toQuotient := rfl
+    _ = (1 : FiniteField f hf hirr).toQuotient := congrArg FiniteField.toQuotient hleft
 
 @[simp] theorem repr_zero
     (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
