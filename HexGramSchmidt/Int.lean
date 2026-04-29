@@ -61,7 +61,7 @@ def independent (b : Matrix Int n m) : Prop :=
 /-- The `k`-th Gram determinant: the determinant of the `k × k` leading
 principal Gram matrix of the integer input. -/
 def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat :=
-  (Matrix.det (GramSchmidt.leadingGramMatrixInt b k hk)).toNat
+  (Matrix.bareiss (GramSchmidt.leadingGramMatrixInt b k hk)).toNat
 
 /-- Product of the squared Gram-Schmidt basis norms along the first `k` rows. -/
 noncomputable def gramSchmidtNormProduct (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) :
@@ -107,7 +107,7 @@ store `d_{j+1}`, and entries above the diagonal are zero. -/
 def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n :=
   Matrix.ofFn fun i j =>
     if hji : j.val < i.val then
-      Matrix.det (GramSchmidt.scaledCoeffMatrix b i j hji)
+      Matrix.bareiss (GramSchmidt.scaledCoeffMatrix b i j hji)
     else if i = j then
       Int.ofNat (gramDet b (j.val + 1) (Nat.succ_le_of_lt j.isLt))
     else
