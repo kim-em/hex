@@ -70,7 +70,17 @@ def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) : PolyQuotient f
 /-- Natural scalar multiplication in the quotient ring. -/
 def nsmul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (n : Nat) (x : PolyQuotient f hf) : PolyQuotient f hf :=
-  Nat.rec (zero f hf) (fun _ acc => add acc x) n
+  let rec go (acc base : PolyQuotient f hf) (k : Nat) : PolyQuotient f hf :=
+    if hk : k = 0 then
+      acc
+    else
+      let acc' := if k % 2 = 1 then add acc base else acc
+      go acc' (add base base) (k / 2)
+  termination_by k
+  decreasing_by
+    simp_wf
+    exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
+  go (zero f hf) x n
 
 /-- Integer literals in the quotient ring. -/
 def intCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) : Int → PolyQuotient f hf
@@ -548,25 +558,139 @@ theorem sub_eq_add_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     _ = reduceMod f (repr x + reduceMod f (-repr y)) := by
           exact (reduceMod_add_right_reduceMod f (repr x) (-repr y)).symm
 
+private def linearNSmul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) : Nat → PolyQuotient f hf
+  | 0 => 0
+  | n + 1 => linearNSmul x n + x
+
+@[simp] private theorem linearNSmul_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) :
+    linearNSmul x 0 = 0 :=
+  rfl
+
+@[simp] private theorem linearNSmul_succ {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearNSmul x (n + 1) = linearNSmul x n + x :=
+  rfl
+
+private theorem linearNSmul_add_assoc_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a b c : PolyQuotient f hf) :
+    add (add a b) c = add a (add b c) := by
+  apply ext
+  exact repr_add_assoc a b c
+
+private theorem linearNSmul_add_comm {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a b : PolyQuotient f hf) :
+    a + b = b + a := by
+  apply ext
+  exact repr_add_comm a b
+
+private theorem linearNSmul_add_zero_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a : PolyQuotient f hf) :
+    add a 0 = a := by
+  apply ext
+  exact repr_add_zero a
+
+private theorem linearNSmul_zero_add_raw {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (a : PolyQuotient f hf) :
+    add (zero f hf) a = a := by
+  apply ext
+  exact repr_zero_add a
+
+private theorem linearNSmul_double {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearNSmul x (2 * n) = linearNSmul (add x x) n := by
+  induction n with
+  | zero =>
+      rfl
+  | succ n ih =>
+      have htwo : 2 * (n + 1) = 2 * n + 2 := by omega
+      rw [htwo]
+      change linearNSmul x ((2 * n + 1) + 1) =
+        linearNSmul (add x x) n + add x x
+      rw [linearNSmul_succ, linearNSmul_succ, ih]
+      exact linearNSmul_add_assoc_raw (linearNSmul (x + x) n) x x
+
+private theorem linearNSmul_double_add_one {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    linearNSmul x (2 * n + 1) = add x (linearNSmul (add x x) n) := by
+  rw [linearNSmul_succ, linearNSmul_double]
+  exact linearNSmul_add_comm (linearNSmul (x + x) n) x
+
+private theorem nsmul_go_eq_acc_add_linearNSmul
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (acc base : PolyQuotient f hf) (k : Nat) :
+    nsmul.go acc base k = add acc (linearNSmul base k) := by
+  induction k using Nat.strongRecOn generalizing acc base with
+  | ind k ih =>
+      rw [nsmul.go.eq_def]
+      by_cases hk : k = 0
+      · simp [hk, linearNSmul_add_zero_raw]
+      · rw [dif_neg hk]
+        have hlt : k / 2 < k :=
+          Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide : 1 < 2)
+        cases Nat.mod_two_eq_zero_or_one k with
+        | inl hmod0 =>
+            have hk_eq : k = 2 * (k / 2) := by
+              have h := Nat.mod_add_div k 2
+              omega
+            have hnot : ¬k % 2 = 1 := by omega
+            have hdiv : 2 * (k / 2) / 2 = k / 2 :=
+              Nat.mul_div_right (k / 2) (by decide : 0 < 2)
+            rw [if_neg hnot]
+            calc
+              nsmul.go acc (add base base) (k / 2)
+                  = add acc (linearNSmul (add base base) (k / 2)) := by
+                    exact ih (k / 2) hlt acc (add base base)
+              _ = add acc (linearNSmul base k) := by
+                    rw [hk_eq, hdiv, linearNSmul_double]
+        | inr hmod1 =>
+            have hk_eq : k = 2 * (k / 2) + 1 := by
+              have h := Nat.mod_add_div k 2
+              omega
+            rw [if_pos hmod1]
+            calc
+              nsmul.go (add acc base) (add base base) (k / 2)
+                  = add (add acc base) (linearNSmul (add base base) (k / 2)) := by
+                    exact ih (k / 2) hlt (add acc base) (add base base)
+              _ = add acc (add base (linearNSmul (add base base) (k / 2))) := by
+                    exact @linearNSmul_add_assoc_raw p _ f hf acc base
+                      (linearNSmul (add base base) (k / 2))
+              _ = add acc (linearNSmul base (2 * (k / 2) + 1)) := by
+                    rw [linearNSmul_double_add_one]
+              _ = add acc (linearNSmul base k) := by
+                    rw [← hk_eq]
+
+private theorem nsmul_eq_linearNSmul
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : PolyQuotient f hf) (n : Nat) :
+    nsmul n x = linearNSmul x n := by
+  change nsmul.go (zero f hf) x n = linearNSmul x n
+  rw [nsmul_go_eq_acc_add_linearNSmul]
+  exact linearNSmul_zero_add_raw (linearNSmul x n)
+
 @[simp] theorem nsmul_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
-    nsmul 0 x = 0 :=
+    nsmul 0 x = 0 := by
+  rw [nsmul_eq_linearNSmul]
   rfl
 
 @[simp] theorem nsmul_succ {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (n : Nat) (x : PolyQuotient f hf) :
-    nsmul (n + 1) x = nsmul n x + x :=
+    nsmul (n + 1) x = nsmul n x + x := by
+  rw [nsmul_eq_linearNSmul, nsmul_eq_linearNSmul]
   rfl
 
 @[simp] theorem repr_nsmul_zero {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
-    repr (nsmul 0 x) = reduceMod f 0 :=
+    repr (nsmul 0 x) = reduceMod f 0 := by
+  rw [nsmul_zero]
   rfl
 
 @[simp] theorem repr_nsmul_succ {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (n : Nat) (x : PolyQuotient f hf) :
-    repr (nsmul (n + 1) x) = reduceMod f (repr (nsmul n x) + repr x) :=
-  rfl
+    repr (nsmul (n + 1) x) = reduceMod f (repr (nsmul n x) + repr x) := by
+  rw [nsmul_succ, repr_add]
 
 private theorem zmod64_zero_add (a : ZMod64 p) : (0 : ZMod64 p) + a = a := by
   change ZMod64.add 0 a = a
@@ -631,7 +755,7 @@ theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
       exact reduceMod_zero f
   | succ n ih =>
       calc
-        (n + 1) • x = n • x + x := rfl
+        (n + 1) • x = n • x + x := by exact nsmul_succ n x
         _ = (Nat.cast n : PolyQuotient f hf) * x + x := by rw [ih]
         _ = ((Nat.cast n : PolyQuotient f hf) + 1) * x := by
           apply ext
@@ -725,6 +849,8 @@ theorem neg_zsmul_eq {f : FpPoly p} {hf : 0 < FpPoly.degree f}
   | ofNat n =>
       cases n with
       | zero =>
+          change nsmul 0 a = -(nsmul 0 a)
+          rw [nsmul_zero]
           exact (neg_zero_eq (f := f) (hf := hf)).symm
       | succ n =>
           rfl
