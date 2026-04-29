@@ -7,7 +7,7 @@ Oracle: none
 Mode: always
 Covered operations:
 - dense representation constructors and accessors (`ofCoeffs`, `ofList`, `C`, `monomial`, `size`, `isZero`, `coeff`, `degree?`, `support`, `toArray`)
-- basic executable arithmetic (`scale`, `shift`, `add`, `sub`, `mul`)
+- basic executable arithmetic (`scale`, `shift`, `add`, `sub`, `mul`, `eval`, `compose`, `derivative`)
 - Euclidean helpers (`leadingCoeff`, `divModMonic`, `divMod`, `/`, `%`, `modByMonic`, `gcd`, `xgcd`)
 - integer content helpers (`content`, `primitivePart`)
 - polynomial CRT witness construction (`polyCRT`)
@@ -16,6 +16,8 @@ Covered properties:
 - dense structural equality matches additive identity and commutativity checks on committed fixtures
 - scaling by zero and shifting zero collapse back to the normalized zero polynomial
 - multiplication by the constant polynomial `1` preserves committed inputs
+- Horner evaluation, polynomial composition, and formal derivative agree with committed
+  small polynomial calculations
 - division fixtures satisfy `quotient * divisor + remainder = dividend`, including exact,
   zero-dividend, and fractional-quotient cases
 - `gcd` and `xgcd` agree on committed fixtures and the returned Bezout coefficients
@@ -26,6 +28,7 @@ Covered edge cases:
 - the zero polynomial encoded with all-zero trailing coefficients
 - sparse polynomials with internal zeros but nonzero leading terms
 - shifted and scaled monomials that exercise normalization after arithmetic
+- evaluation, composition, and differentiation of zero, constant, and sparse inputs
 - Euclidean division with zero dividend, exact division, and non-monic divisors with
   fractional quotients
 - integer content for zero, already primitive, and nontrivial-content polynomials
@@ -181,6 +184,22 @@ private def crtWitness : DensePoly Rat :=
 #guard polyEdge * constEdge = (0 : DensePoly Int)
 #guard (polyAdversarial * monomialAdversarial).toArray.toList = [0, 0, 0, 0, -8, 0, 10]
 #guard polyTypical * C 1 = polyTypical
+
+#guard eval polyTypical 2 = -5
+#guard eval polyEdge 7 = 0
+#guard eval polyAdversarial (-1) = 1
+
+/-- info: [-5] -/
+#guard_msgs in #eval! (compose polyTypical (C 2)).toArray.toList
+
+#guard compose polyEdge polyTypical = (0 : DensePoly Int)
+#guard (compose polyAdversarial (monomial 1 (-1))).toArray.toList = [0, -4, 0, 5]
+
+/-- info: [0, -4] -/
+#guard_msgs in #eval! (derivative polyTypical).toArray.toList
+
+#guard derivative polyEdge = (0 : DensePoly Int)
+#guard (derivative polyAdversarial).toArray.toList = [4, 0, -15]
 
 #guard ratDivTypicalDividend.leadingCoeff = 1
 #guard ratDivEdgeDividend.leadingCoeff = 0
