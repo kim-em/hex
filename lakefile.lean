@@ -133,5 +133,8 @@ lean_exe hexgramschmidt_bench where
 lean_exe hexmodarith_bench where
   root := `HexModArith.Bench
 
+lean_exe hexgf2_bench where
+  root := `HexGF2.Bench
+
 @[default_target]
 lean_lib HexManual where
