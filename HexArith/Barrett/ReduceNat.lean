@@ -25,6 +25,93 @@ def barrettReduceNat (p pinv T : Nat) : Nat :=
   if r ≥ p then r - p else r
 
 /--
+The Barrett quotient computed from `floor(R / p)` never exceeds the exact
+quotient. This is the no-underflow fact needed when forming
+`T - q * p`.
+-/
+theorem barrettQuotient_le_div (hp : 1 < p) (hpinv : pinv = barrettRadix / p) :
+    T * pinv / barrettRadix ≤ T / p := by
+  subst pinv
+  have hp0 : 0 < p := by omega
+  have hRpos : 0 < barrettRadix := by
+    simp [barrettRadix, UInt64.word]
+  refine (Nat.le_div_iff_mul_le hp0).2 ?_
+  let q := T * (barrettRadix / p) / barrettRadix
+  have hqR : q * barrettRadix ≤ T * (barrettRadix / p) := by
+    simpa [q] using Nat.div_mul_le_self (T * (barrettRadix / p)) barrettRadix
+  have hsP : (barrettRadix / p) * p ≤ barrettRadix :=
+    Nat.div_mul_le_self barrettRadix p
+  have hmul : (q * barrettRadix) * p ≤ T * barrettRadix := by
+    calc
+      (q * barrettRadix) * p ≤ (T * (barrettRadix / p)) * p :=
+        Nat.mul_le_mul_right p hqR
+      _ = T * ((barrettRadix / p) * p) := by
+        simp [Nat.mul_assoc]
+      _ ≤ T * barrettRadix := Nat.mul_le_mul_left T hsP
+  have hmul' : (q * p) * barrettRadix ≤ T * barrettRadix := by
+    simpa [Nat.mul_assoc, Nat.mul_left_comm, Nat.mul_comm] using hmul
+  exact Nat.le_of_mul_le_mul_right hmul' hRpos
+
+/--
+The Barrett quotient computed from `floor(R / p)` is at most one below the
+exact quotient while `T` fits in one radix word.
+-/
+theorem div_le_barrettQuotient_add_one (hp : 1 < p)
+    (hpinv : pinv = barrettRadix / p) (hT : T < barrettRadix) :
+    T / p ≤ T * pinv / barrettRadix + 1 := by
+  subst pinv
+  have hp0 : 0 < p := by omega
+  have hRpos : 0 < barrettRadix := by
+    simp [barrettRadix, UInt64.word]
+  by_cases hpR : p ≤ barrettRadix
+  · let s := barrettRadix / p
+    have ha_le_s : T / p ≤ s := by
+      exact Nat.div_le_div_right (Nat.le_of_lt hT)
+    by_cases hzero : T / p = 0
+    · rw [hzero]
+      exact Nat.zero_le _
+    · obtain ⟨a', ha⟩ := Nat.exists_eq_succ_of_ne_zero hzero
+      have ha'_lt_s : a' < s := by
+        have hs : a'.succ ≤ s := by
+          simpa [ha] using ha_le_s
+        exact Nat.lt_of_succ_le hs
+      have hr_lt_p : barrettRadix % p < p := Nat.mod_lt barrettRadix hp0
+      have hprod_lt : a' * (barrettRadix % p) < s * p := by
+        exact Nat.mul_lt_mul_of_lt_of_le ha'_lt_s (Nat.le_of_lt hr_lt_p) hp0
+      have hprod_le : a' * (barrettRadix % p) ≤ s * p := Nat.le_of_lt hprod_lt
+      have hRdecomp : s * p + barrettRadix % p = barrettRadix := by
+        simpa [s, Nat.mul_comm, Nat.add_comm] using Nat.mod_add_div barrettRadix p
+      have hTdecomp : p * (a' + 1) + T % p = T := by
+        have h := Nat.mod_add_div T p
+        rw [ha] at h
+        simpa [Nat.add_comm] using h
+      have hkey : a' * barrettRadix ≤ T * s := by
+        calc
+          a' * barrettRadix = a' * (s * p + barrettRadix % p) := by
+            rw [hRdecomp]
+          _ = a' * (s * p) + a' * (barrettRadix % p) := by
+            simp [Nat.mul_add]
+          _ ≤ a' * (s * p) + s * p := Nat.add_le_add_left hprod_le _
+          _ = (a' + 1) * (s * p) := by
+            simp [Nat.mul_add, Nat.mul_comm, Nat.mul_left_comm]
+          _ = (p * (a' + 1)) * s := by
+            simp [Nat.mul_assoc, Nat.mul_comm, Nat.mul_left_comm]
+          _ ≤ (p * (a' + 1) + T % p) * s := by
+            exact Nat.mul_le_mul_right s (Nat.le_add_right _ _)
+          _ = T * s := by
+            rw [hTdecomp]
+      have ha'_le_q : a' ≤ T * s / barrettRadix := by
+        exact (Nat.le_div_iff_mul_le hRpos).2 hkey
+      rw [ha]
+      dsimp [s] at ha'_le_q ⊢
+      exact Nat.succ_le_succ ha'_le_q
+  · have hRp : barrettRadix < p := Nat.lt_of_not_ge hpR
+    have hTp : T < p := Nat.lt_trans hT hRp
+    have hdiv : T / p = 0 := Nat.div_eq_of_lt hTp
+    rw [hdiv]
+    exact Nat.zero_le _
+
+/--
 With `pinv = floor(R / p)` and `T < R`, Nat-level Barrett reduction returns the
 same value as `% p`.
 -/
