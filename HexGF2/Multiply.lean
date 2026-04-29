@@ -70,6 +70,16 @@ def mul (p q : GF2Poly) : GF2Poly :=
 instance : Mul GF2Poly where
   mul := mul
 
+@[simp] theorem zero_mul (p : GF2Poly) : (0 : GF2Poly) * p = 0 := by
+  apply ext_words
+  change (mul 0 p).words = #[]
+  simp [mul, mulWords]
+
+@[simp] theorem mul_zero (p : GF2Poly) : p * (0 : GF2Poly) = 0 := by
+  apply ext_words
+  change (mul p 0).words = #[]
+  simp [mul, mulWords]
+
 /-- The normalized product stores no more than the raw convolution capacity. -/
 theorem wordCount_mul_le (p q : GF2Poly) : (p * q).wordCount ≤ p.wordCount + q.wordCount := by
   have hnorm := normalizeWords_size_le (mulWords p.words q.words)

@@ -22,6 +22,14 @@ structure GF2Poly where
 
 namespace GF2Poly
 
+/-- Packed polynomials are equal when their normalized word arrays are equal. -/
+theorem ext_words {p q : GF2Poly} (h : p.words = q.words) : p = q := by
+  cases p
+  cases q
+  simp at h
+  subst h
+  simp
+
 /-- Remove trailing zero words without disturbing the lower-degree prefix. -/
 private def trimTrailingZeroWordsList : List UInt64 → List UInt64
   | [] => []
@@ -90,12 +98,19 @@ def ofWords (words : Array UInt64) : GF2Poly :=
       simpa [normalizedWords, normalizeWords, GF2PolyNormalized] using
         trimTrailingZeroWordsList_getLast?_ne_zero words.toList }
 
+@[simp] theorem words_ofWords_empty : (ofWords #[]).words = #[] := by
+  rfl
+
 /-- The zero polynomial. -/
 def zero : GF2Poly :=
   ofWords #[]
 
 instance : Zero GF2Poly where
   zero := zero
+
+@[simp] theorem ofWords_empty : ofWords #[] = 0 := by
+  apply ext_words
+  rfl
 
 /-- The constant polynomial `1`. -/
 def one : GF2Poly :=
@@ -147,6 +162,24 @@ def degree? (p : GF2Poly) : Option Nat :=
 /-- The degree of a polynomial, defaulting to `0` for the zero polynomial. -/
 def degree (p : GF2Poly) : Nat :=
   p.degree?.getD 0
+
+@[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
+  rfl
+
+@[simp] theorem wordCount_zero : (0 : GF2Poly).wordCount = 0 := by
+  rfl
+
+@[simp] theorem isZero_zero : (0 : GF2Poly).isZero = true := by
+  rfl
+
+@[simp] theorem coeff_zero (n : Nat) : (0 : GF2Poly).coeff n = false := by
+  simp [coeff]
+
+@[simp] theorem degree?_zero : (0 : GF2Poly).degree? = none := by
+  rfl
+
+@[simp] theorem degree_zero : (0 : GF2Poly).degree = 0 := by
+  rfl
 
 /-- Word-wise XOR of packed coefficient arrays. -/
 private def xorWords (xs ys : Array UInt64) : Array UInt64 :=
