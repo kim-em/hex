@@ -459,6 +459,19 @@ theorem repr_mul_comm {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     repr (x * y) = repr (y * x) := by
   simp [repr_mul, FpPoly.mul_comm]
 
+theorem repr_mul_assoc {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x y z : PolyQuotient f hf) :
+    repr ((x * y) * z) = repr (x * (y * z)) := by
+  rw [repr_mul, repr_mul, repr_mul, repr_mul]
+  calc
+    reduceMod f (reduceMod f (repr x * repr y) * repr z)
+        = reduceMod f ((repr x * repr y) * repr z) := by
+          exact reduceMod_mul_left_reduceMod f (repr x * repr y) (repr z)
+    _ = reduceMod f (repr x * (repr y * repr z)) := by
+          rw [FpPoly.mul_assoc]
+    _ = reduceMod f (repr x * reduceMod f (repr y * repr z)) := by
+          exact (reduceMod_mul_right_reduceMod f (repr x) (repr y * repr z)).symm
+
 theorem repr_left_distrib {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x y z : PolyQuotient f hf) :
     repr (x * (y + z)) = repr (x * y + x * z) := by
@@ -555,6 +568,86 @@ theorem sub_eq_add_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     repr (nsmul (n + 1) x) = reduceMod f (repr (nsmul n x) + repr x) :=
   rfl
 
+private theorem zmod64_zero_add (a : ZMod64 p) : (0 : ZMod64 p) + a = a := by
+  change ZMod64.add 0 a = a
+  apply ZMod64.ext
+  apply UInt64.toNat_inj.mp
+  change (ZMod64.add 0 a).toNat = a.toNat
+  have h := ZMod64.toNat_add (0 : ZMod64 p) a
+  have hmod : a.val.toNat % p = a.val.toNat := Nat.mod_eq_of_lt a.isLt
+  have hz : (ZMod64.val (0 : ZMod64 p)).toNat = 0 := by
+    simpa [ZMod64.toNat_eq_val] using (ZMod64.toNat_zero (p := p))
+  rw [h]
+  rw [ZMod64.toNat_eq_val, ZMod64.toNat_eq_val, hz, Nat.zero_add, hmod]
+
+private theorem fpPoly_C_add (a b : ZMod64 p) :
+    FpPoly.C (a + b) = (FpPoly.C a + FpPoly.C b : FpPoly p) := by
+  apply DensePoly.ext_coeff
+  intro i
+  by_cases hi : i = 0
+  · subst i
+    change DensePoly.coeff (DensePoly.C (a + b)) 0 =
+      DensePoly.coeff (DensePoly.C a + DensePoly.C b) 0
+    rw [DensePoly.coeff_add, DensePoly.coeff_C, DensePoly.coeff_C, DensePoly.coeff_C]
+    simp
+  · change DensePoly.coeff (DensePoly.C (a + b)) i =
+      DensePoly.coeff (DensePoly.C a + DensePoly.C b) i
+    rw [DensePoly.coeff_add, DensePoly.coeff_C, DensePoly.coeff_C, DensePoly.coeff_C]
+    simp [hi]
+    exact (zmod64_zero_add (p := p) (0 : ZMod64 p)).symm
+
+private theorem const_add (f : FpPoly p) (hf : 0 < FpPoly.degree f) (a b : ZMod64 p) :
+    const f hf (a + b) = const f hf a + const f hf b := by
+  apply ext
+  rw [repr_const, repr_add, repr_const, repr_const]
+  have ha :
+      reduceMod f (FpPoly.C a) = FpPoly.C a := by
+    apply reduceMod_eq_self_of_degree_lt
+    simpa using hf
+  have hb :
+      reduceMod f (FpPoly.C b) = FpPoly.C b := by
+    apply reduceMod_eq_self_of_degree_lt
+    simpa using hf
+  rw [ha, hb, ← fpPoly_C_add]
+
+theorem natCast_succ (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) :
+    (OfNat.ofNat (α := PolyQuotient f hf) (n + 1)) =
+      OfNat.ofNat (α := PolyQuotient f hf) n + 1 := by
+  change natCast f hf (n + 1) = natCast f hf n + natCast f hf 1
+  rw [natCast_eq_const, natCast_eq_const, natCast_eq_const]
+  have hsucc : ((n + 1 : Nat) : ZMod64 p) = (n : ZMod64 p) + 1 := by
+    simpa using Lean.Grind.Semiring.ofNat_succ (α := ZMod64 p) n
+  rw [hsucc]
+  exact const_add f hf (n : ZMod64 p) (1 : ZMod64 p)
+
+theorem nsmul_eq_natCast_mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (n : Nat) (x : PolyQuotient f hf) :
+    n • x = (Nat.cast n : PolyQuotient f hf) * x := by
+  induction n with
+  | zero =>
+      apply ext
+      change repr (nsmul 0 x) = repr ((0 : PolyQuotient f hf) * x)
+      rw [repr_nsmul_zero, repr_zero_mul]
+      exact reduceMod_zero f
+  | succ n ih =>
+      calc
+        (n + 1) • x = n • x + x := rfl
+        _ = (Nat.cast n : PolyQuotient f hf) * x + x := by rw [ih]
+        _ = ((Nat.cast n : PolyQuotient f hf) + 1) * x := by
+          apply ext
+          calc
+            repr ((Nat.cast n : PolyQuotient f hf) * x + x)
+                = repr ((Nat.cast n : PolyQuotient f hf) * x + 1 * x) := by
+                  rw [repr_add, repr_add, repr_one_mul]
+            _ = repr (((Nat.cast n : PolyQuotient f hf) + 1) * x) := by
+                  exact (repr_right_distrib (Nat.cast n : PolyQuotient f hf) 1 x).symm
+        _ = (Nat.cast (n + 1) : PolyQuotient f hf) * x := by
+          have hcast :
+              (Nat.cast (n + 1) : PolyQuotient f hf) =
+                (Nat.cast n : PolyQuotient f hf) + 1 := by
+            exact natCast_succ f hf n
+          rw [hcast]
+
 @[simp] theorem intCast_ofNat
     (f : FpPoly p) (hf : 0 < FpPoly.degree f) (n : Nat) :
     intCast f hf (.ofNat n) = natCast f hf n :=
@@ -599,46 +692,48 @@ theorem sub_eq_add_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Semiring (PolyQuotient f hf) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
-    sorry
+    apply ext
+    exact repr_add_zero a
   · intro a b
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_add_comm a b
   · intro a b c
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_add_assoc a b c
   · intro a b c
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_mul_assoc a b c
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_mul_one a
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_one_mul a
   · intro a b c
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_left_distrib a b c
   · intro a b c
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_right_distrib a b c
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_zero_mul a
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    exact repr_mul_zero a
   · intro a
-    apply Subtype.ext
-    sorry
+    apply ext
+    change repr (pow.go (one f hf) a 0) = repr (1 : PolyQuotient f hf)
+    unfold pow.go
+    rfl
   · intro a n
-    apply Subtype.ext
     sorry
   · intro n
-    sorry
+    exact natCast_succ f hf n
   · intro n
-    sorry
+    rfl
   · intro n a
-    sorry
+    exact nsmul_eq_natCast_mul n a
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Ring (PolyQuotient f hf) := by
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
@@ -661,8 +756,8 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.Ring (PolyQuotie
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} : Lean.Grind.CommRing (PolyQuotient f hf) := by
   refine Lean.Grind.CommRing.mk ?_
   intro a b
-  apply Subtype.ext
-  sorry
+  apply ext
+  simpa using repr_mul_comm a b
 
 end GFqRing
 
