@@ -5,9 +5,9 @@ import LeanBench
 Benchmark registrations for `hex-poly`.
 
 This Phase 4 slice measures the dense core operations over deterministic
-integer polynomials. Input construction is hoisted into `prep`, and each timed
-target returns a small checksum or scalar observable rather than the full
-polynomial.
+integer polynomials and Euclidean operations over a fixed-size prime field.
+Input construction is hoisted into `prep`, and each timed target returns a
+small checksum or scalar observable rather than the full polynomial.
 
 Scientific registrations:
 
@@ -26,10 +26,10 @@ Scientific registrations:
   `O(n^2)`.
 * `runModByMonicChecksum`: remainder from division by a monic divisor,
   `O(n^2)`.
-* `runGcdChecksum`: Euclidean gcd over a field, `O(n^3)` with the current
-  schoolbook division path.
-* `runXGcdChecksum`: extended Euclidean algorithm over a field, `O(n^3)` with
-  the current schoolbook division path.
+* `runGcdChecksum`: Euclidean gcd over a fixed-size field, `O(n^2)` on the
+  committed Fibonacci-style quotient-chain fixture.
+* `runXGcdChecksum`: extended Euclidean algorithm over a fixed-size field,
+  `O(n^2)` on the committed Fibonacci-style quotient-chain fixture.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
 * `runPolyCRTChecksum`: polynomial CRT witness construction over coprime
@@ -37,6 +37,46 @@ Scientific registrations:
 -/
 
 namespace Hex.PolyBench
+
+/-- Tiny fixed-size field used by Euclidean benchmarks to measure polynomial
+operation counts without arbitrary-precision `Rat` coefficient growth. -/
+structure F7 where
+  val : Fin 7
+  deriving DecidableEq, Hashable
+
+namespace F7
+
+def ofNat (n : Nat) : F7 :=
+  { val := ⟨n % 7, Nat.mod_lt n (by decide)⟩ }
+
+private def invNat : Nat → Nat
+  | 1 => 1
+  | 2 => 4
+  | 3 => 5
+  | 4 => 2
+  | 5 => 3
+  | 6 => 6
+  | _ => 0
+
+instance : Zero F7 where
+  zero := ofNat 0
+
+instance : One F7 where
+  one := ofNat 1
+
+instance : Add F7 where
+  add a b := ofNat (a.val.val + b.val.val)
+
+instance : Sub F7 where
+  sub a b := ofNat (a.val.val + 7 - b.val.val)
+
+instance : Mul F7 where
+  mul a b := ofNat (a.val.val * b.val.val)
+
+instance : Div F7 where
+  div a b := ofNat (a.val.val * invNat b.val.val)
+
+end F7
 
 /-- Hash prepared dense-polynomial inputs by their normalized coefficient arrays. -/
 instance [Hashable R] [Zero R] [DecidableEq R] : Hashable (DensePoly R) where
@@ -72,13 +112,13 @@ structure ComposeInput where
 
 /-- Prepared input for field-polynomial Euclidean operations. -/
 structure EuclidInput where
-  dividend : DensePoly Rat
-  divisor : DensePoly Rat
+  dividend : DensePoly F7
+  divisor : DensePoly F7
   deriving Hashable
 
 /-- Prepared input for division by a generated monic polynomial. -/
 structure MonicInput where
-  dividend : DensePoly Rat
+  dividend : DensePoly F7
   divisorDegree : Nat
   deriving Hashable
 
@@ -105,6 +145,10 @@ def densePoly (n salt : Nat) : DensePoly Int :=
 def denseRatPoly (n salt : Nat) : DensePoly Rat :=
   DensePoly.ofCoeffs <| (Array.range n).map fun i => (coeffValue n i salt : Rat)
 
+/-- Deterministic dense polynomial over the fixed-size benchmark field. -/
+def denseF7Poly (n salt : Nat) : DensePoly F7 :=
+  DensePoly.ofCoeffs <| (Array.range n).map fun i => F7.ofNat (coeffValue n i salt).natAbs
+
 /-- Deterministic primitive coefficient used inside nontrivial-content inputs. -/
 def primitiveCoeffValue (n i salt : Nat) : Int :=
   let base : Int := if i = 0 then 1 else coeffValue n i salt
@@ -117,11 +161,11 @@ def contentPoly (n salt : Nat) : DensePoly Int :=
     (Array.range n).map fun i => common * primitiveCoeffValue n i salt
 
 /-- Deterministic monic divisor used by `modByMonic` benchmarks. -/
-def monicDivisor (degree : Nat) : DensePoly Rat :=
-  { coeffs := (Array.replicate degree (0 : Rat)).push 1
+def monicDivisor (degree : Nat) : DensePoly F7 :=
+  { coeffs := (Array.replicate degree (0 : F7)).push 1
     normalized := by
       right
-      have hone : ¬((1 : Rat) = Zero.zero) := by decide
+      have hone : ¬((1 : F7) = Zero.zero) := by decide
       simp [hone] }
 
 /-- Generated monomial divisors are monic by construction. -/
@@ -161,12 +205,25 @@ def prepComposeInput (n : Nat) : ComposeInput :=
 
 /-- Per-parameter fixture for field-polynomial long division. -/
 def prepEuclidInput (n : Nat) : EuclidInput :=
-  { dividend := denseRatPoly (2 * n + 1) 131
-    divisor := denseRatPoly (n + 1) 173 }
+  { dividend := denseF7Poly (2 * n + 1) 131
+    divisor := denseF7Poly (n + 1) 173 }
+
+/-- Consecutive polynomial Fibonacci inputs force many Euclidean quotient steps. -/
+def prepEuclidWorstInput (n : Nat) : EuclidInput :=
+  let x := DensePoly.monomial 1 (1 : F7)
+  let pair :=
+    (List.range (n + 1)).foldl
+      (fun state _ =>
+        let prev := state.1
+        let curr := state.2
+        (curr, x * curr + prev))
+      ((0 : DensePoly F7), (1 : DensePoly F7))
+  { dividend := pair.2
+    divisor := pair.1 }
 
 /-- Per-parameter fixture for division by a monic polynomial. -/
 def prepMonicInput (n : Nat) : MonicInput :=
-  { dividend := denseRatPoly (2 * n + 1) 191
+  { dividend := denseF7Poly (2 * n + 1) 191
     divisorDegree := n + 1 }
 
 /-- Per-parameter fixture for polynomial CRT witness construction. -/
@@ -355,8 +412,8 @@ setup_benchmark runModByMonicChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runGcdChecksum n => n * n * n
-  with prep := prepEuclidInput
+setup_benchmark runGcdChecksum n => n * n
+  with prep := prepEuclidWorstInput
   where {
     paramFloor := 16
     paramCeiling := 96
@@ -366,8 +423,8 @@ setup_benchmark runGcdChecksum n => n * n * n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runXGcdChecksum n => n * n * n
-  with prep := prepEuclidInput
+setup_benchmark runXGcdChecksum n => n * n
+  with prep := prepEuclidWorstInput
   where {
     paramFloor := 16
     paramCeiling := 96
