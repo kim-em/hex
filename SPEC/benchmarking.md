@@ -463,3 +463,21 @@ explicitly forbidden:
 - **Rolling a hex-local benchmark harness.** lean-bench is the
   harness; gaps in its API are filed against it, not papered over
   locally.
+- **Shipping a registration that produces no verdict-eligible rows.**
+  A parametric `run` that emits `only 0 verdict-eligible row(s)
+  survived warmup-trim + signal-floor filter` is evidence the
+  schedule, the per-call cap, or the target inner nanos was set too
+  low for the host the benchmark is scientifically supposed to run
+  on. The fix is the same as for any Phase-4 calibration miss: file
+  an issue, don't merge a registration whose largest interesting rung
+  is below 10× the per-spawn floor on the intended hardware. (Until
+  lean-bench exits non-zero in this case — see [#1045](https://github.com/kim-em/hex/issues/1045)
+  — every parametric registration must be visually inspected the
+  first time it runs on a target host.)
+- **Treating an "inconclusive" verdict as a passing scientific run.**
+  Phase-4 exit criteria require either "consistent with declared
+  complexity" or a tracked finding-issue explaining the mismatch
+  ([PLAN/Phase4.md](../PLAN/Phase4.md) §Exit criteria). Inconclusive
+  verdicts on a registration whose schedule needed bumping are
+  miscalibration, not findings, and the registration must be
+  re-tuned before the library advances through Phase 4.
