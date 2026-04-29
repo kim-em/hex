@@ -52,6 +52,22 @@ instance : Mod GF2Poly where
 instance : Dvd GF2Poly where
   dvd p q := ∃ r : GF2Poly, q = p * r
 
+private theorem add_cancel_middle (a b c : GF2Poly) :
+    (a + b) + (c + b) = a + c := by
+  apply ext_coeff
+  intro n
+  rw [coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne, coeff_add_eq_bne]
+  cases a.coeff n <;> cases b.coeff n <;> cases c.coeff n <;> rfl
+
+/-- A single long-division update preserves quotient/remainder
+reconstruction. -/
+theorem quotient_step_reconstruct (quot rem q : GF2Poly) (k : Nat) :
+    let term := monomial k
+    (quot + term) * q + (rem + q.mulXk k) = quot * q + rem := by
+  dsimp
+  rw [add_monomial_mul]
+  exact add_cancel_middle (quot * q) (q.mulXk k) rem
+
 /-- Result package for the packed extended Euclidean algorithm. -/
 structure XGCDResult where
   gcd : GF2Poly
