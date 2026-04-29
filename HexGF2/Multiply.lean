@@ -136,6 +136,10 @@ private theorem xorWords_getElem! (xs ys : Array UInt64) (i : Nat) :
     (xorWords xs ys)[i]! = xs[i]! ^^^ ys[i]! := by
   simpa only [getElem!_def] using xorWords_get?_getD xs ys i
 
+private theorem normalizeWords_getElem! (words : Array UInt64) (i : Nat) :
+    (normalizeWords words)[i]! = words[i]! := by
+  simpa only [getElem!_def] using normalizeWords_get?_getD words i
+
 private theorem foldl_keep {α β : Type} (xs : List β) (acc : α) :
     xs.foldl (fun acc _ => acc) acc = acc := by
   induction xs generalizing acc with
@@ -2731,6 +2735,27 @@ theorem coeff_mul (p q : GF2Poly) (n : Nat) :
     coeffWords (mulWords p.words q.words) n
   simp
 
+/-- Left distributivity of packed `GF(2)` polynomial multiplication over
+addition. -/
+theorem left_distrib (p r q : GF2Poly) :
+    (p + r) * q = p * q + r * q := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_add_eq_bne, coeff_mul, coeff_mul]
+  change
+    coeffWords (mulWords (normalizeWords (xorWords p.words r.words)) q.words) n =
+      (coeffWords (mulWords p.words q.words) n !=
+        coeffWords (mulWords r.words q.words) n)
+  let raw := xorWords p.words r.words
+  let m := raw.size
+  have hraw := coeffWords_mulWords_xor_left p.words r.words q.words n
+  rw [← coeffWords_mulWords_common_left raw q.words n m (by simp [m])] at hraw
+  rw [← coeffWords_mulWords_common_left (normalizeWords raw) q.words n m
+    (by
+      dsimp [m, raw]
+      exact normalizeWords_size_le _)]
+  simpa [raw, normalizeWords_getElem!] using hraw
+
 private theorem coeff_shiftLeft_lt (p : GF2Poly) {k n : Nat} (hn : n < k) :
     (p.shiftLeft k).coeff n = false := by
   rw [coeff_shiftLeft]
@@ -2807,6 +2832,12 @@ theorem monomial_mul (k : Nat) (q : GF2Poly) :
     · have hsource_le : q.words.size ≤ source / 64 := Nat.le_of_not_gt hsource
       rw [coeffWords_monomial_mulWords_source_oob q.words hsource_le]
       exact (coeff_shiftLeft_add_source_oob q hsource_le).symm
+
+/-- Expanding a quotient update by an added monomial gives the product update
+used by long division. -/
+theorem add_monomial_mul (quot q : GF2Poly) (k : Nat) :
+    (quot + monomial k) * q = quot * q + q.mulXk k := by
+  rw [left_distrib, monomial_mul]
 
 end GF2Poly
 end Hex
