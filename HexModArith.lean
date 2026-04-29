@@ -1,4 +1,5 @@
 import HexModArith.Basic
+import HexModArith.Conformance
 import HexModArith.HotLoop
 import HexModArith.Prime
 import HexModArith.Ring
