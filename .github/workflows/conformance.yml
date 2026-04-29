@@ -15,6 +15,7 @@ jobs:
           - HexArith
           - HexPoly
           - HexGfqRing
+          - HexGfqField
           - HexPolyZ
           - HexMatrix
     steps:
