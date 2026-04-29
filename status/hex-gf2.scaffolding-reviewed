@@ -1,0 +1,2 @@
+Reviewed in issue #672.
+No additional downstream-facing scaffold gaps were identified against `SPEC/Libraries/hex-gf2.md`, likely downstream consumers, and `PLAN/Phase2.md`.
