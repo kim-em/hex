@@ -14,7 +14,9 @@ Scientific registrations:
 * `runCoprimeModPWitness`: finite-prefix Bezout witness checking, `O(n^2)`.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
-* `runBinom`: multiplicative binomial coefficient computation, `O(n)`.
+* `runBinom`: central-binomial multiplicative formula, `O(n log n)` under
+  compiled `Nat` arithmetic because the committed fixture intentionally grows
+  the result to `Θ(n)` bits while still performing `O(n)` multiplications.
 * `runFloorSqrtChecksum`: batched floor-square-root computation, `O(n log n)`.
 * `runCeilSqrtChecksum`: batched ceiling-square-root computation, `O(n log n)`.
 * `runCoeffNormSq`: squared coefficient-vector norm, `O(n)`.
@@ -231,7 +233,7 @@ setup_benchmark runPrimitivePartChecksum n => n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runBinom n => n
+setup_benchmark runBinom n => n * Nat.log2 (n + 1)
   where {
     paramFloor := 32
     paramCeiling := 512
