@@ -118,11 +118,20 @@ def neg [Sub R] (p : DensePoly R) : DensePoly R :=
 instance [Sub R] : Neg (DensePoly R) where
   neg := neg
 
-/-- Schoolbook dense polynomial multiplication. -/
+/-- Schoolbook dense polynomial multiplication by direct coefficient convolution. -/
 def mul [Add R] [Mul R] (p q : DensePoly R) : DensePoly R :=
-  (List.range p.size).foldl
-    (fun acc i => acc + (shift i <| scale (p.coeff i) q))
-    (0 : DensePoly R)
+  if p.isZero || q.isZero then 0 else
+    let size := p.size + q.size - 1
+    let coeffs :=
+      (List.range p.size).foldl
+        (fun acc i =>
+          (List.range q.size).foldl
+            (fun acc j =>
+              let k := i + j
+              acc.set! k ((acc[k]?).getD (Zero.zero : R) + p.coeff i * q.coeff j))
+            acc)
+        (Array.replicate size (Zero.zero : R))
+    ofCoeffs coeffs
 
 instance [Add R] [Mul R] : Mul (DensePoly R) where
   mul := mul
