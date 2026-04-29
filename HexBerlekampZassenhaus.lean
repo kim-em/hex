@@ -15,6 +15,34 @@ namespace ZPoly
 private def intModNat (z : Int) (m : Nat) : Nat :=
   Int.toNat (z % Int.ofNat m)
 
+/-- The integer polynomial `X`. -/
+def X : ZPoly :=
+  DensePoly.monomial 1 1
+
+private def splitInitialZeros : List Int → Nat × List Int
+  | [] => (0, [])
+  | coeff :: coeffs =>
+      if coeff = 0 then
+        let rest := splitInitialZeros coeffs
+        (rest.1 + 1, rest.2)
+      else
+        (0, coeff :: coeffs)
+
+/-- Data from extracting the largest visible power of `X` from a dense integer polynomial. -/
+structure XPowerData where
+  power : Nat
+  core : ZPoly
+
+/--
+Remove the initial zero-coefficient run from a dense integer polynomial.
+
+Dense coefficients are stored in ascending degree order, so the initial zero
+run is exactly the executable power of `X` dividing the polynomial.
+-/
+def extractXPower (f : ZPoly) : XPowerData :=
+  let split := splitInitialZeros f.toArray.toList
+  { power := split.1, core := DensePoly.ofCoeffs split.2.toArray }
+
 /-- The integer leading coefficient reduced to the candidate prime field. -/
 def leadingCoeffModP (f : ZPoly) (p : Nat) [ZMod64.Bounds p] : ZMod64 p :=
   ZMod64.ofNat p (intModNat (DensePoly.leadingCoeff f) p)
@@ -197,6 +225,68 @@ structure LiftData where
   p : Nat
   k : Nat
   liftedFactors : Array ZPoly
+
+/--
+Executable normalization data for the public integer factorization API.
+
+The public input is first split into its integer content, primitive part,
+initial `X` power, and primitive square-free core. The Berlekamp-Zassenhaus
+prime/lift/recombine pipeline runs on `squareFreeCore`; the other fields are
+reassembled around the resulting core factors.
+-/
+structure FactorNormalizationData where
+  content : Int
+  primitive : ZPoly
+  xPower : Nat
+  xFreePrimitive : ZPoly
+  squareFreeCore : ZPoly
+  repeatedPart : ZPoly
+
+/-- Compute the normalization data required before the square-free pipeline. -/
+def normalizeForFactor (f : ZPoly) : FactorNormalizationData :=
+  let primitive := ZPoly.primitivePart f
+  let xData := ZPoly.extractXPower primitive
+  let sqData := ZPoly.primitiveSquareFreeDecomposition xData.core
+  { content := ZPoly.content f
+    primitive
+    xPower := xData.power
+    xFreePrimitive := xData.core
+    squareFreeCore := sqData.squareFreeCore
+    repeatedPart := sqData.repeatedPart }
+
+private def contentFactorArray (content : Int) : Array ZPoly :=
+  if content = 1 then
+    #[]
+  else
+    #[DensePoly.C content]
+
+private def xPowerFactorArray (power : Nat) : Array ZPoly :=
+  (List.replicate power ZPoly.X).toArray
+
+private def repeatedPartFactorArray (repeatedPart : ZPoly) : Array ZPoly :=
+  if repeatedPart = 1 then
+    #[]
+  else
+    #[repeatedPart]
+
+/-- Factors that come from normalization before the square-free core is factored. -/
+def normalizationPrefixFactors (d : FactorNormalizationData) : Array ZPoly :=
+  contentFactorArray d.content ++
+    xPowerFactorArray d.xPower ++
+    repeatedPartFactorArray d.repeatedPart
+
+/-- Reassemble normalization factors around the factors of the square-free core. -/
+def reassembleNormalizedFactors
+    (d : FactorNormalizationData) (coreFactors : Array ZPoly) : Array ZPoly :=
+  normalizationPrefixFactors d ++ coreFactors
+
+private def normalizedConstantFactors (d : FactorNormalizationData) : Array ZPoly :=
+  let coreFactor :=
+    if d.squareFreeCore = 1 then
+      #[]
+    else
+      #[d.squareFreeCore]
+  normalizationPrefixFactors d ++ coreFactor
 
 /--
 Per-prime modular irreducibility evidence for integer irreducibility
@@ -485,9 +575,17 @@ def recombine (f : ZPoly) (d : LiftData) : Array ZPoly :=
 
 /-- Factor with an explicit coefficient bound for the recombination stage. -/
 def factorWithBound (f : ZPoly) (B : Nat) : Array ZPoly :=
-  let primeData := choosePrimeData f
-  let liftData := henselLiftData f B primeData
-  recombine f liftData
+  let normalized := normalizeForFactor f
+  if normalized.squareFreeCore.degree?.getD 0 = 0 then
+    normalizedConstantFactors normalized
+  else
+    let primeData := choosePrimeData normalized.squareFreeCore
+    let liftData := henselLiftData normalized.squareFreeCore B primeData
+    let coreFactors := recombine normalized.squareFreeCore liftData
+    if coreFactors.isEmpty then
+      #[]
+    else
+      reassembleNormalizedFactors normalized coreFactors
 
 /-- Factor using the library's conservative executable coefficient bound. -/
 def factor (f : ZPoly) : Array ZPoly :=
@@ -501,6 +599,38 @@ the later proof layer.
 theorem factor_product_of_bound (f : ZPoly) (B : Nat)
     (hB : ∀ g : ZPoly, g ∣ f → ∀ i, (g.coeff i).natAbs ≤ B) :
     Array.foldl (· * ·) 1 (factorWithBound f B) = f := by
+  sorry
+
+/--
+The normalization prefix and square-free core reassemble to the original
+input. This is the proof-facing invariant connecting content extraction,
+`X`-power extraction, and primitive square-free reduction.
+-/
+theorem normalizeForFactor_reassembles (f : ZPoly) :
+    let normalized := normalizeForFactor f
+    Array.polyProduct (normalizationPrefixFactors normalized ++ #[normalized.squareFreeCore]) = f := by
+  sorry
+
+/--
+Replacing the square-free core by a product-equivalent factor array preserves
+the original normalized input.
+-/
+theorem reassembleNormalizedFactors_product
+    (f : ZPoly) (normalized : FactorNormalizationData) (coreFactors : Array ZPoly)
+    (hnormalized : normalizeForFactor f = normalized)
+    (hcore : Array.polyProduct coreFactors = normalized.squareFreeCore) :
+    Array.polyProduct (reassembleNormalizedFactors normalized coreFactors) = f := by
+  sorry
+
+/--
+For constant square-free cores, the normalization-only factor array preserves
+the original input.
+-/
+theorem normalizedConstantFactors_product
+    (f : ZPoly) (normalized : FactorNormalizationData)
+    (hnormalized : normalizeForFactor f = normalized)
+    (hconst : normalized.squareFreeCore.degree?.getD 0 = 0) :
+    Array.polyProduct (normalizedConstantFactors normalized) = f := by
   sorry
 
 /-- A successful exhaustive recombination search preserves the target product. -/
