@@ -1002,6 +1002,297 @@ private theorem coeffWords_mulWords_monomial_source_oob
     · simp [words_monomial_size]
     · exact hsource
 
+private theorem foldl_mulWords_monomial_prefix_before_source
+    (xs : Array UInt64) {k source m : Nat} (hm : m ≤ source / 64)
+    (hsource : source / 64 < xs.size) :
+    coeffWords
+        ((List.range m).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range (monomial k).words.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x (monomial k).words[j]!)
+              acc)
+          (Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64)))
+        (source + k) =
+      false := by
+  induction m with
+  | zero =>
+      simp only [List.range_zero, List.foldl_nil]
+      rw [coeffWords]
+      have hword :
+          ((Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64))[
+              (source + k) / 64]?).getD 0 = 0 := by
+        by_cases h : (source + k) / 64 <
+            (Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64)).size
+        · rw [Array.getElem?_eq_getElem h]
+          simp
+        · rw [Array.getElem?_eq_none]
+          · rfl
+          · exact Nat.le_of_not_gt h
+      rw [hword, UInt64.bne_zero_eq_toNat_bne_zero]
+      simp
+  | succ m ih =>
+      have hm_le : m ≤ source / 64 := by omega
+      have hm_lt : m < source / 64 := by omega
+      rw [show m + 1 = m.succ by omega]
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [words_monomial_size]
+      by_cases hLow : (source + k) / 64 = m + k / 64
+      · by_cases hbit : (source + k) % 64 < k % 64
+        · have hbitShift : k % 64 ≠ 0 := by omega
+          rw [foldl_xorClmulAt_monomial_active_low_before_shift
+            (acc :=
+              (List.range m).foldl
+                (fun acc i =>
+                  let x := xs[i]!
+                  (List.range (k / 64 + 1)).foldl
+                    (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                    acc)
+                (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+            (i := m) (k := k) (target := source + k) (x := xs[m]!)
+            (hidx := by
+              have hsize := foldl_mulWords_size (List.range m)
+                (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                xs (monomial k).words
+              rw [words_monomial_size] at hsize
+              have hcap : m + k / 64 <
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                simp
+                omega
+              simpa [hsize] using hcap)
+            hLow hbitShift hbit]
+          simpa [words_monomial_size] using ih hm_le
+        · have hsourceWord : source / 64 = m := by
+            have hsourceSplit := Nat.div_add_mod source 64
+            have hkSplit := Nat.div_add_mod k 64
+            have htargetSplit := Nat.div_add_mod (source + k) 64
+            have hsourceBit := Nat.mod_lt source (by decide : 0 < 64)
+            have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+            have htargetBit := Nat.mod_lt (source + k) (by decide : 0 < 64)
+            omega
+          omega
+      · by_cases hHigh : (source + k) / 64 = m + k / 64 + 1
+        · by_cases hbit : k % 64 ≤ (source + k) % 64
+          · rw [foldl_xorClmulAt_monomial_active_high_after_carry
+              (acc :=
+                (List.range m).foldl
+                  (fun acc i =>
+                    let x := xs[i]!
+                    (List.range (k / 64 + 1)).foldl
+                      (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                      acc)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+              (i := m) (k := k) (target := source + k) (x := xs[m]!)
+              (hidx := by
+                have hsize := foldl_mulWords_size (List.range m)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                  xs (monomial k).words
+                rw [words_monomial_size] at hsize
+                have hcap : m + k / 64 <
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                  simp
+                  omega
+                simpa [hsize] using hcap)
+              (hidxNext := by
+                have hsize := foldl_mulWords_size (List.range m)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                  xs (monomial k).words
+                rw [words_monomial_size] at hsize
+                have hcap : m + k / 64 + 1 <
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                  simp
+                  omega
+                simpa [hsize] using hcap)
+              hHigh hbit]
+            simpa [words_monomial_size] using ih hm_le
+          · have hsourceWord : source / 64 = m := by
+              have hsourceSplit := Nat.div_add_mod source 64
+              have hkSplit := Nat.div_add_mod k 64
+              have htargetSplit := Nat.div_add_mod (source + k) 64
+              have hsourceBit := Nat.mod_lt source (by decide : 0 < 64)
+              have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+              have htargetBit := Nat.mod_lt (source + k) (by decide : 0 < 64)
+              omega
+            omega
+        · rw [foldl_xorClmulAt_monomial_ne
+            (acc :=
+              (List.range m).foldl
+                (fun acc i =>
+                  let x := xs[i]!
+                  (List.range (k / 64 + 1)).foldl
+                    (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                    acc)
+                (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+            (i := m) (k := k) (target := source + k) (x := xs[m]!) hLow hHigh]
+          simpa [words_monomial_size] using ih hm_le
+
+private theorem foldl_mulWords_monomial_prefix_after_source
+    (xs : Array UInt64) {k source m : Nat} (hm : source / 64 + 1 ≤ m)
+    (hmSize : m ≤ xs.size)
+    (hsource : source / 64 < xs.size) :
+    coeffWords
+        ((List.range m).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range (monomial k).words.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x (monomial k).words[j]!)
+              acc)
+          (Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64)))
+        (source + k) =
+      coeffWords xs source := by
+  induction m with
+  | zero =>
+      omega
+  | succ m ih =>
+      by_cases hm_active : m = source / 64
+      · subst hm_active
+        by_cases hbitShift : k % 64 = 0
+        · rw [foldl_mulWords_monomial_active_zero
+            (acc := Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64))
+            (xs := xs) (k := k) (n := source)
+            (hidx := by simp [words_monomial_size]; omega) hbitShift]
+          have hprefix := foldl_mulWords_monomial_prefix_before_source xs
+            (m := source / 64) (k := k) (source := source) (by omega) hsource
+          rw [hprefix]
+          have hget : (xs[source / 64]?).getD 0 = xs[source / 64]! := by
+            exact (getElem!_def xs (source / 64)).symm
+          simp [coeffWords, hget]
+        · by_cases hbit : source % 64 + k % 64 < 64
+          · rw [foldl_mulWords_monomial_active_low
+              (acc := Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64))
+              (xs := xs) (k := k) (n := source)
+              (hidx := by simp [words_monomial_size]; omega) hbitShift hbit]
+            have hprefix := foldl_mulWords_monomial_prefix_before_source xs
+              (m := source / 64) (k := k) (source := source) (by omega) hsource
+            rw [hprefix]
+            have hget : (xs[source / 64]?).getD 0 = xs[source / 64]! := by
+              exact (getElem!_def xs (source / 64)).symm
+            simp [coeffWords, hget]
+          · rw [foldl_mulWords_monomial_active_high
+              (acc := Array.replicate (xs.size + (monomial k).words.size) (0 : UInt64))
+              (xs := xs) (k := k) (n := source)
+              (hidx := by simp [words_monomial_size]; omega)
+              (hidxNext := by simp [words_monomial_size]; omega)
+              (hbit := by omega)]
+            have hprefix := foldl_mulWords_monomial_prefix_before_source xs
+              (m := source / 64) (k := k) (source := source) (by omega) hsource
+            rw [hprefix]
+            have hget : (xs[source / 64]?).getD 0 = xs[source / 64]! := by
+              exact (getElem!_def xs (source / 64)).symm
+            simp [coeffWords, hget]
+      · have hm_tail : source / 64 + 1 ≤ m := by omega
+        have hm_gt : source / 64 < m := by omega
+        rw [show m + 1 = m.succ by omega]
+        rw [List.range_succ, List.foldl_append]
+        simp only [List.foldl_cons, List.foldl_nil]
+        rw [words_monomial_size]
+        by_cases hLow : (source + k) / 64 = m + k / 64
+        · by_cases hbit : (source + k) % 64 < k % 64
+          · have hbitShift : k % 64 ≠ 0 := by omega
+            rw [foldl_xorClmulAt_monomial_active_low_before_shift
+              (acc :=
+                (List.range m).foldl
+                  (fun acc i =>
+                    let x := xs[i]!
+                    (List.range (k / 64 + 1)).foldl
+                      (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                      acc)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+              (i := m) (k := k) (target := source + k) (x := xs[m]!)
+              (hidx := by
+                have hsize := foldl_mulWords_size (List.range m)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                  xs (monomial k).words
+                rw [words_monomial_size] at hsize
+                have hcap : m + k / 64 <
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                  simp
+                  omega
+                simpa [hsize] using hcap)
+            hLow hbitShift hbit]
+            simpa [words_monomial_size] using ih hm_tail (by omega)
+          · have hsourceWord : source / 64 = m := by
+              have hsourceSplit := Nat.div_add_mod source 64
+              have hkSplit := Nat.div_add_mod k 64
+              have htargetSplit := Nat.div_add_mod (source + k) 64
+              have hsourceBit := Nat.mod_lt source (by decide : 0 < 64)
+              have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+              have htargetBit := Nat.mod_lt (source + k) (by decide : 0 < 64)
+              omega
+            omega
+        · by_cases hHigh : (source + k) / 64 = m + k / 64 + 1
+          · by_cases hbit : k % 64 ≤ (source + k) % 64
+            · rw [foldl_xorClmulAt_monomial_active_high_after_carry
+                (acc :=
+                  (List.range m).foldl
+                    (fun acc i =>
+                      let x := xs[i]!
+                      (List.range (k / 64 + 1)).foldl
+                        (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                        acc)
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+                (i := m) (k := k) (target := source + k) (x := xs[m]!)
+                (hidx := by
+                  have hsize := foldl_mulWords_size (List.range m)
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                    xs (monomial k).words
+                  rw [words_monomial_size] at hsize
+                  have hcap : m + k / 64 <
+                      (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                    simp
+                    omega
+                  simpa [hsize] using hcap)
+                (hidxNext := by
+                  have hsize := foldl_mulWords_size (List.range m)
+                    (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64))
+                    xs (monomial k).words
+                  rw [words_monomial_size] at hsize
+                  have hcap : m + k / 64 + 1 <
+                      (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)).size := by
+                    simp
+                    omega
+                  simpa [hsize] using hcap)
+                hHigh hbit]
+              simpa [words_monomial_size] using ih hm_tail (by omega)
+            · have hsourceWord : source / 64 = m := by
+                have hsourceSplit := Nat.div_add_mod source 64
+                have hkSplit := Nat.div_add_mod k 64
+                have htargetSplit := Nat.div_add_mod (source + k) 64
+                have hsourceBit := Nat.mod_lt source (by decide : 0 < 64)
+                have hkBit := Nat.mod_lt k (by decide : 0 < 64)
+                have htargetBit := Nat.mod_lt (source + k) (by decide : 0 < 64)
+                omega
+              omega
+          · rw [foldl_xorClmulAt_monomial_ne
+              (acc :=
+                (List.range m).foldl
+                  (fun acc i =>
+                    let x := xs[i]!
+                    (List.range (k / 64 + 1)).foldl
+                      (fun acc j => xorClmulAt acc (i + j) xs[i]! (monomial k).words[j]!)
+                      acc)
+                  (Array.replicate (xs.size + (k / 64 + 1)) (0 : UInt64)))
+              (i := m) (k := k) (target := source + k) (x := xs[m]!) hLow hHigh]
+            simpa [words_monomial_size] using ih hm_tail (by omega)
+
+private theorem coeffWords_mulWords_monomial_source
+    (xs : Array UInt64) {k source : Nat} (hsource : source / 64 < xs.size) :
+    coeffWords (mulWords xs (monomial k).words) (source + k) =
+      coeffWords xs source := by
+  unfold mulWords
+  have hxs : ¬xs.isEmpty := by
+    intro hempty
+    have hsize : xs.size = 0 := by
+      simpa [Array.isEmpty] using hempty
+    omega
+  have hys : ¬ (monomial k).words.isEmpty := by
+    rw [words_monomial]
+    simp
+  simp [hxs, hys]
+  exact foldl_mulWords_monomial_prefix_after_source xs
+    (m := xs.size) (k := k) (source := source) (by omega) (by omega) hsource
+
 /-- Multiplication in `F_2[x]` via carry-less word products and XOR
 accumulation. -/
 def mul (p q : GF2Poly) : GF2Poly :=
@@ -1048,6 +1339,61 @@ theorem coeff_mul (p q : GF2Poly) (n : Nat) :
   change (ofWords (mulWords p.words q.words)).coeff n =
     coeffWords (mulWords p.words q.words) n
   simp
+
+private theorem coeff_shiftLeft_lt (p : GF2Poly) {k n : Nat} (hn : n < k) :
+    (p.shiftLeft k).coeff n = false := by
+  rw [coeff_shiftLeft]
+  by_cases hbitShift : k % 64 = 0
+  · simp [hbitShift]
+    have hword : n / 64 < k / 64 := by
+      have hnSplit := Nat.div_add_mod n 64
+      have hkSplit := Nat.div_add_mod k 64
+      have hnBit := Nat.mod_lt n (by decide : 0 < 64)
+      omega
+    rw [coeffWords]
+    have hget :
+        (((Array.replicate (k / 64) (0 : UInt64)) ++ p.words)[n / 64]?).getD 0 = 0 := by
+      rw [Array.getElem?_append_left]
+      · simp [hword]
+      · simp [hword]
+    rw [hget, UInt64.bne_zero_eq_toNat_bne_zero]
+    simp
+  · simp [hbitShift, coeffWords_replicate_append_shiftLeftBitsList_lt p.words hbitShift hn]
+
+private theorem coeff_shiftLeft_add_source_oob
+    (p : GF2Poly) {k source : Nat} (hsource : p.words.size ≤ source / 64) :
+    (p.shiftLeft k).coeff (source + k) = false := by
+  rw [coeff_shiftLeft]
+  by_cases hbitShift : k % 64 = 0
+  · have hcoeff : p.coeff source = false := by
+      simp [coeff, coeffWords, hsource]
+    simp [hbitShift, coeffWords_replicate_append_add_of_mod_eq_zero, coeff] at hcoeff ⊢
+    exact hcoeff
+  · simp [hbitShift,
+      coeffWords_replicate_append_shiftLeftBitsList_add_of_not_word
+        p.words hbitShift (Nat.not_lt.mpr hsource)]
+
+/-- Right multiplication by the monomial `x^k` shifts packed GF(2)
+polynomials left by `k` coefficients. -/
+theorem mul_monomial (q : GF2Poly) (k : Nat) :
+    q * monomial k = q.mulXk k := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mulXk]
+  by_cases hn : n < k
+  · rw [coeffWords_mulWords_monomial_lt q.words hn]
+    exact (coeff_shiftLeft_lt q hn).symm
+  · let source := n - k
+    have hn_eq : n = source + k := by
+      dsimp [source]
+      omega
+    rw [hn_eq]
+    by_cases hsource : source / 64 < q.words.size
+    · rw [coeffWords_mulWords_monomial_source q.words hsource]
+      exact (coeff_shiftLeft_add_of_word_lt (p := q) (k := k) (n := source) hsource).symm
+    · have hsource_le : q.words.size ≤ source / 64 := Nat.le_of_not_gt hsource
+      rw [coeffWords_mulWords_monomial_source_oob q.words hsource_le]
+      exact (coeff_shiftLeft_add_source_oob q hsource_le).symm
 
 end GF2Poly
 end Hex
