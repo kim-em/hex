@@ -2269,5 +2269,27 @@ theorem mul_monomial (q : GF2Poly) (k : Nat) :
       rw [coeffWords_mulWords_monomial_source_oob q.words hsource_le]
       exact (coeff_shiftLeft_add_source_oob q hsource_le).symm
 
+/-- Left multiplication by the monomial `x^k` shifts packed GF(2)
+polynomials left by `k` coefficients. -/
+theorem monomial_mul (k : Nat) (q : GF2Poly) :
+    monomial k * q = q.mulXk k := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mulXk]
+  by_cases hn : n < k
+  · rw [coeffWords_monomial_mulWords_lt q.words hn]
+    exact (coeff_shiftLeft_lt q hn).symm
+  · let source := n - k
+    have hn_eq : n = source + k := by
+      dsimp [source]
+      omega
+    rw [hn_eq]
+    by_cases hsource : source / 64 < q.words.size
+    · rw [coeffWords_monomial_mulWords_source q.words hsource]
+      exact (coeff_shiftLeft_add_of_word_lt (p := q) (k := k) (n := source) hsource).symm
+    · have hsource_le : q.words.size ≤ source / 64 := Nat.le_of_not_gt hsource
+      rw [coeffWords_monomial_mulWords_source_oob q.words hsource_le]
+      exact (coeff_shiftLeft_add_source_oob q hsource_le).symm
+
 end GF2Poly
 end Hex
