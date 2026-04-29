@@ -600,6 +600,18 @@ theorem coeff_add (p q : GF2Poly) (n : Nat) :
   change (add p q).coeff n = coeffWords (xorWords p.words q.words) n
   simp [add]
 
+/-- Addition over packed `GF(2)` polynomials is coefficientwise XOR. -/
+theorem coeff_add_eq_bne (p q : GF2Poly) (n : Nat) :
+    (p + q).coeff n = (p.coeff n != q.coeff n) := by
+  sorry
+
+/-- Equal set coefficients cancel under `GF(2)` addition. -/
+theorem coeff_add_of_true_true {p q : GF2Poly} {n : Nat}
+    (hp : p.coeff n = true) (hq : q.coeff n = true) :
+    (p + q).coeff n = false := by
+  rw [coeff_add_eq_bne, hp, hq]
+  rfl
+
 /-- Raw packed addition cancels each word against itself. -/
 theorem xorWords_self_getD (xs : Array UInt64) (i : Nat) :
     (xorWords xs xs).getD i 0 = 0 := by
@@ -803,6 +815,32 @@ theorem coeff_shiftLeft (p : GF2Poly) (k n : Nat) :
 theorem coeff_mulXk (p : GF2Poly) (k n : Nat) :
     (p.mulXk k).coeff n = (p.shiftLeft k).coeff n := by
   rfl
+
+/-- Multiplication by `x^k` shifts the degree of a nonzero packed polynomial. -/
+theorem degree?_mulXk_of_degree?_eq_some {p : GF2Poly} {d k : Nat}
+    (h : p.degree? = some d) :
+    (p.mulXk k).degree? = some (d + k) := by
+  sorry
+
+/-- The shifted leading coefficient of `p.mulXk k` is set. -/
+theorem coeff_mulXk_degree_add {p : GF2Poly} {d k : Nat}
+    (h : p.degree? = some d) :
+    (p.mulXk k).coeff (d + k) = true := by
+  sorry
+
+/-- In a long-division step, shifting the divisor by `rd - qd` aligns its
+leading coefficient with the current remainder degree. -/
+theorem coeff_mulXk_division_step {q : GF2Poly} {rd qd : Nat}
+    (hq : q.degree? = some qd) (hrd : ¬ rd < qd) :
+    (q.mulXk (rd - qd)).coeff rd = true := by
+  sorry
+
+/-- The leading coefficient cancels after the characteristic-two subtraction
+step used by long division. -/
+theorem coeff_division_step_cancel {rem q : GF2Poly} {rd qd : Nat}
+    (hrem : rem.degree? = some rd) (hq : q.degree? = some qd) (hrd : ¬ rd < qd) :
+    (rem + q.mulXk (rd - qd)).coeff rd = false := by
+  sorry
 
 /-- Alias for exact division by a power of `x` when the low coefficients vanish;
 otherwise this drops the discarded remainder. -/
