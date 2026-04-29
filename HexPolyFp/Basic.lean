@@ -1,4 +1,4 @@
-import HexModArith.Basic
+import HexModArith.Ring
 import HexPoly.Euclid
 
 /-!
@@ -77,6 +77,80 @@ def X : FpPoly p :=
 /-- Reduction modulo a monic polynomial over `F_p[x]`. -/
 def modByMonic (f g : FpPoly p) (hmonic : DensePoly.Monic f) : FpPoly p :=
   DensePoly.modByMonic g f hmonic
+
+theorem add_zero (f : FpPoly p) :
+    f + 0 = f := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add]
+  grind
+
+theorem zero_add (f : FpPoly p) :
+    0 + f = f := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add]
+  grind
+
+theorem add_comm (f g : FpPoly p) :
+    f + g = g + f := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add]
+  grind
+
+theorem add_assoc (f g h : FpPoly p) :
+    f + g + h = f + (g + h) := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add]
+  grind
+
+theorem neg_zero :
+    -(0 : FpPoly p) = 0 := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_neg]
+  grind
+
+theorem add_left_neg (f : FpPoly p) :
+    -f + f = 0 := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add, DensePoly.coeff_neg]
+  grind
+
+theorem add_right_neg (f : FpPoly p) :
+    f + -f = 0 := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add, DensePoly.coeff_neg]
+  grind
+
+theorem sub_zero (f : FpPoly p) :
+    f - 0 = f := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_sub]
+  grind
+
+theorem zero_sub (f : FpPoly p) :
+    0 - f = -f := by
+  rfl
+
+theorem sub_self (f : FpPoly p) :
+    f - f = 0 := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_sub]
+  grind
+
+theorem sub_eq_add_neg (f g : FpPoly p) :
+    f - g = f + -g := by
+  apply DensePoly.ext_coeff
+  intro i
+  simp [DensePoly.coeff_add, DensePoly.coeff_sub, DensePoly.coeff_neg]
+  grind
 
 end FpPoly
 end Hex
