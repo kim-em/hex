@@ -45,6 +45,28 @@ private def trimTrailingZerosList : List R → List R
       let trimmed := trimTrailingZerosList as
       if trimmed = [] ∧ a = (Zero.zero : R) then [] else a :: trimmed
 
+private theorem trimTrailingZerosList_getD (coeffs : List R) (n : Nat) :
+    (trimTrailingZerosList coeffs).getD n (Zero.zero : R) =
+      coeffs.getD n (Zero.zero : R) := by
+  induction coeffs generalizing n with
+  | nil =>
+      simp [trimTrailingZerosList]
+  | cons a as ih =>
+      cases n with
+      | zero =>
+          by_cases htrim : trimTrailingZerosList as = [] ∧ a = (Zero.zero : R)
+          · simp [trimTrailingZerosList, htrim]
+          · simp [trimTrailingZerosList, htrim]
+      | succ n =>
+          by_cases htrim : trimTrailingZerosList as = [] ∧ a = (Zero.zero : R)
+          · have htail : trimTrailingZerosList as = [] := htrim.1
+            have hcoeff := ih n
+            simp [trimTrailingZerosList, htrim]
+            change Zero.zero = as.getD n (Zero.zero : R)
+            rw [← hcoeff, htail]
+            simp
+          · simpa [trimTrailingZerosList, htrim] using ih n
+
 /-- Normalize a coefficient array by discarding all trailing zeros. -/
 def trimTrailingZeros (coeffs : Array R) : Array R :=
   (trimTrailingZerosList coeffs.toList).toArray
@@ -92,6 +114,15 @@ def isZero (p : DensePoly R) : Bool :=
 /-- The coefficient of `x^n`, defaulting to `0` when `n` is out of range. -/
 def coeff (p : DensePoly R) (n : Nat) : R :=
   p.coeffs.getD n (Zero.zero : R)
+
+theorem coeff_ofCoeffs (coeffs : Array R) (n : Nat) :
+    (ofCoeffs coeffs).coeff n = coeffs.getD n (Zero.zero : R) := by
+  unfold ofCoeffs coeff trimTrailingZeros
+  simpa using trimTrailingZerosList_getD (R := R) coeffs.toList n
+
+theorem coeff_ofCoeffs_list (coeffs : List R) (n : Nat) :
+    (ofCoeffs coeffs.toArray).coeff n = coeffs.getD n (Zero.zero : R) := by
+  simpa using coeff_ofCoeffs (R := R) coeffs.toArray n
 
 /-- Extensionality for normalized dense polynomials when the stored sizes agree. -/
 @[ext] theorem ext_of_size_eq {p q : DensePoly R}

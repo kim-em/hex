@@ -22,12 +22,78 @@ private def natScale [Add R] (n : Nat) (x : R) : R :=
 
 /-- Multiply every coefficient by `c`. -/
 def scale [Mul R] (c : R) (p : DensePoly R) : DensePoly R :=
-  ofCoeffs <| (List.range p.size).map (fun i => c * p.coeff i) |>.toArray
+  ofCoeffs <| p.toArray.toList.map (fun a => c * a) |>.toArray
 
 /-- Multiply by `x^n`. -/
 def shift (n : Nat) (p : DensePoly R) : DensePoly R :=
   if p.isZero then 0 else
     ofCoeffs <| ((List.replicate n (Zero.zero : R)) ++ p.toArray.toList).toArray
+
+omit [DecidableEq R] in
+private theorem list_getD_map_mul_zero [Mul R] (c : R) (coeffs : List R) (n : Nat)
+    (hzero : c * (Zero.zero : R) = (Zero.zero : R)) :
+    (coeffs.map fun a => c * a).getD n (Zero.zero : R) =
+      c * coeffs.getD n (Zero.zero : R) := by
+  induction coeffs generalizing n with
+  | nil =>
+      simp [hzero]
+  | cons a as ih =>
+      cases n with
+      | zero =>
+          simp
+      | succ n =>
+          simpa using ih n
+
+omit [DecidableEq R] in
+private theorem list_getD_replicate_append_zero (n k : Nat) (coeffs : List R) :
+    (List.replicate n (Zero.zero : R) ++ coeffs).getD k (Zero.zero : R) =
+      if k < n then (Zero.zero : R) else coeffs.getD (k - n) (Zero.zero : R) := by
+  induction n generalizing k with
+  | zero =>
+      simp
+  | succ n ih =>
+      cases k with
+      | zero =>
+          simp [List.replicate]
+      | succ k =>
+          simpa [Nat.succ_sub_succ_eq_sub] using ih k
+
+theorem coeff_scale [Mul R] (c : R) (p : DensePoly R) (n : Nat)
+    (hzero : c * (Zero.zero : R) = (Zero.zero : R)) :
+    (scale c p).coeff n = c * p.coeff n := by
+  unfold scale
+  rw [coeff_ofCoeffs_list]
+  simpa [coeff] using list_getD_map_mul_zero (R := R) c p.toArray.toList n hzero
+
+theorem coeff_shift (n : Nat) (p : DensePoly R) (k : Nat) :
+    (shift n p).coeff k =
+      if k < n then (Zero.zero : R) else p.coeff (k - n) := by
+  unfold shift
+  by_cases hp : p.isZero
+  · have hsize : p.size = 0 := by
+      simp [isZero] at hp
+      simpa [size] using hp
+    by_cases hk : k < n
+    · simp [hp, hk]
+      change (0 : DensePoly R).coeff k = (Zero.zero : R)
+      exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)
+    · have hzero : p.coeff (k - n) = (Zero.zero : R) := by
+        exact coeff_eq_zero_of_size_le p (by omega)
+      simp [hp, hk, hzero]
+      change (0 : DensePoly R).coeff k = (Zero.zero : R)
+      exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)
+  · rw [if_neg hp]
+    rw [coeff_ofCoeffs_list]
+    simpa [coeff] using list_getD_replicate_append_zero (R := R) n k p.toArray.toList
+
+theorem coeff_shift_scale [Mul R] (i : Nat) (c : R) (p : DensePoly R) (k : Nat)
+    (hzero : c * (Zero.zero : R) = (Zero.zero : R)) :
+    (shift i (scale c p)).coeff k =
+      if k < i then (Zero.zero : R) else c * p.coeff (k - i) := by
+  rw [coeff_shift]
+  by_cases hk : k < i
+  · simp [hk]
+  · simp [hk, coeff_scale, hzero]
 
 /-- Add two dense polynomials coefficientwise. -/
 def add [Add R] (p q : DensePoly R) : DensePoly R :=
