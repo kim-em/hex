@@ -2,6 +2,7 @@ import HexPolyFp.Basic
 import HexPolyFp.Frobenius
 import HexPolyFp.SquareFree
 import HexPolyFp.ModCompose
+import HexPolyFp.Conformance
 
 /-!
 `HexPolyFp` specializes the executable dense-polynomial API to
