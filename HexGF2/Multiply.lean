@@ -91,6 +91,50 @@ private theorem coeffWords_xorClmulAt_ne (acc : Array UInt64) {idx n : Nat}
   have hHigh : idx + 1 ≠ n / 64 := Ne.symm hnHigh
   simp [xorClmulAt, coeffWords, hLow, hHigh]
 
+private theorem foldl_keep {α β : Type} (xs : List β) (acc : α) :
+    xs.foldl (fun acc _ => acc) acc = acc := by
+  induction xs generalizing acc with
+  | nil => simp
+  | cons _ xs ih => simp [ih]
+
+private theorem clmul_zero_right (x : UInt64) : clmul x 0 = (0, 0) := by
+  simp [clmul, pureClmul, foldl_keep]
+
+private theorem Array.setIfInBounds_getElem! (xs : Array UInt64) (idx : Nat) :
+    xs.setIfInBounds idx xs[idx]! = xs := by
+  unfold Array.setIfInBounds
+  by_cases h : idx < xs.size
+  · simp [h]
+  · simp [h]
+
+private theorem xorClmulAt_zero_right (acc : Array UInt64) (idx : Nat) (x : UInt64) :
+    xorClmulAt acc idx x 0 = acc := by
+  simp [xorClmulAt, clmul_zero_right, Array.setIfInBounds_getElem!]
+
+private theorem coeffWords_xorClmulAt_zero_right (acc : Array UInt64) (idx n : Nat)
+    (x : UInt64) :
+    coeffWords (xorClmulAt acc idx x 0) n = coeffWords acc n := by
+  rw [xorClmulAt_zero_right]
+
+private theorem foldl_xorClmulAt_zero_right_coeff (js : List Nat) (acc : Array UInt64)
+    (idx n : Nat) (x : UInt64) (ys : Array UInt64)
+    (hzero : ∀ j ∈ js, ys[j]! = 0) :
+    coeffWords
+        (js.foldl (fun acc j => xorClmulAt acc (idx + j) x ys[j]!) acc)
+        n =
+      coeffWords acc n := by
+  induction js generalizing acc with
+  | nil =>
+      simp
+  | cons j js ih =>
+      have hjzero : ys[j]! = 0 := hzero j (by simp)
+      have htail : ∀ j' ∈ js, ys[j']! = 0 := by
+        intro j' hj'
+        exact hzero j' (by simp [hj'])
+      simp only [List.foldl_cons]
+      rw [hjzero, ih (acc := xorClmulAt acc (idx + j) x 0) htail,
+        coeffWords_xorClmulAt_zero_right]
+
 /-- Raw packed-word multiplication before trailing zero normalization. -/
 private def mulWords (xs ys : Array UInt64) : Array UInt64 :=
   if xs.isEmpty || ys.isEmpty then
