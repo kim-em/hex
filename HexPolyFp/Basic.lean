@@ -152,5 +152,31 @@ theorem sub_eq_add_neg (f g : FpPoly p) :
   simp [DensePoly.coeff_add, DensePoly.coeff_sub, DensePoly.coeff_neg]
   grind
 
+@[simp] theorem zero_mul (f : FpPoly p) :
+    0 * f = 0 := by
+  rfl
+
+@[simp] theorem mul_zero (f : FpPoly p) :
+    f * 0 = 0 := by
+  change DensePoly.mul f (0 : FpPoly p) = 0
+  unfold DensePoly.mul
+  have hstep (acc : FpPoly p) (i : Nat) :
+      acc + DensePoly.shift i (DensePoly.scale (f.coeff i) (0 : FpPoly p)) = acc := by
+    simpa [DensePoly.scale, DensePoly.shift] using add_zero acc
+  have hfold :
+      ∀ xs : List Nat, ∀ acc : FpPoly p,
+        xs.foldl
+            (fun acc i => acc + DensePoly.shift i (DensePoly.scale (f.coeff i) (0 : FpPoly p)))
+            acc = acc := by
+    intro xs
+    induction xs with
+    | nil =>
+        intro acc
+        rfl
+    | cons i xs ih =>
+        intro acc
+        simp [List.foldl_cons, hstep acc i, ih]
+  simpa using hfold (List.range f.size) 0
+
 end FpPoly
 end Hex
