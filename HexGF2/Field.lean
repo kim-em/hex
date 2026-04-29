@@ -51,6 +51,16 @@ variable {n : Nat} {irr : UInt64}
 variable {hn : 0 < n} {hn64 : n < 64}
 variable {hirr : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic irr n)}
 
+/-- Equality of packed single-word representatives follows from equality of
+their stored canonical words. -/
+private theorem eq_of_val_eq {a b : GF2n n irr hn hn64 hirr}
+    (h : a.val = b.val) : a = b := by
+  cases a
+  cases b
+  simp at h
+  subst h
+  rfl
+
 /-- The packed irreducible modulus polynomial defining this extension field. -/
 def modulus : GF2Poly :=
   GF2Poly.ofUInt64Monic irr n
@@ -103,11 +113,18 @@ def reduceWide (hi lo : UInt64) : GF2n n irr hn hn64 hirr :=
 
 /-- Natural-number literals in characteristic two reduce to their parity. -/
 def natCast (k : Nat) : GF2n n irr hn hn64 hirr :=
-  reduce (if k % 2 = 0 then 0 else 1)
+  if k % 2 = 0 then
+    ⟨0, by
+      show 0 < 2 ^ n
+      exact Nat.pow_pos (by decide : 0 < 2)⟩
+  else
+    reduce 1
 
 /-- Canonical additive identity. -/
 def zero : GF2n n irr hn hn64 hirr :=
-  reduce 0
+  ⟨0, by
+    show 0 < 2 ^ n
+    exact Nat.pow_pos (by decide : 0 < 2)⟩
 
 instance : Zero (GF2n n irr hn hn64 hirr) where
   zero := zero
@@ -235,7 +252,10 @@ theorem div_eq_mul_inv (a b : GF2n n irr hn hn64 hirr) :
   rfl
 
 @[simp] theorem inv_zero : (0 : GF2n n irr hn hn64 hirr)⁻¹ = 0 := by
-  sorry
+  have hzeroVal : (0 : GF2n n irr hn hn64 hirr).val = 0 := by
+    simp [OfNat.ofNat, natCast]
+  apply eq_of_val_eq
+  simp [Inv.inv, inv, hzeroVal]
 
 theorem mul_inv_cancel (a : GF2n n irr hn hn64 hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
@@ -246,6 +266,16 @@ end GF2n
 namespace GF2nPoly
 
 variable {f : GF2Poly} {hirr : GF2Poly.Irreducible f}
+
+/-- Equality of packed polynomial representatives follows from equality of
+their stored reduced polynomials. -/
+private theorem eq_of_val_eq {a b : GF2nPoly f hirr}
+    (h : a.val = b.val) : a = b := by
+  cases a
+  cases b
+  simp at h
+  subst h
+  rfl
 
 /-- The defining irreducible modulus polynomial of the packed quotient field. -/
 def modulus : GF2Poly :=
@@ -267,7 +297,7 @@ def reducePoly (p : GF2Poly) : GF2nPoly f hirr :=
 
 /-- Canonical additive identity. -/
 def zero : GF2nPoly f hirr :=
-  reducePoly 0
+  ⟨0, zero_reduced (f := f)⟩
 
 instance : Zero (GF2nPoly f hirr) where
   zero := zero
@@ -281,7 +311,7 @@ instance : One (GF2nPoly f hirr) where
 
 /-- Natural-number literals reduce to parity in characteristic two. -/
 def natCast (k : Nat) : GF2nPoly f hirr :=
-  reducePoly (if k % 2 = 0 then 0 else 1)
+  if k % 2 = 0 then zero else one
 
 instance : NatCast (GF2nPoly f hirr) where
   natCast := natCast
@@ -394,7 +424,10 @@ theorem div_eq_mul_inv (a b : GF2nPoly f hirr) :
   rfl
 
 @[simp] theorem inv_zero : (0 : GF2nPoly f hirr)⁻¹ = 0 := by
-  sorry
+  have hzeroVal : (0 : GF2nPoly f hirr).val = 0 := by
+    simp [OfNat.ofNat, natCast, zero]
+  apply eq_of_val_eq
+  simp [Inv.inv, inv, hzeroVal]
 
 theorem mul_inv_cancel (a : GF2nPoly f hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
