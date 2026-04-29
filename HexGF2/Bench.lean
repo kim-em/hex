@@ -5,8 +5,9 @@ import LeanBench
 Benchmark registrations for `hex-gf2`.
 
 This Phase 4 packed-core slice measures deterministic `GF2Poly` word-level
-operations. Input construction is hoisted into `prep`, and polynomial-valued
-targets return compact checksums over normalized packed words.
+operations and packed extension-field wrappers. Input construction is hoisted
+into `prep`, and polynomial-valued targets return compact checksums over
+normalized packed words.
 
 Scientific registrations:
 
@@ -24,6 +25,21 @@ Scientific registrations:
   same-size fixtures.
 * `runXGcdChecksum`: packed extended Euclidean algorithm, `O(n^2)` on
   deterministic same-size fixtures.
+* `runGF2nAddChecksum`: AES-modulus single-word field addition chains, `O(n)`.
+* `runGF2nMulChecksum`: AES-modulus single-word field multiplication chains,
+  `O(n)`.
+* `runGF2nInvChecksum`: AES-modulus single-word field inversion chains, `O(n)`.
+* `runGF2nDivChecksum`: AES-modulus single-word field division chains, `O(n)`.
+* `runGF2nPowChecksum`: AES-modulus single-word square-and-multiply powering,
+  `O(log k)`.
+* `runGF2nPolyMulChecksum`: packed quotient-field multiplication chains over a
+  deterministic degree-128 modulus, `O(n)`.
+* `runGF2nPolyInvChecksum`: packed quotient-field inversion chains over that
+  modulus, `O(n)`.
+* `runGF2nPolyDivChecksum`: packed quotient-field division chains over that
+  modulus, `O(n)`.
+* `runGF2nPolyPowChecksum`: packed quotient-field square-and-multiply powering
+  over that modulus, `O(log k)`.
 -/
 
 namespace Hex.GF2Bench
@@ -55,6 +71,58 @@ structure ShiftInput where
   shift : Nat
   deriving Hashable
 
+private theorem aesIrreducible :
+    GF2Poly.Irreducible (GF2Poly.ofUInt64Monic 0x1B 8) := by
+  sorry
+
+private abbrev AESField : Type :=
+  GF2n 8 0x1B (by decide) (by decide) aesIrreducible
+
+private def aesField (w : UInt64) : AESField :=
+  GF2n.reduce w
+
+instance : Hashable AESField where
+  hash a := hash a.val
+
+/-- Prepared single-word extension-field samples. -/
+structure GF2nInput where
+  samples : Array (AESField × AESField)
+  deriving Hashable
+
+/-- Prepared single-word extension-field power input. -/
+structure GF2nPowInput where
+  base : AESField
+  exponent : Nat
+  deriving Hashable
+
+/-- Deterministic degree-128 packed quotient-field modulus fixture. -/
+def gf2nPolyModulus : GF2Poly :=
+  GF2Poly.ofWords #[0x87, 0, 1]
+
+private theorem gf2nPolyIrreducible :
+    GF2Poly.Irreducible gf2nPolyModulus := by
+  sorry
+
+private abbrev PolyField : Type :=
+  GF2nPoly gf2nPolyModulus gf2nPolyIrreducible
+
+private def polyField (p : GF2Poly) : PolyField :=
+  GF2nPoly.reducePoly p
+
+instance : Hashable PolyField where
+  hash a := hash a.val
+
+/-- Prepared packed quotient-field samples. -/
+structure GF2nPolyInput where
+  samples : Array (PolyField × PolyField)
+  deriving Hashable
+
+/-- Prepared packed quotient-field power input. -/
+structure GF2nPolyPowInput where
+  base : PolyField
+  exponent : Nat
+  deriving Hashable
+
 /-- Deterministic mixing over machine words for compact benchmark observables. -/
 def mixWord (acc x : UInt64) : UInt64 :=
   acc * 0x9E3779B97F4A7C15 + x + 0xBF58476D1CE4E5B9
@@ -70,6 +138,14 @@ def checksumPoly (p : GF2Poly) : UInt64 :=
 /-- Stable checksum for two packed polynomial outputs. -/
 def checksumPolyPair (p q : GF2Poly) : UInt64 :=
   mixWord (checksumPoly p) (checksumPoly q)
+
+/-- Stable checksum for a single-word extension-field element. -/
+def checksumGF2n (a : AESField) : UInt64 :=
+  a.val
+
+/-- Stable checksum for a packed quotient-field element. -/
+def checksumGF2nPoly (a : PolyField) : UInt64 :=
+  checksumPoly a.val
 
 /-- Deterministic nonzero-ish packed word generator keyed by index and salt. -/
 def wordValue (i salt : Nat) : UInt64 :=
@@ -121,6 +197,26 @@ def prepShiftRightInput (n : Nat) : ShiftInput :=
   { poly := packedPoly (2 * n + 1) 283
     shift := 32 * n + 13 }
 
+/-- Per-parameter fixture for AES-modulus single-word field operations. -/
+def prepGF2nInput (n : Nat) : GF2nInput :=
+  { samples := (Array.range n).map fun i =>
+      (aesField (wordValue i 311), aesField (wordValue i 347)) }
+
+/-- Per-parameter fixture for AES-modulus powering by a growing exponent. -/
+def prepGF2nPowInput (n : Nat) : GF2nPowInput :=
+  { base := aesField (wordValue n 383)
+    exponent := n + 1 }
+
+/-- Per-parameter fixture for packed quotient-field operations. -/
+def prepGF2nPolyInput (n : Nat) : GF2nPolyInput :=
+  { samples := (Array.range n).map fun i =>
+      (polyField (packedPoly 2 (419 + i)), polyField (packedPoly 2 (467 + i))) }
+
+/-- Per-parameter fixture for packed quotient-field powering. -/
+def prepGF2nPolyPowInput (n : Nat) : GF2nPolyPowInput :=
+  { base := polyField (packedPoly 2 (503 + n))
+    exponent := n + 1 }
+
 /-- Benchmark target: pure Lean carry-less word multiplication. -/
 def runPureClmulChecksum (input : WordInput) : UInt64 :=
   input.samples.foldl
@@ -165,6 +261,56 @@ def runGcdChecksum (input : BinaryInput) : UInt64 :=
 def runXGcdChecksum (input : BinaryInput) : UInt64 :=
   let result := GF2Poly.xgcd input.lhs input.rhs
   mixWord (checksumPoly result.gcd) (checksumPolyPair result.left result.right)
+
+/-- Benchmark target: add AES-modulus single-word field sample pairs. -/
+def runGF2nAddChecksum (input : GF2nInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2n (sample.1 + sample.2)))
+    0
+
+/-- Benchmark target: multiply AES-modulus single-word field sample pairs. -/
+def runGF2nMulChecksum (input : GF2nInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2n (sample.1 * sample.2)))
+    0
+
+/-- Benchmark target: invert AES-modulus single-word field samples. -/
+def runGF2nInvChecksum (input : GF2nInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2n sample.1⁻¹))
+    0
+
+/-- Benchmark target: divide AES-modulus single-word field sample pairs. -/
+def runGF2nDivChecksum (input : GF2nInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2n (sample.1 / sample.2)))
+    0
+
+/-- Benchmark target: power one AES-modulus single-word field element. -/
+def runGF2nPowChecksum (input : GF2nPowInput) : UInt64 :=
+  checksumGF2n (input.base ^ input.exponent)
+
+/-- Benchmark target: multiply packed quotient-field sample pairs. -/
+def runGF2nPolyMulChecksum (input : GF2nPolyInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2nPoly (sample.1 * sample.2)))
+    0
+
+/-- Benchmark target: invert packed quotient-field samples. -/
+def runGF2nPolyInvChecksum (input : GF2nPolyInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2nPoly sample.1⁻¹))
+    0
+
+/-- Benchmark target: divide packed quotient-field sample pairs. -/
+def runGF2nPolyDivChecksum (input : GF2nPolyInput) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => mixWord acc (checksumGF2nPoly (sample.1 / sample.2)))
+    0
+
+/-- Benchmark target: power one packed quotient-field element. -/
+def runGF2nPolyPowChecksum (input : GF2nPolyPowInput) : UInt64 :=
+  checksumGF2nPoly (input.base ^ input.exponent)
 
 setup_benchmark runPureClmulChecksum n => n
   with prep := prepWordInput
@@ -272,6 +418,105 @@ setup_benchmark runXGcdChecksum n => n * n
     paramCeiling := 128
     paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128]
     maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nAddChecksum n => n
+  with prep := prepGF2nInput
+  where {
+    paramFloor := 4096
+    paramCeiling := 65536
+    paramSchedule := .custom #[4096, 8192, 16384, 32768, 65536]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nMulChecksum n => n
+  with prep := prepGF2nInput
+  where {
+    paramFloor := 1024
+    paramCeiling := 16384
+    paramSchedule := .custom #[1024, 2048, 4096, 8192, 16384]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nInvChecksum n => n
+  with prep := prepGF2nInput
+  where {
+    paramFloor := 256
+    paramCeiling := 4096
+    paramSchedule := .custom #[256, 512, 1024, 2048, 4096]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nDivChecksum n => n
+  with prep := prepGF2nInput
+  where {
+    paramFloor := 256
+    paramCeiling := 4096
+    paramSchedule := .custom #[256, 512, 1024, 2048, 4096]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nPowChecksum n => Nat.log2 (n + 1)
+  with prep := prepGF2nPowInput
+  where {
+    paramFloor := 1048576
+    paramCeiling := 268435456
+    paramSchedule := .custom #[1048576, 4194304, 16777216, 67108864, 268435456]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nPolyMulChecksum n => n
+  with prep := prepGF2nPolyInput
+  where {
+    paramFloor := 64
+    paramCeiling := 1024
+    paramSchedule := .custom #[64, 128, 256, 512, 1024]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nPolyInvChecksum n => n
+  with prep := prepGF2nPolyInput
+  where {
+    paramFloor := 16
+    paramCeiling := 256
+    paramSchedule := .custom #[16, 32, 64, 128, 256]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nPolyDivChecksum n => n
+  with prep := prepGF2nPolyInput
+  where {
+    paramFloor := 16
+    paramCeiling := 256
+    paramSchedule := .custom #[16, 32, 64, 128, 256]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+setup_benchmark runGF2nPolyPowChecksum n => Nat.log2 (n + 1)
+  with prep := prepGF2nPolyPowInput
+  where {
+    paramFloor := 1048576
+    paramCeiling := 268435456
+    paramSchedule := .custom #[1048576, 4194304, 16777216, 67108864, 268435456]
+    maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
     signalFloorMultiplier := 1.0
   }
