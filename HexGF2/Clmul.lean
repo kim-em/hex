@@ -34,6 +34,19 @@ def pureClmul (a b : UInt64) : UInt64 × UInt64 :=
         acc)
     (0, 0)
 
+private theorem clmulAccumulateBit_zero_left (acc : UInt64 × UInt64) (bitIdx : Nat) :
+    clmulAccumulateBit acc 0 bitIdx = acc := by
+  by_cases h : bitIdx = 0 <;> simp [clmulAccumulateBit, h]
+
+private theorem foldl_keep {α β : Type} (xs : List β) (acc : α) :
+    xs.foldl (fun acc _ => acc) acc = acc := by
+  induction xs generalizing acc with
+  | nil => simp
+  | cons _ xs ih => simp [ih]
+
+theorem pureClmul_zero_left (x : UInt64) : pureClmul 0 x = (0, 0) := by
+  simp [pureClmul, clmulAccumulateBit_zero_left, foldl_keep]
+
 private theorem oneHotWord_bit {hot bit : Nat} (hhot : hot < 64) (hbit : bit < 64) :
     (((((1 : UInt64) <<< hot.toUInt64) >>> bit.toUInt64) &&& 1) != 0) = (hot == bit) := by
   by_cases h : hot = bit
