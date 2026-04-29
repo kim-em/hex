@@ -170,7 +170,7 @@ still exposes the executable Bezout-derived residue needed by later algebraic
 layers.
 -/
 def inv (a : ZMod64 p) : ZMod64 p :=
-  let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p)
+  let (_, s, _) := HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat p)
   ofNat p (Int.toNat (s % Int.ofNat p))
 
 instance : Zero (ZMod64 p) where
@@ -215,7 +215,7 @@ instance : Inv (ZMod64 p) where
 
 @[simp] theorem toNat_inv_def (a : ZMod64 p) :
     (inv a).toNat =
-      (Int.toNat ((let (_, s, _) := Hex.pureIntExtGcd (Int.ofNat a.toNat) (Int.ofNat p); s)
+      (Int.toNat ((let (_, s, _) := HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat p); s)
         % Int.ofNat p)) % p := by
   rw [inv, toNat_ofNat]
 
