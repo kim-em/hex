@@ -96,5 +96,11 @@ theorem wordCount_mul_le (p q : GF2Poly) : (p * q).wordCount ≤ p.wordCount + q
     _ ≤ (mulWords p.words q.words).size := hnorm
     _ ≤ p.wordCount + q.wordCount := hraw
 
+/-- Multiplication by a monomial has the expected packed-word capacity bound. -/
+theorem wordCount_mul_monomial_le (p : GF2Poly) (k : Nat) :
+    (p * monomial k).wordCount ≤ p.wordCount + (k / 64 + 1) := by
+  exact Nat.le_trans (wordCount_mul_le p (monomial k))
+    (Nat.add_le_add_left (wordCount_monomial_le k) p.wordCount)
+
 end GF2Poly
 end Hex

@@ -81,9 +81,46 @@ private theorem trimTrailingZeroWordsList_length_le (ws : List UInt64) :
         rw [hcons]
         simp [ih]
 
+private theorem trimTrailingZeroWordsList_getD (ws : List UInt64) (i : Nat) :
+    (trimTrailingZeroWordsList ws).getD i 0 = ws.getD i 0 := by
+  induction ws generalizing i with
+  | nil =>
+      simp [trimTrailingZeroWordsList]
+  | cons w ws ih =>
+      by_cases hdrop : trimTrailingZeroWordsList ws = [] ∧ w = 0
+      · cases i with
+        | zero =>
+            simp [trimTrailingZeroWordsList, hdrop]
+        | succ i =>
+            have htail : ws.getD i 0 = 0 := by
+              rw [← ih i, hdrop.1]
+              simp
+            simpa [trimTrailingZeroWordsList, hdrop, List.getD] using htail.symm
+      · cases i with
+        | zero =>
+            simp [trimTrailingZeroWordsList, hdrop]
+        | succ i =>
+            simpa [trimTrailingZeroWordsList, hdrop, List.getD] using ih i
+
 /-- Normalize a word array by discarding trailing zero words. -/
-private def normalizeWords (words : Array UInt64) : Array UInt64 :=
+def normalizeWords (words : Array UInt64) : Array UInt64 :=
   (trimTrailingZeroWordsList words.toList).toArray
+
+/-- Packed-word coefficient lookup before wrapping the array as a `GF2Poly`. -/
+def coeffWords (words : Array UInt64) (n : Nat) : Bool :=
+  let word := words[n / 64]?.getD 0
+  (((word >>> (n % 64).toUInt64) &&& 1) != 0)
+
+/-- Trailing-zero normalization preserves every packed coefficient word. -/
+theorem normalizeWords_get?_getD (words : Array UInt64) (i : Nat) :
+    ((normalizeWords words)[i]?).getD 0 = (words[i]?).getD 0 := by
+  simpa [normalizeWords, Array.getD, List.getD] using
+    trimTrailingZeroWordsList_getD words.toList i
+
+/-- Trailing-zero normalization preserves packed coefficients. -/
+theorem coeffWords_normalizeWords (words : Array UInt64) (n : Nat) :
+    coeffWords (normalizeWords words) n = coeffWords words n := by
+  rw [coeffWords, coeffWords, normalizeWords_get?_getD]
 
 /-- The index of the highest set bit in a machine word, if any. -/
 private def highestSetBit? (w : UInt64) : Option Nat :=
@@ -147,8 +184,12 @@ def IsZero (p : GF2Poly) : Prop :=
 
 /-- The coefficient of `x^n`. -/
 def coeff (p : GF2Poly) (n : Nat) : Bool :=
-  let word := p.words.getD (n / 64) 0
-  (((word >>> (n % 64).toUInt64) &&& 1) != 0)
+  coeffWords p.words n
+
+/-- Coefficients of a raw word array are unchanged by `ofWords` normalization. -/
+@[simp] theorem coeff_ofWords (words : Array UInt64) (n : Nat) :
+    (ofWords words).coeff n = coeffWords words n := by
+  simp [ofWords, coeff, coeffWords_normalizeWords]
 
 /-- The degree of a nonzero polynomial, if any. -/
 def degree? (p : GF2Poly) : Option Nat :=
@@ -173,7 +214,7 @@ def degree (p : GF2Poly) : Nat :=
   rfl
 
 @[simp] theorem coeff_zero (n : Nat) : (0 : GF2Poly).coeff n = false := by
-  simp [coeff]
+  simp [coeff, coeffWords]
 
 @[simp] theorem degree?_zero : (0 : GF2Poly).degree? = none := by
   rfl
@@ -182,7 +223,7 @@ def degree (p : GF2Poly) : Nat :=
   rfl
 
 /-- Word-wise XOR of packed coefficient arrays. -/
-private def xorWords (xs ys : Array UInt64) : Array UInt64 :=
+def xorWords (xs ys : Array UInt64) : Array UInt64 :=
   Array.ofFn fun i : Fin (max xs.size ys.size) => xs.getD i.1 0 ^^^ ys.getD i.1 0
 
 /-- Addition in `F_2[x]` is coefficientwise XOR. -/
@@ -192,8 +233,14 @@ def add (p q : GF2Poly) : GF2Poly :=
 instance : Add GF2Poly where
   add := add
 
+/-- Addition coefficients are the normalized packed XOR of the input words. -/
+theorem coeff_add (p q : GF2Poly) (n : Nat) :
+    (p + q).coeff n = coeffWords (xorWords p.words q.words) n := by
+  change (add p q).coeff n = coeffWords (xorWords p.words q.words) n
+  simp [add]
+
 /-- Shift a normalized word list left by `bitShift ∈ [1, 63]`. -/
-private def shiftLeftBitsList (bitShift : Nat) (carry : UInt64) : List UInt64 → List UInt64
+def shiftLeftBitsList (bitShift : Nat) (carry : UInt64) : List UInt64 → List UInt64
   | [] =>
       if carry = 0 then [] else [carry]
   | w :: ws =>
@@ -238,6 +285,31 @@ def shiftRight (p : GF2Poly) (k : Nat) : GF2Poly :=
 def mulXk (p : GF2Poly) (k : Nat) : GF2Poly :=
   shiftLeft p k
 
+/-- Monomial coefficients reduce to the coefficient lookup on its packed word array. -/
+theorem coeff_monomial (n m : Nat) :
+    (monomial n).coeff m =
+      coeffWords
+        ((Array.replicate (n / 64) (0 : UInt64)).push ((1 : UInt64) <<< (n % 64).toUInt64))
+        m := by
+  simp [monomial]
+
+/-- Shift-left coefficients reduce to the coefficient lookup on the shifted packed words. -/
+theorem coeff_shiftLeft (p : GF2Poly) (k n : Nat) :
+    (p.shiftLeft k).coeff n =
+      coeffWords
+        ((Array.replicate (k / 64) (0 : UInt64)) ++
+          if k % 64 = 0 then
+            p.words
+          else
+            (shiftLeftBitsList (k % 64) 0 p.words.toList).toArray)
+        n := by
+  simp [shiftLeft]
+
+/-- `mulXk` is coefficientwise the same as `shiftLeft`. -/
+theorem coeff_mulXk (p : GF2Poly) (k n : Nat) :
+    (p.mulXk k).coeff n = (p.shiftLeft k).coeff n := by
+  rfl
+
 /-- Alias for exact division by a power of `x` when the low coefficients vanish;
 otherwise this drops the discarded remainder. -/
 def divXk (p : GF2Poly) (k : Nat) : GF2Poly :=
@@ -247,6 +319,32 @@ def divXk (p : GF2Poly) (k : Nat) : GF2Poly :=
 theorem normalizeWords_size_le (words : Array UInt64) :
     (normalizeWords words).size ≤ words.size := by
   simpa [normalizeWords] using trimTrailingZeroWordsList_length_le words.toList
+
+/-- Wrapping raw words never increases the stored word count. -/
+theorem wordCount_ofWords_le (words : Array UInt64) :
+    (ofWords words).wordCount ≤ words.size := by
+  exact normalizeWords_size_le words
+
+/-- Addition stores no more words than the larger input. -/
+theorem wordCount_add_le (p q : GF2Poly) :
+    (p + q).wordCount ≤ max p.wordCount q.wordCount := by
+  calc
+    (p + q).wordCount = (ofWords (xorWords p.words q.words)).wordCount := by
+      rfl
+    _ ≤ (xorWords p.words q.words).size := wordCount_ofWords_le _
+    _ = max p.wordCount q.wordCount := by
+      simp [xorWords, wordCount]
+
+/-- The monomial `x^n` stores at most the one word containing its bit. -/
+theorem wordCount_monomial_le (n : Nat) :
+    (monomial n).wordCount ≤ n / 64 + 1 := by
+  calc
+    (monomial n).wordCount
+        ≤ ((Array.replicate (n / 64) (0 : UInt64)).push
+            ((1 : UInt64) <<< (n % 64).toUInt64)).size := by
+          exact wordCount_ofWords_le _
+    _ = n / 64 + 1 := by
+      simp
 
 end GF2Poly
 end Hex
