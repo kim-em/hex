@@ -171,6 +171,75 @@ theorem highestSetBit?_eq_none_bit {w : UInt64} {i : Nat}
   have hclear := hnone hmem
   cases hbit : (((w >>> i.toUInt64) &&& 1) != 0) <;> simp [hbit] at hclear ⊢
 
+/-- The one-hot word used by `monomial` has its highest set bit at the
+requested in-word position. -/
+theorem highestSetBit?_oneHot {bit : Nat} (hbit : bit < 64) :
+    highestSetBit? ((1 : UInt64) <<< bit.toUInt64) = some bit := by
+  have hcases : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨ bit = 4 ∨ bit = 5 ∨
+      bit = 6 ∨ bit = 7 ∨ bit = 8 ∨ bit = 9 ∨ bit = 10 ∨ bit = 11 ∨
+      bit = 12 ∨ bit = 13 ∨ bit = 14 ∨ bit = 15 ∨ bit = 16 ∨ bit = 17 ∨
+      bit = 18 ∨ bit = 19 ∨ bit = 20 ∨ bit = 21 ∨ bit = 22 ∨ bit = 23 ∨
+      bit = 24 ∨ bit = 25 ∨ bit = 26 ∨ bit = 27 ∨ bit = 28 ∨ bit = 29 ∨
+      bit = 30 ∨ bit = 31 ∨ bit = 32 ∨ bit = 33 ∨ bit = 34 ∨ bit = 35 ∨
+      bit = 36 ∨ bit = 37 ∨ bit = 38 ∨ bit = 39 ∨ bit = 40 ∨ bit = 41 ∨
+      bit = 42 ∨ bit = 43 ∨ bit = 44 ∨ bit = 45 ∨ bit = 46 ∨ bit = 47 ∨
+      bit = 48 ∨ bit = 49 ∨ bit = 50 ∨ bit = 51 ∨ bit = 52 ∨ bit = 53 ∨
+      bit = 54 ∨ bit = 55 ∨ bit = 56 ∨ bit = 57 ∨ bit = 58 ∨ bit = 59 ∨
+      bit = 60 ∨ bit = 61 ∨ bit = 62 ∨ bit = 63 := by
+    omega
+  rcases hcases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    rfl
+
+theorem UInt64.bne_zero_eq_toNat_bne_zero (w : UInt64) :
+    (w != 0) = (w.toNat != 0) := by
+  apply Bool.eq_iff_iff.mpr
+  constructor
+  · intro hw
+    apply bne_iff_ne.mpr
+    intro hnat
+    have hz : w = 0 := UInt64.toNat_inj.mp (by simpa using hnat)
+    exact (bne_iff_ne.mp hw) hz
+  · intro hnat
+    apply bne_iff_ne.mpr
+    intro hw
+    subst hw
+    exact (bne_iff_ne.mp hnat) rfl
+
+private theorem oneHotWord_bit_toNat {hot bit : Nat} (hhot : hot < 64) (hbit : bit < 64) :
+    (((((1 : UInt64) <<< hot.toUInt64) >>> bit.toUInt64) &&& 1).toNat) =
+      ((2 ^ hot >>> bit) &&& 1) := by
+  have hpow : 2 ^ hot < 2 ^ 64 := Nat.pow_lt_pow_of_lt (by decide : 1 < 2) hhot
+  simp [UInt64.toNat_shiftLeft, UInt64.toNat_shiftRight, UInt64.toNat_and,
+    Nat.one_shiftLeft, Nat.mod_eq_of_lt hhot, Nat.mod_eq_of_lt hbit,
+    Nat.mod_eq_of_lt hpow]
+
+theorem oneHotWord_bit_self {bit : Nat} (hbit : bit < 64) :
+    (((((1 : UInt64) <<< bit.toUInt64) >>> bit.toUInt64) &&& 1) != 0) = true := by
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  have hnat := oneHotWord_bit_toNat (hot := bit) (bit := bit) hbit hbit
+  rw [hnat]
+  simpa [Nat.testBit] using Nat.testBit_two_pow_self (n := bit)
+
+theorem oneHotWord_bit_ne {hot bit : Nat} (hhot : hot < 64) (hbit : bit < 64)
+    (hne : hot ≠ bit) :
+    (((((1 : UInt64) <<< hot.toUInt64) >>> bit.toUInt64) &&& 1) != 0) = false := by
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  have hnat := oneHotWord_bit_toNat (hot := hot) (bit := bit) hhot hbit
+  rw [hnat]
+  simpa [Nat.testBit] using Nat.testBit_two_pow_of_ne (n := hot) (m := bit) hne
+
+theorem oneHotWord_ne_zero {bit : Nat} (hbit : bit < 64) :
+    ((1 : UInt64) <<< bit.toUInt64) ≠ 0 := by
+  intro h
+  have hset := oneHotWord_bit_self hbit
+  rw [h] at hset
+  simp at hset
+
 /-- Build a normalized packed polynomial from a raw word array. -/
 def ofWords (words : Array UInt64) : GF2Poly :=
   let normalizedWords := normalizeWords words
@@ -452,6 +521,20 @@ private theorem trimTrailingZeroWordsList_replicate_zero (n : Nat) :
       change trimTrailingZeroWordsList ((0 : UInt64) :: List.replicate n 0) = []
       simp [trimTrailingZeroWordsList, ih]
 
+private theorem trimTrailingZeroWordsList_replicate_zero_append_nonzero
+    (n : Nat) {w : UInt64} (hw : w ≠ 0) :
+    trimTrailingZeroWordsList (List.replicate n (0 : UInt64) ++ [w]) =
+      List.replicate n (0 : UInt64) ++ [w] := by
+  induction n with
+  | zero =>
+      simp [trimTrailingZeroWordsList, hw]
+  | succ n ih =>
+      change
+        trimTrailingZeroWordsList
+            ((0 : UInt64) :: (List.replicate n (0 : UInt64) ++ [w])) =
+          (0 : UInt64) :: (List.replicate n (0 : UInt64) ++ [w])
+      simp [trimTrailingZeroWordsList, ih]
+
 theorem normalizeWords_replicate_zero (n : Nat) :
     normalizeWords (Array.replicate n (0 : UInt64)) = #[] := by
   simp [normalizeWords, trimTrailingZeroWordsList_replicate_zero]
@@ -527,6 +610,77 @@ theorem coeff_monomial (n m : Nat) :
         ((Array.replicate (n / 64) (0 : UInt64)).push ((1 : UInt64) <<< (n % 64).toUInt64))
         m := by
   simp [monomial]
+
+/-- The coefficient of the defining degree of a monomial is set. -/
+theorem coeff_monomial_self (n : Nat) :
+    (monomial n).coeff n = true := by
+  rw [coeff_monomial]
+  have hbit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+  have hget :
+      (((Array.replicate (n / 64) (0 : UInt64)).push
+          ((1 : UInt64) <<< (n % 64).toUInt64))[n / 64]?).getD 0 =
+        ((1 : UInt64) <<< (n % 64).toUInt64) := by
+    simpa using
+      (Array.getElem?_push_size
+        (xs := Array.replicate (n / 64) (0 : UInt64))
+        (x := ((1 : UInt64) <<< (n % 64).toUInt64)))
+  rw [coeffWords, hget]
+  exact oneHotWord_bit_self hbit
+
+/-- Coefficients away from the defining degree of a monomial are clear. -/
+theorem coeff_monomial_ne {n m : Nat} (h : m ≠ n) :
+    (monomial n).coeff m = false := by
+  rw [coeff_monomial]
+  by_cases hword : m / 64 = n / 64
+  · have hbit_ne : m % 64 ≠ n % 64 := by
+      intro hbit
+      apply h
+      exact Nat.div_add_mod m 64 ▸ Nat.div_add_mod n 64 ▸ by omega
+    have hm_bit : m % 64 < 64 := Nat.mod_lt m (by decide : 0 < 64)
+    have hn_bit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+    have hget :
+        (((Array.replicate (n / 64) (0 : UInt64)).push
+            ((1 : UInt64) <<< (n % 64).toUInt64))[m / 64]?).getD 0 =
+          ((1 : UInt64) <<< (n % 64).toUInt64) := by
+      rw [hword]
+      simpa using
+        (Array.getElem?_push_size
+          (xs := Array.replicate (n / 64) (0 : UInt64))
+          (x := ((1 : UInt64) <<< (n % 64).toUInt64)))
+    rw [coeffWords, hget]
+    exact oneHotWord_bit_ne hn_bit hm_bit hbit_ne.symm
+  · have hm_word_ne : m / 64 ≠ n / 64 := hword
+    have hget :
+        (((Array.replicate (n / 64) (0 : UInt64)).push
+            ((1 : UInt64) <<< (n % 64).toUInt64))[m / 64]?).getD 0 = 0 := by
+      by_cases hlt : m / 64 < n / 64
+      · rw [Array.getElem?_push]
+        have hne : m / 64 ≠ n / 64 := by omega
+        simp [hne, hlt]
+      · have hgt : n / 64 < m / 64 := by omega
+        have hsize :
+            ((Array.replicate (n / 64) (0 : UInt64)).push
+              ((1 : UInt64) <<< (n % 64).toUInt64)).size ≤ m / 64 := by
+          simp
+          omega
+        rw [Array.getElem?_push]
+        have hne : m / 64 ≠ n / 64 := by omega
+        have hnlt : ¬m / 64 < n / 64 := by omega
+        simp [hne, hnlt]
+    rw [coeffWords, hget]
+    simp
+
+/-- The packed degree search recovers the degree of a monomial. -/
+theorem degree?_monomial (n : Nat) :
+    (monomial n).degree? = some n := by
+  have hbit : n % 64 < 64 := Nat.mod_lt n (by decide : 0 < 64)
+  have hne : ((1 : UInt64) <<< (n % 64).toUInt64) ≠ 0 :=
+    oneHotWord_ne_zero hbit
+  unfold monomial degree?
+  simp [ofWords, normalizeWords,
+    trimTrailingZeroWordsList_replicate_zero_append_nonzero (n / 64) hne,
+    highestSetBit?_oneHot hbit]
+  omega
 
 /-- Shift-left coefficients reduce to the coefficient lookup on the shifted packed words. -/
 theorem coeff_shiftLeft (p : GF2Poly) (k n : Nat) :
