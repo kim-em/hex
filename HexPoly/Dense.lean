@@ -97,6 +97,33 @@ def coeff (p : DensePoly R) (n : Nat) : R :=
 def degree? (p : DensePoly R) : Option Nat :=
   if _h : p.size = 0 then none else some (p.size - 1)
 
+@[simp] theorem size_zero : (0 : DensePoly R).size = 0 := by
+  rfl
+
+@[simp] theorem coeffs_C_zero : (C (0 : R)).coeffs = #[] := by
+  change (C (Zero.zero : R)).coeffs = #[]
+  simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList]
+
+theorem coeffs_C_of_ne_zero {c : R} (hc : c ≠ (0 : R)) : (C c).coeffs = #[c] := by
+  change c ≠ Zero.zero at hc
+  simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList, hc]
+
+theorem size_C_le_one (c : R) : (C c).size ≤ 1 := by
+  by_cases hc : c = (0 : R)
+  · rw [hc]
+    change (C (Zero.zero : R)).size ≤ 1
+    simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList, size]
+  · change c ≠ Zero.zero at hc
+    simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList, hc, size]
+
+@[simp] theorem degree?_C_getD (c : R) : (C c).degree?.getD 0 = 0 := by
+  by_cases hc : c = (0 : R)
+  · rw [hc]
+    change (C (Zero.zero : R)).degree?.getD 0 = 0
+    simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList, degree?, size]
+  · change c ≠ Zero.zero at hc
+    simp [C, ofCoeffs, trimTrailingZeros, trimTrailingZerosList, hc, degree?, size]
+
 /-- The support of a dense polynomial, listed in ascending degree order. -/
 def support (p : DensePoly R) : List Nat :=
   (List.range p.size).filter fun i => p.coeff i ≠ (Zero.zero : R)
