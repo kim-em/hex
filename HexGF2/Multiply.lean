@@ -49,6 +49,48 @@ private theorem foldl_mulWords_size (is : List Nat) (acc : Array UInt64)
       have hinner := foldl_xorClmulAt_size (List.range ys.size) acc i xs[i]! ys
       rw [ih, hinner]
 
+private theorem bit_eq_one_eq_testBit (x i : Nat) :
+    (x >>> i % 2 == 1) = x.testBit i := by
+  rw [Nat.testBit_eq_decide_div_mod_eq]
+  rw [Nat.shiftRight_eq_div_pow]
+  apply decide_eq_decide.mpr
+  exact Iff.rfl
+
+private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
+    ((((a ^^^ b) >>> i.toUInt64) &&& 1) != 0) =
+      ((((a >>> i.toUInt64) &&& 1) != 0) !=
+        (((b >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  simp [UInt64.toNat_xor, UInt64.toNat_shiftRight, UInt64.toNat_and]
+  rw [bit_eq_one_eq_testBit]
+  rw [bit_eq_one_eq_testBit]
+  rw [bit_eq_one_eq_testBit]
+  simp [Nat.testBit_xor]
+
+private theorem coeffWords_xorClmulAt_low (acc : Array UInt64) {idx n : Nat}
+    (x y : UInt64) (hidx : idx < acc.size) (hn : n / 64 = idx) :
+    coeffWords (xorClmulAt acc idx x y) n =
+      (coeffWords acc n !=
+        ((((clmul x y).2 >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  simp [xorClmulAt, coeffWords, hn, hidx, UInt64.bit_xor_bne]
+
+private theorem coeffWords_xorClmulAt_high (acc : Array UInt64) {idx n : Nat}
+    (x y : UInt64) (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size)
+    (hn : n / 64 = idx + 1) :
+    coeffWords (xorClmulAt acc idx x y) n =
+      (coeffWords acc n !=
+        ((((clmul x y).1 >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  simp [xorClmulAt, coeffWords, hn, hidx, hidxNext, UInt64.bit_xor_bne]
+
+private theorem coeffWords_xorClmulAt_ne (acc : Array UInt64) {idx n : Nat}
+    (x y : UInt64) (hnLow : n / 64 ≠ idx) (hnHigh : n / 64 ≠ idx + 1) :
+    coeffWords (xorClmulAt acc idx x y) n = coeffWords acc n := by
+  have hLow : idx ≠ n / 64 := Ne.symm hnLow
+  have hHigh : idx + 1 ≠ n / 64 := Ne.symm hnHigh
+  simp [xorClmulAt, coeffWords, hLow, hHigh]
+
 /-- Raw packed-word multiplication before trailing zero normalization. -/
 private def mulWords (xs ys : Array UInt64) : Array UInt64 :=
   if xs.isEmpty || ys.isEmpty then
