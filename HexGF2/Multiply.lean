@@ -2756,6 +2756,22 @@ theorem left_distrib (p r q : GF2Poly) :
       exact normalizeWords_size_le _)]
   simpa [raw, normalizeWords_getElem!] using hraw
 
+/-- Packed `GF(2)` polynomial multiplication is commutative. -/
+theorem mul_comm (p q : GF2Poly) :
+    p * q = q * p := by
+  sorry
+
+/-- Right distributivity of packed `GF(2)` polynomial multiplication over
+addition. -/
+theorem right_distrib (p q r : GF2Poly) :
+    p * (q + r) = p * q + p * r := by
+  rw [mul_comm p (q + r), left_distrib, mul_comm q p, mul_comm r p]
+
+/-- Packed `GF(2)` polynomial multiplication is associative. -/
+theorem mul_assoc (p q r : GF2Poly) :
+    (p * q) * r = p * (q * r) := by
+  sorry
+
 private theorem coeff_shiftLeft_lt (p : GF2Poly) {k n : Nat} (hn : n < k) :
     (p.shiftLeft k).coeff n = false := by
   rw [coeff_shiftLeft]
