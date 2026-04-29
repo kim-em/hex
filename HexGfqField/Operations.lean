@@ -246,6 +246,13 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (1 : FiniteField f hf hirr).toQuotient = 1 :=
   rfl
 
+theorem zero_ne_one
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
+    (0 : FiniteField f hf hirr) ≠ 1 := by
+  intro h
+  have hq := congrArg FiniteField.toQuotient h
+  exact GFqRing.zero_ne_one f hf (by simpa using hq)
+
 @[simp] theorem toQuotient_natCast
     (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (n : Nat) :
     ((n : FiniteField f hf hirr).toQuotient) = (n : GFqRing.PolyQuotient f hf) :=
@@ -500,7 +507,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
   · intro a b
     simpa using div_eq_mul_inv a b
   · intro h
-    sorry
+    exact zero_ne_one f hf hirr h
   · exact inv_zero f hf hirr
   · intro a ha
     have ha' : a ≠ (0 : FiniteField f hf hirr) := ha
