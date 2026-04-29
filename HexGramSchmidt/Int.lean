@@ -47,10 +47,30 @@ end GramSchmidt
 
 namespace GramSchmidt.Int
 
+/-- Integer lattice membership in the row span of `b`. This mirrors the LLL
+predicate without making `hex-gram-schmidt` depend on the downstream LLL
+library. -/
+def memLattice (b : Matrix Int n m) (v : Vector Int m) : Prop :=
+  ∃ c : Vector Int n, Matrix.rowCombination b c = v
+
+/-- Linear independence of the row prefix determinants used by the
+Gram-Schmidt theorem surface. -/
+def independent (b : Matrix Int n m) : Prop :=
+  ∀ k : Fin n, 0 < Matrix.det (Matrix.submatrix (Matrix.gramMatrix b) k)
+
 /-- The `k`-th Gram determinant: the determinant of the `k × k` leading
 principal Gram matrix of the integer input. -/
 def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat :=
   (Matrix.det (GramSchmidt.leadingGramMatrixInt b k hk)).toNat
+
+/-- Product of the squared Gram-Schmidt basis norms along the first `k` rows. -/
+noncomputable def gramSchmidtNormProduct (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) :
+    Rat :=
+  (List.finRange k).foldl
+    (fun acc j =>
+      let jn : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt hk⟩
+      acc * Vector.normSq ((basis b).row jn))
+    1
 
 /-- Read a diagonal entry from a Bareiss elimination matrix as a natural
 determinant value. -/
@@ -101,6 +121,23 @@ theorem gramDetVec_eq_gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) :
     (gramDetVec b).get ⟨k, Nat.lt_succ_of_le hk⟩ = gramDet b k hk := by
   sorry
 
+theorem gramDet_eq_prod_normSq (b : Matrix Int n m)
+    (hli : independent b) (k : Nat) (hk : k ≤ n) :
+    (gramDet b k hk : Rat) = gramSchmidtNormProduct b k hk := by
+  sorry
+
+theorem gramDet_pos (b : Matrix Int n m)
+    (hli : independent b) (k : Nat) (hk : k ≤ n) (hk' : 0 < k) :
+    0 < gramDet b k hk := by
+  sorry
+
+theorem basis_normSq (b : Matrix Int n m)
+    (hli : independent b) (k : Nat) (hk : k < n) :
+    Vector.normSq ((basis b).row ⟨k, hk⟩) =
+      (gramDet b (k + 1) (Nat.succ_le_of_lt hk) : Rat) /
+        (gramDet b k (Nat.le_of_lt hk) : Rat) := by
+  sorry
+
 theorem scaledCoeffs_eq (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < i) :
     ((GramSchmidt.entry (scaledCoeffs b) ⟨i, hi⟩ ⟨j, Nat.lt_trans hj hi⟩ : Int) : Rat) =
@@ -116,6 +153,13 @@ theorem scaledCoeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
 theorem scaledCoeffs_upper (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
     GramSchmidt.entry (scaledCoeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
+  sorry
+
+theorem normSq_latticeVec_ge_min_basis_normSq
+    (b : Matrix Int n m) (hli : independent b)
+    (v : Vector Int m) (hv : memLattice b v) (hv' : v ≠ 0) :
+    ∃ i : Fin n,
+      Vector.normSq ((basis b).row i) ≤ ((Vector.normSq v : Int) : Rat) := by
   sorry
 
 end GramSchmidt.Int

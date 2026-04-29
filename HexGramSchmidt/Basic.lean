@@ -163,5 +163,11 @@ theorem coeffs_upper (b : Matrix Rat n m)
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
   sorry
 
+theorem basis_span (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
+    ∀ v : Vector Rat m,
+      GramSchmidt.prefixSpan (basis b) i hi v ↔
+        GramSchmidt.prefixSpan b i hi v := by
+  sorry
+
 end GramSchmidt.Rat
 end Hex
