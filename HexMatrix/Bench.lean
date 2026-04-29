@@ -130,9 +130,10 @@ def leibnizDetComplexity : Nat → Nat
 setup_benchmark runSquareMulChecksum n => n * n * n
   with prep := prepMulInput
   where {
-    paramFloor := 4
-    paramCeiling := 64
-    maxSecondsPerCall := 0.5
+    paramFloor := 160
+    paramCeiling := 256
+    paramSchedule := .custom #[160, 192, 224, 256]
+    maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
   }
 
@@ -142,17 +143,19 @@ setup_benchmark runBareissDet n => n * n * n
     paramFloor := 8
     paramCeiling := 16
     paramSchedule := .custom #[8, 12, 16]
-    maxSecondsPerCall := 1.5
-    targetInnerNanos := 800000000
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 2000000000
   }
 
 setup_benchmark runLeibnizDet n => n * leibnizDetComplexity n
   with prep := prepDetInput
   where {
     paramFloor := 2
-    paramCeiling := 7
+    paramCeiling := 8
+    paramSchedule := .custom #[2, 3, 4, 5, 6, 7, 8]
     maxSecondsPerCall := 1.5
     targetInnerNanos := 800000000
+    verdictWarmupFraction := 0.5
   }
 
 end Hex.MatrixBench
