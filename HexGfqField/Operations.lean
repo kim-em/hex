@@ -292,6 +292,19 @@ theorem natCast_eq_natCast_iff_reduceMod_const_eq
     apply GFqRing.ext
     simpa [repr_natCast] using h
 
+theorem natCast_eq_natCast_iff_mod_eq
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (m n : Nat) :
+    ((m : FiniteField f hf hirr) = n) ↔ m % p = n % p := by
+  constructor
+  · intro h
+    have hq :
+        ((m : GFqRing.PolyQuotient f hf) = n) := by
+      simpa using congrArg FiniteField.toQuotient h
+    exact (GFqRing.natCast_eq_natCast_iff_mod_eq f hf m n).1 hq
+  · intro h
+    exact natCast_eq_of_mod_eq f hf hirr h
+
 @[simp] theorem toQuotient_add
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x y : FiniteField f hf hirr) :
@@ -583,13 +596,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.IsCharP (FiniteField f hf hirr) p where
-  ofNat_ext_iff {x y} := by
-    constructor
-    · intro h
-      sorry
-    · intro h
-      ext
-      all_goals sorry
+  ofNat_ext_iff {x y} := natCast_eq_natCast_iff_mod_eq f hf hirr x y
 
 theorem frob_eq_pow
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
