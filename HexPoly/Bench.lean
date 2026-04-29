@@ -30,9 +30,10 @@ Scientific registrations:
   schoolbook division path.
 * `runXGcdChecksum`: extended Euclidean algorithm over a field, `O(n^3)` with
   the current schoolbook division path.
+* `runContent`: integer coefficient content, `O(n)`.
+* `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
 
-Integer content/primitive part and polynomial CRT are intentionally left for
-later Phase 4 slices.
+Polynomial CRT is intentionally left for a later Phase 4 slice.
 -/
 
 namespace Hex.PolyBench
@@ -49,6 +50,11 @@ structure BinaryInput where
 
 /-- Prepared input for unary dense-polynomial operations. -/
 structure UnaryInput where
+  poly : DensePoly Int
+  deriving Hashable
+
+/-- Prepared input for integer content and primitive-part operations. -/
+structure ContentInput where
   poly : DensePoly Int
   deriving Hashable
 
@@ -89,6 +95,17 @@ def densePoly (n salt : Nat) : DensePoly Int :=
 def denseRatPoly (n salt : Nat) : DensePoly Rat :=
   DensePoly.ofCoeffs <| (Array.range n).map fun i => (coeffValue n i salt : Rat)
 
+/-- Deterministic primitive coefficient used inside nontrivial-content inputs. -/
+def primitiveCoeffValue (n i salt : Nat) : Int :=
+  let base : Int := if i = 0 then 1 else coeffValue n i salt
+  if i % 2 = 0 then base else -base
+
+/-- Deterministic integer polynomial whose coefficient content is nontrivial. -/
+def contentPoly (n salt : Nat) : DensePoly Int :=
+  let common : Int := Int.ofNat ((salt % 5) + 2)
+  DensePoly.ofCoeffs <|
+    (Array.range n).map fun i => common * primitiveCoeffValue n i salt
+
 /-- Deterministic monic divisor used by `modByMonic` benchmarks. -/
 def monicDivisor (degree : Nat) : DensePoly Rat :=
   { coeffs := (Array.replicate degree (0 : Rat)).push 1
@@ -117,6 +134,10 @@ def prepBinaryInput (n : Nat) : BinaryInput :=
 /-- Per-parameter fixture for derivative benchmarks. -/
 def prepUnaryInput (n : Nat) : UnaryInput :=
   { poly := densePoly n 53 }
+
+/-- Per-parameter fixture for integer content and primitive-part benchmarks. -/
+def prepContentInput (n : Nat) : ContentInput :=
+  { poly := contentPoly n 229 }
 
 /-- Per-parameter fixture for Horner evaluation. -/
 def prepEvalInput (n : Nat) : EvalInput :=
@@ -188,6 +209,14 @@ def runGcdChecksum (input : EuclidInput) : Rat :=
 def runXGcdChecksum (input : EuclidInput) : Rat :=
   let result := DensePoly.xgcd input.dividend input.divisor
   ratChecksum result.gcd * 1_048_573 + ratChecksum result.left * 1_024 + ratChecksum result.right
+
+/-- Benchmark target: compute integer coefficient content. -/
+def runContent (input : ContentInput) : Int :=
+  DensePoly.content input.poly
+
+/-- Benchmark target: compute integer primitive part and checksum the result. -/
+def runPrimitivePartChecksum (input : ContentInput) : Int :=
+  checksum (DensePoly.primitivePart input.poly)
 
 setup_benchmark runAddChecksum n => n
   with prep := prepBinaryInput
@@ -306,6 +335,26 @@ setup_benchmark runXGcdChecksum n => n * n * n
     paramCeiling := 96
     paramSchedule := .custom #[16, 24, 32, 48, 64, 96]
     maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runContent n => n
+  with prep := prepContentInput
+  where {
+    paramFloor := 8192
+    paramCeiling := 131072
+    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runPrimitivePartChecksum n => n
+  with prep := prepContentInput
+  where {
+    paramFloor := 8192
+    paramCeiling := 131072
+    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
+    maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
   }
 
