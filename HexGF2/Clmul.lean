@@ -325,6 +325,94 @@ theorem pureClmul_oneHot_left_snd (a : UInt64) {bit : Nat} (hbit : bit < 64) :
     simp [List.range, List.range.loop, List.foldl, clmulOneHotLeftLowStep] <;>
     bv_decide
 
+private def clmulOneHotLeftHighStep (hot : Nat) (a hi : UInt64) (bitIdx : Nat) : UInt64 :=
+  if (((a >>> bitIdx.toUInt64) &&& 1) != 0) then
+    if hot + bitIdx < 64 then
+      hi
+    else
+      hi ^^^ ((1 : UInt64) <<< (hot + bitIdx - 64).toUInt64)
+  else
+    hi
+
+private theorem foldl_oneHot_left_fst_eq_highStep (a : UInt64) {hot : Nat}
+    (hhot : hot < 64) :
+    ∀ (xs : List Nat) (acc : UInt64 × UInt64),
+      (∀ bitIdx ∈ xs, bitIdx < 64) →
+      (xs.foldl
+          (fun acc bitIdx =>
+            if (((a >>> bitIdx.toUInt64) &&& 1) != 0) then
+              clmulAccumulateBit acc ((1 : UInt64) <<< hot.toUInt64) bitIdx
+            else
+              acc)
+          acc).1 =
+        xs.foldl (clmulOneHotLeftHighStep hot a) acc.1 := by
+  intro xs
+  induction xs with
+  | nil =>
+      intro acc _
+      simp
+  | cons bitIdx xs ih =>
+      intro acc hlt
+      have hbitIdx : bitIdx < 64 := hlt bitIdx (by simp)
+      have hltTail : ∀ idx ∈ xs, idx < 64 := by
+        intro idx hmem
+        exact hlt idx (by simp [hmem])
+      rw [List.foldl_cons, List.foldl_cons]
+      by_cases hset : (((a >>> bitIdx.toUInt64) &&& 1) != 0) = true
+      · by_cases hsum : hot + bitIdx < 64
+        · rw [if_pos hset]
+          have hhighStep : clmulOneHotLeftHighStep hot a acc.1 bitIdx = acc.1 := by
+            simp [clmulOneHotLeftHighStep, hset, hsum]
+          rw [clmulAccumulateBit_oneHot_low acc hhot hbitIdx hsum]
+          simpa [hhighStep] using
+            ih (acc.1, acc.2 ^^^ ((1 : UInt64) <<< (hot + bitIdx).toUInt64)) hltTail
+        · have hsumGe : 64 ≤ hot + bitIdx := Nat.le_of_not_gt hsum
+          rw [if_pos hset]
+          have hhighStep :
+              clmulOneHotLeftHighStep hot a acc.1 bitIdx =
+                acc.1 ^^^ ((1 : UInt64) <<< (hot + bitIdx - 64).toUInt64) := by
+            simp [clmulOneHotLeftHighStep, hset, hsum]
+          rw [clmulAccumulateBit_oneHot_high acc hhot hbitIdx hsumGe]
+          simpa [hhighStep] using
+            ih (acc.1 ^^^ ((1 : UInt64) <<< (hot + bitIdx - 64).toUInt64), acc.2)
+              hltTail
+      · rw [if_neg hset]
+        have hhighStep : clmulOneHotLeftHighStep hot a acc.1 bitIdx = acc.1 := by
+          simp [clmulOneHotLeftHighStep, hset]
+        simpa [hhighStep] using ih acc hltTail
+
+set_option maxHeartbeats 2000000 in
+/-- High word of pure carry-less multiplication with an in-word monomial on the
+left. -/
+theorem pureClmul_oneHot_left_fst (a : UInt64) {bit : Nat} (hbit : bit < 64) :
+    (pureClmul ((1 : UInt64) <<< bit.toUInt64) a).1 =
+      if bit = 0 then 0 else a >>> (64 - bit).toUInt64 := by
+  rw [pureClmul]
+  rw [foldl_oneHot_left_fst_eq_highStep a hbit (List.range 64) (0, 0)
+    (by
+      intro bitIdx hmem
+      exact List.mem_range.mp hmem)]
+  have hcases : bit = 0 ∨ bit = 1 ∨ bit = 2 ∨ bit = 3 ∨ bit = 4 ∨ bit = 5 ∨
+      bit = 6 ∨ bit = 7 ∨ bit = 8 ∨ bit = 9 ∨ bit = 10 ∨ bit = 11 ∨
+      bit = 12 ∨ bit = 13 ∨ bit = 14 ∨ bit = 15 ∨ bit = 16 ∨ bit = 17 ∨
+      bit = 18 ∨ bit = 19 ∨ bit = 20 ∨ bit = 21 ∨ bit = 22 ∨ bit = 23 ∨
+      bit = 24 ∨ bit = 25 ∨ bit = 26 ∨ bit = 27 ∨ bit = 28 ∨ bit = 29 ∨
+      bit = 30 ∨ bit = 31 ∨ bit = 32 ∨ bit = 33 ∨ bit = 34 ∨ bit = 35 ∨
+      bit = 36 ∨ bit = 37 ∨ bit = 38 ∨ bit = 39 ∨ bit = 40 ∨ bit = 41 ∨
+      bit = 42 ∨ bit = 43 ∨ bit = 44 ∨ bit = 45 ∨ bit = 46 ∨ bit = 47 ∨
+      bit = 48 ∨ bit = 49 ∨ bit = 50 ∨ bit = 51 ∨ bit = 52 ∨ bit = 53 ∨
+      bit = 54 ∨ bit = 55 ∨ bit = 56 ∨ bit = 57 ∨ bit = 58 ∨ bit = 59 ∨
+      bit = 60 ∨ bit = 61 ∨ bit = 62 ∨ bit = 63 := by
+    omega
+  rcases hcases with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
+    rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+    simp [List.range, List.range.loop, List.foldl, clmulOneHotLeftHighStep] <;>
+    bv_decide
+
 /-- Trusted runtime hook for carry-less multiplication.
 
 The compiled C shim must return the same `(hi, lo)` pair as `pureClmul`; the
