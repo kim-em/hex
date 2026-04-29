@@ -413,6 +413,16 @@ theorem pureClmul_oneHot_left_fst (a : UInt64) {bit : Nat} (hbit : bit < 64) :
     simp [List.range, List.range.loop, List.foldl, clmulOneHotLeftHighStep] <;>
     bv_decide
 
+/-- Pure carry-less multiplication with an in-word monomial on the left. -/
+theorem pureClmul_oneHot_left (a : UInt64) {bit : Nat} (hbit : bit < 64) :
+    pureClmul ((1 : UInt64) <<< bit.toUInt64) a =
+      if bit = 0 then (0, a) else (a >>> (64 - bit).toUInt64, a <<< bit.toUInt64) := by
+  ext
+  · rw [pureClmul_oneHot_left_fst a hbit]
+    by_cases h : bit = 0 <;> simp [h]
+  · rw [pureClmul_oneHot_left_snd a hbit]
+    by_cases h : bit = 0 <;> simp [h]
+
 /-- Trusted runtime hook for carry-less multiplication.
 
 The compiled C shim must return the same `(hi, lo)` pair as `pureClmul`; the
@@ -440,6 +450,27 @@ theorem clmul_oneHot_snd (a : UInt64) {bit : Nat} (hbit : bit < 64) :
     (clmul a ((1 : UInt64) <<< bit.toUInt64)).2 =
       if bit = 0 then a else a <<< bit.toUInt64 := by
   rw [clmul_oneHot a hbit]
+  by_cases h : bit = 0 <;> simp [h]
+
+/-- Runtime `clmul`, under its trusted reference contract, with an in-word
+monomial on the left. -/
+theorem clmul_oneHot_left (a : UInt64) {bit : Nat} (hbit : bit < 64) :
+    clmul ((1 : UInt64) <<< bit.toUInt64) a =
+      if bit = 0 then (0, a) else (a >>> (64 - bit).toUInt64, a <<< bit.toUInt64) := by
+  rw [clmul, pureClmul_oneHot_left a hbit]
+
+/-- High word of carry-less multiplication with an in-word monomial on the left. -/
+theorem clmul_oneHot_left_fst (a : UInt64) {bit : Nat} (hbit : bit < 64) :
+    (clmul ((1 : UInt64) <<< bit.toUInt64) a).1 =
+      if bit = 0 then 0 else a >>> (64 - bit).toUInt64 := by
+  rw [clmul_oneHot_left a hbit]
+  by_cases h : bit = 0 <;> simp [h]
+
+/-- Low word of carry-less multiplication with an in-word monomial on the left. -/
+theorem clmul_oneHot_left_snd (a : UInt64) {bit : Nat} (hbit : bit < 64) :
+    (clmul ((1 : UInt64) <<< bit.toUInt64) a).2 =
+      if bit = 0 then a else a <<< bit.toUInt64 := by
+  rw [clmul_oneHot_left a hbit]
   by_cases h : bit = 0 <;> simp [h]
 
 end Hex
