@@ -15,11 +15,6 @@ namespace GFqRing
 
 variable {p : Nat} [ZMod64.Bounds p]
 
-/-- Coefficientwise additive inverse on `F_p[x]`. -/
-private def negPoly (g : FpPoly p) : FpPoly p :=
-  DensePoly.ofCoeffs <|
-    (List.range g.size).map (fun i => (0 : ZMod64 p) - g.coeff i) |>.toArray
-
 /-- The quotient zero element. -/
 def zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) : PolyQuotient f hf :=
   ofPoly f hf 0
@@ -46,7 +41,7 @@ def mul {f : FpPoly p} {hf : 0 < FpPoly.degree f}
 /-- Quotient negation reduces the coefficientwise additive inverse. -/
 def neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) : PolyQuotient f hf :=
-  ofPoly f hf (negPoly (repr x))
+  ofPoly f hf (-repr x)
 
 /-- Quotient subtraction reduces the difference of representatives. -/
 def sub {f : FpPoly p} {hf : 0 < FpPoly.degree f}
@@ -182,7 +177,7 @@ theorem natCast_eq_natCast_iff_reduceMod_const_eq
 
 @[simp] theorem repr_neg {f : FpPoly p} {hf : 0 < FpPoly.degree f}
     (x : PolyQuotient f hf) :
-    repr (-x) = reduceMod f (negPoly (repr x)) :=
+    repr (-x) = reduceMod f (-repr x) :=
   rfl
 
 @[simp] theorem repr_sub {f : FpPoly p} {hf : 0 < FpPoly.degree f}

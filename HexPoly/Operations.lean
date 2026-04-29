@@ -45,6 +45,13 @@ def sub [Sub R] (p q : DensePoly R) : DensePoly R :=
 instance [Sub R] : Sub (DensePoly R) where
   sub := sub
 
+/-- Coefficientwise additive inverse, expressed through executable subtraction. -/
+def neg [Sub R] (p : DensePoly R) : DensePoly R :=
+  0 - p
+
+instance [Sub R] : Neg (DensePoly R) where
+  neg := neg
+
 /-- Schoolbook dense polynomial multiplication. -/
 def mul [Add R] [Mul R] (p q : DensePoly R) : DensePoly R :=
   (List.range p.size).foldl
@@ -74,6 +81,15 @@ theorem coeff_add [Add R] (p q : DensePoly R) (n : Nat) :
 theorem coeff_sub [Sub R] (p q : DensePoly R) (n : Nat) :
     (p - q).coeff n = (p.coeff n - q.coeff n) := by
   sorry
+
+@[simp] theorem coeff_zero (n : Nat) :
+    (0 : DensePoly R).coeff n = (0 : R) := by
+  exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)
+
+theorem coeff_neg [Sub R] (p : DensePoly R) (n : Nat) :
+    (-p).coeff n = ((0 : R) - p.coeff n) := by
+  change (neg p).coeff n = ((0 : R) - p.coeff n)
+  simp [neg, coeff_sub]
 
 theorem eval_zero [Add R] [Mul R] (x : R) :
     eval (0 : DensePoly R) x = 0 := by
