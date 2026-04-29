@@ -225,6 +225,39 @@ private theorem mul_one (p : GF2Poly) :
     p * (1 : GF2Poly) = p := by
   rw [one_eq_monomial_zero, mul_monomial, mulXk_zero]
 
+private theorem dvd_refl (p : GF2Poly) :
+    p ∣ p := by
+  exact ⟨1, by rw [mul_one]⟩
+
+private theorem dvd_zero (p : GF2Poly) :
+    p ∣ 0 := by
+  exact ⟨0, by rw [mul_zero]⟩
+
+private theorem dvd_add {d a b : GF2Poly} :
+    d ∣ a → d ∣ b → d ∣ a + b := by
+  intro hda hdb
+  rcases hda with ⟨ra, hra⟩
+  rcases hdb with ⟨rb, hrb⟩
+  exact ⟨ra + rb, by rw [hra, hrb, right_distrib]⟩
+
+private theorem dvd_mul_left {d a : GF2Poly} (c : GF2Poly) :
+    d ∣ a → d ∣ c * a := by
+  intro hda
+  rcases hda with ⟨r, hr⟩
+  refine ⟨c * r, ?_⟩
+  calc
+    c * a = c * (d * r) := by rw [hr]
+    _ = (c * d) * r := by rw [mul_assoc]
+    _ = (d * c) * r := by rw [mul_comm c d]
+    _ = d * (c * r) := by rw [mul_assoc]
+
+private theorem dvd_of_division_step {d r₀ r₁ div rem : GF2Poly}
+    (hr₁ : d ∣ r₁) (hrem : d ∣ rem)
+    (hdiv : div * r₁ + rem = r₀) :
+    d ∣ r₀ := by
+  rw [← hdiv]
+  exact dvd_add (dvd_mul_left div hr₁) hrem
+
 private theorem xgcd_step_bezout
     (p q r₀ s₀ t₀ r₁ s₁ t₁ div rem : GF2Poly)
     (h₀ : s₀ * p + t₀ * q = r₀)
@@ -288,20 +321,62 @@ theorem mod_degree_lt (p q : GF2Poly) :
   · exact Or.inl hpzero
   · exact Or.inr (Nat.lt_succ_self p.degree)
 
-/-- The gcd divides the left input. -/
-theorem gcd_dvd_left (p q : GF2Poly) :
-    gcd p q ∣ p := by
-  sorry
-
-/-- The gcd divides the right input. -/
-theorem gcd_dvd_right (p q : GF2Poly) :
-    gcd p q ∣ q := by
-  sorry
-
-/-- Any common divisor divides the computed gcd. -/
-theorem dvd_gcd (d p q : GF2Poly) :
-    d ∣ p → d ∣ q → d ∣ gcd p q := by
-  sorry
+set_option maxHeartbeats 800000 in
+private theorem xgcdAux_dvd_current_of_fuel
+    (r₀ s₀ t₀ r₁ s₁ t₁ : GF2Poly) (fuel : Nat)
+    (hfuel : r₁.isZero = true ∨ r₁.degree < fuel) :
+    (xgcdAux r₀ s₀ t₀ r₁ s₁ t₁ fuel).gcd ∣ r₀ ∧
+      (xgcdAux r₀ s₀ t₀ r₁ s₁ t₁ fuel).gcd ∣ r₁ := by
+  induction fuel generalizing r₀ s₀ t₀ r₁ s₁ t₁ with
+  | zero =>
+      cases hfuel with
+      | inl hzero =>
+          simp only [xgcdAux]
+          constructor
+          · exact dvd_refl r₀
+          · rw [eq_zero_of_isZero hzero]
+            exact dvd_zero r₀
+      | inr hlt =>
+          omega
+  | succ fuel ih =>
+      simp only [xgcdAux]
+      by_cases hzero : r₁.isZero = true
+      · simp only [hzero]
+        constructor
+        · exact dvd_refl r₀
+        · rw [eq_zero_of_isZero hzero]
+          exact dvd_zero r₀
+      · have hzeroFalse : r₁.isZero = false := by
+          cases h : r₁.isZero <;> simp [h] at hzero ⊢
+        simp [hzeroFalse]
+        have hdiv : (divMod r₀ r₁).1 * r₁ + (divMod r₀ r₁).2 = r₀ := by
+          exact divMod_spec r₀ r₁
+        have hr₁ne : r₁ ≠ 0 := by
+          intro hr₁
+          have : r₁.isZero = true := by simp [hr₁]
+          exact hzero this
+        have hremDegree :
+            (divMod r₀ r₁).2.isZero = true ∨ (divMod r₀ r₁).2.degree < r₁.degree := by
+          simpa [mod] using mod_degree_lt r₀ r₁ hr₁ne
+        have hr₁Degree : r₁.degree < fuel + 1 := by
+          cases hfuel with
+          | inl hzero' =>
+              contradiction
+          | inr hlt =>
+              exact hlt
+        have hnextFuel :
+            (divMod r₀ r₁).2.isZero = true ∨ (divMod r₀ r₁).2.degree < fuel := by
+          cases hremDegree with
+          | inl hremZero =>
+              exact Or.inl hremZero
+          | inr hremLt =>
+              exact Or.inr (Nat.lt_of_lt_of_le hremLt (Nat.le_of_lt_succ hr₁Degree))
+        have hih :=
+          ih r₁ s₁ t₁ (divMod r₀ r₁).2 (s₀ + (divMod r₀ r₁).1 * s₁)
+            (t₀ + (divMod r₀ r₁).1 * t₁) hnextFuel
+        constructor
+        · exact dvd_of_division_step hih.1 hih.2 hdiv
+        · exact hih.1
 
 /-- The extended-gcd output satisfies the Bezout identity. -/
 theorem xgcd_bezout (p q : GF2Poly) :
@@ -311,6 +386,38 @@ theorem xgcd_bezout (p q : GF2Poly) :
   apply xgcdAux_bezout
   · rw [one_mul, zero_mul, add_zero]
   · rw [zero_mul, one_mul, zero_add]
+
+/-- The gcd divides the left input. -/
+theorem gcd_dvd_left (p q : GF2Poly) :
+    gcd p q ∣ p := by
+  unfold gcd xgcd
+  have hfuel : q.isZero = true ∨ q.degree < p.degree + q.degree + 2 := by
+    by_cases hqzero : q.isZero = true
+    · exact Or.inl hqzero
+    · exact Or.inr (by omega)
+  exact (xgcdAux_dvd_current_of_fuel p 1 0 q 0 1 (p.degree + q.degree + 2) hfuel).1
+
+/-- The gcd divides the right input. -/
+theorem gcd_dvd_right (p q : GF2Poly) :
+    gcd p q ∣ q := by
+  unfold gcd xgcd
+  have hfuel : q.isZero = true ∨ q.degree < p.degree + q.degree + 2 := by
+    by_cases hqzero : q.isZero = true
+    · exact Or.inl hqzero
+    · exact Or.inr (by omega)
+  exact (xgcdAux_dvd_current_of_fuel p 1 0 q 0 1 (p.degree + q.degree + 2) hfuel).2
+
+/-- Any common divisor divides the computed gcd. -/
+theorem dvd_gcd (d p q : GF2Poly) :
+    d ∣ p → d ∣ q → d ∣ gcd p q := by
+  intro hdp hdq
+  unfold gcd
+  have hbezout := xgcd_bezout p q
+  let r := xgcd p q
+  have hsum : d ∣ r.left * p + r.right * q :=
+    dvd_add (dvd_mul_left r.left hdp) (dvd_mul_left r.right hdq)
+  rw [hbezout] at hsum
+  simpa [r] using hsum
 
 end GF2Poly
 end Hex
