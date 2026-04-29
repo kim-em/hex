@@ -213,6 +213,19 @@ structure PrimeFactorData where
   factorCerts : Array Berlekamp.IrreducibilityCertificate
 
 /--
+Evidence that a candidate integer factor degree is impossible for one recorded
+prime block.
+
+If an integer factor has degree `targetDegree`, then reducing modulo any good
+prime gives a product of modular irreducible factors whose degrees sum to
+`targetDegree`. The checker validates an obstruction by confirming that the
+referenced prime block has no subset of recorded factor degrees with this sum.
+-/
+structure DegreeObstruction where
+  targetDegree : Nat
+  primeIndex : Nat
+
+/--
 Checker-first certificate data for irreducibility over `Z[x]`.
 
 Each entry groups all modular degree and irreducibility-certificate data for a
@@ -221,6 +234,7 @@ the later proof layer interprets the degree obstruction mathematically.
 -/
 structure ZPolyIrreducibilityCertificate where
   perPrime : Array PrimeFactorData
+  degreeObstructions : Array DegreeObstruction
 
 namespace PrimeFactorData
 
@@ -231,6 +245,18 @@ def degreeSum (d : PrimeFactorData) : Nat :=
 /-- Does the recorded degree multiset contain `n`? -/
 def containsDegree (d : PrimeFactorData) (n : Nat) : Bool :=
   d.factorDegrees.toList.any fun degree => degree == n
+
+private def hasSubsetDegreeAux : List Nat → Nat → Bool
+  | [], target => target == 0
+  | degree :: degrees, target =>
+      hasSubsetDegreeAux degrees target ||
+        (degree ≤ target && hasSubsetDegreeAux degrees (target - degree))
+
+/--
+Does some subset of this prime block's modular factor degrees sum to `target`?
+-/
+def hasSubsetDegree (d : PrimeFactorData) (target : Nat) : Bool :=
+  hasSubsetDegreeAux d.factorDegrees.toList target
 
 /-- Check one nested finite-field irreducibility certificate against its degree slot. -/
 def checkCertAtDegree
@@ -257,17 +283,70 @@ def checkForPolynomial (f : ZPoly) (d : PrimeFactorData) : Bool :=
 
 end PrimeFactorData
 
+namespace ZPolyIrreducibilityCertificate
+
+/-- Nontrivial integer factor degrees that must be ruled out for `f`. -/
+def candidateFactorDegrees (f : ZPoly) : List Nat :=
+  (List.range ((f.degree?.getD 0) / 2)).map fun i => i + 1
+
+/-- Look up a per-prime block by the index stored in an obstruction. -/
+def primeDataAt? (cert : ZPolyIrreducibilityCertificate) (idx : Nat) :
+    Option PrimeFactorData :=
+  match cert.perPrime.toList.drop idx with
+  | [] => none
+  | primeData :: _ => some primeData
+
+end ZPolyIrreducibilityCertificate
+
+namespace DegreeObstruction
+
+/--
+Check one degree obstruction against the certificate's per-prime degree data.
+
+The target must be one of the nontrivial candidate degrees for `f`, and the
+referenced prime block must have no subset of modular factor degrees summing to
+that target.
+-/
+def checkForCertificate
+    (f : ZPoly) (cert : ZPolyIrreducibilityCertificate)
+    (obs : DegreeObstruction) : Bool :=
+  decide (obs.targetDegree ∈ ZPolyIrreducibilityCertificate.candidateFactorDegrees f) &&
+    match cert.primeDataAt? obs.primeIndex with
+    | none => false
+    | some primeData => !primeData.hasSubsetDegree obs.targetDegree
+
+end DegreeObstruction
+
+namespace ZPolyIrreducibilityCertificate
+
+/-- Does the obstruction array contain a valid obstruction for `targetDegree`? -/
+def hasObstructionFor (f : ZPoly)
+    (cert : ZPolyIrreducibilityCertificate) (targetDegree : Nat) : Bool :=
+  cert.degreeObstructions.toList.any fun obs =>
+    obs.targetDegree == targetDegree && obs.checkForCertificate f cert
+
+/-- Check that every candidate nontrivial factor degree is ruled out. -/
+def checkDegreeObstructions (f : ZPoly)
+    (cert : ZPolyIrreducibilityCertificate) : Bool :=
+  (cert.degreeObstructions.all fun obs => obs.checkForCertificate f cert) &&
+    (candidateFactorDegrees f).all fun targetDegree =>
+      cert.hasObstructionFor f targetDegree
+
+end ZPolyIrreducibilityCertificate
+
 /--
 Executable surface checker for integer-polynomial irreducibility certificates.
 
 This validates all computational alignment data available at this layer: every
 prime block must use an admissible prime for `f`, its factor degrees must cover
-the modular image degree, and each nested finite-field certificate must match
-the enclosing prime and its corresponding factor degree.
+the modular image degree, each nested finite-field certificate must match the
+enclosing prime and its corresponding factor degree, and every nontrivial
+integer factor degree must be excluded by explicit per-prime degree data.
 -/
 def checkIrreducibleCert
     (f : ZPoly) (cert : ZPolyIrreducibilityCertificate) : Bool :=
-  cert.perPrime.all fun primeData => primeData.checkForPolynomial f
+  cert.perPrime.all (fun primeData => primeData.checkForPolynomial f) &&
+    cert.checkDegreeObstructions f
 
 private structure PrimeChoiceDataScore where
   data : PrimeChoiceData
@@ -453,6 +532,27 @@ theorem checkIrreducibleCert_certificate_alignment
     (hcert : checkIrreducibleCert f cert = true) :
     ∀ primeData ∈ cert.perPrime.toList,
       primeData.checkFactorCerts = true := by
+  sorry
+
+theorem checkIrreducibleCert_degree_obstructions
+    (f : ZPoly) (cert : ZPolyIrreducibilityCertificate)
+    (hcert : checkIrreducibleCert f cert = true) :
+    cert.checkDegreeObstructions f = true := by
+  sorry
+
+theorem checkIrreducibleCert_obstructs_candidate_degrees
+    (f : ZPoly) (cert : ZPolyIrreducibilityCertificate)
+    (hcert : checkIrreducibleCert f cert = true) :
+    ∀ targetDegree ∈ ZPolyIrreducibilityCertificate.candidateFactorDegrees f,
+      cert.hasObstructionFor f targetDegree = true := by
+  sorry
+
+theorem degreeObstruction_no_subset_degree
+    (f : ZPoly) (cert : ZPolyIrreducibilityCertificate)
+    (obs : DegreeObstruction) (primeData : PrimeFactorData)
+    (hobs : obs.checkForCertificate f cert = true)
+    (hprime : cert.primeDataAt? obs.primeIndex = some primeData) :
+    primeData.hasSubsetDegree obs.targetDegree = false := by
   sorry
 
 end Hex
