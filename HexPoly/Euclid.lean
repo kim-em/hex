@@ -195,6 +195,18 @@ theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p % q) % q = p % q := by
   sorry
 
+/-- Reducing both summands before addition preserves the canonical remainder. -/
+theorem mod_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q m : DensePoly R) :
+    (p + q) % m = ((p % m) + (q % m)) % m := by
+  sorry
+
+/-- Reducing both factors before multiplication preserves the canonical remainder. -/
+theorem mod_mul_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q m : DensePoly R) :
+    (p * q) % m = ((p % m) * (q % m)) % m := by
+  sorry
+
 end DensePoly
 
 namespace DensePoly

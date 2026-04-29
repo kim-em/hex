@@ -102,6 +102,16 @@ theorem reduceMod_idem (f : FpPoly p) (g : FpPoly p) :
     reduceMod f (reduceMod f g) = reduceMod f g := by
   simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_mod g f)
 
+/-- Reducing both summands before quotient reduction preserves the canonical representative. -/
+theorem reduceMod_add_reduceMod_congr (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (a + b) = reduceMod f (reduceMod f a + reduceMod f b) := by
+  simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_add_mod a b f)
+
+/-- Reducing both factors before quotient reduction preserves the canonical representative. -/
+theorem reduceMod_mul_reduceMod_congr (f : FpPoly p) (a b : FpPoly p) :
+    reduceMod f (a * b) = reduceMod f (reduceMod f a * reduceMod f b) := by
+  simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_mul_mod a b f)
+
 theorem ofPoly_reduceMod (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
     ofPoly f hf (reduceMod f g) = ofPoly f hf g := by
   apply Subtype.ext
