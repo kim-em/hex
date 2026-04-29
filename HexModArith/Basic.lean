@@ -149,6 +149,7 @@ Raise a residue to a natural power using exponentiation by squaring.
 The accumulator form keeps the executable path close to the intended downstream
 runtime usage while preserving a simple semantic contract.
 -/
+@[extern "lean_hex_zmod64_pow"]
 def pow (a : ZMod64 p) (n : Nat) : ZMod64 p :=
   let rec go (base acc : ZMod64 p) (k : Nat) : ZMod64 p :=
     match k with
