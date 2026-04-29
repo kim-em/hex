@@ -21,6 +21,7 @@ Covered operations:
 - `MontCtx.toMont`
 - `MontCtx.fromMont`
 - `MontCtx.mulMont`
+- `HexArith.powMod`
 Covered properties:
 - each extended-GCD API returns the same gcd as Lean's built-in arithmetic on committed fixtures
 - each extended-GCD API returns Bezout coefficients satisfying the advertised identity
@@ -29,6 +30,7 @@ Covered properties:
 - `BarrettCtx.mulMod` agrees with ordinary modular multiplication on committed residues
 - `barrettReduce` follows the corrective-subtraction branch and still returns `T % p`
 - Montgomery round-trips preserve reduced residues and Montgomery multiplication agrees with `Nat`-level modular products
+- `HexArith.powMod` agrees with ordinary modular exponentiation on committed fixtures
 Covered edge cases:
 - zero-left and zero-right extended-GCD inputs
 - signed extended-GCD inputs with mixed signs
@@ -37,6 +39,7 @@ Covered edge cases:
 - Barrett multiplication at the `p < 2^32` boundary
 - the Montgomery modulus-`1` degenerate case
 - a near-`2^64` odd Montgomery modulus with near-modulus residues
+- `powMod` exponent zero, base larger than the modulus, even-modulus fallback, and large-`Nat` fallback
 -/
 
 namespace HexArith
@@ -207,5 +210,11 @@ private def maxWord : UInt64 := UInt64.ofNat (wordBase - 1)
   ctx.fromMont (ctx.toMont a) = a ∧
     (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
       (a.toNat * b.toNat) % p.toNat
+
+#guard HexArith.powMod 1234 13 97 = 1234 ^ 13 % 97
+#guard HexArith.powMod 123456 0 64 = 123456 ^ 0 % 64
+#guard let p := wordBase + 59
+  HexArith.powMod (p + 123) 5 p = (p + 123) ^ 5 % p
+#guard HexArith.powMod 42 99 1 = 42 ^ 99 % 1
 
 end HexArith

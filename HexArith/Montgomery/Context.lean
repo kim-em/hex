@@ -103,6 +103,8 @@ theorem mulMont_eq (ctx : MontCtx p) (a b : UInt64)
 
 end MontCtx
 
+namespace HexArith
+
 /-- Tail-recursive exponentiation by repeated squaring in Montgomery form. -/
 private def powMontGo (ctx : MontCtx p) (k : Nat) (acc base : UInt64) : UInt64 :=
   if hk : k = 0 then
@@ -162,3 +164,5 @@ def powMod (a n p : Nat) : Nat :=
 theorem powMod_eq (a n p : Nat) (hp : p > 0) :
     powMod a n p = a ^ n % p := by
   sorry
+
+end HexArith
