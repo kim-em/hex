@@ -10,18 +10,6 @@ and modular multiplication modulo a fixed irreducible polynomial.
 namespace Hex
 namespace GF2Poly
 
-/-- Bitmask for coefficients of degree `< n` inside one `UInt64` word. -/
-def lowerMask (n : Nat) : UInt64 :=
-  if n < 64 then
-    ((1 : UInt64) <<< n.toUInt64) - 1
-  else
-    (0 : UInt64) - 1
-
-/-- Build the monic degree-`n` polynomial `x^n + lower`, truncating `lower` to
-degrees `< n` as required by the packed `GF(2^n)` modulus convention. -/
-def ofUInt64Monic (lower : UInt64) (n : Nat) : GF2Poly :=
-  monomial n + ofUInt64 (lower &&& lowerMask n)
-
 end GF2Poly
 
 /-- `GF(2^n)` for arbitrary `n`, represented by reduced `GF2Poly` residues
@@ -74,22 +62,18 @@ def toPolyWide (hi lo : UInt64) : GF2Poly :=
 /-- Reduce a packed polynomial modulo the fixed irreducible and read back the
 single-word representative. -/
 def reducePoly (p : GF2Poly) : UInt64 :=
-  (((p % modulus (n := n) (irr := irr)).toWords).getD 0 0) &&&
-    mask (n := n)
+  GF2Poly.packedReduceWord n irr p
 
 /-- Repackage a word as a canonical representative below `2^n`. -/
 private def canonicalWord (w : UInt64) : UInt64 :=
-  UInt64.ofNatLT (w.toNat % 2 ^ n) <| by
-    exact Nat.lt_of_lt_of_le (Nat.mod_lt _ (by
-      show 0 < 2 ^ n
-      exact Nat.pow_pos (by decide : 0 < 2))) <|
-      Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_lt hn64)
+  GF2Poly.canonicalWordLT n hn64 w
 
 /-- Canonical words are bounded by the extension degree. -/
 private theorem canonicalWord_lt (w : UInt64) :
     (canonicalWord (n := n) (hn64 := hn64) w).toNat < 2 ^ n := by
   unfold canonicalWord
-  simpa [UInt64.toNat_ofNatLT] using
+  simp [GF2Poly.canonicalWordLT]
+  exact
     (Nat.mod_lt w.toNat (by
       show 0 < 2 ^ n
       exact Nat.pow_pos (by decide : 0 < 2)))
@@ -211,8 +195,7 @@ instance : SMul Int (GF2n n irr hn hn64 hirr) where
 /-- The extended Euclidean witness supplies an inverse candidate modulo the
 packed irreducible. -/
 private def invWord (w : UInt64) : UInt64 :=
-  reducePoly (n := n) (irr := irr)
-    ((GF2Poly.xgcd (toPolyWord w) (modulus (n := n) (irr := irr))).left)
+  GF2Poly.packedInvWord n irr w
 
 /-- Inversion follows the packed extended-GCD path and uses the usual junk
 value `0⁻¹ = 0`. -/
@@ -253,7 +236,26 @@ theorem div_eq_mul_inv (a b : GF2n n irr hn hn64 hirr) :
 
 theorem mul_inv_cancel (a : GF2n n irr hn hn64 hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
-  sorry
+  have hval_ne : a.val ≠ 0 := by
+    intro hval
+    apply ha
+    apply eq_of_val_eq
+    change a.val = (zero (n := n) (irr := irr) (hn := hn) (hn64 := hn64)
+      (hirr := hirr)).val
+    simpa [zero] using hval
+  apply eq_of_val_eq
+  simp [HMul.hMul, Mul.mul, mul, Inv.inv, inv, hval_ne, reduceWide,
+    reducePoly, invWord, canonicalWord]
+  change GF2Poly.canonicalWordLT n hn64
+      (GF2Poly.packedReduceWord n irr
+        (toPolyWide (clmul a.val
+          (GF2Poly.canonicalWordLT n hn64 (GF2Poly.packedInvWord n irr a.val))).fst
+          (clmul a.val
+            (GF2Poly.canonicalWordLT n hn64 (GF2Poly.packedInvWord n irr a.val))).snd)) =
+    GF2Poly.canonicalWordLT n hn64 (GF2Poly.packedReduceWord n irr 1)
+  rw [toPolyWide,
+    GF2Poly.packedReduceWord_clmul_packedInvWord_eq_one
+      (n := n) (irr := irr) (w := a.val) hn64 hirr hval_ne]
 
 end GF2n
 
@@ -288,6 +290,18 @@ def reducePoly (p : GF2Poly) : GF2nPoly f hirr :=
     ⟨r, Or.inr hdegree⟩
   else
     ⟨0, zero_reduced (f := f)⟩
+
+private theorem reducePoly_val_eq_mod (p : GF2Poly) :
+    (reducePoly (f := f) (hirr := hirr) p).val = p % f := by
+  unfold reducePoly modulus
+  by_cases hzero : (p % f).isZero = true
+  · simp [hzero]
+  · by_cases hdegree : (p % f).degree < f.degree
+    · simp [hzero, hdegree]
+    · have hrem := GF2Poly.mod_degree_lt p f hirr.1
+      cases hrem with
+      | inl hrem_zero => exact False.elim (hzero hrem_zero)
+      | inr hrem_degree => exact False.elim (hdegree hrem_degree)
 
 /-- Canonical additive identity. -/
 def zero : GF2nPoly f hirr :=
@@ -425,7 +439,29 @@ theorem div_eq_mul_inv (a b : GF2nPoly f hirr) :
 
 theorem mul_inv_cancel (a : GF2nPoly f hirr) (ha : a ≠ 0) :
     a * a⁻¹ = 1 := by
-  sorry
+  have hval_ne : a.val ≠ 0 := by
+    intro hval
+    apply ha
+    apply eq_of_val_eq
+    change a.val = (zero (f := f) (hirr := hirr)).val
+    simpa [zero] using hval
+  have hval_nonzero : a.val.isZero = false := by
+    cases hzero : a.val.isZero
+    · rfl
+    · exfalso
+      exact hval_ne (GF2Poly.eq_zero_of_isZero hzero)
+  apply eq_of_val_eq
+  simp [HMul.hMul, Mul.mul, mul, Inv.inv, inv, hval_nonzero, invPoly]
+  change (reducePoly (f := f) (hirr := hirr)
+      (a.val * (reducePoly (f := f) (hirr := hirr) (GF2Poly.xgcd a.val f).left).val)).val =
+    (reducePoly (f := f) (hirr := hirr) 1).val
+  rw [reducePoly_val_eq_mod
+      (f := f) (hirr := hirr)
+      (p := a.val * (reducePoly (f := f) (hirr := hirr) (GF2Poly.xgcd a.val f).left).val),
+    reducePoly_val_eq_mod (f := f) (hirr := hirr) (p := (GF2Poly.xgcd a.val f).left),
+    reducePoly_val_eq_mod (f := f) (hirr := hirr) (p := 1)]
+  exact GF2Poly.mul_mod_xgcd_left_mod_eq_one_of_irreducible_of_nonzero_reduced
+    hirr hval_ne a.val_reduced
 
 end GF2nPoly
 end Hex
