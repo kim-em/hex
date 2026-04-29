@@ -52,6 +52,11 @@ instance : Mod GF2Poly where
 instance : Dvd GF2Poly where
   dvd p q := ∃ r : GF2Poly, q = p * r
 
+/-- Polynomial irreducibility over `GF(2)` phrased in terms of nontrivial
+factorizations inside the packed `GF2Poly` execution model. -/
+def Irreducible (f : GF2Poly) : Prop :=
+  f ≠ 0 ∧ ∀ a b : GF2Poly, a * b = f → a.degree = 0 ∨ b.degree = 0
+
 private theorem add_cancel_middle (a b c : GF2Poly) :
     (a + b) + (c + b) = a + c := by
   apply ext_coeff
@@ -418,6 +423,35 @@ theorem dvd_gcd (d p q : GF2Poly) :
     dvd_add (dvd_mul_left r.left hdp) (dvd_mul_left r.right hdq)
   rw [hbezout] at hsum
   simpa [r] using hsum
+
+/-- Any nonzero reduced residue modulo an irreducible packed polynomial is
+coprime to the modulus, as computed by the packed Euclidean algorithm. -/
+theorem gcd_eq_one_of_irreducible_of_nonzero_reduced {a f : GF2Poly}
+    (hf : Irreducible f) (ha : a ≠ 0)
+    (hred : a.IsZero ∨ a.degree < f.degree) :
+    gcd a f = 1 := by
+  sorry
+
+/-- Adding a right multiple of the modulus does not change the computed
+remainder. This is the quotient-congruence bridge used with Bezout witnesses. -/
+theorem mod_add_mul_right_eq_mod (a c f : GF2Poly) :
+    (a + c * f) % f = a % f := by
+  sorry
+
+/-- The Bezout identity for `xgcd` gives a congruence between the left inverse
+candidate and the computed gcd modulo the right input. -/
+theorem xgcd_left_mul_mod_eq_gcd_mod (a f : GF2Poly) :
+    (a * (xgcd a f).left) % f = (gcd a f) % f := by
+  sorry
+
+/-- For a nonzero reduced residue modulo an irreducible packed polynomial, the
+left Bezout coefficient computed by `xgcd` is a multiplicative inverse modulo
+the modulus. -/
+theorem xgcd_left_mul_mod_eq_one_of_irreducible_of_nonzero_reduced {a f : GF2Poly}
+    (hf : Irreducible f) (ha : a ≠ 0)
+    (hred : a.IsZero ∨ a.degree < f.degree) :
+    (a * (xgcd a f).left) % f = 1 := by
+  sorry
 
 end GF2Poly
 end Hex

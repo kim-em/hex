@@ -3,10 +3,9 @@ import HexGF2.Euclid
 /-!
 Single-word extension-field wrappers for `hex-gf2`.
 
-This module adds the spec-named irreducible-modulus helper surface on top of
-`GF2Poly`, then packages both the `n < 64` single-word case and the arbitrary-
-degree packed-quotient case of `GF(2^n)` as reduced representatives with XOR
-addition and modular multiplication modulo a fixed irreducible polynomial.
+This module packages both the `n < 64` single-word case and the arbitrary-degree
+packed-quotient case of `GF(2^n)` as reduced representatives with XOR addition
+and modular multiplication modulo a fixed irreducible polynomial.
 -/
 namespace Hex
 namespace GF2Poly
@@ -22,11 +21,6 @@ def lowerMask (n : Nat) : UInt64 :=
 degrees `< n` as required by the packed `GF(2^n)` modulus convention. -/
 def ofUInt64Monic (lower : UInt64) (n : Nat) : GF2Poly :=
   monomial n + ofUInt64 (lower &&& lowerMask n)
-
-/-- Polynomial irreducibility over `GF(2)` phrased in terms of nontrivial
-factorizations inside the packed `GF2Poly` execution model. -/
-def Irreducible (f : GF2Poly) : Prop :=
-  f ≠ 0 ∧ ∀ a b : GF2Poly, a * b = f → a.degree = 0 ∨ b.degree = 0
 
 end GF2Poly
 
