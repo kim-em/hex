@@ -118,7 +118,7 @@ def mulInnerRepeats : Nat :=
 
 /-- Hot-loop multiplier for repeated exponentiation by squaring. -/
 def powInnerRepeats : Nat :=
-  64
+  256
 
 /-- Hot-loop multiplier for the Barrett chain benchmark. -/
 def barrettInnerRepeats : Nat :=
@@ -334,9 +334,9 @@ setup_benchmark runMulChecksum n => n
 setup_benchmark runPow n => n
   with prep := prepPowInput
   where {
-    paramFloor := 8192
-    paramCeiling := 32768
-    paramSchedule := .custom #[8192, 16384, 32768]
+    paramFloor := 65536
+    paramCeiling := 262144
+    paramSchedule := .custom #[65536, 131072, 262144]
     maxSecondsPerCall := 8.0
     targetInnerNanos := 500000000
   }

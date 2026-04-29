@@ -65,7 +65,8 @@ lean_lib HexMatrix where
 lean_lib HexModArith where
   precompileModules := true
   moreLinkArgs := #[
-    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexmodarithffi").toString}"
+    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexmodarithffi").toString}",
+    "-lgmp"
   ]
 
 lean_lib HexGramSchmidt where
