@@ -210,7 +210,7 @@ structure PrimeFactorData where
   p : Nat
   [bounds : ZMod64.Bounds p]
   factorDegrees : Array Nat
-  factorCerts : Array (Berlekamp.IrreducibilityCertificate p)
+  factorCerts : Array Berlekamp.IrreducibilityCertificate
 
 /--
 Checker-first certificate data for irreducibility over `Z[x]`.
@@ -235,11 +235,11 @@ def containsDegree (d : PrimeFactorData) (n : Nat) : Bool :=
 /-- Check one nested finite-field irreducibility certificate against its degree slot. -/
 def checkCertAtDegree
     (d : PrimeFactorData) (degree : Nat)
-    (cert : @Berlekamp.IrreducibilityCertificate d.p d.bounds) : Bool :=
+    (cert : Berlekamp.IrreducibilityCertificate) : Bool :=
   letI := d.bounds
-  decide (cert.prime = d.p) &&
-    decide (cert.degree = degree) &&
-    d.containsDegree cert.degree
+  decide (cert.p = d.p) &&
+    decide (cert.n = degree) &&
+    d.containsDegree cert.n
 
 /-- Check that nested certificates match the enclosing prime and degree array. -/
 def checkFactorCerts (d : PrimeFactorData) : Bool :=
