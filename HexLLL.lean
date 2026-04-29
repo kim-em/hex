@@ -1,4 +1,5 @@
 import HexLLL.Basic
+import HexLLL.Conformance
 
 /-!
 The `HexLLL` library exposes the initial lattice predicates, `LLLState`
