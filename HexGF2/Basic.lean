@@ -277,6 +277,10 @@ private theorem bit_eq_one_eq_testBit (x i : Nat) :
   apply decide_eq_decide.mpr
   exact Iff.rfl
 
+private theorem Nat.testBit_eq_false_of_lt {n i : Nat} (h : n < 2 ^ i) :
+    n.testBit i = false := by
+  simp [Nat.testBit, Nat.shiftRight_eq_div_pow, Nat.div_eq_of_lt h]
+
 private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
     ((((a ^^^ b) >>> i.toUInt64) &&& 1) != 0) =
       ((((a >>> i.toUInt64) &&& 1) != 0) !=
@@ -289,6 +293,44 @@ private theorem UInt64.bit_xor_bne (a b : UInt64) (i : Nat) :
   rw [bit_eq_one_eq_testBit]
   rw [bit_eq_one_eq_testBit]
   simp [Nat.testBit_xor]
+
+private theorem UInt64.shiftLeft_or_carry_high_bit
+    (w prev : UInt64) {shift old : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64)
+    (hold : old < 64) (htarget : old + shift < 64) :
+    (((((w <<< shift.toUInt64) ||| (prev >>> (64 - shift).toUInt64)) >>>
+          (old + shift).toUInt64) &&& 1) != 0) =
+      ((((w >>> old.toUInt64) &&& 1) != 0)) := by
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  rw [UInt64.bne_zero_eq_toNat_bne_zero]
+  simp [UInt64.toNat_or, UInt64.toNat_shiftLeft, UInt64.toNat_shiftRight,
+    UInt64.toNat_and, Nat.mod_eq_of_lt hshift, Nat.mod_eq_of_lt hold,
+    Nat.mod_eq_of_lt htarget]
+  rw [bit_eq_one_eq_testBit]
+  rw [bit_eq_one_eq_testBit]
+  simp [Nat.testBit_or, Nat.testBit_shiftRight]
+  have hprev :
+      (prev.toNat >>> (64 - shift)).testBit (old + shift) = false := by
+    rw [Nat.testBit_shiftRight]
+    apply Nat.testBit_eq_false_of_lt
+    have hprevlt : prev.toNat < 2 ^ 64 := by
+      simpa [UInt64.size] using UInt64.toNat_lt_size prev
+    refine Nat.lt_of_lt_of_le hprevlt ?_
+    apply Nat.pow_le_pow_right (by decide : 0 < 2)
+    omega
+  have hprev' :
+      prev.toNat.testBit ((64 - shift) % 64 + (old + shift)) = false := by
+    have h64 : 64 - shift < 64 := by omega
+    simpa [Nat.testBit_shiftRight, Nat.mod_eq_of_lt h64] using hprev
+  simpa [hprev'] using (show
+    ((w.toNat <<< shift) % 18446744073709551616).testBit (old + shift) =
+      w.toNat.testBit old by
+        change ((w.toNat <<< shift) % 2 ^ 64).testBit (old + shift) =
+          w.toNat.testBit old
+        rw [Nat.testBit_mod_two_pow]
+        have hge : old + shift ≥ shift := by omega
+        have hsub : old + shift - shift = old := by omega
+        simp [Nat.testBit_shiftLeft, htarget, hge, hsub])
 
 private theorem oneHotWord_bit_toNat {hot bit : Nat} (hhot : hot < 64) (hbit : bit < 64) :
     (((((1 : UInt64) <<< hot.toUInt64) >>> bit.toUInt64) &&& 1).toNat) =
