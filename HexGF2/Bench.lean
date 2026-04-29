@@ -40,6 +40,9 @@ Scientific registrations:
   modulus, `O(n)`.
 * `runGF2nPolyPowChecksum`: packed quotient-field square-and-multiply powering
   over that modulus, `O(log k)`.
+The `hexgf2_bench` executable root additionally imports `HexGF2Bench`, which
+registers cross-library `GF2Poly` versus `FpPoly 2` comparison workloads outside
+the `HexGF2` library ownership boundary.
 -/
 
 namespace Hex.GF2Bench
@@ -522,6 +525,3 @@ setup_benchmark runGF2nPolyPowChecksum n => Nat.log2 (n + 1)
   }
 
 end Hex.GF2Bench
-
-def main (args : List String) : IO UInt32 :=
-  LeanBench.Cli.dispatch args
