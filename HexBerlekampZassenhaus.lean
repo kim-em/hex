@@ -330,16 +330,79 @@ def henselLiftData (f : ZPoly) (B : Nat) (d : PrimeChoiceData) : LiftData :=
     k := B
     liftedFactors := ZPoly.multifactorLift d.p B f factors }
 
+private def subsetSplits : List ZPoly → List (List ZPoly × List ZPoly)
+  | [] => [([], [])]
+  | factor :: factors =>
+      let rest := subsetSplits factors
+      rest.map (fun split => (split.1, factor :: split.2)) ++
+        rest.map (fun split => (factor :: split.1, split.2))
+
+private def subsetSplitsWithFirst : List ZPoly → List (List ZPoly × List ZPoly)
+  | [] => []
+  | factor :: factors =>
+      (subsetSplits factors).map fun split => (factor :: split.1, split.2)
+
+private def firstSome {α β : Type} : List α → (α → Option β) → Option β
+  | [], _ => none
+  | x :: xs, f =>
+      match f x with
+      | some y => some y
+      | none => firstSome xs f
+
+private def exactQuotient? (target candidate : ZPoly) : Option ZPoly :=
+  if candidate.isZero || candidate = 1 then
+    none
+  else
+    let qr := DensePoly.divMod target candidate
+    if qr.2 = 0 && qr.1 * candidate == target then
+      some qr.1
+    else
+      none
+
+private def recombinationSearchAux
+    (target : ZPoly) (localFactors : List ZPoly) : Nat → Option (List ZPoly)
+  | 0 => none
+  | fuel + 1 =>
+      if target = 1 then
+        some []
+      else
+        firstSome (subsetSplitsWithFirst localFactors) fun split =>
+          let candidate := Array.polyProduct split.1.toArray
+          match exactQuotient? target candidate with
+          | none => none
+          | some quotient =>
+              match recombinationSearchAux quotient split.2 fuel with
+              | none => none
+              | some rest => some (candidate :: rest)
+
 /--
-Conservative integer recombination. Lifted local factors are accepted exactly
-when their ordered product is already the input; otherwise the input remains as
-one irreducible-for-this-pass factor.
+Search for an integer-factor recombination of the lifted local factors.
+
+The search enumerates subsets containing the first remaining local factor,
+accepts a subset only when its product exactly divides the current target, and
+then recurses on the quotient and unused local factors.
+-/
+def recombinationSearch (f : ZPoly) (localFactors : List ZPoly) : Option (List ZPoly) :=
+  recombinationSearchAux f localFactors (localFactors.length + 1)
+
+/--
+The lifted factors contain enough information for the executable exhaustive
+recombination search to recover factors of `f`.
+-/
+def LiftedFactorsRecombineTo (f : ZPoly) (d : LiftData) : Prop :=
+  ∃ factors, recombinationSearch f d.liftedFactors.toList = some factors
+
+/--
+Exhaustively recombine lifted local factors into integer factors.
+
+An empty result means the lifted data did not pass the exact-divisibility
+checks; it is an explicit recombination failure rather than a replacement of
+the factorization by the original input.
 -/
 def recombine (f : ZPoly) (d : LiftData) : Array ZPoly :=
-  if Array.polyProduct d.liftedFactors = f then
-    d.liftedFactors
-  else
-    #[f]
+  match recombinationSearch f d.liftedFactors.toList with
+  | some factors => factors.toArray
+  | none => #[]
 
 /-- Factor with an explicit coefficient bound for the recombination stage. -/
 def factorWithBound (f : ZPoly) (B : Nat) : Array ZPoly :=
@@ -359,6 +422,23 @@ the later proof layer.
 theorem factor_product_of_bound (f : ZPoly) (B : Nat)
     (hB : ∀ g : ZPoly, g ∣ f → ∀ i, (g.coeff i).natAbs ≤ B) :
     Array.foldl (· * ·) 1 (factorWithBound f B) = f := by
+  sorry
+
+/-- A successful exhaustive recombination search preserves the target product. -/
+theorem recombinationSearch_product
+    (f : ZPoly) (localFactors factors : List ZPoly)
+    (hsearch : recombinationSearch f localFactors = some factors) :
+    Array.polyProduct factors.toArray = f := by
+  sorry
+
+/--
+Product preservation for `recombine` under the lifted-factor recombination
+hypothesis supplied by the Hensel/recombination proof layer.
+-/
+theorem recombine_product_of_lifted_factors
+    (f : ZPoly) (d : LiftData)
+    (hvalid : LiftedFactorsRecombineTo f d) :
+    Array.polyProduct (recombine f d) = f := by
   sorry
 
 theorem checkIrreducibleCert_prime_data
