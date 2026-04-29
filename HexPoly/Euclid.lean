@@ -174,6 +174,31 @@ theorem mod_eq_divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
     p % q = (divMod p q).2 := by
   rfl
 
+theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    p.degree?.getD 0 < q.degree?.getD 0 → divMod p q = (0, p) := by
+  intro hdeg
+  unfold divMod
+  cases hsize : p.size with
+  | zero =>
+      simp [divModAux]
+  | succ n =>
+      by_cases hq : q.isZero
+      · simp [divModAux, hq]
+      · cases hqdeg : q.degree? with
+        | none =>
+            have hfalse : ¬ p.degree?.getD 0 < q.degree?.getD 0 := by
+              simp [hqdeg]
+            exact False.elim (hfalse hdeg)
+        | some qd =>
+            have hpdeg : p.degree?.getD 0 = n := by
+              simp [DensePoly.degree?, hsize]
+            have hqdeg' : (if q.size = 0 then none else some (q.size - 1)) = some qd := by
+              simpa [DensePoly.degree?] using hqdeg
+            have hlt : n < qd := by
+              simpa [hpdeg, hqdeg] using hdeg
+            simp [divModAux, hq, DensePoly.degree?, hsize, hqdeg', hlt]
+
 /-- The computed remainder has degree below a positive-degree divisor. -/
 theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :

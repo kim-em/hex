@@ -27,6 +27,9 @@ variable {p : Nat} [ZMod64.Bounds p]
 def degree (f : FpPoly p) : Nat :=
   f.degree?.getD 0
 
+@[simp] theorem degree_C (c : ZMod64 p) : degree (C c) = 0 := by
+  simp [degree, C]
+
 end FpPoly
 
 namespace GFqRing
@@ -36,6 +39,22 @@ variable {p : Nat} [ZMod64.Bounds p]
 /-- Canonical remainder reduction modulo `f`, using the existing division surface. -/
 def reduceMod (f : FpPoly p) : FpPoly p → FpPoly p :=
   fun g => (Hex.DensePoly.divMod g f).2
+
+theorem reduceMod_eq_self_of_degree_lt (f g : FpPoly p) :
+    FpPoly.degree g < FpPoly.degree f → reduceMod f g = g := by
+  intro hdeg
+  have hdiv := DensePoly.divMod_eq_zero_self_of_degree_lt g f hdeg
+  simpa [reduceMod] using congrArg Prod.snd hdiv
+
+@[simp] theorem reduceMod_zero (f : FpPoly p) : reduceMod f 0 = 0 := by
+  rfl
+
+@[simp] theorem reduceMod_one (f : FpPoly p) (hf : 0 < FpPoly.degree f) :
+    reduceMod f 1 = 1 := by
+  have hone : FpPoly.degree (1 : FpPoly p) = 0 := by
+    change (DensePoly.C (1 : ZMod64 p)).degree?.getD 0 = 0
+    simp
+  exact reduceMod_eq_self_of_degree_lt f 1 (by simpa [hone] using hf)
 
 /-- Polynomials already known to be canonical representatives modulo `f`. -/
 def IsReduced (f : FpPoly p) (g : FpPoly p) : Prop :=
