@@ -122,54 +122,114 @@ theorem coeffWords_normalizeWords (words : Array UInt64) (n : Nat) :
     coeffWords (normalizeWords words) n = coeffWords words n := by
   rw [coeffWords, coeffWords, normalizeWords_get?_getD]
 
+private def wordBitIsSet (w : UInt64) (i : Nat) : Bool :=
+  (((w >>> i.toUInt64) &&& 1) != 0)
+
+private def highestSetBitBelow? (fuel : Nat) (w : UInt64) : Option Nat :=
+  match fuel with
+  | 0 => none
+  | fuel' + 1 =>
+      if wordBitIsSet w fuel' then
+        some fuel'
+      else
+        highestSetBitBelow? fuel' w
+
 /-- The index of the highest set bit in a machine word, if any. -/
 def highestSetBit? (w : UInt64) : Option Nat :=
-  (List.range 64).reverse.find? fun i => (((w >>> i.toUInt64) &&& 1) != 0)
+  highestSetBitBelow? 64 w
 
-private theorem mem_of_find?_eq_some {α : Type u} {p : α → Bool}
-    {xs : List α} {x : α} (h : xs.find? p = some x) :
-    x ∈ xs := by
-  induction xs with
-  | nil =>
-      simp at h
-  | cons y ys ih =>
-      by_cases hy : p y = true
-      · simp [List.find?, hy] at h
+private theorem highestSetBitBelow?_lt {fuel : Nat} {w : UInt64} {i : Nat}
+    (h : highestSetBitBelow? fuel w = some i) :
+    i < fuel := by
+  induction fuel generalizing i with
+  | zero =>
+      simp [highestSetBitBelow?] at h
+  | succ fuel ih =>
+      by_cases htop : wordBitIsSet w fuel = true
+      · simp [highestSetBitBelow?, htop] at h
+        omega
+      · have htopFalse : wordBitIsSet w fuel = false := by
+          cases hbit : wordBitIsSet w fuel <;> simp [hbit] at htop ⊢
+        simp [highestSetBitBelow?, htopFalse] at h
+        exact Nat.lt_trans (ih h) (Nat.lt_succ_self fuel)
+
+private theorem highestSetBitBelow?_bit {fuel : Nat} {w : UInt64} {i : Nat}
+    (h : highestSetBitBelow? fuel w = some i) :
+    wordBitIsSet w i = true := by
+  induction fuel generalizing i with
+  | zero =>
+      simp [highestSetBitBelow?] at h
+  | succ fuel ih =>
+      by_cases htop : wordBitIsSet w fuel = true
+      · simp [highestSetBitBelow?, htop] at h
         subst h
-        simp
-      · have hyFalse : p y = false := by
-          cases hpy : p y <;> simp [hpy] at hy ⊢
-        simp [List.find?, hyFalse] at h
-        exact List.mem_cons_of_mem y (ih h)
+        exact htop
+      · have htopFalse : wordBitIsSet w fuel = false := by
+          cases hbit : wordBitIsSet w fuel <;> simp [hbit] at htop ⊢
+        simp [highestSetBitBelow?, htopFalse] at h
+        exact ih h
+
+private theorem highestSetBitBelow?_above_bit {fuel : Nat} {w : UInt64} {i j : Nat}
+    (h : highestSetBitBelow? fuel w = some i) (hj : j < fuel) (hij : i < j) :
+    wordBitIsSet w j = false := by
+  induction fuel generalizing i j with
+  | zero =>
+      omega
+  | succ fuel ih =>
+      by_cases htop : wordBitIsSet w fuel = true
+      · simp [highestSetBitBelow?, htop] at h
+        subst h
+        omega
+      · have htopFalse : wordBitIsSet w fuel = false := by
+          cases hbit : wordBitIsSet w fuel <;> simp [hbit] at htop ⊢
+        simp [highestSetBitBelow?, htopFalse] at h
+        by_cases hjtop : j = fuel
+        · subst hjtop
+          exact htopFalse
+        · have hjlt : j < fuel := by omega
+          exact ih h hjlt hij
+
+private theorem highestSetBitBelow?_eq_none_bit {fuel : Nat} {w : UInt64} {i : Nat}
+    (h : highestSetBitBelow? fuel w = none) (hi : i < fuel) :
+    wordBitIsSet w i = false := by
+  induction fuel generalizing i with
+  | zero =>
+      omega
+  | succ fuel ih =>
+      by_cases htop : wordBitIsSet w fuel = true
+      · simp [highestSetBitBelow?, htop] at h
+      · have htopFalse : wordBitIsSet w fuel = false := by
+          cases hbit : wordBitIsSet w fuel <;> simp [hbit] at htop ⊢
+        simp [highestSetBitBelow?, htopFalse] at h
+        by_cases hitop : i = fuel
+        · subst hitop
+          exact htopFalse
+        · have hilt : i < fuel := by omega
+          exact ih h hilt
 
 /-- A returned highest-bit index is one of the 64 word-bit positions. -/
 theorem highestSetBit?_lt {w : UInt64} {i : Nat}
     (h : highestSetBit? w = some i) :
     i < 64 := by
-  have hmem : i ∈ (List.range 64).reverse := mem_of_find?_eq_some h
-  rw [List.mem_reverse, List.mem_range] at hmem
-  exact hmem
+  exact highestSetBitBelow?_lt h
 
 /-- A returned highest-bit index has its bit set in the word. -/
 theorem highestSetBit?_bit {w : UInt64} {i : Nat}
     (h : highestSetBit? w = some i) :
     (((w >>> i.toUInt64) &&& 1) != 0) = true := by
-  unfold highestSetBit? at h
-  exact
-    @List.find?_some Nat
-      (fun j => (((w >>> j.toUInt64) &&& 1) != 0))
-      i (List.range 64).reverse h
+  exact highestSetBitBelow?_bit h
 
 /-- If no highest bit exists, every queried word bit is clear. -/
 theorem highestSetBit?_eq_none_bit {w : UInt64} {i : Nat}
     (h : highestSetBit? w = none) (hi : i < 64) :
     (((w >>> i.toUInt64) &&& 1) != 0) = false := by
-  have hnone := (List.find?_eq_none.mp h) i
-  have hmem : i ∈ (List.range 64).reverse := by
-    rw [List.mem_reverse, List.mem_range]
-    exact hi
-  have hclear := hnone hmem
-  cases hbit : (((w >>> i.toUInt64) &&& 1) != 0) <;> simp [hbit] at hclear ⊢
+  exact highestSetBitBelow?_eq_none_bit h hi
+
+/-- Bits strictly above the reported highest set bit are clear. -/
+theorem highestSetBit?_above_bit {w : UInt64} {i j : Nat}
+    (h : highestSetBit? w = some i) (hj : j < 64) (hij : i < j) :
+    (((w >>> j.toUInt64) &&& 1) != 0) = false := by
+  exact highestSetBitBelow?_above_bit h hj hij
 
 /-- Build a normalized packed polynomial from a raw word array. -/
 def ofWords (words : Array UInt64) : GF2Poly :=
@@ -347,6 +407,51 @@ theorem degree?_eq_some_high_bit {p : GF2Poly} {d : Nat}
         d = 64 * (p.words.size - 1) + bit := by
   obtain ⟨last, bit, hback, hbit, hd⟩ := degree?_eq_some_highestSetBit h
   exact ⟨last, bit, hback, hbit, highestSetBit?_bit hbit, hd⟩
+
+/-- A successful `degree?` computation points at a set global coefficient. -/
+theorem coeff_eq_true_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p.coeff d = true := by
+  obtain ⟨last, bit, hback, hbit, hwordBit, hd⟩ := degree?_eq_some_high_bit h
+  have hbitLt : bit < 64 := highestSetBit?_lt hbit
+  have hwordIdx : d / 64 = p.words.size - 1 := by
+    rw [hd, Nat.mul_add_div (by decide : 64 > 0)]
+    rw [Nat.div_eq_of_lt hbitLt, Nat.add_zero]
+  have hbitIdx : d % 64 = bit := by
+    rw [hd, Nat.mul_add_mod]
+    exact Nat.mod_eq_of_lt hbitLt
+  have hlastAt : p.words[p.words.size - 1]? = some last := by
+    simpa [Array.back?_eq_getElem?] using hback
+  simp [coeff, coeffWords, hwordIdx, hbitIdx, hlastAt, hwordBit]
+
+/-- Every coefficient strictly above a successful `degree?` computation is clear. -/
+theorem coeff_eq_false_of_degree?_lt {p : GF2Poly} {d n : Nat}
+    (h : p.degree? = some d) (hdn : d < n) :
+    p.coeff n = false := by
+  obtain ⟨last, bit, hback, hbit, hd⟩ := degree?_eq_some_highestSetBit h
+  have hbitLt : bit < 64 := highestSetBit?_lt hbit
+  have hlastAt : p.words[p.words.size - 1]? = some last := by
+    simpa [Array.back?_eq_getElem?] using hback
+  have hsizePos : 0 < p.words.size := by
+    apply Nat.pos_of_ne_zero
+    intro hzero
+    have hnone : p.words[p.words.size - 1]? = none := by
+      simp [hzero]
+    rw [hnone] at hlastAt
+    contradiction
+  have hwordLe : p.words.size - 1 ≤ n / 64 := by
+    rw [Nat.le_div_iff_mul_le (by decide : 0 < 64)]
+    omega
+  by_cases hsame : n / 64 = p.words.size - 1
+  · have hnmodLt : n % 64 < 64 := Nat.mod_lt _ (by decide)
+    have hnDecomp := Nat.div_add_mod n 64
+    have hbitBelow : bit < n % 64 := by
+      omega
+    have hclear := highestSetBit?_above_bit hbit hnmodLt hbitBelow
+    simp [coeff, coeffWords, hsame, hlastAt, hclear]
+  · have hout : ¬ n / 64 < p.words.size := by
+      omega
+    simp [coeff, coeffWords, hout]
 
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
