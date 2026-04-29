@@ -201,6 +201,16 @@ private theorem words_monomial_getElem!_active (k : Nat) :
   rw [Array.getElem_push]
   simp
 
+private theorem words_monomial_getElem!_zero_lt {j k : Nat} (hj : j < k / 64) :
+    (monomial k).words[j]! = 0 := by
+  rw [words_monomial]
+  rw [Array.getElem!_eq_getD]
+  unfold Array.getD
+  rw [dif_pos]
+  · simp [Array.getElem_push, hj]
+  · simp
+    omega
+
 private theorem coeffWords_xorClmulAt_monomial_active_low
     (acc : Array UInt64) {i k n : Nat} (x : UInt64)
     (hidx : i + k / 64 < acc.size) (hn : n / 64 = i)
@@ -279,6 +289,76 @@ private theorem foldl_xorClmulAt_zero_right_coeff (js : List Nat) (acc : Array U
       simp only [List.foldl_cons]
       rw [hjzero, ih (acc := xorClmulAt acc (idx + j) x 0) htail,
         coeffWords_xorClmulAt_zero_right]
+
+private theorem foldl_xorClmulAt_monomial_zero_prefix_coeff
+    (acc : Array UInt64) (idx n : Nat) (x : UInt64) (k : Nat) :
+    coeffWords
+        ((List.range (k / 64)).foldl
+          (fun acc j => xorClmulAt acc (idx + j) x (monomial k).words[j]!)
+          acc)
+        n =
+      coeffWords acc n := by
+  exact foldl_xorClmulAt_zero_right_coeff
+    (List.range (k / 64)) acc idx n x (monomial k).words
+    (by
+      intro j hj
+      exact words_monomial_getElem!_zero_lt (List.mem_range.mp hj))
+
+private theorem foldl_xorClmulAt_monomial_active_low
+    (acc : Array UInt64) {i k n : Nat} (x : UInt64)
+    (hidx : i + k / 64 < acc.size) (hn : n / 64 = i)
+    (hbitShift : k % 64 ≠ 0) (hbit : n % 64 + k % 64 < 64) :
+    coeffWords
+        ((List.range (k / 64 + 1)).foldl
+          (fun acc j => xorClmulAt acc (i + j) x (monomial k).words[j]!)
+          acc)
+        (n + k) =
+      (coeffWords acc (n + k) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  rw [show k / 64 + 1 = (k / 64).succ by omega]
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  rw [coeffWords_xorClmulAt_monomial_active_low
+    (hidx := by simpa [foldl_xorClmulAt_size] using hidx)
+    (hn := hn) (hbitShift := hbitShift) (hbit := hbit)]
+  rw [foldl_xorClmulAt_monomial_zero_prefix_coeff]
+
+private theorem foldl_xorClmulAt_monomial_active_high
+    (acc : Array UInt64) {i k n : Nat} (x : UInt64)
+    (hidx : i + k / 64 < acc.size) (hidxNext : i + k / 64 + 1 < acc.size)
+    (hn : n / 64 = i) (hbit : 64 ≤ n % 64 + k % 64) :
+    coeffWords
+        ((List.range (k / 64 + 1)).foldl
+          (fun acc j => xorClmulAt acc (i + j) x (monomial k).words[j]!)
+          acc)
+        (n + k) =
+      (coeffWords acc (n + k) !=
+        (((x >>> (n % 64).toUInt64) &&& 1) != 0)) := by
+  rw [show k / 64 + 1 = (k / 64).succ by omega]
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  rw [coeffWords_xorClmulAt_monomial_active_high
+    (hidx := by simpa [foldl_xorClmulAt_size] using hidx)
+    (hidxNext := by simpa [foldl_xorClmulAt_size] using hidxNext)
+    (hn := hn) (hbit := hbit)]
+  rw [foldl_xorClmulAt_monomial_zero_prefix_coeff]
+
+private theorem foldl_xorClmulAt_monomial_ne
+    (acc : Array UInt64) {i k target : Nat} (x : UInt64)
+    (hLow : target / 64 ≠ i + k / 64)
+    (hHigh : target / 64 ≠ i + k / 64 + 1) :
+    coeffWords
+        ((List.range (k / 64 + 1)).foldl
+          (fun acc j => xorClmulAt acc (i + j) x (monomial k).words[j]!)
+          acc)
+        target =
+      coeffWords acc target := by
+  rw [show k / 64 + 1 = (k / 64).succ by omega]
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  rw [coeffWords_xorClmulAt_ne
+    (hnLow := hLow) (hnHigh := hHigh)]
+  rw [foldl_xorClmulAt_monomial_zero_prefix_coeff]
 
 /-- Raw packed-word multiplication before trailing zero normalization. -/
 private def mulWords (xs ys : Array UInt64) : Array UInt64 :=
