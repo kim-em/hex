@@ -5,9 +5,9 @@ import LeanBench
 Benchmark registrations for `hex-poly`.
 
 This Phase 4 slice measures the dense core operations over deterministic
-integer polynomials and Euclidean operations over a fixed-size prime field.
-Input construction is hoisted into `prep`, and each timed target returns a
-small checksum or scalar observable rather than the full polynomial.
+integer polynomials, with scalar-cost-sensitive operations over a fixed-size
+prime field. Input construction is hoisted into `prep`, and each timed target
+returns a small checksum or scalar observable rather than the full polynomial.
 
 Scientific registrations:
 
@@ -100,8 +100,8 @@ structure ContentInput where
 
 /-- Prepared input for Horner evaluation. -/
 structure EvalInput where
-  poly : DensePoly Int
-  point : Int
+  poly : DensePoly F7
+  point : F7
   deriving Hashable
 
 /-- Prepared input for polynomial composition. -/
@@ -195,8 +195,8 @@ def prepContentInput (n : Nat) : ContentInput :=
 
 /-- Per-parameter fixture for Horner evaluation. -/
 def prepEvalInput (n : Nat) : EvalInput :=
-  { poly := densePoly n 71
-    point := 3 }
+  { poly := denseF7Poly n 71
+    point := F7.ofNat 3 }
 
 /-- Per-parameter fixture for same-size dense polynomial composition. -/
 def prepComposeInput (n : Nat) : ComposeInput :=
@@ -250,7 +250,7 @@ def runMulChecksum (input : BinaryInput) : UInt64 :=
   checksum (input.lhs * input.rhs)
 
 /-- Benchmark target: evaluate a prepared dense polynomial at a fixed point. -/
-def runEval (input : EvalInput) : Int :=
+def runEval (input : EvalInput) : F7 :=
   DensePoly.eval input.poly input.point
 
 /-- Benchmark target: compose two prepared same-size dense polynomials. -/
