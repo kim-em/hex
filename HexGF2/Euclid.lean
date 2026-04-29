@@ -57,6 +57,31 @@ factorizations inside the packed `GF2Poly` execution model. -/
 def Irreducible (f : GF2Poly) : Prop :=
   f ≠ 0 ∧ ∀ a b : GF2Poly, a * b = f → a.degree = 0 ∨ b.degree = 0
 
+/-- Bitmask for coefficients of degree `< n` inside one `UInt64` word. -/
+def lowerMask (n : Nat) : UInt64 :=
+  if n < 64 then
+    ((1 : UInt64) <<< n.toUInt64) - 1
+  else
+    (0 : UInt64) - 1
+
+/-- Build the monic degree-`n` polynomial `x^n + lower`, truncating `lower` to
+degrees `< n` as required by the packed `GF(2^n)` modulus convention. -/
+def ofUInt64Monic (lower : UInt64) (n : Nat) : GF2Poly :=
+  monomial n + ofUInt64 (lower &&& lowerMask n)
+
+/-- Reduce a packed polynomial modulo a single-word extension modulus and read
+back the low canonical word. -/
+def packedReduceWord (n : Nat) (irr : UInt64) (p : GF2Poly) : UInt64 :=
+  (((p % ofUInt64Monic irr n).toWords).getD 0 0) &&& lowerMask n
+
+/-- Repackage a word as a canonical representative below `2^n`. -/
+def canonicalWordLT (n : Nat) (hn64 : n < 64) (w : UInt64) : UInt64 :=
+  UInt64.ofNatLT (w.toNat % 2 ^ n) <| by
+    exact Nat.lt_of_lt_of_le (Nat.mod_lt _ (by
+      show 0 < 2 ^ n
+      exact Nat.pow_pos (by decide : 0 < 2))) <|
+      Nat.pow_le_pow_right (by decide : 0 < 2) (Nat.le_of_lt hn64)
+
 private theorem add_cancel_middle (a b c : GF2Poly) :
     (a + b) + (c + b) = a + c := by
   apply ext_coeff
@@ -199,6 +224,11 @@ private def xgcdAux
 with Bezout coefficients. -/
 def xgcd (p q : GF2Poly) : XGCDResult :=
   xgcdAux p 1 0 q 0 1 (p.degree + q.degree + 2)
+
+/-- The single-word xgcd inverse candidate reduced modulo the packed
+irreducible modulus. -/
+def packedInvWord (n : Nat) (irr w : UInt64) : UInt64 :=
+  packedReduceWord n irr ((xgcd (ofUInt64 w) (ofUInt64Monic irr n)).left)
 
 /-- Polynomial gcd over packed `GF(2)`. -/
 def gcd (p q : GF2Poly) : GF2Poly :=
@@ -451,6 +481,24 @@ theorem xgcd_left_mul_mod_eq_one_of_irreducible_of_nonzero_reduced {a f : GF2Pol
     (hf : Irreducible f) (ha : a ≠ 0)
     (hred : a.IsZero ∨ a.degree < f.degree) :
     (a * (xgcd a f).left) % f = 1 := by
+  sorry
+
+/-- Reducing the xgcd left coefficient before multiplying preserves the
+left-inverse congruence for nonzero reduced residues modulo an irreducible. -/
+theorem mul_mod_xgcd_left_mod_eq_one_of_irreducible_of_nonzero_reduced {a f : GF2Poly}
+    (hf : Irreducible f) (ha : a ≠ 0)
+    (hred : a.IsZero ∨ a.degree < f.degree) :
+    (a * ((xgcd a f).left % f)) % f = 1 % f := by
+  sorry
+
+/-- The packed single-word CLMUL/reduction path agrees with the polynomial
+xgcd inverse bridge for nonzero canonical representatives. -/
+theorem packedReduceWord_clmul_packedInvWord_eq_one {n : Nat} {irr w : UInt64}
+    (hn64 : n < 64) (hf : Irreducible (ofUInt64Monic irr n)) (hw : w ≠ 0) :
+    packedReduceWord n irr
+        (ofWords #[(clmul w (canonicalWordLT n hn64 (packedInvWord n irr w))).2,
+          (clmul w (canonicalWordLT n hn64 (packedInvWord n irr w))).1]) =
+      packedReduceWord n irr 1 := by
   sorry
 
 end GF2Poly
