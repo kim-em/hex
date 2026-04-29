@@ -847,21 +847,27 @@ theorem degree?_mulXk_of_degree?_eq_some {p : GF2Poly} {d k : Nat}
 theorem coeff_mulXk_degree_add {p : GF2Poly} {d k : Nat}
     (h : p.degree? = some d) :
     (p.mulXk k).coeff (d + k) = true := by
-  sorry
+  exact coeff_eq_true_of_degree?_eq_some (degree?_mulXk_of_degree?_eq_some h)
 
 /-- In a long-division step, shifting the divisor by `rd - qd` aligns its
 leading coefficient with the current remainder degree. -/
 theorem coeff_mulXk_division_step {q : GF2Poly} {rd qd : Nat}
     (hq : q.degree? = some qd) (hrd : ¬ rd < qd) :
     (q.mulXk (rd - qd)).coeff rd = true := by
-  sorry
+  have hshift := coeff_mulXk_degree_add (p := q) (d := qd) (k := rd - qd) hq
+  have hrd_eq : qd + (rd - qd) = rd := by
+    omega
+  simpa [hrd_eq] using hshift
 
 /-- The leading coefficient cancels after the characteristic-two subtraction
 step used by long division. -/
 theorem coeff_division_step_cancel {rem q : GF2Poly} {rd qd : Nat}
     (hrem : rem.degree? = some rd) (hq : q.degree? = some qd) (hrd : ¬ rd < qd) :
     (rem + q.mulXk (rd - qd)).coeff rd = false := by
-  sorry
+  rw [coeff_add_eq_bne]
+  rw [coeff_eq_true_of_degree?_eq_some hrem]
+  rw [coeff_mulXk_division_step hq hrd]
+  rfl
 
 /-- Alias for exact division by a power of `x` when the low coefficients vanish;
 otherwise this drops the discarded remainder. -/
