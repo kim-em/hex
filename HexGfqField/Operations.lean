@@ -501,6 +501,55 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
   apply GFqField.ext
   simpa using Lean.Grind.CommSemiring.mul_comm a.toQuotient b.toQuotient
 
+private theorem eq_inv_of_mul_eq_one
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {a b : FiniteField f hf hirr} (h : a * b = 1) :
+    a = b⁻¹ := by
+  by_cases hb : b = 0
+  · subst b
+    have hmul_zero : a * (0 : FiniteField f hf hirr) = 0 :=
+      Lean.Grind.Semiring.mul_zero a
+    have hzero_one : (0 : FiniteField f hf hirr) = 1 :=
+      hmul_zero.symm.trans h
+    exfalso
+    exact zero_ne_one f hf hirr hzero_one
+  · replace h := congrArg (fun x => x * b⁻¹) h
+    calc
+      a = a * 1 := (Lean.Grind.Semiring.mul_one a).symm
+      _ = a * (b * b⁻¹) := by rw [mul_inv_cancel hb]
+      _ = (a * b) * b⁻¹ := (Lean.Grind.Semiring.mul_assoc a b b⁻¹).symm
+      _ = 1 * b⁻¹ := h
+      _ = b⁻¹ := Lean.Grind.Semiring.one_mul b⁻¹
+
+private theorem inv_one
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
+    (1 : FiniteField f hf hirr)⁻¹ = 1 :=
+  (eq_inv_of_mul_eq_one (Lean.Grind.Semiring.mul_one (1 : FiniteField f hf hirr))).symm
+
+private theorem inv_inv
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    (x : FiniteField f hf hirr) :
+    x⁻¹⁻¹ = x := by
+  by_cases hx : x = 0
+  · subst x
+    simp [inv_zero]
+  · symm
+    apply eq_inv_of_mul_eq_one
+    exact mul_inv_cancel (x := x) hx
+
+private theorem inv_inv_def
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    (x : FiniteField f hf hirr) :
+    (inv x)⁻¹ = x :=
+  inv_inv x
+
+private theorem pow_zero_eq_one
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    (x : FiniteField f hf hirr) :
+    pow x 0 = 1 := by
+  apply GFqField.ext
+  simpa using Lean.Grind.Semiring.pow_zero x.toQuotient
+
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.Field (FiniteField f hf hirr) := by
   refine Lean.Grind.Field.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_
@@ -519,8 +568,18 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     apply GFqField.ext
     simpa [zpow] using Lean.Grind.Semiring.pow_succ a.toQuotient n
   · intro a n
-    ext
-    sorry
+    cases n with
+    | ofNat m =>
+        cases m with
+        | zero =>
+            change pow a 0 = (pow a 0)⁻¹
+            rw [pow_zero_eq_one, inv_one]
+        | succ m =>
+            rfl
+    | negSucc m =>
+        change zpow a (Int.ofNat (m + 1)) = (zpow a (Int.negSucc m))⁻¹
+        rw [zpow, zpow]
+        exact (inv_inv_def (pow a (m + 1))).symm
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
     Lean.Grind.IsCharP (FiniteField f hf hirr) p where
@@ -530,7 +589,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
       sorry
     · intro h
       ext
-      sorry
+      all_goals sorry
 
 theorem frob_eq_pow
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
