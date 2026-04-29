@@ -108,6 +108,22 @@ def residueAt (i salt : Nat) : ZMod64 benchModulus :=
 def mixWord (acc x : UInt64) : UInt64 :=
   acc * 0x9E3779B97F4A7C15 + x + 0xBF58476D1CE4E5B9
 
+/-- Hot-loop multiplier for very fast checksum-style benchmarks. -/
+def checksumInnerRepeats : Nat :=
+  2048
+
+/-- Hot-loop multiplier for extern-backed multiplication checksums. -/
+def mulInnerRepeats : Nat :=
+  128
+
+/-- Hot-loop multiplier for repeated exponentiation by squaring. -/
+def powInnerRepeats : Nat :=
+  64
+
+/-- Hot-loop multiplier for the Barrett chain benchmark. -/
+def barrettInnerRepeats : Nat :=
+  256
+
 /-- Stable checksum for standard residues. -/
 def checksumZMod (acc : UInt64) (x : ZMod64 benchModulus) : UInt64 :=
   mixWord acc x.toUInt64
@@ -148,11 +164,19 @@ def prepMontInput (n : Nat) : MontInput :=
   { residues := residues
     montResidues := residues.map montCtx.toMont }
 
-/-- Benchmark target: construct residues from natural representatives. -/
-def runConstructChecksum (input : ConstructInput) : UInt64 :=
+/-- One checksum pass constructing residues from natural representatives. -/
+def constructChecksumOnce (input : ConstructInput) (seed : UInt64) : UInt64 :=
   input.values.foldl
     (fun acc n => checksumZMod acc (ZMod64.ofNat benchModulus n))
-    0
+    seed
+
+/-- Benchmark target: construct residues from natural representatives. -/
+def runConstructChecksum (input : ConstructInput) : UInt64 :=
+  let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
+    match remaining with
+    | 0 => acc
+    | k + 1 => go k (constructChecksumOnce input acc)
+  go checksumInnerRepeats 0
 
 /-- Benchmark target: natural and integer casts. -/
 def runCastChecksum (input : CastInput) : UInt64 :=
@@ -164,27 +188,57 @@ def runCastChecksum (input : CastInput) : UInt64 :=
     (fun acc i => checksumZMod acc (ZMod64.intCast benchModulus i))
     acc
 
-/-- Benchmark target: batched addition. -/
-def runAddChecksum (input : BinaryInput) : UInt64 :=
+/-- One checksum pass for batched addition. -/
+def addChecksumOnce (input : BinaryInput) (seed : UInt64) : UInt64 :=
   input.samples.foldl
     (fun acc sample => checksumZMod acc (sample.lhs + sample.rhs))
-    0
+    seed
+
+/-- Benchmark target: batched addition. -/
+def runAddChecksum (input : BinaryInput) : UInt64 :=
+  let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
+    match remaining with
+    | 0 => acc
+    | k + 1 => go k (addChecksumOnce input acc)
+  go checksumInnerRepeats 0
+
+/-- One checksum pass for batched subtraction. -/
+def subChecksumOnce (input : BinaryInput) (seed : UInt64) : UInt64 :=
+  input.samples.foldl
+    (fun acc sample => checksumZMod acc (sample.lhs - sample.rhs))
+    seed
 
 /-- Benchmark target: batched subtraction. -/
 def runSubChecksum (input : BinaryInput) : UInt64 :=
+  let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
+    match remaining with
+    | 0 => acc
+    | k + 1 => go k (subChecksumOnce input acc)
+  go checksumInnerRepeats 0
+
+/-- One checksum pass for batched extern-backed multiplication. -/
+def mulChecksumOnce (input : BinaryInput) (seed : UInt64) : UInt64 :=
   input.samples.foldl
-    (fun acc sample => checksumZMod acc (sample.lhs - sample.rhs))
-    0
+    (fun acc sample => checksumZMod acc (sample.lhs * sample.rhs))
+    seed
 
 /-- Benchmark target: batched extern-backed multiplication. -/
 def runMulChecksum (input : BinaryInput) : UInt64 :=
-  input.samples.foldl
-    (fun acc sample => checksumZMod acc (sample.lhs * sample.rhs))
-    0
+  let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
+    match remaining with
+    | 0 => acc
+    | k + 1 => go k (mulChecksumOnce input acc)
+  go mulInnerRepeats 0
 
 /-- Benchmark target: exponentiation by squaring with an `n`-bit exponent. -/
-def runPow (input : PowInput) : Nat :=
-  (input.base ^ input.exponent).toNat
+def runPow (input : PowInput) : UInt64 :=
+  let rec go (remaining : Nat) (acc : UInt64) : UInt64 :=
+    match remaining with
+    | 0 => acc
+    | k + 1 =>
+        let base := input.base + ZMod64.ofNat benchModulus acc.toNat
+        go k (checksumZMod acc (base ^ input.exponent))
+  go powInnerRepeats 0
 
 /-- Benchmark target: batched modular inverse candidates. -/
 def runInvChecksum (input : UnaryInput) : UInt64 :=
@@ -192,12 +246,21 @@ def runInvChecksum (input : UnaryInput) : UInt64 :=
     (fun acc x => checksumZMod acc x.inv)
     0
 
-/-- Benchmark target: Barrett-context multiplication chain. -/
-def runBarrettMulModChain (input : UnaryInput) : UInt64 :=
+/-- One Barrett-context multiplication chain. -/
+def barrettMulModChainOnce (input : UnaryInput)
+    (seed : ZMod64 benchModulus) : ZMod64 benchModulus :=
   let acc := input.residues.foldl
     (fun acc x => barrettCtx.mulMod acc x)
-    (1 : ZMod64 benchModulus)
-  acc.toUInt64
+    seed
+  acc
+
+/-- Benchmark target: Barrett-context multiplication chain. -/
+def runBarrettMulModChain (input : UnaryInput) : UInt64 :=
+  let rec go (remaining : Nat) (acc : ZMod64 benchModulus) : ZMod64 benchModulus :=
+    match remaining with
+    | 0 => acc
+    | k + 1 => go k (barrettMulModChainOnce input acc)
+  (go barrettInnerRepeats (1 : ZMod64 benchModulus)).toUInt64
 
 /-- Benchmark target: Montgomery conversion into hot-loop representation. -/
 def runMontToChecksum (input : MontInput) : UInt64 :=
@@ -221,11 +284,11 @@ def runMontFromChecksum (input : MontInput) : UInt64 :=
 setup_benchmark runConstructChecksum n => n
   with prep := prepConstructInput
   where {
-    paramFloor := 8192
-    paramCeiling := 131072
-    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 131072
+    paramCeiling := 1048576
+    paramSchedule := .custom #[131072, 262144, 524288, 1048576]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runCastChecksum n => n
@@ -241,41 +304,41 @@ setup_benchmark runCastChecksum n => n
 setup_benchmark runAddChecksum n => n
   with prep := prepBinaryInput
   where {
-    paramFloor := 8192
-    paramCeiling := 131072
-    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 131072
+    paramCeiling := 524288
+    paramSchedule := .custom #[131072, 262144, 524288]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runSubChecksum n => n
   with prep := prepBinaryInput
   where {
-    paramFloor := 8192
-    paramCeiling := 131072
-    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 131072
+    paramCeiling := 1048576
+    paramSchedule := .custom #[131072, 262144, 524288, 1048576]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runMulChecksum n => n
   with prep := prepBinaryInput
   where {
-    paramFloor := 8192
-    paramCeiling := 131072
-    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 131072
+    paramCeiling := 524288
+    paramSchedule := .custom #[131072, 262144, 524288]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runPow n => n
   with prep := prepPowInput
   where {
-    paramFloor := 1024
-    paramCeiling := 16384
-    paramSchedule := .custom #[1024, 2048, 4096, 8192, 16384]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 8192
+    paramCeiling := 32768
+    paramSchedule := .custom #[8192, 16384, 32768]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runInvChecksum n => n
@@ -291,11 +354,11 @@ setup_benchmark runInvChecksum n => n
 setup_benchmark runBarrettMulModChain n => n
   with prep := prepUnaryInput
   where {
-    paramFloor := 8192
-    paramCeiling := 131072
-    paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
-    maxSecondsPerCall := 2.0
-    targetInnerNanos := 300000000
+    paramFloor := 131072
+    paramCeiling := 1048576
+    paramSchedule := .custom #[131072, 262144, 524288, 1048576]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 500000000
   }
 
 setup_benchmark runMontToChecksum n => n
