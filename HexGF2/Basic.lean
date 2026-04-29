@@ -1588,6 +1588,51 @@ theorem coeff_division_step_cancel {rem q : GF2Poly} {rd qd : Nat}
   rw [coeff_mulXk_division_step hq hrd]
   rfl
 
+/-- A non-terminal long-division subtraction step strictly lowers the
+remainder degree. -/
+theorem division_step_degree_lt {rem q : GF2Poly} {rd qd : Nat}
+    (hrem : rem.degree? = some rd) (hq : q.degree? = some qd) (hrd : ¬ rd < qd) :
+    (rem + q.mulXk (rd - qd)).isZero = true ∨
+      (rem + q.mulXk (rd - qd)).degree < rd := by
+  let next := rem + q.mulXk (rd - qd)
+  by_cases hzero : next.isZero = true
+  · exact Or.inl hzero
+  · right
+    have hnonzero : next.isZero = false := by
+      cases h : next.isZero <;> simp [h] at hzero ⊢
+    obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hnonzero
+    have hdegree : next.degree = d := degree_eq_of_degree?_eq_some hd
+    rw [hdegree]
+    by_cases hlt : d < rd
+    · exact hlt
+    · have hrd_le_d : rd ≤ d := Nat.le_of_not_gt hlt
+      have hdcoeff : next.coeff d = true := coeff_eq_true_of_degree?_eq_some hd
+      by_cases hd_eq_rd : d = rd
+      · have hnextfalse : next.coeff d = false := by
+          rw [hd_eq_rd]
+          dsimp [next]
+          exact coeff_division_step_cancel hrem hq hrd
+        rw [hnextfalse] at hdcoeff
+        contradiction
+      · have hrd_lt_d : rd < d := Nat.lt_of_le_of_ne hrd_le_d (Ne.symm hd_eq_rd)
+        have hremfalse : rem.coeff d = false :=
+          coeff_eq_false_of_degree?_lt hrem hrd_lt_d
+        have hshiftDegree :
+            (q.mulXk (rd - qd)).degree? = some rd := by
+          have h := degree?_mulXk_of_degree?_eq_some
+            (p := q) (d := qd) (k := rd - qd) hq
+          have hrd_eq : qd + (rd - qd) = rd := by
+            omega
+          simpa [hrd_eq] using h
+        have hshiftfalse : (q.mulXk (rd - qd)).coeff d = false :=
+          coeff_eq_false_of_degree?_lt hshiftDegree hrd_lt_d
+        have hnextfalse : next.coeff d = false := by
+          dsimp [next]
+          rw [coeff_add_eq_bne, hremfalse, hshiftfalse]
+          rfl
+        rw [hnextfalse] at hdcoeff
+        contradiction
+
 /-- Alias for exact division by a power of `x` when the low coefficients vanish;
 otherwise this drops the discarded remainder. -/
 def divXk (p : GF2Poly) (k : Nat) : GF2Poly :=
