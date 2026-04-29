@@ -89,6 +89,18 @@ def fp2CoeffPoly (degree salt : Nat) : F2Poly :=
       else
         ZMod64.ofNat 2 0
 
+/-- Shared packed GCD fixture with a dense long-division quotient. -/
+def packedDenseQuotientPair (degree : Nat) : GF2Poly × GF2Poly :=
+  let divisor := packedCoeffPoly degree 541
+  let quotient := packedCoeffPoly degree 577
+  (divisor * quotient + 1, divisor)
+
+/-- Shared generic GCD fixture with a dense long-division quotient. -/
+def fp2DenseQuotientPair (degree : Nat) : F2Poly × F2Poly :=
+  let divisor := fp2CoeffPoly degree 541
+  let quotient := fp2CoeffPoly degree 577
+  (divisor * quotient + 1, divisor)
+
 /-- Packed polynomial exponentiation modulo a nonzero modulus. -/
 def packedPowMod (base modulus : GF2Poly) : Nat → GF2Poly → GF2Poly → GF2Poly
   | 0, _, acc => acc
@@ -113,11 +125,13 @@ decreasing_by
 
 /-- Per-parameter fixture for packed/generic polynomial GCD comparisons. -/
 def prepCompareInput (n : Nat) : CompareInput :=
-  let degree := 64 * n + 31
-  { packedLhs := packedCoeffPoly degree 541
-    packedRhs := packedCoeffPoly degree 577
-    genericLhs := fp2CoeffPoly degree 541
-    genericRhs := fp2CoeffPoly degree 577 }
+  let degree := 40 * n + 3
+  let packed := packedDenseQuotientPair degree
+  let generic := fp2DenseQuotientPair degree
+  { packedLhs := packed.1
+    packedRhs := packed.2
+    genericLhs := generic.1
+    genericRhs := generic.2 }
 
 /-- Per-parameter fixture for packed/generic Berlekamp-style comparisons. -/
 def prepBerlekampCompareInput (n : Nat) : BerlekampCompareInput :=
@@ -155,22 +169,24 @@ def runFp2BerlekampCompareChecksum (input : BerlekampCompareInput) : UInt64 :=
 setup_benchmark runPackedGcdCompareChecksum n => n * n
   with prep := prepCompareInput
   where {
-    paramFloor := 16
-    paramCeiling := 128
-    paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128]
+    paramFloor := 8
+    paramCeiling := 64
+    paramSchedule := .custom #[8, 12, 16, 24, 32, 48, 64]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    verdictWarmupFraction := 0.35
     signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runFp2GcdCompareChecksum n => n * n
   with prep := prepCompareInput
   where {
-    paramFloor := 16
-    paramCeiling := 128
-    paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128]
+    paramFloor := 8
+    paramCeiling := 64
+    paramSchedule := .custom #[8, 12, 16, 24, 32, 48, 64]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    verdictWarmupFraction := 0.35
     signalFloorMultiplier := 1.0
   }
 
