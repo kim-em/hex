@@ -20,8 +20,9 @@ Additional scientific registrations:
   packed versus generic Berlekamp-matrix-style Frobenius-column construction
   over the same monic modulus family. This comparison schedule maps parameter
   `n` to degree `16 * n + 3`; on that word-parallel packed schedule the
-  packed construction is declared as `O(n^2)`, while the generic
-  dense-coefficient construction is declared as `O(n^3)`.
+  packed construction and the generic dense-coefficient construction are both
+  declared as `O(n^2)` because the iterative column update multiplies by the
+  fixed sparse polynomial `x^2`.
 -/
 
 namespace Hex.GF2Bench
@@ -208,7 +209,7 @@ setup_benchmark runPackedBerlekampCompareChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runFp2BerlekampCompareChecksum n => n * n * n
+setup_benchmark runFp2BerlekampCompareChecksum n => n * n
   with prep := prepBerlekampCompareInput
   where {
     paramFloor := 8
