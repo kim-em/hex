@@ -1079,6 +1079,153 @@ theorem coeffWords_replicate_append_add_of_mod_eq_zero
     · simp
   simp [coeffWords, hdiv, hmod, hget]
 
+private theorem shiftLeftBitsList_length_le_succ
+    (shift : Nat) (carry : UInt64) (ws : List UInt64) :
+    (shiftLeftBitsList shift carry ws).length ≤ ws.length + 1 := by
+  induction ws generalizing carry with
+  | nil =>
+      by_cases hcarry : carry = 0 <;> simp [shiftLeftBitsList, hcarry]
+  | cons w ws ih =>
+      simp [shiftLeftBitsList]
+      exact ih (w >>> (64 - shift).toUInt64)
+
+private theorem UInt64.shiftRight_high_bit_false
+    (w : UInt64) {shift bit : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64) (hbit : bit < 64) (hle : shift ≤ bit) :
+    (((((w >>> (64 - shift).toUInt64) >>> bit.toUInt64) &&& 1) != 0) = false) := by
+  apply Bool.eq_false_iff.mpr
+  intro hb
+  have hne :
+      (((w >>> (64 - shift).toUInt64) >>> bit.toUInt64) &&& 1) ≠ 0 :=
+    bne_iff_ne.mp hb
+  apply hne
+  apply UInt64.toNat_inj.mp
+  simp [UInt64.toNat_shiftRight, UInt64.toNat_and, Nat.mod_eq_of_lt hbit]
+  rw [← Nat.shiftRight_add]
+  rw [Nat.shiftRight_eq_div_pow]
+  have hzero :
+      w.toNat / 2 ^ ((64 - shift) % 64 + bit) = 0 := by
+    apply Nat.div_eq_of_lt
+    have hwlt : w.toNat < 2 ^ 64 := by
+      simpa [UInt64.size] using UInt64.toNat_lt_size w
+    refine Nat.lt_of_lt_of_le hwlt ?_
+    apply Nat.pow_le_pow_right (by decide : 0 < 2)
+    have hsub : (64 - shift) % 64 = 64 - shift := by
+      apply Nat.mod_eq_of_lt
+      omega
+    omega
+  simp [hzero]
+
+private theorem shiftLeftBitsList_getD_length_high_bit_false_with_prev
+    (ws : List UInt64) (prev : UInt64) {shift bit : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64)
+    (hbit : bit < 64) (hle : shift ≤ bit) :
+    (((((shiftLeftBitsList shift (prev >>> (64 - shift).toUInt64) ws).getD ws.length 0) >>>
+          bit.toUInt64) &&& 1) != 0) = false := by
+  induction ws generalizing prev with
+  | nil =>
+      by_cases hcarry : prev >>> (64 - shift).toUInt64 = 0
+      · simp [shiftLeftBitsList, hcarry]
+      · simpa [shiftLeftBitsList, hcarry] using
+          UInt64.shiftRight_high_bit_false prev hshiftPos hshift hbit hle
+  | cons w ws ih =>
+      simpa [shiftLeftBitsList, List.getD] using
+        ih w
+
+private theorem shiftLeftBitsList_getD_length_high_bit_false
+    (ws : List UInt64) {shift bit : Nat}
+    (hshiftPos : 0 < shift) (hshift : shift < 64)
+    (hbit : bit < 64) (hle : shift ≤ bit) :
+    (((((shiftLeftBitsList shift 0 ws).getD ws.length 0) >>>
+          bit.toUInt64) &&& 1) != 0) = false := by
+  cases ws with
+  | nil =>
+      simp [shiftLeftBitsList]
+  | cons w ws =>
+      simpa [shiftLeftBitsList, List.getD] using
+        shiftLeftBitsList_getD_length_high_bit_false_with_prev
+          ws w hshiftPos hshift hbit hle
+
+theorem coeffWords_replicate_append_shiftLeftBitsList_add_of_not_word
+    (words : Array UInt64) {k n : Nat}
+    (hbitShift : k % 64 ≠ 0) (hword : ¬ n / 64 < words.size) :
+    coeffWords
+        ((Array.replicate (k / 64) (0 : UInt64)) ++
+          (shiftLeftBitsList (k % 64) 0 words.toList).toArray)
+        (n + k) =
+      false := by
+  have hshiftPos : 0 < k % 64 := Nat.pos_of_ne_zero hbitShift
+  have hshift : k % 64 < 64 := Nat.mod_lt k (by decide : 0 < 64)
+  by_cases hbit : n % 64 + k % 64 < 64
+  · have hdiv : (n + k) / 64 = k / 64 + n / 64 := by
+      have hn := Nat.div_add_mod n 64
+      have hk := Nat.div_add_mod k 64
+      omega
+    have hmod : (n + k) % 64 = n % 64 + k % 64 := by
+      have hn := Nat.div_add_mod n 64
+      have hk := Nat.div_add_mod k 64
+      omega
+    have hgetAppend :
+        (((Array.replicate (k / 64) (0 : UInt64)) ++
+              (shiftLeftBitsList (k % 64) 0 words.toList).toArray)[k / 64 + n / 64]?).getD 0 =
+          (((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64]?).getD 0 := by
+      rw [Array.getElem?_append_right]
+      · simp
+      · simp
+    by_cases hgt : words.size < n / 64
+    · have hlen :=
+        shiftLeftBitsList_length_le_succ (k % 64) 0 words.toList
+      have hwordsLen : words.toList.length = words.size := by simp
+      have hout :
+          (shiftLeftBitsList (k % 64) 0 words.toList).length ≤ n / 64 := by
+        exact Nat.le_trans hlen (by omega)
+      have hnone :
+          ((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64]? = none := by
+        rw [Array.getElem?_eq_none_iff]
+        simpa using hout
+      simp [coeffWords, hdiv, hmod, hgetAppend, hnone]
+    · have hnsize : n / 64 = words.size := by omega
+      have hgetList :
+          (((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64]?).getD 0 =
+            (shiftLeftBitsList (k % 64) 0 words.toList).getD (n / 64) 0 := by
+        simp [List.getD]
+      have hclear :
+          (((((shiftLeftBitsList (k % 64) 0 words.toList).getD (n / 64) 0) >>>
+              (n % 64 + k % 64).toUInt64) &&& 1) != 0) = false := by
+        rw [hnsize]
+        simpa using
+          shiftLeftBitsList_getD_length_high_bit_false
+            words.toList hshiftPos hshift hbit (by omega)
+      rw [coeffWords, hdiv, hmod, hgetAppend, hgetList]
+      exact hclear
+  · have hcarry : 64 ≤ n % 64 + k % 64 := Nat.le_of_not_gt hbit
+    have hdiv : (n + k) / 64 = k / 64 + (n / 64 + 1) := by
+      have hn := Nat.div_add_mod n 64
+      have hk := Nat.div_add_mod k 64
+      omega
+    have hmod : (n + k) % 64 = n % 64 + k % 64 - 64 := by
+      have hn := Nat.div_add_mod n 64
+      have hk := Nat.div_add_mod k 64
+      omega
+    have hgetAppend :
+        (((Array.replicate (k / 64) (0 : UInt64)) ++
+              (shiftLeftBitsList (k % 64) 0 words.toList).toArray)[k / 64 + (n / 64 + 1)]?).getD 0 =
+          (((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64 + 1]?).getD 0 := by
+      rw [Array.getElem?_append_right]
+      · simp
+      · simp
+    have hlen :=
+      shiftLeftBitsList_length_le_succ (k % 64) 0 words.toList
+    have hwordsLen : words.toList.length = words.size := by simp
+    have hout :
+        (shiftLeftBitsList (k % 64) 0 words.toList).length ≤ n / 64 + 1 := by
+      exact Nat.le_trans hlen (by omega)
+    have hnone :
+        ((shiftLeftBitsList (k % 64) 0 words.toList).toArray)[n / 64 + 1]? = none := by
+      rw [Array.getElem?_eq_none_iff]
+      simpa using hout
+    simp [coeffWords, hdiv, hmod, hgetAppend, hnone]
+
 /-- Shift packed words right by `bitShift ∈ [1, 63]`, reading the input from
 high degree to low degree. -/
 private def shiftRightBitsRevList (bitShift : Nat) (carry : UInt64) :
@@ -1207,6 +1354,17 @@ theorem coeff_shiftLeft (p : GF2Poly) (k n : Nat) :
         n := by
   simp [shiftLeft]
 
+/-- Shifting left by `k` moves every source coefficient at `n` to `n + k`
+when the source coefficient lies in a stored word. -/
+theorem coeff_shiftLeft_add_of_word_lt (p : GF2Poly) {k n : Nat}
+    (hword : n / 64 < p.words.size) :
+    (p.shiftLeft k).coeff (n + k) = p.coeff n := by
+  rw [coeff_shiftLeft]
+  by_cases hbitShift : k % 64 = 0
+  · simp [hbitShift, coeff, coeffWords_replicate_append_add_of_mod_eq_zero]
+  · simp [hbitShift, coeff,
+      coeffWords_replicate_append_shiftLeftBitsList_add p.words hbitShift hword]
+
 /-- `mulXk` is coefficientwise the same as `shiftLeft`. -/
 theorem coeff_mulXk (p : GF2Poly) (k n : Nat) :
     (p.mulXk k).coeff n = (p.shiftLeft k).coeff n := by
@@ -1216,7 +1374,43 @@ theorem coeff_mulXk (p : GF2Poly) (k n : Nat) :
 theorem degree?_mulXk_of_degree?_eq_some {p : GF2Poly} {d k : Nat}
     (h : p.degree? = some d) :
     (p.mulXk k).degree? = some (d + k) := by
-  sorry
+  apply degree?_eq_some_of_coeff_eq_true_of_forall_gt_false
+  · rw [coeff_mulXk]
+    have hdword : d / 64 < p.words.size := by
+      have hdcoeff := coeff_eq_true_of_degree?_eq_some h
+      by_cases hlt : d / 64 < p.words.size
+      · exact hlt
+      have hdcoeffFalse : p.coeff d = false := by
+        simp [coeff, coeffWords, hlt]
+      rw [hdcoeffFalse] at hdcoeff
+      contradiction
+    have hshift := coeff_shiftLeft_add_of_word_lt (p := p) (k := k) (n := d) hdword
+    have hdcoeff := coeff_eq_true_of_degree?_eq_some h
+    rw [hshift, hdcoeff]
+  · intro m hm
+    rw [coeff_mulXk]
+    have hk_le_m : k ≤ m := by omega
+    let n := m - k
+    have hm_eq : m = n + k := by
+      dsimp [n]
+      omega
+    have hd_lt_n : d < n := by
+      dsimp [n]
+      omega
+    by_cases hnword : n / 64 < p.words.size
+    · have hshift :=
+        coeff_shiftLeft_add_of_word_lt (p := p) (k := k) (n := n) hnword
+      have hnfalse : p.coeff n = false := coeff_eq_false_of_degree?_lt h hd_lt_n
+      rw [hm_eq, hshift, hnfalse]
+    · rw [hm_eq, coeff_shiftLeft]
+      by_cases hbitShift : k % 64 = 0
+      · have hnfalse : p.coeff n = false := coeff_eq_false_of_degree?_lt h hd_lt_n
+        simp [hbitShift, coeffWords_replicate_append_add_of_mod_eq_zero,
+          coeff] at hnfalse ⊢
+        exact hnfalse
+      · simp [hbitShift,
+          coeffWords_replicate_append_shiftLeftBitsList_add_of_not_word
+            p.words hbitShift hnword]
 
 /-- The shifted leading coefficient of `p.mulXk k` is set. -/
 theorem coeff_mulXk_degree_add {p : GF2Poly} {d k : Nat}
