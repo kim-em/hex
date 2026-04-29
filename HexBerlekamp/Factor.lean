@@ -37,9 +37,9 @@ def Factorization.product (result : Factorization p) : FpPoly p :=
 def splitFactorAt (f witness : FpPoly p) (c : ZMod64 p) : FpPoly p :=
   DensePoly.gcd f (witness - FpPoly.C c)
 
-/-- `true` exactly when the gcd candidate is neither `0`, `1`, nor all of `f`. -/
+/-- `true` exactly when the gcd candidate is nonconstant and not all of `f`. -/
 private def isNontrivialSplitFactor (f g : FpPoly p) : Bool :=
-  !g.isZero && g ≠ 1 && g ≠ f
+  !g.isZero && g.degree? ≠ some 0 && g ≠ f
 
 /-- Search the constants `0, 1, ..., p - 1` for a nontrivial Berlekamp split. -/
 private def kernelWitnessSplitAux (f witness : FpPoly p) : Nat → Nat → Option (SplitResult p)

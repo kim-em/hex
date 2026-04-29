@@ -2,6 +2,7 @@ import HexBerlekamp.Basic
 import HexBerlekamp.DistinctDegree
 import HexBerlekamp.Factor
 import HexBerlekamp.Irreducibility
+import HexBerlekamp.Conformance
 
 /-!
 `HexBerlekamp` exposes the executable Berlekamp-matrix surface for factoring
