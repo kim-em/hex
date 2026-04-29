@@ -174,6 +174,12 @@ theorem mod_eq_divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
     p % q = (divMod p q).2 := by
   rfl
 
+/-- The computed remainder has degree below a positive-degree divisor. -/
+theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    0 < q.degree?.getD 0 → (p % q).degree?.getD 0 < q.degree?.getD 0 := by
+  sorry
+
 theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     (p / q) * q + (p % q) = p := by
