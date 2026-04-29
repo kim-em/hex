@@ -7,7 +7,9 @@ Benchmark registrations for `hex-arith`.
 This Phase 4 slice compares two implementations of the same repeated modular
 multiplication task over the shared small odd modulus `65537`: Barrett reduction
 for one-off modular products, and Montgomery arithmetic with factors converted
-to Montgomery form in the prepared input.
+to Montgomery form in the prepared input. It also registers public modular
+exponentiation over the same odd word-sized modulus, parameterized by exponent
+bit length.
 
 It also registers the `Nat`, GMP-backed `Int`, and `UInt64` extended-GCD API
 surface on a shared nonnegative input family. The `run*ExtGcdShapes`
@@ -24,6 +26,8 @@ Scientific registrations:
   `O(n)`.
 * `runMontgomeryMulChain`: the same multiplication chain using
   `MontCtx.toMont`, `MontCtx.mulMont`, and `MontCtx.fromMont`, `O(n)`.
+* `runPowMod`: `HexArith.powMod` over a fixed odd word-sized modulus with an
+  `n`-bit deterministic exponent, `O(n)`.
 * `runNatExtGcdShapes`: `HexArith.extGcd` over `Nat`, batched over `n`
   bounded-word samples, `O(n)`.
 * `runIntExtGcdShapes`: `HexArith.Int.extGcd` over nonnegative `Int`, batched
@@ -50,6 +54,13 @@ def montCtx : MontCtx benchModulus :=
 structure MulChainInput where
   factors : Array UInt64
   montFactors : Array UInt64
+  deriving Repr, BEq, Hashable
+
+/-- Prepared input for public modular-exponentiation benchmarks. -/
+structure PowModInput where
+  base : Nat
+  exponent : Nat
+  modulus : Nat
   deriving Repr, BEq, Hashable
 
 /-- One nonnegative shared input pair for extended-GCD benchmarks. -/
@@ -85,6 +96,15 @@ def prepMulChainInput (n : Nat) : MulChainInput :=
   let factors := (Array.range n).map factorAt
   { factors := factors
     montFactors := factors.map montCtx.toMont }
+
+/--
+Deterministic public-API exponentiation input. The parameter is the requested
+exponent bit length, so repeated squaring has the textbook linear model in `n`.
+-/
+def prepPowModInput (n : Nat) : PowModInput :=
+  { base := 0x1234_5678_9ABC_DEF0
+    exponent := 2 ^ n - 1
+    modulus := benchModulus.toNat }
 
 /--
 Deterministic nonnegative sample generator. Values stay below `2^32`, keeping
@@ -139,6 +159,10 @@ def runMontgomeryMulChain (input : MulChainInput) : UInt64 :=
     (fun acc x => montCtx.mulMont acc x)
     acc0
   montCtx.fromMont acc
+
+/-- Benchmark target: public modular exponentiation by repeated squaring. -/
+def runPowMod (input : PowModInput) : Nat :=
+  HexArith.powMod input.base input.exponent input.modulus
 
 /-- Summarize a batch of `HexArith.extGcd` results over the prepared samples. -/
 def natExtGcdShapes (input : ExtGcdInput) : ExtGcdShape :=
@@ -199,6 +223,16 @@ setup_benchmark runMontgomeryMulChain n => n
     paramFloor := 8192
     paramCeiling := 131072
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
+    maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runPowMod n => n
+  with prep := prepPowModInput
+  where {
+    paramFloor := 1024
+    paramCeiling := 16384
+    paramSchedule := .custom #[1024, 2048, 4096, 8192, 16384]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
   }
