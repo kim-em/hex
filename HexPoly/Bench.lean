@@ -32,8 +32,8 @@ Scientific registrations:
   the current schoolbook division path.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
-
-Polynomial CRT is intentionally left for a later Phase 4 slice.
+* `runPolyCRTChecksum`: polynomial CRT witness construction over coprime
+  monic moduli, `O(n^2)` with the current schoolbook multiplication path.
 -/
 
 namespace Hex.PolyBench
@@ -80,6 +80,16 @@ structure EuclidInput where
 structure MonicInput where
   dividend : DensePoly Rat
   divisorDegree : Nat
+  deriving Hashable
+
+/-- Prepared input for polynomial CRT witness construction. -/
+structure PolyCRTInput where
+  modulusA : DensePoly Rat
+  modulusB : DensePoly Rat
+  residueA : DensePoly Rat
+  residueB : DensePoly Rat
+  bezoutS : DensePoly Rat
+  bezoutT : DensePoly Rat
   deriving Hashable
 
 /-- Deterministic nonzero-ish coefficient generator keyed by size, index, and salt. -/
@@ -159,6 +169,17 @@ def prepMonicInput (n : Nat) : MonicInput :=
   { dividend := denseRatPoly (2 * n + 1) 191
     divisorDegree := n + 1 }
 
+/-- Per-parameter fixture for polynomial CRT witness construction. -/
+def prepPolyCRTInput (n : Nat) : PolyCRTInput :=
+  let modulusDegree := n + 1
+  let monomial := DensePoly.monomial modulusDegree (1 : Rat)
+  { modulusA := monomial
+    modulusB := monomial + DensePoly.C (1 : Rat)
+    residueA := denseRatPoly n 251
+    residueB := denseRatPoly n 283
+    bezoutS := DensePoly.C (-1 : Rat)
+    bezoutT := DensePoly.C (1 : Rat) }
+
 /-- Benchmark target: add two prepared dense polynomials and checksum the result. -/
 def runAddChecksum (input : BinaryInput) : Int :=
   checksum (input.lhs + input.rhs)
@@ -217,6 +238,12 @@ def runContent (input : ContentInput) : Int :=
 /-- Benchmark target: compute integer primitive part and checksum the result. -/
 def runPrimitivePartChecksum (input : ContentInput) : Int :=
   checksum (DensePoly.primitivePart input.poly)
+
+/-- Benchmark target: construct a polynomial CRT witness and checksum it. -/
+def runPolyCRTChecksum (input : PolyCRTInput) : Rat :=
+  ratChecksum <|
+    DensePoly.polyCRT
+      input.modulusA input.modulusB input.residueA input.residueB input.bezoutS input.bezoutT
 
 setup_benchmark runAddChecksum n => n
   with prep := prepBinaryInput
@@ -355,6 +382,16 @@ setup_benchmark runPrimitivePartChecksum n => n
     paramCeiling := 131072
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runPolyCRTChecksum n => n * n
+  with prep := prepPolyCRTInput
+  where {
+    paramFloor := 128
+    paramCeiling := 512
+    paramSchedule := .custom #[128, 192, 256, 384, 512]
+    maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
   }
 
