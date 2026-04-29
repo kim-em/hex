@@ -123,8 +123,53 @@ theorem coeffWords_normalizeWords (words : Array UInt64) (n : Nat) :
   rw [coeffWords, coeffWords, normalizeWords_get?_getD]
 
 /-- The index of the highest set bit in a machine word, if any. -/
-private def highestSetBit? (w : UInt64) : Option Nat :=
+def highestSetBit? (w : UInt64) : Option Nat :=
   (List.range 64).reverse.find? fun i => (((w >>> i.toUInt64) &&& 1) != 0)
+
+private theorem mem_of_find?_eq_some {α : Type u} {p : α → Bool}
+    {xs : List α} {x : α} (h : xs.find? p = some x) :
+    x ∈ xs := by
+  induction xs with
+  | nil =>
+      simp at h
+  | cons y ys ih =>
+      by_cases hy : p y = true
+      · simp [List.find?, hy] at h
+        subst h
+        simp
+      · have hyFalse : p y = false := by
+          cases hpy : p y <;> simp [hpy] at hy ⊢
+        simp [List.find?, hyFalse] at h
+        exact List.mem_cons_of_mem y (ih h)
+
+/-- A returned highest-bit index is one of the 64 word-bit positions. -/
+theorem highestSetBit?_lt {w : UInt64} {i : Nat}
+    (h : highestSetBit? w = some i) :
+    i < 64 := by
+  have hmem : i ∈ (List.range 64).reverse := mem_of_find?_eq_some h
+  rw [List.mem_reverse, List.mem_range] at hmem
+  exact hmem
+
+/-- A returned highest-bit index has its bit set in the word. -/
+theorem highestSetBit?_bit {w : UInt64} {i : Nat}
+    (h : highestSetBit? w = some i) :
+    (((w >>> i.toUInt64) &&& 1) != 0) = true := by
+  unfold highestSetBit? at h
+  exact
+    @List.find?_some Nat
+      (fun j => (((w >>> j.toUInt64) &&& 1) != 0))
+      i (List.range 64).reverse h
+
+/-- If no highest bit exists, every queried word bit is clear. -/
+theorem highestSetBit?_eq_none_bit {w : UInt64} {i : Nat}
+    (h : highestSetBit? w = none) (hi : i < 64) :
+    (((w >>> i.toUInt64) &&& 1) != 0) = false := by
+  have hnone := (List.find?_eq_none.mp h) i
+  have hmem : i ∈ (List.range 64).reverse := by
+    rw [List.mem_reverse, List.mem_range]
+    exact hi
+  have hclear := hnone hmem
+  cases hbit : (((w >>> i.toUInt64) &&& 1) != 0) <;> simp [hbit] at hclear ⊢
 
 /-- Build a normalized packed polynomial from a raw word array. -/
 def ofWords (words : Array UInt64) : GF2Poly :=
@@ -259,6 +304,49 @@ theorem ne_zero_of_degree?_eq_some {p : GF2Poly} {d : Nat}
     (h : p.degree? = some d) :
     p.degree = d := by
   simp [degree, h]
+
+/-- Unpack a successful `degree?` computation into the normalized high word and
+the selected bit inside that word. -/
+theorem degree?_eq_some_highestSetBit {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    ∃ last bit,
+      p.words.back? = some last ∧
+        highestSetBit? last = some bit ∧
+        d = 64 * (p.words.size - 1) + bit := by
+  unfold degree? at h
+  cases hback : p.words.back? with
+  | none =>
+      simp [hback] at h
+  | some last =>
+      cases hbit : highestSetBit? last with
+      | none =>
+          simp [hback, hbit] at h
+      | some bit =>
+          have hsome : some (64 * (p.words.size - 1) + bit) = some d := by
+            simpa [hback, hbit] using h
+          injection hsome with hd
+          exact ⟨last, bit, rfl, hbit, hd.symm⟩
+
+/-- The in-word bit recovered from a successful `degree?` computation is a
+valid machine-word bit index. -/
+theorem degree?_eq_some_bit_lt {p : GF2Poly} {d bit : Nat} {last : UInt64}
+    (hparts :
+      p.words.back? = some last ∧
+        highestSetBit? last = some bit ∧
+        d = 64 * (p.words.size - 1) + bit) :
+    bit < 64 :=
+  highestSetBit?_lt hparts.2.1
+
+/-- A successful `degree?` computation points at a set bit in the high word. -/
+theorem degree?_eq_some_high_bit {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    ∃ last bit,
+      p.words.back? = some last ∧
+        highestSetBit? last = some bit ∧
+        (((last >>> bit.toUInt64) &&& 1) != 0) = true ∧
+        d = 64 * (p.words.size - 1) + bit := by
+  obtain ⟨last, bit, hback, hbit, hd⟩ := degree?_eq_some_highestSetBit h
+  exact ⟨last, bit, hback, hbit, highestSetBit?_bit hbit, hd⟩
 
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
