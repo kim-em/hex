@@ -21,7 +21,9 @@ Scientific registrations:
 * `runCeilSqrtChecksum`: batched ceiling-square-root computation, `O(n log n)`.
 * `runCoeffNormSq`: squared coefficient-vector norm, `O(n)`.
 * `runCoeffL2NormBound`: conservative coefficient-vector norm bound, `O(n)`.
-* `runMignotteCoeffBound`: executable Mignotte coefficient bound, `O(n)`.
+* `runMignotteCoeffBound`: executable Mignotte coefficient bound over a
+  bounded factor-degree fixture, `O(n)`. The central-binomial stress case is
+  covered separately by `runBinom`.
 -/
 
 namespace Hex.PolyZBench
@@ -141,6 +143,18 @@ def prepMignotteInput (n : Nat) : MignotteInput :=
   { poly := denseZPoly n 89
     factorDegree := n
     coeffIndex := n / 2 }
+
+/-- Per-parameter fixture for the full Mignotte-bound benchmark.
+
+The benchmark keeps the factor-degree part bounded so the scientific run
+measures the ambient coefficient-norm scan plus the bound composition. The
+central-binomial subcomputation has its own registration above.
+-/
+def prepMignotteBoundInput (n : Nat) : MignotteInput :=
+  let factorDegree := min n 64
+  { poly := denseZPoly n 89
+    factorDegree := factorDegree
+    coeffIndex := factorDegree / 2 }
 
 /-- Per-parameter batch of square-root inputs with values of size `O(n^2)`. -/
 def prepSqrtInput (n : Nat) : SqrtInput :=
@@ -288,7 +302,7 @@ setup_benchmark runCoeffL2NormBound n => n
   }
 
 setup_benchmark runMignotteCoeffBound n => n
-  with prep := prepMignotteInput
+  with prep := prepMignotteBoundInput
   where {
     paramFloor := 8192
     paramCeiling := 131072
