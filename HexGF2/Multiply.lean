@@ -883,6 +883,126 @@ private theorem foldl_mulWords_xor_left_coeff
         (by simp [foldl_xorClmulAt_size, hsizeY])
         htail hinner
 
+private theorem coeffWords_xorClmulAt_congr
+    (accA accB : Array UInt64) {idx n : Nat} (x y : UInt64)
+    (hidxA : idx + 1 < accA.size) (hidxB : idx + 1 < accB.size)
+    (hacc : coeffWords accA n = coeffWords accB n) :
+    coeffWords (xorClmulAt accA idx x y) n =
+      coeffWords (xorClmulAt accB idx x y) n := by
+  by_cases hLow : n / 64 = idx
+  · rw [coeffWords_xorClmulAt_low accA x y (by omega) hLow]
+    rw [coeffWords_xorClmulAt_low accB x y (by omega) hLow]
+    rw [hacc]
+  · by_cases hHigh : n / 64 = idx + 1
+    · rw [coeffWords_xorClmulAt_high accA x y (by omega) hidxA hHigh]
+      rw [coeffWords_xorClmulAt_high accB x y (by omega) hidxB hHigh]
+      rw [hacc]
+    · rw [coeffWords_xorClmulAt_ne accA x y hLow hHigh]
+      rw [coeffWords_xorClmulAt_ne accB x y hLow hHigh]
+      exact hacc
+
+private theorem foldl_xorClmulAt_congr_coeff
+    (js : List Nat) (accA accB : Array UInt64) {idx n : Nat}
+    (x : UInt64) (ys : Array UInt64)
+    (hidxA : ∀ j ∈ js, idx + j + 1 < accA.size)
+    (hidxB : ∀ j ∈ js, idx + j + 1 < accB.size)
+    (hacc : coeffWords accA n = coeffWords accB n) :
+    coeffWords
+        (js.foldl (fun acc j => xorClmulAt acc (idx + j) x ys[j]!) accA)
+        n =
+      coeffWords
+        (js.foldl (fun acc j => xorClmulAt acc (idx + j) x ys[j]!) accB)
+        n := by
+  induction js generalizing accA accB with
+  | nil =>
+      simpa using hacc
+  | cons j js ih =>
+      simp only [List.foldl_cons]
+      have hjA : idx + j + 1 < accA.size := hidxA j (by simp)
+      have hjB : idx + j + 1 < accB.size := hidxB j (by simp)
+      have htailA : ∀ j' ∈ js,
+          idx + j' + 1 < (xorClmulAt accA (idx + j) x ys[j]!).size := by
+        intro j' hj'
+        rw [xorClmulAt_size]
+        exact hidxA j' (by simp [hj'])
+      have htailB : ∀ j' ∈ js,
+          idx + j' + 1 < (xorClmulAt accB (idx + j) x ys[j]!).size := by
+        intro j' hj'
+        rw [xorClmulAt_size]
+        exact hidxB j' (by simp [hj'])
+      exact ih
+        (accA := xorClmulAt accA (idx + j) x ys[j]!)
+        (accB := xorClmulAt accB (idx + j) x ys[j]!)
+        htailA htailB
+        (coeffWords_xorClmulAt_congr accA accB x ys[j]!
+          (idx := idx + j) (n := n) hjA hjB hacc)
+
+private theorem foldl_mulWords_congr_coeff
+    (is : List Nat) (accA accB : Array UInt64) {n : Nat}
+    (xs ys : Array UInt64)
+    (hidxA : ∀ i ∈ is, ∀ j, j < ys.size → i + j + 1 < accA.size)
+    (hidxB : ∀ i ∈ is, ∀ j, j < ys.size → i + j + 1 < accB.size)
+    (hacc : coeffWords accA n = coeffWords accB n) :
+    coeffWords
+        (is.foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          accA)
+        n =
+      coeffWords
+        (is.foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          accB)
+        n := by
+  induction is generalizing accA accB with
+  | nil =>
+      simpa using hacc
+  | cons i is ih =>
+      simp only [List.foldl_cons]
+      have hinner :=
+        foldl_xorClmulAt_congr_coeff (List.range ys.size)
+          accA accB (idx := i) (n := n) xs[i]! ys
+          (by
+            intro j hj
+            exact hidxA i (by simp) j (List.mem_range.mp hj))
+          (by
+            intro j hj
+            exact hidxB i (by simp) j (List.mem_range.mp hj))
+          hacc
+      have htailA : ∀ i' ∈ is, ∀ j, j < ys.size →
+          i' + j + 1 <
+            ((List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) xs[i]! ys[j]!)
+              accA).size := by
+        intro i' hi' j hj
+        rw [foldl_xorClmulAt_size]
+        exact hidxA i' (by simp [hi']) j hj
+      have htailB : ∀ i' ∈ is, ∀ j, j < ys.size →
+          i' + j + 1 <
+            ((List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) xs[i]! ys[j]!)
+              accB).size := by
+        intro i' hi' j hj
+        rw [foldl_xorClmulAt_size]
+        exact hidxB i' (by simp [hi']) j hj
+      exact ih
+        (accA :=
+          (List.range ys.size).foldl
+            (fun acc j => xorClmulAt acc (i + j) xs[i]! ys[j]!)
+            accA)
+        (accB :=
+          (List.range ys.size).foldl
+            (fun acc j => xorClmulAt acc (i + j) xs[i]! ys[j]!)
+            accB)
+        htailA htailB hinner
+
 private theorem foldl_xorClmulAt_zero_left (js : List Nat) (acc : Array UInt64)
     (idx : Nat) (ys : Array UInt64) :
     js.foldl (fun acc j => xorClmulAt acc (idx + j) 0 ys[j]!) acc = acc := by
@@ -905,6 +1025,69 @@ private theorem foldl_xorClmulAt_zero_left_coeff (js : List Nat) (acc : Array UI
   | cons j js ih =>
       simp only [List.foldl_cons]
       rw [ih, coeffWords_xorClmulAt_zero_left]
+
+private theorem getElem!_eq_zero_of_size_le (xs : Array UInt64) {i : Nat}
+    (hi : xs.size ≤ i) :
+    xs[i]! = 0 := by
+  rw [getElem!_def]
+  rw [Array.getElem?_eq_none]
+  · rfl
+  · exact hi
+
+private theorem foldl_mulWords_range_add_zero_left_coeff
+    (xs ys acc : Array UInt64) (n k : Nat) :
+    coeffWords
+        ((List.range (xs.size + k)).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          acc)
+        n =
+      coeffWords
+        ((List.range xs.size).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          acc)
+        n := by
+  induction k with
+  | zero =>
+      simp
+  | succ k ih =>
+      rw [show xs.size + Nat.succ k = xs.size + k + 1 by omega]
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [getElem!_eq_zero_of_size_le xs (by omega)]
+      rw [foldl_xorClmulAt_zero_left_coeff]
+      exact ih
+
+private theorem foldl_mulWords_range_extend_left_coeff
+    (xs ys acc : Array UInt64) (n m : Nat) (hsize : xs.size ≤ m) :
+    coeffWords
+        ((List.range m).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          acc)
+        n =
+      coeffWords
+        ((List.range xs.size).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          acc)
+        n := by
+  have hm : m = xs.size + (m - xs.size) := by omega
+  rw [hm]
+  exact foldl_mulWords_range_add_zero_left_coeff xs ys acc n (m - xs.size)
 
 private theorem foldl_mulWords_left_monomial_zero_prefix_coeff_aux
     (is : List Nat) (acc xs : Array UInt64) (k n : Nat)
@@ -1928,6 +2111,58 @@ private theorem coeffWords_empty (n : Nat) :
   rw [coeffWords]
   simp
 
+private theorem coeffWords_mulWords_common_left
+    (xs zs : Array UInt64) (n m : Nat) (hm : xs.size ≤ m) :
+    coeffWords
+        ((List.range m).foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range zs.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x zs[j]!)
+              acc)
+          (Array.replicate (m + zs.size) (0 : UInt64)))
+        n =
+      coeffWords (mulWords xs zs) n := by
+  unfold mulWords
+  by_cases hzs : zs.isEmpty
+  · have hcommon :=
+      foldl_mulWords_range_extend_left_coeff xs zs
+        (Array.replicate (m + zs.size) (0 : UInt64)) n m hm
+    rw [hcommon]
+    have hzsize : zs.size = 0 := by
+      simpa [Array.isEmpty] using hzs
+    simp only [hzs, hzsize, List.range_zero, List.foldl_nil, Bool.or_true, ↓reduceIte]
+    rw [foldl_keep, coeffWords_replicate_zero, coeffWords_empty]
+  · by_cases hxs : xs.isEmpty
+    · have hcommon :=
+        foldl_mulWords_range_extend_left_coeff xs zs
+          (Array.replicate (m + zs.size) (0 : UInt64)) n m hm
+      rw [hcommon]
+      have hxsize : xs.size = 0 := by
+        simpa [Array.isEmpty] using hxs
+      simp [hxs, hzs, hxsize, coeffWords_replicate_zero, coeffWords_empty]
+    · have hcommon :=
+        foldl_mulWords_range_extend_left_coeff xs zs
+          (Array.replicate (m + zs.size) (0 : UInt64)) n m hm
+      rw [hcommon]
+      have hcongr :=
+        foldl_mulWords_congr_coeff (List.range xs.size)
+          (Array.replicate (m + zs.size) (0 : UInt64))
+          (Array.replicate (xs.size + zs.size) (0 : UInt64))
+          (n := n) xs zs
+          (by
+            intro i hi j hj
+            have hi' : i < xs.size := List.mem_range.mp hi
+            simpa using (by omega : i + j + 1 < m + zs.size))
+          (by
+            intro i hi j hj
+            have hi' : i < xs.size := List.mem_range.mp hi
+            simpa using (by omega : i + j + 1 < xs.size + zs.size))
+          (by
+            rw [coeffWords_replicate_zero, coeffWords_replicate_zero])
+      rw [hcongr]
+      simp [hxs, hzs]
+
 private theorem coeffWords_mulWords_xor_left_same_size
     (xs ys zs : Array UInt64) (n : Nat) (hsize : xs.size = ys.size) :
     coeffWords (mulWords (xorWords xs ys) zs) n =
@@ -1980,6 +2215,30 @@ private theorem coeffWords_mulWords_xor_left_same_size
         (by
           rw [coeffWords_replicate_zero]
           rfl)
+
+private theorem coeffWords_mulWords_xor_left
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords (xorWords xs ys) zs) n =
+      (coeffWords (mulWords xs zs) n != coeffWords (mulWords ys zs) n) := by
+  let m := max xs.size ys.size
+  rw [← coeffWords_mulWords_common_left (xorWords xs ys) zs n m (by simp [m])]
+  rw [← coeffWords_mulWords_common_left xs zs n m
+    (by simpa [m] using Nat.le_max_left xs.size ys.size)]
+  rw [← coeffWords_mulWords_common_left ys zs n m
+    (by simpa [m] using Nat.le_max_right xs.size ys.size)]
+  simp only [xorWords_getElem!]
+  exact foldl_mulWords_xor_left_coeff (List.range m)
+    (Array.replicate (m + zs.size) (0 : UInt64))
+    (Array.replicate (m + zs.size) (0 : UInt64))
+    (Array.replicate (m + zs.size) (0 : UInt64))
+    (n := n) xs ys zs rfl rfl
+    (by
+      intro i hi j hj
+      have hi' : i < m := List.mem_range.mp hi
+      simpa using (by omega : i + j + 1 < m + zs.size))
+    (by
+      rw [coeffWords_replicate_zero]
+      rfl)
 
 private theorem coeffWords_mulWords_monomial_lt
     (xs : Array UInt64) {k target : Nat} (htarget : target < k) :
