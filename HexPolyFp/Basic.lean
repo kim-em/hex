@@ -178,5 +178,153 @@ theorem sub_eq_add_neg (f g : FpPoly p) :
         simp [List.foldl_cons, hstep acc i, ih]
   simpa using hfold (List.range f.size) 0
 
+/-- The `i`th schoolbook contribution to coefficient `n` of `f * g`. -/
+def mulCoeffTerm (f g : FpPoly p) (n i : Nat) : ZMod64 p :=
+  if n < i then 0 else f.coeff i * g.coeff (n - i)
+
+/-- The executable schoolbook coefficient sum matching `FpPoly` multiplication. -/
+def mulCoeffSum (f g : FpPoly p) (n : Nat) : ZMod64 p :=
+  (List.range f.size).foldl (fun acc i => acc + mulCoeffTerm f g n i) 0
+
+private theorem coeff_mul_fold (xs : List Nat) (acc f g : FpPoly p) (n : Nat) :
+    (xs.foldl
+        (fun acc i => acc + DensePoly.shift i (DensePoly.scale (f.coeff i) g))
+        acc).coeff n =
+      xs.foldl (fun coeff i => coeff + mulCoeffTerm f g n i) (acc.coeff n) := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih]
+      congr 1
+      have hzero : f.coeff i * (0 : ZMod64 p) = 0 := by grind
+      rw [DensePoly.coeff_add, DensePoly.coeff_shift_scale i (f.coeff i) g n hzero]
+      rfl
+
+theorem coeff_mul (f g : FpPoly p) (n : Nat) :
+    (f * g).coeff n = mulCoeffSum f g n := by
+  change (DensePoly.mul f g).coeff n = mulCoeffSum f g n
+  unfold DensePoly.mul mulCoeffSum
+  simpa [DensePoly.coeff_zero] using coeff_mul_fold (List.range f.size) 0 f g n
+
+private theorem mulCoeffTerm_eq_zero_of_size_le
+    (f g : FpPoly p) (n i : Nat) (hi : f.size ≤ i) :
+    mulCoeffTerm f g n i = 0 := by
+  unfold mulCoeffTerm
+  by_cases hn : n < i
+  · simp [hn]
+  · have hcoeff : f.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le f hi
+    simp [hn, hcoeff]
+    grind
+
+private theorem fold_mulCoeff_extend (f g : FpPoly p) (n d : Nat) :
+    (List.range (f.size + d)).foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 =
+      (List.range f.size).foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 := by
+  induction d with
+  | zero =>
+      simp
+  | succ d ih =>
+      rw [Nat.add_succ, List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      have hterm : mulCoeffTerm f g n (f.size + d) = 0 :=
+        mulCoeffTerm_eq_zero_of_size_le f g n (f.size + d) (by omega)
+      simp [hterm]
+      grind
+
+private theorem mulCoeffSum_eq_bound
+    (f g : FpPoly p) (n m : Nat) (hm : f.size ≤ m) :
+    mulCoeffSum f g n =
+      (List.range m).foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 := by
+  unfold mulCoeffSum
+  have hm' : f.size + (m - f.size) = m := by omega
+  rw [← hm', fold_mulCoeff_extend]
+
+private theorem coeff_mul_of_size_le
+    (f g : FpPoly p) (n m : Nat) (hm : f.size ≤ m) :
+    (f * g).coeff n =
+      (List.range m).foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 := by
+  rw [coeff_mul, mulCoeffSum_eq_bound f g n m hm]
+
+private theorem mulCoeffTerm_left_distrib (f g h : FpPoly p) (n i : Nat) :
+    mulCoeffTerm f (g + h) n i =
+      mulCoeffTerm f g n i + mulCoeffTerm f h n i := by
+  unfold mulCoeffTerm
+  by_cases hi : n < i
+  · simp [hi]
+    grind
+  · simp [hi, DensePoly.coeff_add]
+    grind
+
+private theorem mulCoeffTerm_right_distrib (f g h : FpPoly p) (n i : Nat) :
+    mulCoeffTerm (f + g) h n i =
+      mulCoeffTerm f h n i + mulCoeffTerm g h n i := by
+  unfold mulCoeffTerm
+  by_cases hi : n < i
+  · simp [hi]
+    grind
+  · simp [hi, DensePoly.coeff_add]
+    grind
+
+private theorem fold_distrib_acc
+    (xs : List Nat) (a b : ZMod64 p)
+    (term term₁ term₂ : Nat → ZMod64 p)
+    (hterm : ∀ i, term i = term₁ i + term₂ i) :
+    xs.foldl (fun acc i => acc + term i) (a + b) =
+      xs.foldl (fun acc i => acc + term₁ i) a +
+        xs.foldl (fun acc i => acc + term₂ i) b := by
+  induction xs generalizing a b with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+    simp only [List.foldl_cons]
+    rw [hterm i]
+    have hacc :
+        a + b + (term₁ i + term₂ i) =
+          (a + term₁ i) + (b + term₂ i) := by
+      grind
+    rw [hacc]
+    exact ih (a + term₁ i) (b + term₂ i)
+
+private theorem fold_left_distrib (xs : List Nat) (f g h : FpPoly p) (n : Nat) :
+    xs.foldl (fun acc i => acc + mulCoeffTerm f (g + h) n i) 0 =
+      xs.foldl (fun acc i => acc + mulCoeffTerm f g n i) 0 +
+        xs.foldl (fun acc i => acc + mulCoeffTerm f h n i) 0 := by
+  simpa [show (0 : ZMod64 p) + 0 = 0 by grind] using
+    fold_distrib_acc (p := p) xs 0 0
+      (fun i => mulCoeffTerm f (g + h) n i)
+      (fun i => mulCoeffTerm f g n i)
+      (fun i => mulCoeffTerm f h n i)
+      (mulCoeffTerm_left_distrib f g h n)
+
+private theorem fold_right_distrib (xs : List Nat) (f g h : FpPoly p) (n : Nat) :
+    xs.foldl (fun acc i => acc + mulCoeffTerm (f + g) h n i) 0 =
+      xs.foldl (fun acc i => acc + mulCoeffTerm f h n i) 0 +
+        xs.foldl (fun acc i => acc + mulCoeffTerm g h n i) 0 := by
+  simpa [show (0 : ZMod64 p) + 0 = 0 by grind] using
+    fold_distrib_acc (p := p) xs 0 0
+      (fun i => mulCoeffTerm (f + g) h n i)
+      (fun i => mulCoeffTerm f h n i)
+      (fun i => mulCoeffTerm g h n i)
+      (mulCoeffTerm_right_distrib f g h n)
+
+theorem left_distrib (f g h : FpPoly p) :
+    f * (g + h) = f * g + f * h := by
+  apply DensePoly.ext_coeff
+  intro n
+  simp [DensePoly.coeff_add, coeff_mul, mulCoeffSum, fold_left_distrib]
+
+theorem right_distrib (f g h : FpPoly p) :
+    (f + g) * h = f * h + g * h := by
+  apply DensePoly.ext_coeff
+  intro n
+  let m := max (max (f + g).size f.size) g.size
+  rw [DensePoly.coeff_add]
+  rw [coeff_mul_of_size_le (f + g) h n m (by dsimp [m]; omega)]
+  rw [coeff_mul_of_size_le f h n m (by dsimp [m]; omega)]
+  rw [coeff_mul_of_size_le g h n m (by dsimp [m]; omega)]
+  exact fold_right_distrib (List.range m) f g h n
+
 end FpPoly
 end Hex
