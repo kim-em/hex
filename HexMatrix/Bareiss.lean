@@ -98,6 +98,123 @@ private def stepMatrix (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) :
     else
       M[i][j]
 
+private structure BareissArrayState where
+  step : Nat
+  matrix : Array (Array Int)
+  prevPivot : Int
+  rowSwaps : Nat
+  singularStep : Option Nat
+
+@[inline] private def getEntry (rows : Array (Array Int)) (row col : Nat) : Int :=
+  rows[row]![col]!
+
+private def matrixToRows (M : Matrix Int n n) : Array (Array Int) :=
+  (Array.range n).map fun row =>
+    (Array.range n).map fun col =>
+      if hrow : row < n then
+        if hcol : col < n then
+          let i : Fin n := ⟨row, hrow⟩
+          let j : Fin n := ⟨col, hcol⟩
+          M[i][j]
+        else
+          0
+      else
+        0
+
+private def rowsToMatrix (rows : Array (Array Int)) (n : Nat) : Matrix Int n n :=
+  Matrix.ofFn fun i j => getEntry rows i.val j.val
+
+private def swapRowsArray (rows : Array (Array Int)) (rowA rowB : Nat) :
+    Array (Array Int) :=
+  if rowA = rowB then
+    rows
+  else
+    (rows.set! rowA rows[rowB]!).set! rowB rows[rowA]!
+
+private def findPivotArrayAux
+    (rows : Array (Array Int)) (n col start fuel : Nat) : Option Nat :=
+  match fuel with
+  | 0 => none
+  | fuel + 1 =>
+      if start < n then
+        if getEntry rows start col = 0 then
+          findPivotArrayAux rows n col (start + 1) fuel
+        else
+          some start
+      else
+        none
+
+private def findPivotArray? (rows : Array (Array Int)) (n col start : Nat) :
+    Option Nat :=
+  findPivotArrayAux rows n col start (n - start)
+
+private def stepArray (rows : Array (Array Int)) (n k : Nat) (pivot prevPivot : Int) :
+    Array (Array Int) :=
+  Id.run do
+    let mut next := rows
+    for i in [k + 1:n] do
+      let sourceRow := rows[i]!
+      let entryIK := sourceRow[k]!
+      let mut nextRow := sourceRow.set! k 0
+      for j in [k + 1:n] do
+        let value :=
+          (pivot * sourceRow[j]! - entryIK * getEntry rows k j) / prevPivot
+        nextRow := nextRow.set! j value
+      next := next.set! i nextRow
+    return next
+
+private def pivotArrayLoop (n fuel : Nat) (state : BareissArrayState) :
+    BareissArrayState :=
+  match fuel with
+  | 0 => state
+  | fuel + 1 =>
+      if state.step + 1 < n then
+        let k := state.step
+        let (rows, swaps) :=
+          if getEntry state.matrix k k = 0 then
+            match findPivotArray? state.matrix n k (state.step + 1) with
+            | some pivot => (swapRowsArray state.matrix k pivot, state.rowSwaps + 1)
+            | none => (state.matrix, state.rowSwaps)
+          else
+            (state.matrix, state.rowSwaps)
+        let pivot := getEntry rows k k
+        if pivot = 0 then
+          { state with matrix := rows, rowSwaps := swaps, singularStep := some state.step }
+        else
+          let next : BareissArrayState :=
+            { step := state.step + 1
+              matrix := stepArray rows n state.step pivot state.prevPivot
+              prevPivot := pivot
+              rowSwaps := swaps
+              singularStep := none }
+          pivotArrayLoop n fuel next
+      else
+        state
+
+private def bareissArrayState (M : Matrix Int n n) : BareissArrayState :=
+  pivotArrayLoop n n
+    { step := 0
+      matrix := matrixToRows M
+      prevPivot := 1
+      rowSwaps := 0
+      singularStep := none }
+
+private def arraySign (rowSwaps : Nat) : Int :=
+  if rowSwaps % 2 = 0 then 1 else -1
+
+private def arrayLastDiag? (rows : Array (Array Int)) (n : Nat) : Option Int :=
+  match n with
+  | 0 => none
+  | k + 1 => some (getEntry rows k k)
+
+private def bareissArrayDet (state : BareissArrayState) (n : Nat) : Int :=
+  match state.singularStep with
+  | some _ => 0
+  | none =>
+      match arrayLastDiag? state.matrix n with
+      | some d => arraySign state.rowSwaps * d
+      | none => arraySign state.rowSwaps
+
 private def finish (state : BareissState n) : BareissData n :=
   { matrix := state.matrix
     rowSwaps := state.rowSwaps
@@ -170,16 +287,15 @@ def bareissNoPivot (M : Matrix Int n n) : Int :=
 /-- Run the row-pivoted Bareiss elimination and return the final elimination
 data together with the swap/sign bookkeeping. -/
 def bareissData (M : Matrix Int n n) : BareissData n :=
-  finish <| pivotLoop n
-    { step := 0
-      matrix := M
-      prevPivot := 1
-      rowSwaps := 0
-      singularStep := none }
+  let state := bareissArrayState M
+  { matrix := rowsToMatrix state.matrix n
+    rowSwaps := state.rowSwaps
+    singularStep := state.singularStep }
 
 /-- Determinant computed by the row-pivoted Bareiss algorithm. -/
 def bareiss (M : Matrix Int n n) : Int :=
-  (bareissData M).det
+  let state := bareissArrayState M
+  bareissArrayDet state n
 
 /-- The Bareiss determinant agrees with the generic determinant. -/
 theorem bareiss_eq_det (M : Matrix Int n n) :
