@@ -241,11 +241,25 @@ noncomputable def gramSchmidtCoeff (s : LLLState n m) (i j : Nat)
   (((s.ν.get ⟨i, hi⟩).get ⟨j, hj⟩ : Int) : Rat) / (s.d.get ⟨j + 1, Nat.succ_lt_succ hj⟩ : Rat)
 
 /-- The multiplicative potential used by the LLL termination argument:
-`d₁ * ... * dₙ`. -/
+`d₁ * ... * dₙ₋₁`. -/
 def potential (s : LLLState n m) : Nat :=
-  (List.finRange n).foldl
-    (fun acc i => acc * s.d.get ⟨i.val + 1, Nat.succ_lt_succ i.isLt⟩)
+  (List.finRange (n - 1)).foldl
+    (fun acc i =>
+      acc * s.d.get
+        ⟨i.val + 1, Nat.succ_lt_succ (Nat.lt_of_lt_of_le i.isLt (Nat.sub_le n 1))⟩)
     1
+
+/-- Unfold the termination potential through the state's Gram-determinant
+certificate. The product only ranges over `d₁, ..., dₙ₋₁`, so later
+termination proofs do not need to reason about `dₙ`. -/
+theorem potential_eq_gramDetProduct (s : LLLState n m) :
+    s.potential =
+      (List.finRange (n - 1)).foldl
+        (fun acc i =>
+          acc * GramSchmidt.Int.gramDet s.b (i.val + 1)
+            (Nat.succ_le_of_lt (Nat.lt_of_lt_of_le i.isLt (Nat.sub_le n 1))))
+        1 := by
+  simp [potential, s.d_eq]
 
 end LLLState
 
