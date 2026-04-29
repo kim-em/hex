@@ -18,9 +18,21 @@ Scientific registrations:
 * `runComposeChecksum`: Horner composition using schoolbook multiplication,
   `O(n^3)` for same-size dense inputs.
 * `runDerivativeChecksum`: formal derivative, `O(n)`.
+* `runDivModChecksum`: field-polynomial long division returning quotient and
+  remainder, `O(n^2)`.
+* `runDivChecksum`: quotient extraction from field-polynomial long division,
+  `O(n^2)`.
+* `runModChecksum`: remainder extraction from field-polynomial long division,
+  `O(n^2)`.
+* `runModByMonicChecksum`: remainder from division by a monic divisor,
+  `O(n^2)`.
+* `runGcdChecksum`: Euclidean gcd over a field, `O(n^3)` with the current
+  schoolbook division path.
+* `runXGcdChecksum`: extended Euclidean algorithm over a field, `O(n^3)` with
+  the current schoolbook division path.
 
-Euclidean division, gcd/xgcd, integer content/primitive part, and polynomial
-CRT are intentionally left for later Phase 4 slices.
+Integer content/primitive part and polynomial CRT are intentionally left for
+later Phase 4 slices.
 -/
 
 namespace Hex.PolyBench
@@ -52,6 +64,18 @@ structure ComposeInput where
   inner : DensePoly Int
   deriving Hashable
 
+/-- Prepared input for field-polynomial Euclidean operations. -/
+structure EuclidInput where
+  dividend : DensePoly Rat
+  divisor : DensePoly Rat
+  deriving Hashable
+
+/-- Prepared input for division by a generated monic polynomial. -/
+structure MonicInput where
+  dividend : DensePoly Rat
+  divisorDegree : Nat
+  deriving Hashable
+
 /-- Deterministic nonzero-ish coefficient generator keyed by size, index, and salt. -/
 def coeffValue (n i salt : Nat) : Int :=
   let raw := ((i + 1) * (salt + 17) + (i + 3) * (i + 5) * 13 + n * 29) % 1009
@@ -61,8 +85,28 @@ def coeffValue (n i salt : Nat) : Int :=
 def densePoly (n salt : Nat) : DensePoly Int :=
   DensePoly.ofCoeffs <| (Array.range n).map fun i => coeffValue n i salt
 
+/-- Deterministic dense polynomial over `Rat` for field-operation benchmarks. -/
+def denseRatPoly (n salt : Nat) : DensePoly Rat :=
+  DensePoly.ofCoeffs <| (Array.range n).map fun i => (coeffValue n i salt : Rat)
+
+/-- Deterministic monic divisor used by `modByMonic` benchmarks. -/
+def monicDivisor (degree : Nat) : DensePoly Rat :=
+  { coeffs := (Array.replicate degree (0 : Rat)).push 1
+    normalized := by
+      right
+      have hone : ¬((1 : Rat) = Zero.zero) := by decide
+      simp [hone] }
+
+/-- Generated monomial divisors are monic by construction. -/
+theorem monicDivisor_monic (degree : Nat) : DensePoly.Monic (monicDivisor degree) := by
+  simp [monicDivisor, DensePoly.Monic, DensePoly.leadingCoeff]
+
 /-- Stable scalar observable for polynomial-valued benchmark results. -/
 def checksum (p : DensePoly Int) : Int :=
+  p.toArray.foldl (fun acc coeff => acc * 65_537 + coeff) 0
+
+/-- Stable scalar observable for field-polynomial benchmark results. -/
+def ratChecksum (p : DensePoly Rat) : Rat :=
   p.toArray.foldl (fun acc coeff => acc * 65_537 + coeff) 0
 
 /-- Per-parameter fixture for addition, subtraction, and multiplication. -/
@@ -83,6 +127,16 @@ def prepEvalInput (n : Nat) : EvalInput :=
 def prepComposeInput (n : Nat) : ComposeInput :=
   { outer := densePoly n 89
     inner := densePoly n 107 }
+
+/-- Per-parameter fixture for field-polynomial long division. -/
+def prepEuclidInput (n : Nat) : EuclidInput :=
+  { dividend := denseRatPoly (2 * n + 1) 131
+    divisor := denseRatPoly (n + 1) 173 }
+
+/-- Per-parameter fixture for division by a monic polynomial. -/
+def prepMonicInput (n : Nat) : MonicInput :=
+  { dividend := denseRatPoly (2 * n + 1) 191
+    divisorDegree := n + 1 }
 
 /-- Benchmark target: add two prepared dense polynomials and checksum the result. -/
 def runAddChecksum (input : BinaryInput) : Int :=
@@ -107,6 +161,33 @@ def runComposeChecksum (input : ComposeInput) : Int :=
 /-- Benchmark target: compute the formal derivative and checksum the result. -/
 def runDerivativeChecksum (input : UnaryInput) : Int :=
   checksum (DensePoly.derivative input.poly)
+
+/-- Benchmark target: compute quotient and remainder, then checksum both outputs. -/
+def runDivModChecksum (input : EuclidInput) : Rat :=
+  let qr := DensePoly.divMod input.dividend input.divisor
+  ratChecksum qr.1 * 131_071 + ratChecksum qr.2
+
+/-- Benchmark target: compute the quotient from field-polynomial long division. -/
+def runDivChecksum (input : EuclidInput) : Rat :=
+  ratChecksum (input.dividend / input.divisor)
+
+/-- Benchmark target: compute the remainder from field-polynomial long division. -/
+def runModChecksum (input : EuclidInput) : Rat :=
+  ratChecksum (input.dividend % input.divisor)
+
+/-- Benchmark target: compute the remainder from division by a monic polynomial. -/
+def runModByMonicChecksum (input : MonicInput) : Rat :=
+  let divisor := monicDivisor input.divisorDegree
+  ratChecksum (DensePoly.modByMonic input.dividend divisor (monicDivisor_monic input.divisorDegree))
+
+/-- Benchmark target: compute the Euclidean gcd and checksum the result. -/
+def runGcdChecksum (input : EuclidInput) : Rat :=
+  ratChecksum (DensePoly.gcd input.dividend input.divisor)
+
+/-- Benchmark target: compute extended gcd and checksum gcd plus Bezout outputs. -/
+def runXGcdChecksum (input : EuclidInput) : Rat :=
+  let result := DensePoly.xgcd input.dividend input.divisor
+  ratChecksum result.gcd * 1_048_573 + ratChecksum result.left * 1_024 + ratChecksum result.right
 
 setup_benchmark runAddChecksum n => n
   with prep := prepBinaryInput
@@ -165,6 +246,66 @@ setup_benchmark runDerivativeChecksum n => n
     paramCeiling := 131072
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runDivModChecksum n => n * n
+  with prep := prepEuclidInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runDivChecksum n => n * n
+  with prep := prepEuclidInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runModChecksum n => n * n
+  with prep := prepEuclidInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runModByMonicChecksum n => n * n
+  with prep := prepMonicInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 3.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runGcdChecksum n => n * n * n
+  with prep := prepEuclidInput
+  where {
+    paramFloor := 16
+    paramCeiling := 96
+    paramSchedule := .custom #[16, 24, 32, 48, 64, 96]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+  }
+
+setup_benchmark runXGcdChecksum n => n * n * n
+  with prep := prepEuclidInput
+  where {
+    paramFloor := 16
+    paramCeiling := 96
+    paramSchedule := .custom #[16, 24, 32, 48, 64, 96]
+    maxSecondsPerCall := 4.0
     targetInnerNanos := 200000000
   }
 
