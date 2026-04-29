@@ -126,6 +126,24 @@ theorem coeffWords_normalizeWords (words : Array UInt64) (n : Nat) :
 private def highestSetBit? (w : UInt64) : Option Nat :=
   (List.range 64).reverse.find? fun i => (((w >>> i.toUInt64) &&& 1) != 0)
 
+/-- If the highest-set-bit search returns a bit, that bit is set. -/
+private theorem highestSetBit?_coeff_eq_true {w : UInt64} {i : Nat}
+    (h : highestSetBit? w = some i) :
+    (((w >>> i.toUInt64) &&& 1) != 0) = true := by
+  sorry
+
+/-- If the highest-set-bit search returns `i`, every higher bit below the
+machine-word width is clear. -/
+private theorem highestSetBit?_coeff_eq_false_of_lt {w : UInt64} {i j : Nat}
+    (h : highestSetBit? w = some i) (hij : i < j) (hj : j < 64) :
+    (((w >>> j.toUInt64) &&& 1) != 0) = false := by
+  sorry
+
+/-- A nonzero machine word has a highest set bit. -/
+private theorem highestSetBit?_eq_some_of_ne_zero {w : UInt64} (h : w ≠ 0) :
+    ∃ i, highestSetBit? w = some i := by
+  sorry
+
 /-- Build a normalized packed polynomial from a raw word array. -/
 def ofWords (words : Array UInt64) : GF2Poly :=
   let normalizedWords := normalizeWords words
@@ -203,6 +221,29 @@ def degree? (p : GF2Poly) : Option Nat :=
 /-- The degree of a polynomial, defaulting to `0` for the zero polynomial. -/
 def degree (p : GF2Poly) : Nat :=
   p.degree?.getD 0
+
+/-- A polynomial whose executable zero test is false has a computed degree. -/
+theorem degree?_eq_some_of_isZero_eq_false {p : GF2Poly} (h : p.isZero = false) :
+    ∃ d, p.degree? = some d := by
+  sorry
+
+/-- If `degree?` computes `d`, the defaulting `degree` accessor is exactly `d`. -/
+theorem degree_eq_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p.degree = d := by
+  simp [degree, h]
+
+/-- If `degree?` computes `d`, the coefficient of `x^d` is set. -/
+theorem coeff_eq_true_of_degree?_eq_some {p : GF2Poly} {d : Nat}
+    (h : p.degree? = some d) :
+    p.coeff d = true := by
+  sorry
+
+/-- If `degree?` computes `d`, every coefficient above `d` is clear. -/
+theorem coeff_eq_false_of_degree?_lt {p : GF2Poly} {d n : Nat}
+    (h : p.degree? = some d) (hdn : d < n) :
+    p.coeff n = false := by
+  sorry
 
 @[simp] theorem words_zero : (0 : GF2Poly).words = #[] := by
   rfl
@@ -352,6 +393,31 @@ theorem coeff_monomial (n m : Nat) :
         ((Array.replicate (n / 64) (0 : UInt64)).push ((1 : UInt64) <<< (n % 64).toUInt64))
         m := by
   simp [monomial]
+
+/-- The packed monomial `x^n` has computed degree `n`. -/
+@[simp] theorem degree?_monomial (n : Nat) :
+    (monomial n).degree? = some n := by
+  sorry
+
+/-- The defaulting degree accessor agrees with the exponent of a monomial. -/
+@[simp] theorem degree_monomial (n : Nat) :
+    (monomial n).degree = n := by
+  exact degree_eq_of_degree?_eq_some (degree?_monomial n)
+
+/-- The coefficient at the defining exponent of a monomial is set. -/
+@[simp] theorem coeff_monomial_self (n : Nat) :
+    (monomial n).coeff n = true := by
+  exact coeff_eq_true_of_degree?_eq_some (degree?_monomial n)
+
+/-- All coefficients above the defining exponent of a monomial are clear. -/
+theorem coeff_monomial_eq_false_of_lt {n m : Nat} (hnm : n < m) :
+    (monomial n).coeff m = false := by
+  exact coeff_eq_false_of_degree?_lt (degree?_monomial n) hnm
+
+/-- Monomials have no coefficients away from their defining exponent. -/
+theorem coeff_monomial_eq_false_of_ne {n m : Nat} (hnm : m ≠ n) :
+    (monomial n).coeff m = false := by
+  sorry
 
 /-- Shift-left coefficients reduce to the coefficient lookup on the shifted packed words. -/
 theorem coeff_shiftLeft (p : GF2Poly) (k n : Nat) :
