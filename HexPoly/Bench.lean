@@ -128,13 +128,13 @@ def monicDivisor (degree : Nat) : DensePoly Rat :=
 theorem monicDivisor_monic (degree : Nat) : DensePoly.Monic (monicDivisor degree) := by
   simp [monicDivisor, DensePoly.Monic, DensePoly.leadingCoeff]
 
-/-- Stable scalar observable for polynomial-valued benchmark results. -/
-def checksum (p : DensePoly Int) : Int :=
-  p.toArray.foldl (fun acc coeff => acc * 65_537 + coeff) 0
+/-- Stable bounded observable for polynomial-valued benchmark results. -/
+def checksum [Hashable R] [Zero R] [DecidableEq R] (p : DensePoly R) : UInt64 :=
+  p.toArray.foldl (fun acc coeff => mixHash acc (hash coeff)) 0
 
-/-- Stable scalar observable for field-polynomial benchmark results. -/
-def ratChecksum (p : DensePoly Rat) : Rat :=
-  p.toArray.foldl (fun acc coeff => acc * 65_537 + coeff) 0
+/-- Stable bounded observable for pairs of polynomial-valued benchmark results. -/
+def checksumPair [Hashable R] [Zero R] [DecidableEq R] (p q : DensePoly R) : UInt64 :=
+  mixHash (checksum p) (checksum q)
 
 /-- Per-parameter fixture for addition, subtraction, and multiplication. -/
 def prepBinaryInput (n : Nat) : BinaryInput :=
@@ -181,15 +181,15 @@ def prepPolyCRTInput (n : Nat) : PolyCRTInput :=
     bezoutT := DensePoly.C (1 : Rat) }
 
 /-- Benchmark target: add two prepared dense polynomials and checksum the result. -/
-def runAddChecksum (input : BinaryInput) : Int :=
+def runAddChecksum (input : BinaryInput) : UInt64 :=
   checksum (input.lhs + input.rhs)
 
 /-- Benchmark target: subtract two prepared dense polynomials and checksum the result. -/
-def runSubChecksum (input : BinaryInput) : Int :=
+def runSubChecksum (input : BinaryInput) : UInt64 :=
   checksum (input.lhs - input.rhs)
 
 /-- Benchmark target: multiply two prepared dense polynomials and checksum the result. -/
-def runMulChecksum (input : BinaryInput) : Int :=
+def runMulChecksum (input : BinaryInput) : UInt64 :=
   checksum (input.lhs * input.rhs)
 
 /-- Benchmark target: evaluate a prepared dense polynomial at a fixed point. -/
@@ -197,51 +197,51 @@ def runEval (input : EvalInput) : Int :=
   DensePoly.eval input.poly input.point
 
 /-- Benchmark target: compose two prepared same-size dense polynomials. -/
-def runComposeChecksum (input : ComposeInput) : Int :=
+def runComposeChecksum (input : ComposeInput) : UInt64 :=
   checksum (DensePoly.compose input.outer input.inner)
 
 /-- Benchmark target: compute the formal derivative and checksum the result. -/
-def runDerivativeChecksum (input : UnaryInput) : Int :=
+def runDerivativeChecksum (input : UnaryInput) : UInt64 :=
   checksum (DensePoly.derivative input.poly)
 
 /-- Benchmark target: compute quotient and remainder, then checksum both outputs. -/
-def runDivModChecksum (input : EuclidInput) : Rat :=
+def runDivModChecksum (input : EuclidInput) : UInt64 :=
   let qr := DensePoly.divMod input.dividend input.divisor
-  ratChecksum qr.1 * 131_071 + ratChecksum qr.2
+  checksumPair qr.1 qr.2
 
 /-- Benchmark target: compute the quotient from field-polynomial long division. -/
-def runDivChecksum (input : EuclidInput) : Rat :=
-  ratChecksum (input.dividend / input.divisor)
+def runDivChecksum (input : EuclidInput) : UInt64 :=
+  checksum (input.dividend / input.divisor)
 
 /-- Benchmark target: compute the remainder from field-polynomial long division. -/
-def runModChecksum (input : EuclidInput) : Rat :=
-  ratChecksum (input.dividend % input.divisor)
+def runModChecksum (input : EuclidInput) : UInt64 :=
+  checksum (input.dividend % input.divisor)
 
 /-- Benchmark target: compute the remainder from division by a monic polynomial. -/
-def runModByMonicChecksum (input : MonicInput) : Rat :=
+def runModByMonicChecksum (input : MonicInput) : UInt64 :=
   let divisor := monicDivisor input.divisorDegree
-  ratChecksum (DensePoly.modByMonic input.dividend divisor (monicDivisor_monic input.divisorDegree))
+  checksum (DensePoly.modByMonic input.dividend divisor (monicDivisor_monic input.divisorDegree))
 
 /-- Benchmark target: compute the Euclidean gcd and checksum the result. -/
-def runGcdChecksum (input : EuclidInput) : Rat :=
-  ratChecksum (DensePoly.gcd input.dividend input.divisor)
+def runGcdChecksum (input : EuclidInput) : UInt64 :=
+  checksum (DensePoly.gcd input.dividend input.divisor)
 
 /-- Benchmark target: compute extended gcd and checksum gcd plus Bezout outputs. -/
-def runXGcdChecksum (input : EuclidInput) : Rat :=
+def runXGcdChecksum (input : EuclidInput) : UInt64 :=
   let result := DensePoly.xgcd input.dividend input.divisor
-  ratChecksum result.gcd * 1_048_573 + ratChecksum result.left * 1_024 + ratChecksum result.right
+  mixHash (checksum result.gcd) (checksumPair result.left result.right)
 
 /-- Benchmark target: compute integer coefficient content. -/
 def runContent (input : ContentInput) : Int :=
   DensePoly.content input.poly
 
 /-- Benchmark target: compute integer primitive part and checksum the result. -/
-def runPrimitivePartChecksum (input : ContentInput) : Int :=
+def runPrimitivePartChecksum (input : ContentInput) : UInt64 :=
   checksum (DensePoly.primitivePart input.poly)
 
 /-- Benchmark target: construct a polynomial CRT witness and checksum it. -/
-def runPolyCRTChecksum (input : PolyCRTInput) : Rat :=
-  ratChecksum <|
+def runPolyCRTChecksum (input : PolyCRTInput) : UInt64 :=
+  checksum <|
     DensePoly.polyCRT
       input.modulusA input.modulusB input.residueA input.residueB input.bezoutS input.bezoutT
 
@@ -253,6 +253,7 @@ setup_benchmark runAddChecksum n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runSubChecksum n => n
@@ -263,6 +264,7 @@ setup_benchmark runSubChecksum n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runMulChecksum n => n * n
@@ -273,6 +275,7 @@ setup_benchmark runMulChecksum n => n * n
     paramSchedule := .custom #[128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runEval n => n
@@ -283,6 +286,7 @@ setup_benchmark runEval n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runComposeChecksum n => n * n * n
@@ -293,6 +297,7 @@ setup_benchmark runComposeChecksum n => n * n * n
     paramSchedule := .custom #[16, 24, 32, 48, 64]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runDerivativeChecksum n => n
@@ -303,6 +308,7 @@ setup_benchmark runDerivativeChecksum n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runDivModChecksum n => n * n
@@ -313,6 +319,7 @@ setup_benchmark runDivModChecksum n => n * n
     paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runDivChecksum n => n * n
@@ -323,6 +330,7 @@ setup_benchmark runDivChecksum n => n * n
     paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runModChecksum n => n * n
@@ -333,6 +341,7 @@ setup_benchmark runModChecksum n => n * n
     paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runModByMonicChecksum n => n * n
@@ -343,6 +352,7 @@ setup_benchmark runModByMonicChecksum n => n * n
     paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runGcdChecksum n => n * n * n
@@ -353,6 +363,7 @@ setup_benchmark runGcdChecksum n => n * n * n
     paramSchedule := .custom #[16, 24, 32, 48, 64, 96]
     maxSecondsPerCall := 4.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runXGcdChecksum n => n * n * n
@@ -363,6 +374,7 @@ setup_benchmark runXGcdChecksum n => n * n * n
     paramSchedule := .custom #[16, 24, 32, 48, 64, 96]
     maxSecondsPerCall := 4.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runContent n => n
@@ -373,6 +385,7 @@ setup_benchmark runContent n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runPrimitivePartChecksum n => n
@@ -383,6 +396,7 @@ setup_benchmark runPrimitivePartChecksum n => n
     paramSchedule := .custom #[8192, 16384, 32768, 65536, 131072]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runPolyCRTChecksum n => n * n
@@ -393,6 +407,7 @@ setup_benchmark runPolyCRTChecksum n => n * n
     paramSchedule := .custom #[128, 192, 256, 384, 512]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 end Hex.PolyBench
