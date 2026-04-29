@@ -8,7 +8,7 @@ This module implements a Yun-style square-free decomposition for
 `Hex.FpPoly p`, recording the unit factor and the positive-multiplicity
 square-free factors obtained from repeated gcd/derivative steps and
 `p`-th-root descent in characteristic `p`. The public API carries an
-explicit `Nat.Prime p` contract because the exported factorization and
+explicit `Hex.Nat.Prime p` contract because the exported factorization and
 square-free theorems are intended for prime-field coefficients.
 -/
 namespace Hex
@@ -124,7 +124,7 @@ private def squareFreeAux (f : FpPoly p) (multiplicity : Nat) :
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
 -/
-def squareFreeDecomposition (hp : Nat.Prime p) (f : FpPoly p) : SquareFreeDecomposition p :=
+def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDecomposition p :=
   let _ := hp
   let normalized := normalizeMonic f
   let unit := normalized.1
@@ -132,17 +132,17 @@ def squareFreeDecomposition (hp : Nat.Prime p) (f : FpPoly p) : SquareFreeDecomp
   let factors := squareFreeAux monicPart 1 (monicPart.size + 1)
   { unit, factors }
 
-theorem squareFree_pairwise_coprime (hp : Nat.Prime p) (f : FpPoly p) :
+theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   sorry
 
-theorem squareFree_weightedProduct (hp : Nat.Prime p) (f : FpPoly p) :
+theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     DensePoly.C d.unit * weightedProduct d.factors = f := by
   sorry
 
-theorem squareFree_factors_squareFree (hp : Nat.Prime p) (f : FpPoly p) :
+theorem squareFree_factors_squareFree (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     ∀ sf ∈ d.factors, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
   sorry

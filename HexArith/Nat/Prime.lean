@@ -3,10 +3,12 @@ import HexArith.Nat.ModArith
 /-!
 Mathlib-free combinatorial and prime-number lemmas for `HexArith`.
 
-This module owns the local `Nat.choose` and `Nat.Prime` surfaces that the
+This module owns the local `Hex.Nat.choose` and `Hex.Nat.Prime` surfaces that the
 computational core needs for binomial divisibility and Fermat-style congruence
 statements, without importing Mathlib into the root arithmetic layer.
 -/
+
+namespace Hex
 
 namespace Nat
 
@@ -39,9 +41,9 @@ def Prime (p : Nat) : Prop :=
 
 namespace Prime
 
-theorem two_le {p : Nat} (hp : Nat.Prime p) : 2 ≤ p := hp.1
+theorem two_le {p : Nat} (hp : Hex.Nat.Prime p) : 2 ≤ p := hp.1
 
-theorem dvd_mul {p a b : Nat} (hp : Nat.Prime p) (h : p ∣ a * b) :
+theorem dvd_mul {p a b : Nat} (hp : Hex.Nat.Prime p) (h : p ∣ a * b) :
     p ∣ a ∨ p ∣ b := by
   sorry
 
@@ -51,22 +53,24 @@ end Prime
 Every nontrivial binomial coefficient in the `p`th row of Pascal's triangle is
 divisible by `p` when `p` is prime.
 -/
-theorem choose_prime_dvd {p k : Nat} (hp : Nat.Prime p) (hk : 0 < k) (hk' : k < p) :
-    p ∣ Nat.choose p k := by
+theorem choose_prime_dvd {p k : Nat} (hp : Prime p) (hk : 0 < k) (hk' : k < p) :
+    p ∣ choose p k := by
   sorry
 
 /--
 Freshman's dream modulo a prime: all middle binomial terms vanish.
 -/
-theorem add_pow_prime_mod {p : Nat} (hp : Nat.Prime p) (a b : Nat) :
+theorem add_pow_prime_mod {p : Nat} (hp : Prime p) (a b : Nat) :
     (a + b) ^ p % p = (a ^ p + b ^ p) % p := by
   sorry
 
 /--
 Fermat's little theorem in the form used by downstream modular arithmetic code.
 -/
-theorem pow_prime_mod {p : Nat} (hp : Nat.Prime p) (a : Nat) :
+theorem pow_prime_mod {p : Nat} (hp : Prime p) (a : Nat) :
     a ^ p % p = a % p := by
   sorry
 
 end Nat
+
+end Hex

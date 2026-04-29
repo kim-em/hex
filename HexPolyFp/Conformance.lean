@@ -41,7 +41,7 @@ private theorem one_ne_zero_five : (1 : ZMod64 5) ≠ 0 := by
   have hm := (ZMod64.natCast_eq_natCast_iff (p := 5) 1 0).mp h
   simp at hm
 
-private theorem prime_five : Nat.Prime 5 := by
+private theorem prime_five : Hex.Nat.Prime 5 := by
   constructor
   · decide
   · intro m hm
