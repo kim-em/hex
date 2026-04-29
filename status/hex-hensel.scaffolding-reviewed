@@ -1,0 +1,2 @@
+Reviewed in issue #1086.
+No additional downstream-facing scaffold gaps were identified against `SPEC/Libraries/hex-hensel.md`, `SPEC/Libraries/hex-berlekamp-zassenhaus.md`, and `PLAN/Phase2.md`.
