@@ -1,14 +1,27 @@
 name: Conformance
 
 on:
+  push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
   conformance:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - HexArith
+          - HexPoly
+          - HexMatrix
     steps:
       - uses: actions/checkout@v4
-      - name: Phase 0 stub
+      - name: Install system dependencies
         run: |
-          echo "Phase 0 stub: conformance workflow to be expanded per SPEC/testing.md."
-      - uses: leanprover/lean-action@v1
+          sudo apt-get update
+          sudo apt-get install -y libgmp-dev
+      - name: Build ${{ matrix.target }} conformance checks
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: ${{ matrix.target }}
