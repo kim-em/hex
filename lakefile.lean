@@ -64,6 +64,9 @@ lean_lib HexMatrix where
 
 lean_lib HexModArith where
   precompileModules := true
+  moreLinkArgs := #[
+    s!"{(defaultBuildDir / "lib" / nameToStaticLib "hexmodarithffi").toString}"
+  ]
 
 lean_lib HexGramSchmidt where
 
@@ -122,6 +125,9 @@ lean_exe hexpoly_bench where
 
 lean_exe hexgramschmidt_bench where
   root := `HexGramSchmidt.Bench
+
+lean_exe hexmodarith_bench where
+  root := `HexModArith.Bench
 
 @[default_target]
 lean_lib HexManual where
