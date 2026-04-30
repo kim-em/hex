@@ -233,11 +233,39 @@ theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
   intro hdeg
   simp [divMod, hdeg]
 
+/-- Core division invariant: for positive-degree divisors, `divMod` returns a remainder whose
+degree is strictly smaller than the divisor degree. -/
+theorem divMod_remainder_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    0 < q.degree?.getD 0 → (divMod p q).2.degree?.getD 0 < q.degree?.getD 0 := by
+  sorry
+
+/-- Monic division agrees with field-style division when the divisor is monic. This is the
+implementation invariant relating the specialized `divModMonic` path to `divMod`. -/
+theorem divModMonic_eq_divMod_of_monic [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) (hq : Monic q) :
+    divModMonic p q hq = divMod p q := by
+  sorry
+
+/-- A polynomial whose degree is already below the divisor is its own remainder. -/
+theorem mod_eq_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    p.degree?.getD 0 < q.degree?.getD 0 → p % q = p := by
+  intro hdeg
+  have hdiv := divMod_eq_zero_self_of_degree_lt p q hdeg
+  simpa [DensePoly.mod] using congrArg Prod.snd hdiv
+
+/-- Constant-degree divisors are an idempotent edge case for `%`. -/
+theorem mod_mod_of_not_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) :
+    ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q := by
+  sorry
+
 /-- The computed remainder has degree below a positive-degree divisor. -/
 theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     0 < q.degree?.getD 0 → (p % q).degree?.getD 0 < q.degree?.getD 0 := by
-  sorry
+  simpa [DensePoly.mod] using divMod_remainder_degree_lt_of_pos_degree p q
 
 theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
@@ -247,12 +275,14 @@ theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
 theorem modByMonic_eq_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) (hq : Monic q) :
     modByMonic p q hq = p % q := by
-  sorry
+  rw [modByMonic_eq_divModMonic, mod_eq_divMod, divModMonic_eq_divMod_of_monic p q hq]
 
 theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     (p % q) % q = p % q := by
-  sorry
+  by_cases hq : 0 < q.degree?.getD 0
+  · exact mod_eq_self_of_degree_lt (p % q) q (mod_degree_lt_of_pos_degree p q hq)
+  · exact mod_mod_of_not_pos_degree p q hq
 
 /-- Reducing both summands before addition preserves the canonical remainder. -/
 theorem mod_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
