@@ -1,0 +1,4 @@
+Reviewed in issue #1272.
+All HexGF2 Phase 4 parametric benchmark registrations returned verdicts
+consistent with their declared complexity, and the required packed/generic
+comparison groups agreed on common parameters.
