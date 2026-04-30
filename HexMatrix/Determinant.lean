@@ -185,6 +185,26 @@ private theorem foldl_det_sum_add_zero {R : Type u} [Lean.Grind.CommRing R]
         xs.foldl (fun acc x => acc + g x) 0 := by
         exact foldl_det_sum_add_start xs f g 0 0
 
+private theorem foldl_det_sum_flatMap {R : Type u} [Add R] {β γ : Type v}
+    (xs : List β) (f : β → List γ) (g : γ → R) (z : R) :
+    (xs.flatMap f).foldl (fun acc x => acc + g x) z =
+      xs.foldl (fun acc x => (f x).foldl (fun acc y => acc + g y) acc) z := by
+  induction xs generalizing z with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.flatMap_cons, List.foldl_append, List.foldl_cons]
+      exact ih ((f x).foldl (fun acc y => acc + g y) z)
+
+private theorem foldl_det_sum_zero {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (z : R) :
+    xs.foldl (fun acc _ => acc + 0) z = z := by
+  induction xs generalizing z with
+  | nil => rfl
+  | cons _ xs ih =>
+      simp only [List.foldl_cons]
+      have hzero : z + (0 : R) = z := by grind
+      simpa [hzero] using ih z
+
 private theorem foldl_det_product_mul_left {R : Type u} [Lean.Grind.CommRing R]
     {β : Type v} (xs : List β) (c : R) (f : β → R) (z : R) :
     xs.foldl (fun acc x => acc * f x) (c * z) =
@@ -587,6 +607,41 @@ private theorem detTerm_identity_insertAt_last {R : Type u}
   unfold detTerm
   rw [detSign_insertAt_last, detProduct_identity_insertAt_last]
 
+private theorem foldl_detTerm_identity_insertions {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (v : Vector (Fin n) n) (z : R) :
+    (List.finRange (n + 1)).foldl
+        (fun acc i =>
+          acc + detTerm (1 : Matrix R (n + 1) (n + 1))
+            (insertAt (Fin.last n) (v.map Fin.castSucc) i)) z =
+      z + detTerm (1 : Matrix R n n) v := by
+  rw [← Fin.foldl_eq_foldl_finRange]
+  rw [Fin.foldl_succ_last]
+  have hprefix :
+      Fin.foldl n
+          (fun acc i =>
+            acc + detTerm (1 : Matrix R (n + 1) (n + 1))
+              (insertAt (Fin.last n) (v.map Fin.castSucc) i.castSucc)) z = z := by
+    rw [Fin.foldl_eq_foldl_finRange]
+    calc
+      (List.finRange n).foldl
+          (fun acc i =>
+            acc + detTerm (1 : Matrix R (n + 1) (n + 1))
+              (insertAt (Fin.last n) (v.map Fin.castSucc) i.castSucc)) z =
+        (List.finRange n).foldl (fun acc (_i : Fin n) => acc + (0 : R)) z := by
+          apply foldl_det_sum_congr
+          intro i _hmem
+          unfold detTerm
+          rw [detProduct_identity_insertAt_not_last_zero (R := R) v i.castSucc (by
+            intro hlast
+            have hval := congrArg Fin.val hlast
+            simp at hval
+            exact (Nat.ne_of_lt i.isLt) hval)]
+          grind
+      _ = z := by
+          exact foldl_det_sum_zero (List.finRange n) z
+  rw [hprefix]
+  rw [detTerm_identity_insertAt_last]
+
 private theorem rowScale_get {R : Type u} [Mul R] {n m : Nat}
     (M : Matrix R n m) (i r : Fin n) (c : R) (k : Fin m) :
     (rowScale M i c)[r][k] = if r = i then c * M[i][k] else M[r][k] := by
@@ -757,7 +812,15 @@ private theorem permutationVectors_identity_sum {R : Type u} [Lean.Grind.CommRin
     {n : Nat} :
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (1 : Matrix R n n) perm) 0 = 1 := by
-  sorry
+  induction n with
+  | zero =>
+      simp [permutationVectors, emptyVec, detTerm, detSign, detProduct, inversionCount]
+      grind
+  | succ n ih =>
+      simp only [permutationVectors]
+      rw [foldl_det_sum_flatMap]
+      simp only [List.foldl_map, foldl_detTerm_identity_insertions]
+      exact ih
 
 /-- Row swapping pairs the permutation-vector Leibniz terms with opposite sign. -/
 private theorem permutationVectors_rowSwap_sum {R : Type u} [Lean.Grind.CommRing R]
