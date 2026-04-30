@@ -930,6 +930,189 @@ private theorem transposePermutationValues_get {n : Nat}
     (transposePermutationValues perm i j)[r] = perm[finTranspose i j r] := by
   simp [transposePermutationValues]
 
+private theorem vector_get_fin_congr {α : Type u} {n : Nat} (v : Vector α n)
+    {a b : Fin n} (h : a = b) : v[a] = v[b] := by
+  subst b
+  rfl
+
+private theorem vector_toList_split_two {α : Type u} {n : Nat}
+    (v : Vector α n) {i j : Fin n} (hij : i.val < j.val) :
+    v.toList =
+      v.toList.take i.val ++ v[i] ::
+        (v.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+          v[j] :: v.toList.drop (j.val + 1) := by
+  have hi : i.val < v.toList.length := by
+    simp [Vector.length_toList]
+  have hjdrop : j.val - i.val - 1 < (v.toList.drop (i.val + 1)).length := by
+    simp only [List.length_drop, Vector.length_toList]
+    omega
+  calc
+    v.toList = v.toList.take i.val ++ v.toList.drop i.val := by
+      exact (List.take_append_drop i.val v.toList).symm
+    _ = v.toList.take i.val ++ v[i] :: v.toList.drop (i.val + 1) := by
+      rw [List.drop_eq_getElem_cons hi]
+      simp [Vector.getElem_toList]
+    _ =
+      v.toList.take i.val ++ v[i] ::
+        (v.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+          (v.toList.drop (i.val + 1)).drop (j.val - i.val - 1) := by
+      rw [List.append_assoc]
+      congr 1
+      congr 1
+      exact (List.take_append_drop (j.val - i.val - 1)
+        (v.toList.drop (i.val + 1))).symm
+    _ =
+      v.toList.take i.val ++ v[i] ::
+        (v.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+          v[j] :: v.toList.drop (j.val + 1) := by
+      have hmid : i.val + 1 + (j.val - i.val - 1) = j.val := by
+        omega
+      have hdrop : i.val + 1 + ((j.val - i.val - 1) + 1) = j.val + 1 := by
+        omega
+      rw [List.drop_eq_getElem_cons hjdrop]
+      simp [List.drop_drop, Vector.getElem_toList, List.getElem_drop, hmid, hdrop]
+
+private theorem transposePermutationValues_take_of_lt {n : Nat}
+    (perm : Vector (Fin n) n) {i j : Fin n} (hij : i.val < j.val) :
+    (transposePermutationValues perm i j).toList.take i.val =
+      perm.toList.take i.val := by
+  apply List.ext_getElem
+  · simp [Vector.length_toList]
+  · intro k hk₁ hk₂
+    simp [Vector.length_toList] at hk₁ hk₂
+    have hk : k < n := by omega
+    have hki : (⟨k, hk⟩ : Fin n) ≠ i := by
+      intro h
+      have : k = i.val := by simpa using congrArg Fin.val h
+      omega
+    have hkj : (⟨k, hk⟩ : Fin n) ≠ j := by
+      intro h
+      have : k = j.val := by simpa using congrArg Fin.val h
+      omega
+    calc
+      (List.take i.val (transposePermutationValues perm i j).toList)[k] =
+          (transposePermutationValues perm i j)[k]'hk := by
+        simp [Vector.getElem_toList]
+      _ = perm[k]'hk := by
+        change (transposePermutationValues perm i j)[(⟨k, hk⟩ : Fin n)] =
+          perm[(⟨k, hk⟩ : Fin n)]
+        rw [transposePermutationValues_get]
+        exact vector_get_fin_congr perm (finTranspose_of_ne i j ⟨k, hk⟩ hki hkj)
+      _ = (List.take i.val perm.toList)[k] := by
+        simp [Vector.getElem_toList]
+
+private theorem transposePermutationValues_middle_of_lt {n : Nat}
+    (perm : Vector (Fin n) n) {i j : Fin n} (hij : i.val < j.val) :
+    ((transposePermutationValues perm i j).toList.drop (i.val + 1)).take
+        (j.val - i.val - 1) =
+      (perm.toList.drop (i.val + 1)).take (j.val - i.val - 1) := by
+  apply List.ext_getElem
+  · simp [Vector.length_toList]
+  · intro k hk₁ hk₂
+    simp [Vector.length_toList] at hk₁ hk₂
+    have hrlt : i.val + 1 + k < n := by
+      omega
+    have hri : (⟨i.val + 1 + k, hrlt⟩ : Fin n) ≠ i := by
+      intro h
+      have : i.val + 1 + k = i.val := by simpa using congrArg Fin.val h
+      omega
+    have hrj : (⟨i.val + 1 + k, hrlt⟩ : Fin n) ≠ j := by
+      intro h
+      have : i.val + 1 + k = j.val := by simpa using congrArg Fin.val h
+      omega
+    calc
+      (List.take (j.val - i.val - 1)
+          (List.drop (i.val + 1) (transposePermutationValues perm i j).toList))[k] =
+          (transposePermutationValues perm i j)[i.val + 1 + k]'hrlt := by
+        simp [Vector.getElem_toList]
+      _ = perm[i.val + 1 + k]'hrlt := by
+        change (transposePermutationValues perm i j)[(⟨i.val + 1 + k, hrlt⟩ : Fin n)] =
+          perm[(⟨i.val + 1 + k, hrlt⟩ : Fin n)]
+        rw [transposePermutationValues_get]
+        exact vector_get_fin_congr perm
+          (finTranspose_of_ne i j ⟨i.val + 1 + k, hrlt⟩ hri hrj)
+      _ =
+          (List.take (j.val - i.val - 1) (List.drop (i.val + 1) perm.toList))[k] := by
+        simp [Vector.getElem_toList]
+
+private theorem transposePermutationValues_drop_of_lt {n : Nat}
+    (perm : Vector (Fin n) n) {i j : Fin n} (hij : i.val < j.val) :
+    (transposePermutationValues perm i j).toList.drop (j.val + 1) =
+      perm.toList.drop (j.val + 1) := by
+  apply List.ext_getElem
+  · simp [Vector.length_toList]
+  · intro k hk₁ hk₂
+    simp [Vector.length_toList] at hk₁ hk₂
+    have hrlt : j.val + 1 + k < n := by
+      omega
+    have hri : (⟨j.val + 1 + k, hrlt⟩ : Fin n) ≠ i := by
+      intro h
+      have : j.val + 1 + k = i.val := by simpa using congrArg Fin.val h
+      omega
+    have hrj : (⟨j.val + 1 + k, hrlt⟩ : Fin n) ≠ j := by
+      intro h
+      have : j.val + 1 + k = j.val := by simpa using congrArg Fin.val h
+      omega
+    calc
+      (List.drop (j.val + 1) (transposePermutationValues perm i j).toList)[k] =
+          (transposePermutationValues perm i j)[j.val + 1 + k]'hrlt := by
+        simp [Vector.getElem_toList]
+      _ = perm[j.val + 1 + k]'hrlt := by
+        change (transposePermutationValues perm i j)[(⟨j.val + 1 + k, hrlt⟩ : Fin n)] =
+          perm[(⟨j.val + 1 + k, hrlt⟩ : Fin n)]
+        rw [transposePermutationValues_get]
+        exact vector_get_fin_congr perm
+          (finTranspose_of_ne i j ⟨j.val + 1 + k, hrlt⟩ hri hrj)
+      _ = (List.drop (j.val + 1) perm.toList)[k] := by
+        simp [Vector.getElem_toList]
+
+private theorem transposePermutationValues_toList_of_lt {n : Nat}
+    (perm : Vector (Fin n) n) {i j : Fin n} (hij : i.val < j.val) :
+    (transposePermutationValues perm i j).toList =
+      perm.toList.take i.val ++ perm[j] ::
+        (perm.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+          perm[i] :: perm.toList.drop (j.val + 1) := by
+  rw [vector_toList_split_two (transposePermutationValues perm i j) hij]
+  rw [transposePermutationValues_take_of_lt perm hij]
+  rw [transposePermutationValues_middle_of_lt perm hij]
+  rw [transposePermutationValues_drop_of_lt perm hij]
+  have hi : (transposePermutationValues perm i j)[i] = perm[j] := by
+    rw [transposePermutationValues_get]
+    exact vector_get_fin_congr perm (finTranspose_left i j)
+  have hj : (transposePermutationValues perm i j)[j] = perm[i] := by
+    rw [transposePermutationValues_get]
+    exact vector_get_fin_congr perm (finTranspose_right i j)
+  rw [hi, hj]
+
+private theorem transposePermutationValues_toList_of_gt {n : Nat}
+    (perm : Vector (Fin n) n) {i j : Fin n} (hji : j.val < i.val) :
+    (transposePermutationValues perm i j).toList =
+      perm.toList.take j.val ++ perm[i] ::
+        (perm.toList.drop (j.val + 1)).take (i.val - j.val - 1) ++
+          perm[j] :: perm.toList.drop (i.val + 1) := by
+  have hcomm : transposePermutationValues perm i j = transposePermutationValues perm j i := by
+    apply Vector.ext
+    intro r hr
+    change (transposePermutationValues perm i j)[(⟨r, hr⟩ : Fin n)] =
+      (transposePermutationValues perm j i)[(⟨r, hr⟩ : Fin n)]
+    repeat rw [transposePermutationValues_get]
+    by_cases hri : (⟨r, hr⟩ : Fin n) = i
+    · subst i
+      exact vector_get_fin_congr perm
+        ((finTranspose_left ⟨r, hr⟩ j).trans
+          (finTranspose_right j ⟨r, hr⟩).symm)
+    · by_cases hrj : (⟨r, hr⟩ : Fin n) = j
+      · subst j
+        exact vector_get_fin_congr perm
+          ((finTranspose_right i ⟨r, hr⟩).trans
+            (finTranspose_left ⟨r, hr⟩ i).symm)
+      · exact vector_get_fin_congr perm
+          ((finTranspose_of_ne i j ⟨r, hr⟩ hri hrj).trans
+            (finTranspose_of_ne j i ⟨r, hr⟩ hrj hri).symm)
+  rw [hcomm]
+  exact
+    (transposePermutationValues_toList_of_lt perm (i := j) (j := i) hji)
+
 private theorem transposePermutationValues_involutive {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) :
     transposePermutationValues (transposePermutationValues perm i j) i j = perm := by
