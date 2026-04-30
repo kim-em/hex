@@ -1,3 +1,4 @@
+import HexModArith.Prime
 import HexGfqRing.Operations
 
 /-!
@@ -12,16 +13,17 @@ namespace Hex
 
 namespace GFqField
 
-variable {p : Nat} [ZMod64.Bounds p]
+variable {p : Nat} [ZMod64.Bounds p] {hp : Hex.Nat.Prime p}
 
 /-- Executable finite-field elements are a thin wrapper around quotient-ring
 residues modulo an irreducible polynomial. -/
 structure FiniteField
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (_hirr : FpPoly.Irreducible f) where
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f)
+    (_hp : Hex.Nat.Prime p) (_hirr : FpPoly.Irreducible f) where
   toQuotient : GFqRing.PolyQuotient f hf
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    DecidableEq (FiniteField f hf hirr) := by
+    DecidableEq (FiniteField f hf hp hirr) := by
   intro x y
   match decEq x.toQuotient y.toQuotient with
   | isTrue h =>
@@ -38,45 +40,47 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
 
 /-- Wrap a quotient-ring element as a finite-field element. -/
 def ofQuotient {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : GFqRing.PolyQuotient f hf) : FiniteField f hf hirr :=
+    (x : GFqRing.PolyQuotient f hf) : FiniteField f hf hp hirr :=
   ⟨x⟩
 
 /-- Reduce a polynomial into the finite field by reusing the quotient-ring
 constructor. -/
-def ofPoly (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
-    (g : FpPoly p) : FiniteField f hf hirr :=
+def ofPoly (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) (g : FpPoly p) : FiniteField f hf hp hirr :=
   ofQuotient (GFqRing.ofPoly f hf g)
 
 /-- Project a finite-field element to its canonical polynomial representative. -/
 def repr {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) : FpPoly p :=
+    (x : FiniteField f hf hp hirr) : FpPoly p :=
   GFqRing.repr x.toQuotient
 
 @[simp] theorem toQuotient_ofQuotient
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x : GFqRing.PolyQuotient f hf) :
-    (ofQuotient x : FiniteField f hf hirr).toQuotient = x :=
+    (ofQuotient x : FiniteField f hf hp hirr).toQuotient = x :=
   rfl
 
 @[simp] theorem toQuotient_ofPoly
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (g : FpPoly p) :
-    (ofPoly f hf hirr g).toQuotient = GFqRing.ofPoly f hf g :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) (g : FpPoly p) :
+    (ofPoly f hf hp hirr g).toQuotient = GFqRing.ofPoly f hf g :=
   rfl
 
 @[simp] theorem repr_ofPoly
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (g : FpPoly p) :
-    repr (ofPoly f hf hirr g) = GFqRing.reduceMod f g :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) (g : FpPoly p) :
+    repr (ofPoly f hf hp hirr g) = GFqRing.reduceMod f g :=
   rfl
 
 @[simp] theorem degree_repr_lt_degree
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     FpPoly.degree (repr x) < FpPoly.degree f :=
   GFqRing.degree_repr_lt_degree x.toQuotient
 
 @[ext] theorem ext
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x y : FiniteField f hf hirr} (h : x.toQuotient = y.toQuotient) :
+    {x y : FiniteField f hf hp hirr} (h : x.toQuotient = y.toQuotient) :
     x = y := by
   cases x
   cases y

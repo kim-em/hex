@@ -31,6 +31,17 @@ namespace GF2n
 
 instance : Hex.ZMod64.Bounds 2 := ⟨by decide, by decide⟩
 
+private theorem prime_two : Hex.Nat.Prime 2 := by
+  constructor
+  · decide
+  · intro m hm
+    have hmle : m ≤ 2 := Nat.le_of_dvd (by decide : 0 < 2) hm
+    have hcases : m = 0 ∨ m = 1 ∨ m = 2 := by omega
+    rcases hcases with rfl | rfl | rfl
+    · simp at hm
+    · exact Or.inl rfl
+    · exact Or.inr rfl
+
 variable {n : Nat} {irr : UInt64}
 variable {hn : 0 < n} {hn64 : n < 64}
 variable {hirr : Hex.GF2Poly.Irreducible (Hex.GF2Poly.ofUInt64Monic irr n)}
@@ -57,6 +68,7 @@ abbrev GenericFiniteField :=
   Hex.GFqField.FiniteField
     (modulusFpPoly (n := n) (irr := irr))
     (modulusFpPoly_degree_pos (n := n) (irr := irr))
+    prime_two
     (modulusFpPoly_irreducible (n := n) (irr := irr))
 
 /-- Interpret a packed single-word field element inside the generic quotient
@@ -65,6 +77,7 @@ def toGeneric (x : Hex.GF2n n irr hn hn64 hirr) : GenericFiniteField (n := n) (i
   Hex.GFqField.ofPoly
     (modulusFpPoly (n := n) (irr := irr))
     (modulusFpPoly_degree_pos (n := n) (irr := irr))
+    prime_two
     (modulusFpPoly_irreducible (n := n) (irr := irr))
     (HexGF2Mathlib.GF2Poly.toFpPoly (Hex.GF2n.toPolyWord x.val))
 
@@ -146,6 +159,17 @@ namespace GF2nPoly
 
 instance : Hex.ZMod64.Bounds 2 := ⟨by decide, by decide⟩
 
+private theorem prime_two : Hex.Nat.Prime 2 := by
+  constructor
+  · decide
+  · intro m hm
+    have hmle : m ≤ 2 := Nat.le_of_dvd (by decide : 0 < 2) hm
+    have hcases : m = 0 ∨ m = 1 ∨ m = 2 := by omega
+    rcases hcases with rfl | rfl | rfl
+    · simp at hm
+    · exact Or.inl rfl
+    · exact Or.inr rfl
+
 variable {f : Hex.GF2Poly} {hirr : Hex.GF2Poly.Irreducible f}
 
 /-- Reduced packed representatives modulo `f`, isolated from the field wrapper
@@ -222,6 +246,7 @@ abbrev GenericFiniteField :=
   Hex.GFqField.FiniteField
     (modulusFpPoly (f := f))
     (modulusFpPoly_degree_pos (f := f))
+    prime_two
     (modulusFpPoly_irreducible (f := f))
 
 /-- Interpret a packed quotient-field element inside the generic quotient field
@@ -230,6 +255,7 @@ def toGeneric (x : Hex.GF2nPoly f hirr) : GenericFiniteField (f := f) :=
   Hex.GFqField.ofPoly
     (modulusFpPoly (f := f))
     (modulusFpPoly_degree_pos (f := f))
+    prime_two
     (modulusFpPoly_irreducible (f := f))
     (HexGF2Mathlib.GF2Poly.toFpPoly x.val)
 

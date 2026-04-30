@@ -38,6 +38,46 @@ private theorem one_ne_zero_mersenne : (1 : ZMod64 8191) ≠ 0 := by
   have hm := (ZMod64.natCast_eq_natCast_iff (p := 8191) 1 0).mp h
   simp at hm
 
+private def noNontrivialDivisors (p : Nat) : Nat → Bool
+  | 0 => true
+  | k + 1 =>
+      noNontrivialDivisors p k &&
+        if k + 1 = 1 ∨ k + 1 = p then true else p % (k + 1) != 0
+
+private theorem noNontrivialDivisors_sound {p n m : Nat} (hp0 : 0 < p)
+    (hcheck : noNontrivialDivisors p n = true) (hmn : m ≤ n) (hm : m ∣ p) :
+    m = 1 ∨ m = p := by
+  induction n generalizing m with
+  | zero =>
+      have hm0 : m = 0 := Nat.eq_zero_of_le_zero hmn
+      subst m
+      rcases hm with ⟨c, hc⟩
+      omega
+  | succ n ih =>
+      have hparts :
+          noNontrivialDivisors p n = true ∧
+            ((n = 0 ∨ n + 1 = p) ∨ ¬p % (n + 1) = 0) := by
+        simpa [noNontrivialDivisors] using hcheck
+      by_cases hmle : m ≤ n
+      · exact ih hparts.1 hmle hm
+      · have hmEq : m = n + 1 := by omega
+        subst m
+        rcases hparts.2 with hleft | hnmod
+        · rcases hleft with hn0 | hnp
+          · left
+            omega
+          · exact Or.inr hnp
+        · have hmod : p % (n + 1) = 0 := Nat.mod_eq_zero_of_dvd hm
+          contradiction
+
+set_option maxRecDepth 100000 in
+private theorem prime_mersenne : Hex.Nat.Prime 8191 := by
+  constructor
+  · decide
+  · intro m hm
+    exact noNontrivialDivisors_sound (p := 8191) (n := 8191) (m := m)
+      (by decide) (by decide) (Nat.le_of_dvd (by decide : 0 < 8191) hm) hm
+
 instance : Hashable (ZMod64 8191) where
   hash a := hash a.toNat
 
@@ -89,22 +129,22 @@ structure BinaryInput where
   modulus : FpPoly 8191
   modulusDegreePos : 0 < FpPoly.degree modulus
   modulusIrreducible : FpPoly.Irreducible modulus
-  lhs : FiniteField modulus modulusDegreePos modulusIrreducible
-  rhs : FiniteField modulus modulusDegreePos modulusIrreducible
+  lhs : FiniteField modulus modulusDegreePos prime_mersenne modulusIrreducible
+  rhs : FiniteField modulus modulusDegreePos prime_mersenne modulusIrreducible
 
 /-- Prepared input for unary field operations. -/
 structure UnaryInput where
   modulus : FpPoly 8191
   modulusDegreePos : 0 < FpPoly.degree modulus
   modulusIrreducible : FpPoly.Irreducible modulus
-  value : FiniteField modulus modulusDegreePos modulusIrreducible
+  value : FiniteField modulus modulusDegreePos prime_mersenne modulusIrreducible
 
 /-- Prepared input for field exponentiation. -/
 structure PowInput where
   modulus : FpPoly 8191
   modulusDegreePos : 0 < FpPoly.degree modulus
   modulusIrreducible : FpPoly.Irreducible modulus
-  value : FiniteField modulus modulusDegreePos modulusIrreducible
+  value : FiniteField modulus modulusDegreePos prime_mersenne modulusIrreducible
   exponent : Nat
 
 /-- Prepared input for signed field exponentiation. -/
@@ -112,7 +152,7 @@ structure ZPowInput where
   modulus : FpPoly 8191
   modulusDegreePos : 0 < FpPoly.degree modulus
   modulusIrreducible : FpPoly.Irreducible modulus
-  value : FiniteField modulus modulusDegreePos modulusIrreducible
+  value : FiniteField modulus modulusDegreePos prime_mersenne modulusIrreducible
   exponent : Int
 
 instance : Hashable OfPolyInput where
@@ -159,8 +199,8 @@ def prepBinaryInput (n : Nat) : BinaryInput :=
   { modulus := f
     modulusDegreePos := hf
     modulusIrreducible := hirr
-    lhs := ofPoly f hf hirr (densePoly degree 37)
-    rhs := ofPoly f hf hirr (densePoly degree 71) }
+    lhs := ofPoly f hf prime_mersenne hirr (densePoly degree 37)
+    rhs := ofPoly f hf prime_mersenne hirr (densePoly degree 71) }
 
 /-- Per-parameter fixture for field unary operations. -/
 def prepUnaryInput (n : Nat) : UnaryInput :=
@@ -195,7 +235,7 @@ def prepZPowInput (n : Nat) : ZPowInput :=
 /-- Benchmark target: construct and project a finite-field representative. -/
 def runOfPolyReprChecksum (input : OfPolyInput) : UInt64 :=
   checksumPoly <| repr <| ofPoly input.modulus input.modulusDegreePos
-    input.modulusIrreducible input.poly
+    prime_mersenne input.modulusIrreducible input.poly
 
 /-- Benchmark target: field addition checksum. -/
 def runAddChecksum (input : BinaryInput) : UInt64 :=
