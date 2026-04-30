@@ -98,6 +98,10 @@ For library `hex-foo`, Phase 4 is done when:
   `HexFoo.Bench` exe;
 - every parametric registration declares a complexity model that
   matches the SPEC's textbook complexity for that operation;
+- every new or changed parametric registration has an adjacent
+  cost-model derivation comment, and every PR that changes a
+  `setup_benchmark` complexity declaration includes an independent
+  cost-model derivation in the commit message that made the change;
 - `lake exe hexfoo_bench verify` succeeds under smoke settings, and
   `lake exe hexfoo_bench run NAME` returns *consistent with declared
   complexity* for every parametric registration at its scientific
