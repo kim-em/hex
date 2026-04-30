@@ -1672,9 +1672,18 @@ private theorem quadraticHenselStep_raw_bezout_congr
         quadraticHenselStep_bezout_correction_congr m f g h s t hm hprod hbez hmonic)
     (congr_one_sub_square_of_congr_zero m b hm hb)
 
+private theorem addModSquare_divModMonicModSquare_remainder_monic
+    (m : Nat)
+    (p g : ZPoly)
+    (hm : 1 < m)
+    (hmonic : DensePoly.Monic g) :
+    let qr := divModMonicModSquare p g m
+    DensePoly.Monic (addModSquare g qr.2 m) := by
+  sorry
+
 private theorem quadraticHenselStep_g_update_monic
     (m : Nat)
-    (f g h s t : ZPoly)
+    (f g h _s t : ZPoly)
     (hm : 1 < m)
     (hmonic : DensePoly.Monic g) :
     let e := QuadraticLiftResult.factorError f g h
@@ -1682,7 +1691,12 @@ private theorem quadraticHenselStep_g_update_monic
     let factorQR := divModMonicModSquare te g m
     let rFactor := factorQR.2
     DensePoly.Monic (addModSquare g rFactor m) := by
-  sorry
+  intro e te factorQR rFactor
+  have hmono :
+      (let qr := divModMonicModSquare te g m
+       DensePoly.Monic (addModSquare g qr.2 m)) :=
+    addModSquare_divModMonicModSquare_remainder_monic m te g hm hmonic
+  simpa [factorQR, rFactor] using hmono
 
 /-- The updated factors multiply to `f` modulo `m^2`. -/
 theorem quadraticHenselStep_factor_spec
