@@ -1184,6 +1184,37 @@ private theorem transposePermutationValues_get {n : Nat}
     (transposePermutationValues perm i j)[r] = perm[finTranspose i j r] := by
   simp [transposePermutationValues]
 
+private theorem vector_toList_eq_finRange_map_get {α : Type u} {n : Nat}
+    (v : Vector α n) :
+    v.toList = (List.finRange n).map fun i => v[i] := by
+  apply List.ext_getElem
+  · simp [Vector.length_toList]
+  · intro k hk₁ hk₂
+    simp
+
+private theorem transposePermutationValues_toList_perm {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) :
+    (transposePermutationValues perm i j).toList.Perm perm.toList := by
+  rw [vector_toList_eq_finRange_map_get (transposePermutationValues perm i j)]
+  rw [vector_toList_eq_finRange_map_get perm]
+  have hleft :
+      (List.finRange n).map (fun r => (transposePermutationValues perm i j)[r]) =
+        (List.finRange n).map ((fun r => perm[r]) ∘ finTranspose i j) := by
+    apply List.map_congr_left
+    intro r _hr
+    exact transposePermutationValues_get perm i j r
+  rw [hleft]
+  simpa [List.map_map] using
+    (finRange_map_finTranspose_perm i j).map fun r => perm[r]
+
+private theorem transposePermutationValues_mem_permutationVectors {n : Nat}
+    {perm : Vector (Fin n) n} (i j : Fin n)
+    (hmem : perm ∈ permutationVectors n) :
+    transposePermutationValues perm i j ∈ permutationVectors n := by
+  apply permutationVectors_complete
+  exact (transposePermutationValues_toList_perm perm i j).symm.nodup
+    (permutationVectors_nodup hmem)
+
 private theorem vector_get_fin_congr {α : Type u} {n : Nat} (v : Vector α n)
     {a b : Fin n} (h : a = b) : v[a] = v[b] := by
   subst b
