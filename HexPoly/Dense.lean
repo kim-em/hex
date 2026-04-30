@@ -159,6 +159,40 @@ theorem coeff_C (c : R) (n : Nat) :
   | succ n =>
       simp
 
+theorem coeff_monomial (n : Nat) (c : R) (i : Nat) :
+    (monomial n c).coeff i = if i = n then c else (Zero.zero : R) := by
+  unfold monomial
+  by_cases hc : c = (Zero.zero : R)
+  · rw [dif_pos hc]
+    change (0 : DensePoly R).coeff i = if i = n then c else (Zero.zero : R)
+    by_cases hi : i = n
+    · subst i
+      rw [if_pos rfl, hc]
+      change (#[] : Array R).getD n (Zero.zero : R) = Zero.zero
+      simp [Array.getD]
+    · change (#[] : Array R).getD i (Zero.zero : R) = if i = n then c else Zero.zero
+      simp [Array.getD, hi]
+  · simp [hc, coeff, Array.getD]
+    by_cases hi : i = n
+    · subst i
+      rw [dif_pos (Nat.lt_succ_self n)]
+      rw [show
+          ((Array.replicate n (Zero.zero : R)).push c)[n] = c by
+            simpa using
+              (Array.getElem_push_eq (xs := Array.replicate n (Zero.zero : R)) (x := c))]
+      simp
+    · by_cases hlt : i < n
+      · have hrep : i < (Array.replicate n (Zero.zero : R)).size := by
+          simpa using hlt
+        have hpush : i < n + 1 := by omega
+        rw [dif_pos hpush]
+        rw [Array.getElem_push_lt hrep]
+        simp [hi]
+      · have hnle : n < i := by omega
+        have hpush_not : ¬ i < n + 1 := by omega
+        rw [dif_neg hpush_not]
+        simp [hi]
+
 theorem coeff_ofCoeffs_list (coeffs : List R) (n : Nat) :
     (ofCoeffs coeffs.toArray).coeff n = coeffs.getD n (Zero.zero : R) := by
   simpa using coeff_ofCoeffs (R := R) coeffs.toArray n

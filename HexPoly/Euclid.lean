@@ -1170,6 +1170,41 @@ private theorem neg_mul_right_poly {S : Type _}
     (0 - p) * q = 0 - p * q := by
   rw [mul_comm_poly (0 - p) q, mul_sub_zero_comm q p]
 
+theorem add_mul_sub_cancel_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p t q r : DensePoly S) :
+    (p + t) * q + (r - t * q) = p * q + r := by
+  rw [mul_add_left_poly]
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  rw [coeff_add (p * q + t * q) (r - t * q) n hzero_add]
+  rw [coeff_add (p * q) (t * q) n hzero_add]
+  rw [coeff_sub r (t * q) n hzero_sub]
+  rw [coeff_add (p * q) r n hzero_add]
+  grind
+
+theorem zero_mul {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    (0 : DensePoly S) * p = 0 := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mul]
+  simp [mulCoeffSum]
+  rfl
+
+theorem zero_add {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    (0 : DensePoly S) + p = p := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_add 0 p n hzero_add, coeff_zero]
+  grind
+
 /-- The nonnegative gcd of the coefficients of an integer polynomial. -/
 private def contentNat (p : DensePoly Int) : Nat :=
   p.toArray.toList.foldl (fun acc coeff => Nat.gcd acc coeff.natAbs) 0
