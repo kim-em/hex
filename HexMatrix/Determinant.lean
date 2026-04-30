@@ -47,6 +47,43 @@ def inversionCount : List (Fin n) → Nat
   | x :: xs =>
       xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 + inversionCount xs
 
+private def crossInversionCount {n : Nat} : List (Fin n) → List (Fin n) → Nat
+  | [], _ => 0
+  | x :: xs, ys =>
+      ys.foldl (fun acc y => acc + if y < x then 1 else 0) 0 +
+        crossInversionCount xs ys
+
+private theorem inversionFold_start {n : Nat} (xs : List (Fin n)) (x : Fin n)
+    (acc : Nat) :
+    xs.foldl (fun acc y => acc + if y < x then 1 else 0) acc =
+      acc + xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 := by
+  induction xs generalizing acc with
+  | nil => simp
+  | cons y ys ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc + if y < x then 1 else 0), ih (0 + if y < x then 1 else 0)]
+      omega
+
+private theorem inversionFold_append {n : Nat} (xs ys : List (Fin n)) (x : Fin n) :
+    (xs ++ ys).foldl (fun acc y => acc + if y < x then 1 else 0) 0 =
+      xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 +
+        ys.foldl (fun acc y => acc + if y < x then 1 else 0) 0 := by
+  rw [List.foldl_append, inversionFold_start]
+
+private theorem inversionCount_append {n : Nat} (xs ys : List (Fin n)) :
+    inversionCount (xs ++ ys) =
+      inversionCount xs + inversionCount ys + crossInversionCount xs ys := by
+  induction xs with
+  | nil =>
+      change inversionCount ys =
+        inversionCount ([] : List (Fin n)) + inversionCount ys +
+          crossInversionCount ([] : List (Fin n)) ys
+      simp [inversionCount, crossInversionCount]
+  | cons x xs ih =>
+      simp only [List.cons_append, inversionCount, crossInversionCount]
+      rw [inversionFold_append, ih]
+      omega
+
 /-- The sign of a permutation vector, computed from inversion parity. -/
 def detSign {R : Type u} [Lean.Grind.Ring R] {n : Nat} (perm : Vector (Fin n) n) : R :=
   if inversionCount perm.toList % 2 = 0 then 1 else -1
