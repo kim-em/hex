@@ -467,6 +467,73 @@ private theorem insertAt_last_toList {α : Type u} {n : Nat} (x : α) (v : Vecto
     simp
   simpa [hidx] using list_insertIdx_length v.toArray.toList x
 
+private theorem insertAt_toList {α : Type u} {n : Nat}
+    (x : α) (v : Vector α n) (i : Fin (n + 1)) :
+    (insertAt x v i).toList = v.toList.insertIdx i.val x := by
+  unfold insertAt
+  simp [Vector.toList]
+
+private theorem list_nodup_map_castSucc {n : Nat} (xs : List (Fin n)) :
+    xs.Nodup → (xs.map Fin.castSucc).Nodup := by
+  induction xs with
+  | nil =>
+      intro _h
+      simp
+  | cons x xs ih =>
+      intro hnodup
+      rw [List.nodup_cons] at hnodup
+      rw [List.map_cons, List.nodup_cons]
+      constructor
+      · intro hmem
+        rw [List.mem_map] at hmem
+        rcases hmem with ⟨y, hy, hxy⟩
+        have hval : x.val = y.val := by
+          simpa using (congrArg Fin.val hxy).symm
+        exact hnodup.1 (Fin.ext hval ▸ hy)
+      · exact ih hnodup.2
+
+private theorem finLast_not_mem_map_castSucc {n : Nat} (xs : List (Fin n)) :
+    Fin.last n ∉ xs.map Fin.castSucc := by
+  intro hmem
+  rw [List.mem_map] at hmem
+  rcases hmem with ⟨x, _hxmem, hxlast⟩
+  have hval : x.val = n := by
+    simpa using congrArg Fin.val hxlast
+  exact Nat.ne_of_lt x.isLt hval
+
+private theorem insertAt_last_castSucc_nodup {n : Nat}
+    (v : Vector (Fin n) n) (i : Fin (n + 1))
+    (hnodup : v.toList.Nodup) :
+    (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.Nodup := by
+  rw [insertAt_toList]
+  have hmap : (v.map Fin.castSucc).toList.Nodup := by
+    rw [vector_toList_map]
+    exact list_nodup_map_castSucc v.toList hnodup
+  have hlast : Fin.last n ∉ (v.map Fin.castSucc).toList := by
+    rw [vector_toList_map]
+    exact finLast_not_mem_map_castSucc v.toList
+  have hcons : (Fin.last n :: (v.map Fin.castSucc).toList).Nodup := by
+    rw [List.nodup_cons]
+    exact ⟨hlast, hmap⟩
+  have hidx : i.val ≤ (v.map Fin.castSucc).toList.length := by
+    simpa using Nat.lt_succ_iff.mp i.isLt
+  exact (List.perm_insertIdx (Fin.last n) (v.map Fin.castSucc).toList hidx).symm.nodup hcons
+
+private theorem permutationVectors_nodup {n : Nat} {perm : Vector (Fin n) n}
+    (hmem : perm ∈ permutationVectors n) :
+    perm.toList.Nodup := by
+  induction n with
+  | zero =>
+      have hnil : perm.toList = [] := by
+        apply List.eq_nil_iff_length_eq_zero.mpr
+        simp [Vector.length_toList]
+      rw [hnil]
+      simp
+  | succ n ih =>
+      simp [permutationVectors, List.mem_flatMap, List.mem_map] at hmem
+      rcases hmem with ⟨v, hv, i, _hi, rfl⟩
+      exact insertAt_last_castSucc_nodup v i (ih hv)
+
 private theorem detSign_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
     (v : Vector (Fin n) n) :
     detSign (R := R)
