@@ -10,7 +10,7 @@ namespace Nat
 
 /-- Exact divisibility lets us rewrite `n / d * d` back to `n`. -/
 theorem div_mul_of_dvd {n d : Nat} (hd : d ∣ n) : (n / d) * d = n := by
-  sorry
+  exact Nat.div_mul_cancel hd
 
 /-- `n` decomposes into its quotient and remainder with respect to `d`. -/
 theorem mod_add_div_eq (n d : Nat) : n % d + (n / d) * d = n := by
@@ -22,7 +22,10 @@ Montgomery inversion over `R = 2^k`.
 -/
 theorem coprime_pow_two_of_odd {p k : Nat} (hp : p % 2 = 1) :
     Nat.Coprime p (2 ^ k) := by
-  sorry
+  have hbase : Nat.Coprime p 2 := by
+    rw [Nat.Coprime, Nat.gcd_comm p 2, Nat.gcd_rec 2 p, hp]
+    rfl
+  exact hbase.pow_right k
 
 /-- The converse packaging of `coprime_pow_two_of_odd` for a fixed power of two. -/
 theorem coprime_twoPow_right {p k : Nat} (hp : p % 2 = 1) :
@@ -36,6 +39,7 @@ This is the divisibility transfer form used when proving Montgomery exactness.
 theorem twoPow_dvd_mul_add_one_of_mod_eq_pred {p p' k : Nat}
     (h : (p * p') % (2 ^ k) = 2 ^ k - 1) :
     2 ^ k ∣ p * p' + 1 := by
-  sorry
+  exact (Nat.mod_eq_sub_iff (a := p * p') (b := 2 ^ k) (c := 1)
+    (by decide) (Nat.succ_le_of_lt (Nat.two_pow_pos k))).1 h
 
 end Nat
