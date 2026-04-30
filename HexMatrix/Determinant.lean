@@ -207,6 +207,95 @@ private theorem foldl_det_product_single_scale {R : Type u}
           | inr htail => exact htail
         exact ih (z * f x) hmemTail hnodup.2
 
+private theorem foldl_det_product_add_start {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f : β → R) (a b : R) :
+    xs.foldl (fun acc x => acc * f x) (a + b) =
+      xs.foldl (fun acc x => acc * f x) a +
+        xs.foldl (fun acc x => acc * f x) b := by
+  induction xs generalizing a b with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      calc
+        xs.foldl (fun acc x => acc * f x) ((a + b) * f x) =
+          xs.foldl (fun acc x => acc * f x) (a * f x + b * f x) := by
+            congr 1
+            grind
+        _ =
+          xs.foldl (fun acc x => acc * f x) (a * f x) +
+            xs.foldl (fun acc x => acc * f x) (b * f x) := by
+            exact ih (a * f x) (b * f x)
+
+private theorem foldl_det_product_single_add {R : Type u}
+    [Lean.Grind.CommRing R] {β : Type v} [DecidableEq β]
+    (xs : List β) (i : β) (c : R) (f g : β → R) (z : R)
+    (hmem : i ∈ xs) (hnodup : xs.Nodup)
+    (hagree : ∀ x, x ∈ xs → x ≠ i → g x = f x) :
+    xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x) z =
+      xs.foldl (fun acc x => acc * f x) z +
+        c * xs.foldl (fun acc x => acc * g x) z := by
+  induction xs generalizing z with
+  | nil =>
+      cases hmem
+  | cons x xs ih =>
+      simp only [List.mem_cons] at hmem
+      simp only [List.nodup_cons] at hnodup
+      simp only [List.foldl_cons]
+      by_cases hx : x = i
+      · subst x
+        rw [if_pos rfl]
+        have hnot : i ∉ xs := hnodup.1
+        calc
+          xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x)
+              (z * (f i + c * g i)) =
+            xs.foldl (fun acc x => acc * f x) (z * (f i + c * g i)) := by
+              apply foldl_det_product_congr
+              intro y hy
+              have hyi : y ≠ i := by
+                intro h
+                exact hnot (h ▸ hy)
+              rw [if_neg hyi]
+          _ = xs.foldl (fun acc x => acc * f x) (z * f i + c * (z * g i)) := by
+              congr 1
+              grind
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              xs.foldl (fun acc x => acc * f x) (c * (z * g i)) := by
+              exact foldl_det_product_add_start xs f (z * f i) (c * (z * g i))
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              c * xs.foldl (fun acc x => acc * f x) (z * g i) := by
+              rw [show
+                xs.foldl (fun acc x => acc * f x) (c * (z * g i)) =
+                  c * xs.foldl (fun acc x => acc * f x) (z * g i) from
+                    foldl_det_product_mul_left xs c f (z * g i)]
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              c * xs.foldl (fun acc x => acc * g x) (z * g i) := by
+              congr 2
+              apply foldl_det_product_congr
+              intro y hy
+              exact (hagree y (List.mem_cons.mpr (Or.inr hy)) (by
+                intro h
+                exact hnot (h ▸ hy))).symm
+      · rw [if_neg hx]
+        have hmemTail : i ∈ xs := by
+          cases hmem with
+          | inl hxi => exact False.elim (hx hxi.symm)
+          | inr htail => exact htail
+        have hgx : g x = f x := hagree x (List.mem_cons.mpr (Or.inl rfl)) hx
+        calc
+          xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x)
+              (z * f x) =
+            xs.foldl (fun acc x => acc * f x) (z * f x) +
+              c * xs.foldl (fun acc x => acc * g x) (z * f x) := by
+              exact ih (z * f x) hmemTail hnodup.2
+                (fun y hy hyi => hagree y (List.mem_cons.mpr (Or.inr hy)) hyi)
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f x) +
+              c * xs.foldl (fun acc x => acc * g x) (z * g x) := by
+              rw [hgx]
+
 private theorem foldl_det_product_zero_start {R : Type u}
     [Lean.Grind.CommRing R] {β : Type v} (xs : List β) (f : β → R) :
     xs.foldl (fun acc x => acc * f x) 0 = 0 := by
@@ -528,7 +617,38 @@ private theorem detProduct_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (src dst : Fin n) (c : R) (perm : Vector (Fin n) n) :
     detProduct (rowAdd M src dst c) perm =
       detProduct M perm + c * detProduct (rowAddDuplicate M src dst) perm := by
-  sorry
+  unfold detProduct
+  calc
+    (List.finRange n).foldl
+        (fun acc r => acc * (rowAdd M src dst c)[r][perm[r]]) 1 =
+      (List.finRange n).foldl
+        (fun acc r =>
+          acc * if r = dst then
+            M[r][perm[r]] + c * (rowAddDuplicate M src dst)[r][perm[r]]
+          else
+            M[r][perm[r]]) 1 := by
+        apply foldl_det_product_congr
+        intro r _hmem
+        by_cases h : r = dst
+        · subst r
+          rw [rowAdd_get M src dst dst c perm[dst]]
+          rw [rowAddDuplicate_get M src dst dst perm[dst]]
+          simp
+        · rw [rowAdd_get, rowAddDuplicate_get]
+          simp [h]
+    _ =
+      (List.finRange n).foldl (fun acc r => acc * M[r][perm[r]]) 1 +
+        c * (List.finRange n).foldl
+          (fun acc r => acc * (rowAddDuplicate M src dst)[r][perm[r]]) 1 := by
+        exact foldl_det_product_single_add
+          (List.finRange n) dst c
+          (fun r => M[r][perm[r]])
+          (fun r => (rowAddDuplicate M src dst)[r][perm[r]]) 1
+          (List.mem_finRange dst) (List.nodup_finRange n)
+          (fun r _hmem hne => by
+            change (rowAddDuplicate M src dst)[r][perm[r]] = M[r][perm[r]]
+            rw [rowAddDuplicate_get]
+            simp [hne])
 
 private theorem detTerm_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (src dst : Fin n) (c : R) (perm : Vector (Fin n) n) :
