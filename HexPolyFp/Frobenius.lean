@@ -51,7 +51,8 @@ def frobeniusXPowMod (f : FpPoly p) (hmonic : DensePoly.Monic f) (k : Nat) :
 @[simp] theorem frobeniusXPowMod_zero
     (f : FpPoly p) (hmonic : DensePoly.Monic f) :
     frobeniusXPowMod f hmonic 0 = modByMonic f X hmonic := by
-  sorry
+  simp [frobeniusXPowMod, powModMonic, powModMonicAux, modByMonic,
+    DensePoly.modByMonic_eq_mod, DensePoly.mod_mod]
 
 end FpPoly
 end Hex
