@@ -414,8 +414,9 @@ setup_benchmark runModByMonicChecksum n => n * n
 
 /-
 The prepared inputs are consecutive polynomial Fibonacci values. That shape
-intentionally forces the Euclidean worst case: Theta(n) quotient steps, with
-schoolbook division work across decreasing degrees summing to Theta(n^2).
+intentionally forces the Euclidean worst case: Theta(n) quotient steps. Each
+division in the chain has quotient `x` and spends linear work in the current
+degree, so the decreasing-degree divisions sum to Theta(n^2).
 -/
 setup_benchmark runGcdChecksum n => n * n
   with prep := prepEuclidWorstInput
@@ -430,8 +431,11 @@ setup_benchmark runGcdChecksum n => n * n
 
 /-
 This uses the same Fibonacci quotient-chain fixture as `runGcdChecksum`.
-Extended gcd carries Bezout updates in the same Euclidean loop, so the declared
-model is the worst-case polynomial Euclidean bound, not an average-case claim.
+Extended gcd carries Bezout updates in the same Euclidean loop; here every
+quotient is degree one, so each Bezout multiplication/update is linear in the
+current coefficient length. Those updates and the divisions both sum to
+Theta(n^2) over the decreasing-degree chain, matching the declared worst-case
+polynomial Euclidean bound.
 -/
 setup_benchmark runXGcdChecksum n => n * n
   with prep := prepEuclidWorstInput
