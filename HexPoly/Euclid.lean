@@ -321,6 +321,12 @@ end DensePoly
 
 namespace DensePoly
 
+private theorem mul_sub_zero_comm {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q : DensePoly S) :
+    p * (0 - q) = 0 - q * p := by
+  sorry
+
 /-- The nonnegative gcd of the coefficients of an integer polynomial. -/
 private def contentNat (p : DensePoly Int) : Nat :=
   p.toArray.toList.foldl (fun acc coeff => Nat.gcd acc coeff.natAbs) 0
@@ -441,7 +447,18 @@ private theorem mod_sub_self_eq_mul_neg_div {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
     (p m : DensePoly S) :
     p % m - p = m * (0 - p / m) := by
-  sorry
+  have hdiv : (p / m) * m + (p % m) = p := div_mul_add_mod p m
+  apply ext_coeff
+  intro n
+  have hcoeff := congrArg (fun x : DensePoly S => x.coeff n) hdiv
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  change (((p / m) * m + (p % m)).coeff n = p.coeff n) at hcoeff
+  rw [coeff_add ((p / m) * m) (p % m) n hzero_add] at hcoeff
+  rw [coeff_sub (p % m) p n hzero_sub]
+  rw [mul_sub_zero_comm m (p / m), coeff_sub 0 ((p / m) * m) n hzero_sub]
+  rw [coeff_zero]
+  grind
 
 private theorem congr_mod_core {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
