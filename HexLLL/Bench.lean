@@ -153,9 +153,11 @@ def swapStepComplexity (n : Nat) : Nat :=
 def gramSchmidtCoeffComplexity (_n : Nat) : Nat :=
   1
 
-/-- Model for multiplying the determinant prefix `d_1, ..., d_{rows-1}`. -/
+/-- Model for multiplying the determinant prefix `d_1, ..., d_{rows-1}` with
+determinant bit-width growth from the prepared integer fixture. -/
 def potentialComplexity (n : Nat) : Nat :=
-  n + 2
+  let rows := n + 3
+  rows * rows * rows
 
 /-- Fixed repeat count for one-step linear state updates. This is independent
 of `n`, so it changes only the constant factor in the declared linear model. -/
@@ -281,7 +283,10 @@ setup_benchmark runGramSchmidtCoeffChecksum n => gramSchmidtCoeffComplexity n
 
 /- Complexity derivation: `potential` folds once over the prepared state's
 determinant prefix. The fixture has `rows = n + 3`, so the prefix length is
-`n + 2`; the fixed hot-loop repeat count is independent of `n`. -/
+`n + 2`; each stored Gram determinant has row-dependent bit width, and the
+running product's bit width grows across the prefix. The resulting executable
+integer-arithmetic surface is cubic in `rows`; the fixed hot-loop repeat count
+is independent of `n`. -/
 setup_benchmark runPotential n => potentialComplexity n
   with prep := prepStateInput
   where {
