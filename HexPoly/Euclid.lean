@@ -570,17 +570,37 @@ theorem mod_eq_mod_of_congr {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S]
     Congr p q m -> p % m = q % m := by
   exact mod_eq_mod_of_dvd_sub
 
+private theorem polyCRT_sub_left_factor {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (a b u v s t : DensePoly S) :
+    s * a + t * b = 1 ->
+    polyCRT a b u v s t - u = a * (v * s + (0 - u * s)) := by
+  sorry
+
+private theorem polyCRT_sub_right_factor {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (a b u v s t : DensePoly S) :
+    s * a + t * b = 1 ->
+    polyCRT a b u v s t - v = b * (u * t + (0 - v * t)) := by
+  sorry
+
 private theorem polyCRT_congr_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
     Congr (polyCRT a b u v s t) u a := by
-  sorry
+  intro S _ _ a b u v s t hbez
+  unfold Congr polyCRT
+  refine ⟨v * s + (0 - u * s), ?_⟩
+  exact polyCRT_sub_left_factor a b u v s t hbez
 
 private theorem polyCRT_congr_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
     Congr (polyCRT a b u v s t) v b := by
-  sorry
+  intro S _ _ a b u v s t hbez
+  unfold Congr polyCRT
+  refine ⟨u * t + (0 - v * t), ?_⟩
+  exact polyCRT_sub_right_factor a b u v s t hbez
 
 /-- The CRT witness reduces to the prescribed first residue modulo `a` via monic reduction. -/
 theorem polyCRT_modByMonic_fst :
