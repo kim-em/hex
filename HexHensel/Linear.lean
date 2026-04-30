@@ -432,6 +432,50 @@ private def henselLiftLoop
       let next := linearHenselStep p current f acc.g acc.h s t
       henselLiftLoop p steps (current + 1) f s t next
 
+/-- The proof state carried by the linear Hensel loop at precision `p^current`. -/
+def LinearLiftLoopInvariant
+    (p current : Nat) [ZMod64.Bounds p]
+    (f : ZPoly) (s t : FpPoly p) (acc : LinearLiftResult) : Prop :=
+  ZPoly.congr (acc.g * acc.h) f (p ^ current) ∧
+    ZPoly.congr
+      (FpPoly.liftToZ (s * ZPoly.modP p acc.g + t * ZPoly.modP p acc.h))
+      1 p ∧
+    DensePoly.Monic acc.g
+
+/-- The per-step degree hypothesis needed to preserve monicity of the `g` factor. -/
+def LinearLiftStepDegreeInvariant
+    (p current : Nat) [ZMod64.Bounds p]
+    (f : ZPoly) (_s t : FpPoly p) (acc : LinearLiftResult) : Prop :=
+  let e := ZPoly.coeffwiseDiv (f - acc.g * acc.h) (p ^ current)
+  let gMod := ZPoly.modP p acc.g
+  let eMod := ZPoly.modP p e
+  let qr := DensePoly.divMod (t * eMod) gMod
+  (LinearLiftResult.liftScaledIncrement p current qr.2).degree?.getD 0 <
+    acc.g.degree?.getD 0
+
+private theorem henselLiftLoop_invariant
+    (p steps current : Nat) [ZMod64.Bounds p]
+    (f : ZPoly) (s t : FpPoly p) (acc : LinearLiftResult)
+    (hp : 1 < p)
+    (hcurrent : 1 ≤ current)
+    (hinv : LinearLiftLoopInvariant p current f s t acc)
+    (hstepDegree :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        current ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        LinearLiftStepDegreeInvariant p n f s t state)
+    (hstepBezout :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        current ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        let next := linearHenselStep p n f state.g state.h s t
+        ZPoly.congr
+          (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
+          1 p) :
+    LinearLiftLoopInvariant p (current + steps) f s t
+      (henselLiftLoop p steps current f s t acc) := by
+  sorry
+
 /--
 Lift a factorization modulo `p` to a factorization modulo `p^k` by iterating the
 linear Hensel step.
@@ -528,12 +572,24 @@ theorem henselLift_spec
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
-    (hprod : ZPoly.congr (g * h) f p)
-    (hbez :
-      ZPoly.congr
-        (FpPoly.liftToZ (s * ZPoly.modP p g + t * ZPoly.modP p h))
-        1 p)
-    (hmonic : DensePoly.Monic g) :
+    (hp : 1 < p)
+    (hstart :
+      LinearLiftLoopInvariant p 1 f s t
+        { g := ZPoly.reduceModPow g p 1
+          h := ZPoly.reduceModPow h p 1 })
+    (hstepDegree :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        1 ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        LinearLiftStepDegreeInvariant p n f s t state)
+    (hstepBezout :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        1 ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        let next := linearHenselStep p n f state.g state.h s t
+        ZPoly.congr
+          (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
+          1 p) :
     let r := henselLift p k f g h s t
     ZPoly.congr (r.g * r.h) f (p ^ k) := by
   sorry
@@ -544,7 +600,23 @@ theorem henselLift_monic
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hp : 1 < p)
-    (hmonic : DensePoly.Monic g) :
+    (hstart :
+      LinearLiftLoopInvariant p 1 f s t
+        { g := ZPoly.reduceModPow g p 1
+          h := ZPoly.reduceModPow h p 1 })
+    (hstepDegree :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        1 ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        LinearLiftStepDegreeInvariant p n f s t state)
+    (hstepBezout :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        1 ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        let next := linearHenselStep p n f state.g state.h s t
+        ZPoly.congr
+          (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
+          1 p) :
     DensePoly.Monic (henselLift p k f g h s t).g := by
   sorry
 
