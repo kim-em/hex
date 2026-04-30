@@ -12,7 +12,11 @@ Specialized polynomial arithmetic over `Z/pZ` using `UInt64` coefficients.
   decomposition's product (e.g. `factor^multiplicity`) is
   square-and-multiply, `O(log multiplicity)` polynomial
   multiplications. The textbook `n+1 ↦ f * pow f n` recursion is
-  forbidden.
+  forbidden. Factor accumulation: assembling the output list of
+  `(factor, multiplicity)` pairs must be linear in the output size.
+  Building via repeated `acc ++ [x]` is `O(|acc|)` per append and
+  `O(k^2)` overall, and is forbidden; use `Array.push` or
+  cons-then-reverse.
 
 **Key properties:**
 - Frobenius endomorphism: `frob(a + b) = frob(a) + frob(b)`

@@ -112,6 +112,14 @@ For j = k-1 downto 0: if 2 * |ν[k][j]| > d[j+1] (i.e., |coeffs[k][j]| > 1/2):
     ν[k][l] := ν[k][l] - r * ν[j][l]    for l < j
     ν[k][j] := ν[k][j] - r * d[j+1]
 
+These are pointwise updates: only ν cells in row k change, only d[j+1]
+is read, and d itself is unchanged. Implementations must do targeted
+writes — `O(k)` cells per j-step, `O(k^2)` per `sizeReduce` call.
+Rebuilding the full ν matrix via `Matrix.ofFn` (or any equivalent that
+allocates a fresh n × n matrix per step) is forbidden — that turns
+size reduction into `O(n^3)` per column and the overall algorithm
+into `O(n^5 · log B)`.
+
 **Swap step.** Swap b[k] and b[k-1], updating ν and d.
 
 ```lean
@@ -143,6 +151,11 @@ von zur Gathen & Gerhard Algorithm 16.10 during implementation.) All
 divisions are exact (see integrality section below). Only d[k] changes
 among d-values, and only ν values with one index equal to k or k-1
 change.
+
+These are pointwise updates: targeted writes only. Rebuilding the full
+ν matrix or d vector via `Matrix.ofFn` / `Vector.ofFn` per swap is
+forbidden — that turns a per-swap `O(n)` update into `O(n^2)` and adds
+a factor of `n` to the overall LLL cost.
 
 **Main loop.** The Lovász condition in integer form (see integrality
 section below for derivation) is:
