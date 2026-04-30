@@ -63,24 +63,57 @@ def detTerm {R : Type u} [Lean.Grind.Ring R] {n : Nat}
 def det {R : Type u} [Lean.Grind.Ring R] {n : Nat} (M : Matrix R n n) : R :=
   (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0
 
+/-- The Leibniz sum for the identity matrix has exactly the identity
+permutation as its nonzero contribution. -/
+private theorem det_identity_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat} :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (1 : Matrix R n n) perm) 0 = 1 := by
+  sorry
+
+/-- Swapping two rows pairs each Leibniz summand with the corresponding
+transposed permutation and flips the computed inversion parity. -/
+private theorem det_rowSwap_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowSwap M i j) perm) 0 =
+      -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+  sorry
+
+/-- Scaling one row factors the scalar out of every nonzero Leibniz summand. -/
+private theorem det_rowScale_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i : Fin n) (c : R) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowScale M i c) perm) 0 =
+      c * ((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+  sorry
+
+/-- Adding a multiple of one row to a distinct row leaves the Leibniz sum
+unchanged; the extra multilinear contribution has two equal rows. -/
+private theorem det_rowAdd_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (c : R) (h : src ≠ dst) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowAdd M src dst c) perm) 0 =
+      (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 := by
+  sorry
+
 theorem det_one {R : Type u} [Lean.Grind.CommRing R] {n : Nat} :
     det (1 : Matrix R n n) = 1 := by
-  sorry
+  simpa [det] using (det_identity_leibniz (R := R) (n := n))
 
 theorem det_rowSwap {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
     det (rowSwap M i j) = -det M := by
-  sorry
+  simpa [det] using det_rowSwap_leibniz M i j h
 
 theorem det_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (i : Fin n) (c : R) :
     det (rowScale M i c) = c * det M := by
-  sorry
+  simpa [det] using det_rowScale_leibniz M i c
 
 theorem det_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (src dst : Fin n) (c : R) (h : src ≠ dst) :
     det (rowAdd M src dst c) = det M := by
-  sorry
+  simpa [det] using det_rowAdd_leibniz M src dst c h
 
 end Matrix
 end Hex
