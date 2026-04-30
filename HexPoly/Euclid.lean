@@ -240,6 +240,17 @@ theorem modByMonic_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
     modByMonic p q hq = (divModMonic p q hq).2 := by
   rfl
 
+/-- Zero has zero remainder under monic division. -/
+theorem modByMonic_zero [One R] [Add R] [Sub R] [Mul R]
+    (q : DensePoly R) (hq : Monic q) :
+    modByMonic (0 : DensePoly R) q hq = 0 := by
+  unfold modByMonic divModMonic divModArray
+  by_cases hqzero : q.isZero
+  · simp [hqzero]
+  · simp [hqzero, divModArrayAux, toArray]
+    change (ofCoeffs (#[] : Array R) : DensePoly R) = 0
+    rfl
+
 theorem mod_eq_divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     p % q = (divMod p q).2 := by
