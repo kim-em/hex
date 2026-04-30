@@ -189,7 +189,21 @@ private theorem scale_congr_of_congr_mod_base
       (DensePoly.scale (Int.ofNat (p ^ k)) first)
       (DensePoly.scale (Int.ofNat (p ^ k)) e)
       (p ^ (k + 1)) := by
-  sorry
+  intro i
+  rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero (Int.ofNat (p ^ k))),
+    DensePoly.coeff_scale _ _ _ (Int.mul_zero (Int.ofNat (p ^ k)))]
+  have hbase : (p : Int) ∣ first.coeff i - e.coeff i :=
+    Int.dvd_of_emod_eq_zero (hfirst i)
+  rcases hbase with ⟨w, hw⟩
+  apply Int.emod_eq_zero_of_dvd
+  refine ⟨w, ?_⟩
+  rw [← Int.mul_sub, hw]
+  rw [← Int.mul_assoc]
+  have hpow : p ^ (k + 1) = p ^ k * p := by
+    rw [Nat.pow_succ]
+  rw [hpow]
+  change (Int.ofNat (p ^ k) * Int.ofNat p) * w = Int.ofNat (p ^ k * p) * w
+  rfl
 
 private theorem linearHenselStep_product_expansion_identity_congr
     (p k : Nat) [ZMod64.Bounds p]
