@@ -1,5 +1,6 @@
 import Std
 import Init.Grind.Ring.Field
+import Batteries.Data.Fin.Fold
 import Batteries.Data.Vector.Lemmas
 import HexMatrix.RowEchelon
 
@@ -246,6 +247,118 @@ private theorem detProduct_identity_insertAt_not_last_zero {R : Type u}
   exact by
     rw [insertAt_get_self]
     exact h.symm
+
+private theorem detProduct_identity_insertAt_last {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (v : Vector (Fin n) n) :
+    detProduct (1 : Matrix R (n + 1) (n + 1))
+      (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)) =
+    detProduct (1 : Matrix R n n) v := by
+  unfold detProduct
+  rw [← Fin.foldl_eq_foldl_finRange, ← Fin.foldl_eq_foldl_finRange]
+  rw [Fin.foldl_succ_last]
+  have hfold :
+      Fin.foldl n
+          (fun acc i =>
+            acc *
+              (1 : Matrix R (n + 1) (n + 1))[i.castSucc][
+                (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[i.castSucc]]) 1 =
+      Fin.foldl n (fun acc i => acc * (1 : Matrix R n n)[i][v[i]]) 1 := by
+    congr
+    funext acc i
+    rw [identity_get, identity_get]
+    have hget :
+        (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[i.castSucc] =
+          (v[i]).castSucc := by
+      simpa using insertAt_last_get_castSucc (Fin.last n) (v.map Fin.castSucc) i
+    rw [hget]
+    simp [Fin.ext_iff]
+  have hlast :
+      (1 : Matrix R (n + 1) (n + 1))[Fin.last n][
+        (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[Fin.last n]] = 1 := by
+    rw [identity_get]
+    have hself :
+        (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[Fin.last n] =
+          Fin.last n := by
+      exact insertAt_get_self (Fin.last n) (v.map Fin.castSucc) (Fin.last n)
+    simp [hself]
+  rw [hfold, hlast]
+  have hmul_one : ∀ x : R, x * (1 : R) = x := by
+    intro x
+    exact Lean.Grind.Semiring.mul_one x
+  exact hmul_one _
+
+private theorem inversionFold_map_castSucc {n : Nat} (xs : List (Fin n)) (x : Fin n)
+    (acc : Nat) :
+    (xs.map Fin.castSucc).foldl
+        (fun acc y => acc + if y < x.castSucc then 1 else 0) acc =
+    xs.foldl (fun acc y => acc + if y < x then 1 else 0) acc := by
+  induction xs generalizing acc with
+  | nil => rfl
+  | cons y ys ih =>
+      simp only [List.map_cons, List.foldl_cons]
+      have hhead :
+          (if y.castSucc < x.castSucc then 1 else 0) =
+            (if y < x then 1 else 0) := by
+        simp [Fin.lt_def]
+      rw [hhead]
+      exact ih _
+
+private theorem inversionCount_map_castSucc {n : Nat} (xs : List (Fin n)) :
+    inversionCount (xs.map Fin.castSucc) = inversionCount xs := by
+  induction xs with
+  | nil => rfl
+  | cons x xs ih =>
+      simp [inversionCount, ih, inversionFold_map_castSucc]
+
+private theorem inversionCount_insert_last_castSucc {n : Nat} (xs : List (Fin n)) :
+    inversionCount ((xs.map Fin.castSucc) ++ [Fin.last n]) = inversionCount xs := by
+  induction xs with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.map_cons, List.cons_append, inversionCount]
+      rw [ih]
+      rw [List.foldl_append, List.foldl_cons, List.foldl_nil]
+      rw [inversionFold_map_castSucc]
+      simp [Fin.lt_def]
+
+private theorem list_insertIdx_length {α : Type u} (xs : List α) (x : α) :
+    xs.insertIdx xs.length x = xs ++ [x] := by
+  induction xs with
+  | nil => rfl
+  | cons y ys ih =>
+      simp [ih]
+
+private theorem vector_toList_map {α β : Type u} {n : Nat} (v : Vector α n)
+    (f : α → β) :
+    (v.map f).toList = v.toList.map f := by
+  apply List.ext_getElem
+  · simp
+  · intro i h₁ h₂
+    simp
+
+private theorem insertAt_last_toList {α : Type u} {n : Nat} (x : α) (v : Vector α n) :
+    (insertAt x v (Fin.last n)).toList = v.toList ++ [x] := by
+  unfold insertAt
+  simp only [Vector.toList]
+  have hidx : (Fin.last n).val = v.toArray.toList.length := by
+    simp
+  simpa [hidx] using list_insertIdx_length v.toArray.toList x
+
+private theorem detSign_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
+    (v : Vector (Fin n) n) :
+    detSign (R := R)
+      (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)) =
+    detSign (R := R) v := by
+  unfold detSign
+  rw [insertAt_last_toList, vector_toList_map, inversionCount_insert_last_castSucc]
+
+private theorem detTerm_identity_insertAt_last {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (v : Vector (Fin n) n) :
+    detTerm (1 : Matrix R (n + 1) (n + 1))
+      (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)) =
+    detTerm (1 : Matrix R n n) v := by
+  unfold detTerm
+  rw [detSign_insertAt_last, detProduct_identity_insertAt_last]
 
 private theorem rowScale_get {R : Type u} [Mul R] {n m : Nat}
     (M : Matrix R n m) (i r : Fin n) (c : R) (k : Fin m) :
