@@ -114,6 +114,61 @@ private theorem congr_mul_reduceModPow_pair
   · exact ZPoly.congr_reduceModPow g p k (Nat.pow_pos (ZMod64.Bounds.pPos (p := p)))
   · exact ZPoly.congr_reduceModPow h p k (Nat.pow_pos (ZMod64.Bounds.pPos (p := p)))
 
+private theorem linearHenselStep_correction_identity
+    (p : Nat) [ZMod64.Bounds p]
+    (gMod hMod eMod s t q r : FpPoly p)
+    (hdiv : q * gMod + r = t * eMod)
+    (hbez : s * gMod + t * hMod = 1) :
+    r * hMod + gMod * (s * eMod + q * hMod) = eMod := by
+  calc
+    r * hMod + gMod * (s * eMod + q * hMod)
+        = r * hMod + (gMod * (s * eMod) + gMod * (q * hMod)) := by
+          rw [FpPoly.left_distrib]
+    _ = (s * gMod) * eMod + (q * gMod + r) * hMod := by
+          grind [FpPoly.add_assoc, FpPoly.add_comm, FpPoly.mul_assoc, FpPoly.mul_comm,
+            FpPoly.right_distrib]
+    _ = (s * gMod) * eMod + (t * eMod) * hMod := by
+          rw [hdiv]
+    _ = (s * gMod) * eMod + (t * hMod) * eMod := by
+          grind [FpPoly.mul_assoc, FpPoly.mul_comm]
+    _ = (s * gMod + t * hMod) * eMod := by
+          rw [FpPoly.right_distrib]
+    _ = 1 * eMod := by
+          rw [hbez]
+    _ = eMod := by
+          rw [FpPoly.one_mul]
+
+private theorem modP_one (p : Nat) [ZMod64.Bounds p] :
+    ZPoly.modP p (1 : ZPoly) = (1 : FpPoly p) := by
+  have hcong : ZPoly.congr (FpPoly.liftToZ (1 : FpPoly p)) (1 : ZPoly) p := by
+    intro i
+    rw [FpPoly.coeff_liftToZ]
+    change
+      (Int.ofNat (DensePoly.coeff (DensePoly.C (1 : ZMod64 p)) i).toNat -
+          DensePoly.coeff (DensePoly.C (1 : Int)) i) % (p : Int) = 0
+    rw [DensePoly.coeff_C, DensePoly.coeff_C]
+    cases i with
+    | zero =>
+        cases p with
+        | zero =>
+            cases Nat.not_lt_zero _ (ZMod64.Bounds.pPos (p := 0))
+        | succ p' =>
+            cases p' with
+            | zero =>
+                change (Int.ofNat (1 % 1) - 1) % (1 : Int) = 0
+                simp
+            | succ p'' =>
+                have hlt : 1 < Nat.succ (Nat.succ p'') := by omega
+                change
+                  (Int.ofNat (1 % Nat.succ (Nat.succ p'')) - 1) %
+                    (Nat.succ (Nat.succ p'') : Int) = 0
+                simp [Nat.mod_eq_of_lt hlt]
+    | succ i =>
+        change (Int.ofNat 0 - (0 : Int)) % (p : Int) = 0
+        simp
+  exact Eq.trans (ZPoly.modP_eq_of_congr p _ _ (ZPoly.congr_symm _ _ _ hcong))
+    (FpPoly.modP_liftToZ (p := p) (1 : FpPoly p))
+
 private theorem linearHenselStep_raw_factor_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
