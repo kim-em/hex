@@ -468,9 +468,89 @@ instance : Inv (ZMod64 p) where
         % Int.ofNat p)) % p := by
   rw [inv, toNat_ofNat]
 
+private theorem nat_mod_mul_pow_square_even (acc base k p : Nat) (heven : k % 2 = 0) :
+    (acc * ((base * base) % p) ^ (k / 2)) % p = (acc * base ^ k) % p := by
+  have hk : 2 * (k / 2) = k := by
+    have h := Nat.mod_add_div k 2
+    omega
+  have hsquare : (base * base) ^ (k / 2) = base ^ (2 * (k / 2)) := by
+    rw [Nat.mul_pow, ← Nat.pow_add]
+    congr
+    omega
+  calc
+    (acc * ((base * base) % p) ^ (k / 2)) % p =
+        (acc * (base * base) ^ (k / 2)) % p := by
+      rw [Nat.mul_mod]
+      rw [show ((base * base) % p) ^ (k / 2) % p = (base * base) ^ (k / 2) % p by
+        exact (Nat.pow_mod (base * base) (k / 2) p).symm]
+      rw [← Nat.mul_mod]
+    _ = (acc * base ^ (2 * (k / 2))) % p := by rw [hsquare]
+    _ = (acc * base ^ k) % p := by rw [hk]
+
+private theorem nat_mod_mul_pow_square_odd (acc base k p : Nat) (hodd : k % 2 ≠ 0) :
+    ((acc * base) % p * ((base * base) % p) ^ (k / 2)) % p =
+      (acc * base ^ k) % p := by
+  have hmod : k % 2 = 1 := by
+    have h := Nat.mod_two_eq_zero_or_one k
+    omega
+  have hk : 1 + 2 * (k / 2) = k := by
+    have h := Nat.mod_add_div k 2
+    omega
+  have hsquare : (base * base) ^ (k / 2) = base ^ (2 * (k / 2)) := by
+    rw [Nat.mul_pow, ← Nat.pow_add]
+    congr
+    omega
+  calc
+    ((acc * base) % p * ((base * base) % p) ^ (k / 2)) % p =
+        (acc * base * (base * base) ^ (k / 2)) % p := by
+      rw [Nat.mul_mod]
+      rw [Nat.mod_mod]
+      rw [show ((base * base) % p) ^ (k / 2) % p = (base * base) ^ (k / 2) % p by
+        exact (Nat.pow_mod (base * base) (k / 2) p).symm]
+      rw [← Nat.mul_mod]
+    _ = (acc * (base * base ^ (2 * (k / 2)))) % p := by
+      rw [hsquare]
+      grind
+    _ = (acc * base ^ (1 + 2 * (k / 2))) % p := by
+      simp [Nat.pow_add]
+    _ = (acc * base ^ k) % p := by rw [hk]
+
+private theorem pow_go_toNat (base acc : ZMod64 p) (k : Nat) :
+    (pow.go base acc k).toNat = (acc.toNat * base.toNat ^ k) % p := by
+  revert base acc
+  induction k using Nat.strongRecOn with
+  | ind k ih =>
+      intro base acc
+      cases k with
+      | zero =>
+          simp [pow.go, Nat.mod_eq_of_lt acc.isLt]
+      | succ m =>
+          have hlt : (m + 1) / 2 < m + 1 :=
+            Nat.div_lt_self (Nat.succ_pos m) (by decide : 1 < 2)
+          simp [pow.go]
+          by_cases heven : (m + 1) % 2 = 0
+          · rw [if_pos heven]
+            have hrec := ih ((m + 1) / 2) hlt (mul base base) acc
+            change (pow.go (mul base base) acc ((m + 1) / 2)).toNat =
+              acc.toNat * base.toNat ^ (m + 1) % p
+            rw [hrec]
+            rw [toNat_mul]
+            exact nat_mod_mul_pow_square_even acc.toNat base.toNat (m + 1) p heven
+          · rw [if_neg heven]
+            have hrec := ih ((m + 1) / 2) hlt (mul base base) (mul acc base)
+            change (pow.go (mul base base) (mul acc base) ((m + 1) / 2)).toNat =
+              acc.toNat * base.toNat ^ (m + 1) % p
+            rw [hrec]
+            rw [toNat_mul, toNat_mul]
+            exact nat_mod_mul_pow_square_odd acc.toNat base.toNat (m + 1) p heven
+
 theorem toNat_pow (a : ZMod64 p) (n : Nat) :
     (pow a n).toNat = a.toNat ^ n % p := by
-  sorry
+  rw [pow]
+  rw [pow_go_toNat]
+  rw [toNat_one]
+  rw [← Nat.mod_mul_mod]
+  simp
 
 theorem inv_mul_eq_one (a : ZMod64 p) (hcop : Nat.Coprime a.toNat p) :
     (mul (inv a) a).toNat = 1 % p := by
