@@ -9,7 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - run: python3 scripts/check_dag.py
+      - run: python3 scripts/check_phase4.py
       - run: sudo apt-get install -y libgmp-dev
       - uses: leanprover/lean-action@v1
       - run: |
