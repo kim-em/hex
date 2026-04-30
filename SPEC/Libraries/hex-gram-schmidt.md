@@ -45,7 +45,12 @@ def gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) : Nat
 def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1)
 
 /-- Scaled GS coefficients (the ν-values): entry (i,j) = d_{j+1} * μ_{i,j}
-    for j < i. Always integers (integrality lemma). -/
+    for j < i. Always integers (integrality lemma).
+    Computed in a single Bareiss-style integer pass shared across all
+    entries, reusing the same elimination scaffolding as `gramDetVec`:
+    O(n^3 + n^2 m) total. Computing each below-diagonal entry
+    independently as a (j+1) × (j+1) Bareiss determinant is forbidden —
+    that body is `O(n^5)`. -/
 def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n
 
 end Hex.GramSchmidt.Int
