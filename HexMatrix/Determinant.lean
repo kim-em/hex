@@ -287,6 +287,22 @@ private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
       intro y hy
       exact h y (List.mem_cons_of_mem x hy)
 
+private theorem foldl_det_sum_perm {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (f : β → R) {xs ys : List β} (hperm : xs.Perm ys) (z : R) :
+    xs.foldl (fun acc x => acc + f x) z =
+      ys.foldl (fun acc x => acc + f x) z := by
+  induction hperm generalizing z with
+  | nil => rfl
+  | cons _ _ ih =>
+      simp only [List.foldl_cons]
+      exact ih (z + _)
+  | swap x y xs =>
+      simp only [List.foldl_cons]
+      congr 1
+      grind
+  | trans _ _ ih₁ ih₂ =>
+      exact (ih₁ z).trans (ih₂ z)
+
 private theorem foldl_det_product_congr {R : Type u} [Mul R] {β : Type v}
     (xs : List β) (f g : β → R) (z : R)
     (h : ∀ x, x ∈ xs → f x = g x) :
@@ -987,6 +1003,113 @@ private theorem permutationVectors_nodup {n : Nat} {perm : Vector (Fin n) n}
       rcases hmem with ⟨v, hv, i, _hi, rfl⟩
       exact insertAt_last_castSucc_nodup v i (ih hv)
 
+private theorem insertAt_last_castSucc_idxOf {n : Nat}
+    (v : Vector (Fin n) n) (i : Fin (n + 1)) (hnodup : v.toList.Nodup) :
+    (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.idxOf (Fin.last n) =
+      i.val := by
+  have hins :
+      (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.Nodup :=
+    insertAt_last_castSucc_nodup v i hnodup
+  have hlen :
+      i.val < (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.length := by
+    simp [Vector.length_toList]
+  have hget :
+      (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList[i.val] =
+        Fin.last n := by
+    change (insertAt (Fin.last n) (v.map Fin.castSucc) i)[i] = Fin.last n
+    exact insertAt_get_self (Fin.last n) (v.map Fin.castSucc) i
+  simpa [hget] using hins.idxOf_getElem i.val hlen
+
+private theorem insertAt_last_castSucc_injective {n : Nat}
+    {v w : Vector (Fin n) n} {i j : Fin (n + 1)}
+    (hv : v.toList.Nodup) (hw : w.toList.Nodup)
+    (h :
+      insertAt (Fin.last n) (v.map Fin.castSucc) i =
+        insertAt (Fin.last n) (w.map Fin.castSucc) j) :
+    i = j ∧ v = w := by
+  have hidx :
+      i.val = j.val := by
+    rw [← insertAt_last_castSucc_idxOf v i hv]
+    rw [h]
+    exact insertAt_last_castSucc_idxOf w j hw
+  have hij : i = j := Fin.ext hidx
+  subst j
+  have hlist := congrArg
+    (fun x : Vector (Fin (n + 1)) (n + 1) => x.toList.eraseIdx i.val) h
+  change
+    (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.eraseIdx i.val =
+      (insertAt (Fin.last n) (w.map Fin.castSucc) i).toList.eraseIdx i.val at hlist
+  rw [insertAt_toList, insertAt_toList] at hlist
+  repeat rw [List.eraseIdx_insertIdx_self] at hlist
+  have hmap : v.toList.map Fin.castSucc = w.toList.map Fin.castSucc := by
+    simpa [vector_toList_map] using hlist
+  have hvwList : v.toList = w.toList := by
+    exact (List.map_inj_right
+      (fun x y hxy => Fin.ext (by simpa using congrArg Fin.val hxy))).mp hmap
+  refine ⟨rfl, ?_⟩
+  apply Vector.toArray_inj.mp
+  apply Array.toList_inj.mp
+  simpa [Vector.toList] using hvwList
+
+private theorem permutationVectorInsertions_nodup {n : Nat}
+    (v : Vector (Fin n) n) (hnodup : v.toList.Nodup) :
+    ((List.finRange (n + 1)).map fun i =>
+        insertAt (Fin.last n) (v.map Fin.castSucc) i).Nodup := by
+  exact list_nodup_map_of_injective
+    (fun i j h => (insertAt_last_castSucc_injective hnodup hnodup h).1)
+    (List.nodup_finRange (n + 1))
+
+private theorem permutationVectorInsertions_disjoint {n : Nat}
+    {v w : Vector (Fin n) n}
+    (hv : v.toList.Nodup) (hw : w.toList.Nodup) (hvw : v ≠ w) :
+    ∀ a, a ∈ ((List.finRange (n + 1)).map fun i =>
+        insertAt (Fin.last n) (v.map Fin.castSucc) i) →
+      ∀ b, b ∈ ((List.finRange (n + 1)).map fun i =>
+        insertAt (Fin.last n) (w.map Fin.castSucc) i) →
+        a ≠ b := by
+  intro a ha b hb hab
+  simp only [List.mem_map] at ha hb
+  rcases ha with ⟨i, _hi, rfl⟩
+  rcases hb with ⟨j, _hj, hb⟩
+  exact hvw (insertAt_last_castSucc_injective hv hw (hab.trans hb.symm)).2
+
+private theorem permutationVectors_flatMap_nodup {n : Nat}
+    (vs : List (Vector (Fin n) n))
+    (hvs : vs.Nodup) (hperm : ∀ v, v ∈ vs → v.toList.Nodup) :
+    (vs.flatMap fun v =>
+        (List.finRange (n + 1)).map fun i =>
+          insertAt (Fin.last n) (v.map Fin.castSucc) i).Nodup := by
+  induction vs with
+  | nil =>
+      simp
+  | cons v vs ih =>
+      simp only [List.flatMap_cons]
+      rw [List.nodup_append]
+      simp only [List.nodup_cons] at hvs
+      refine ⟨?_, ?_, ?_⟩
+      · exact permutationVectorInsertions_nodup v (hperm v (by simp))
+      · exact ih hvs.2 (fun w hw => hperm w (List.mem_cons_of_mem v hw))
+      · intro a ha b hb hab
+        simp only [List.mem_flatMap, List.mem_map] at hb
+        rcases hb with ⟨w, hw, j, _hj, rfl⟩
+        exact permutationVectorInsertions_disjoint
+          (hperm v (by simp)) (hperm w (List.mem_cons_of_mem v hw))
+          (by
+            intro hvw
+            exact hvs.1 (hvw ▸ hw))
+          a ha _ (List.mem_map.mpr ⟨j, List.mem_finRange j, rfl⟩) hab
+
+private theorem permutationVectors_nodup_list {n : Nat} :
+    (permutationVectors n).Nodup := by
+  induction n with
+  | zero =>
+      simp [permutationVectors]
+  | succ n ih =>
+      simp only [permutationVectors]
+      exact permutationVectors_flatMap_nodup
+        (permutationVectors n) ih
+        (fun v hv => permutationVectors_nodup hv)
+
 private theorem detSign_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
     (v : Vector (Fin n) n) :
     detSign (R := R)
@@ -1405,6 +1528,36 @@ private theorem transposePermutationValues_involutive {n : Nat}
   intro r hr
   simp [transposePermutationValues, finTranspose_involutive]
 
+private theorem transposePermutationValues_map_permutationVectors_perm {n : Nat}
+    (i j : Fin n) :
+    ((permutationVectors n).map fun perm => transposePermutationValues perm i j).Perm
+      (permutationVectors n) := by
+  have hmapNodup :
+      ((permutationVectors n).map fun perm => transposePermutationValues perm i j).Nodup := by
+    exact list_nodup_map_of_injective
+      (f := fun perm => transposePermutationValues perm i j)
+      (fun a b h => by
+        have h' := congrArg (fun perm => transposePermutationValues perm i j) h
+        change
+          transposePermutationValues (transposePermutationValues a i j) i j =
+            transposePermutationValues (transposePermutationValues b i j) i j at h'
+        rw [transposePermutationValues_involutive] at h'
+        rw [transposePermutationValues_involutive] at h'
+        exact h')
+      permutationVectors_nodup_list
+  apply (List.perm_ext_iff_of_nodup hmapNodup permutationVectors_nodup_list).mpr
+  intro perm
+  constructor
+  · intro hmem
+    simp only [List.mem_map] at hmem
+    rcases hmem with ⟨pre, hpre, rfl⟩
+    exact transposePermutationValues_mem_permutationVectors i j hpre
+  · intro hmem
+    simp only [List.mem_map]
+    refine ⟨transposePermutationValues perm i j,
+      transposePermutationValues_mem_permutationVectors i j hmem, ?_⟩
+    exact transposePermutationValues_involutive perm i j
+
 private theorem detSign_transposePermutationValues_involutive {R : Type u}
     [Lean.Grind.Ring R] {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) :
@@ -1537,11 +1690,34 @@ private theorem detTerm_rowSwap_transposeValues {R : Type u}
 
 private theorem permutationVectors_transposeValues_neg_sum {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
-    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
+    (M : Matrix R n n) (i j : Fin n) (_h : i ≠ j) :
     (permutationVectors n).foldl
         (fun acc perm => acc + -detTerm M (transposePermutationValues perm i j)) 0 =
       -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
-  sorry
+  calc
+    (permutationVectors n).foldl
+        (fun acc perm => acc + -detTerm M (transposePermutationValues perm i j)) 0 =
+      ((permutationVectors n).map fun perm => transposePermutationValues perm i j).foldl
+        (fun acc perm => acc + -detTerm M perm) 0 := by
+        simp [List.foldl_map]
+    _ =
+      (permutationVectors n).foldl
+        (fun acc perm => acc + -detTerm M perm) 0 := by
+        exact foldl_det_sum_perm
+          (fun perm => -detTerm M perm)
+          (transposePermutationValues_map_permutationVectors_perm i j) 0
+    _ =
+      (permutationVectors n).foldl
+        (fun acc perm => acc + (-1 : R) * detTerm M perm) 0 := by
+        apply foldl_det_sum_congr
+        intro perm _hmem
+        grind
+    _ =
+      (-1 : R) *
+        ((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+        exact foldl_det_sum_mul_left_zero (permutationVectors n) (-1 : R) (detTerm M)
+    _ = -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+        grind
 
 /-- The permutation-vector enumeration contributes `1` on the identity
 matrix: all non-identity terms vanish and the identity vector appears once. -/
