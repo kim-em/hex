@@ -60,6 +60,9 @@ instance : DensePoly.DivModLaws (ZMod64 p) where
   divModMonic_eq_divMod_of_monic := by
     intro f g hmonic
     sorry
+  mod_self_eq_zero := by
+    intro f
+    sorry
   mod_mod_of_not_pos_degree := by
     intro f g hdegree
     sorry

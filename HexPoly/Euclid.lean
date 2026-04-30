@@ -202,6 +202,8 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
       0 < q.degree?.getD 0 → (divMod p q).2.degree?.getD 0 < q.degree?.getD 0
   divModMonic_eq_divMod_of_monic :
     ∀ (p q : DensePoly R) (hq : Monic q), divModMonic p q hq = divMod p q
+  mod_self_eq_zero :
+    ∀ p : DensePoly R, p % p = 0
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
 
@@ -511,7 +513,7 @@ private theorem mod_self_eq_zero {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (m : DensePoly S) :
     m % m = 0 := by
-  sorry
+  exact DivModLaws.mod_self_eq_zero m
 
 private theorem zero_mod_eq_zero {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
