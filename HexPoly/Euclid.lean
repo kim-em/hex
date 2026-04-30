@@ -488,11 +488,54 @@ private theorem eq_add_mul_of_sub_eq_mul {S : Type _}
   rw [coeff_add q (m * r) n hzero_add]
   grind
 
+private theorem add_zero_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    p + 0 = p := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_add p 0 n hzero_add]
+  simp
+  grind
+
+private theorem zero_mul_left {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    (0 : DensePoly S) * p = 0 := by
+  change mul 0 p = 0
+  have hzero : (0 : DensePoly S).coeffs = #[] := rfl
+  simp [mul, isZero, hzero]
+
+private theorem mod_self_eq_zero {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
+    (m : DensePoly S) :
+    m % m = 0 := by
+  sorry
+
+private theorem zero_mod_eq_zero {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
+    (m : DensePoly S) :
+    (0 : DensePoly S) % m = 0 := by
+  sorry
+
+private theorem mod_mul_self_left {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
+    (m r : DensePoly S) :
+    (m * r) % m = 0 := by
+  rw [mod_mul_mod]
+  rw [mod_self_eq_zero]
+  rw [zero_mul_left]
+  rw [zero_mod_eq_zero]
+
 private theorem mod_add_mul_self {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (q m r : DensePoly S) :
     (q + m * r) % m = q % m := by
-  sorry
+  rw [mod_add_mod]
+  rw [mod_mul_self_left]
+  rw [add_zero_right]
+  rw [mod_mod]
 
 private theorem mod_eq_mod_of_dvd_sub {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
