@@ -454,12 +454,64 @@ theorem dvd_gcd (d p q : GF2Poly) :
   rw [hbezout] at hsum
   simpa [r] using hsum
 
+private theorem nonzero_degree_zero_eq_one {p : GF2Poly}
+    (hp : p ≠ 0) (hdegree : p.degree = 0) :
+    p = 1 := by
+  have hpzeroFalse : p.isZero = false := by
+    cases hzero : p.isZero
+    · rfl
+    · exfalso
+      exact hp (eq_zero_of_isZero hzero)
+  obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hpzeroFalse
+  have hd0 : d = 0 := by
+    simpa [degree, hd] using hdegree
+  subst d
+  rw [one_eq_monomial_zero]
+  apply ext_coeff
+  intro n
+  cases n with
+  | zero =>
+      rw [coeff_eq_true_of_degree?_eq_some hd, coeff_monomial_self]
+  | succ n =>
+      rw [coeff_eq_false_of_degree?_lt hd (by omega)]
+      rw [coeff_monomial_ne (by omega)]
+
+private theorem degree_le_of_dvd_nonzero {p q : GF2Poly}
+    (hp : p ≠ 0) (hq : q ≠ 0) :
+    p ∣ q → p.degree ≤ q.degree := by
+  sorry
+
 private theorem irreducible_common_divisor_eq_one_of_reduced
     {a f d : GF2Poly} (hf : Irreducible f) (ha : a ≠ 0)
     (hred : a.IsZero ∨ a.degree < f.degree)
     (hda : d ∣ a) (hdf : d ∣ f) :
     d = 1 := by
-  sorry
+  rcases hdf with ⟨r, hr⟩
+  have hdne : d ≠ 0 := by
+    intro hd
+    rcases hda with ⟨s, hs⟩
+    apply ha
+    rw [hs, hd, zero_mul]
+  rcases hf.2 d r hr.symm with hd_degree | hr_degree
+  · exact nonzero_degree_zero_eq_one hdne hd_degree
+  · have hrne : r ≠ 0 := by
+      intro hzero
+      apply hf.1
+      rw [hr, hzero, mul_zero]
+    have hr_one : r = 1 := nonzero_degree_zero_eq_one hrne hr_degree
+    have hdf : d = f := by
+      calc
+        d = d * 1 := by rw [mul_one]
+        _ = d * r := by rw [hr_one]
+        _ = f := hr.symm
+    have hf_dvd_a : f ∣ a := by
+      simpa [hdf] using hda
+    cases hred with
+    | inl hzero =>
+        exact False.elim (ha (eq_zero_of_isZero hzero))
+    | inr hlt =>
+        have hle : f.degree ≤ a.degree := degree_le_of_dvd_nonzero hf.1 ha hf_dvd_a
+        omega
 
 private theorem mod_eq_of_add_right_multiple (a c f : GF2Poly) :
     (a + c * f) % f = a % f := by
