@@ -18,11 +18,7 @@ Additional scientific registrations:
   coefficient family, `O(n^2)`.
 * `runPackedBerlekampCompareChecksum` and `runFp2BerlekampCompareChecksum`:
   packed versus generic Berlekamp-matrix-style Frobenius-column construction
-  over the same monic modulus family. This comparison schedule maps parameter
-  `n` to degree `16 * n + 3`; on that word-parallel packed schedule the
-  packed construction and the generic dense-coefficient construction are both
-  declared as `O(n^2)` because the iterative column update multiplies by the
-  fixed sparse polynomial `x^2`.
+  over the same monic modulus family, `O(n^2)`.
 -/
 
 namespace Hex.GF2Bench
@@ -173,6 +169,13 @@ def runFp2BerlekampCompareChecksum (input : BerlekampCompareInput) : UInt64 :=
           (mixWord acc (checksumFp2Coeffs col))
   go input.columnCount 1 0
 
+/- Cost model: `prepCompareInput` maps parameter `n` to
+`degree = 40 * n + 3`. The target computes `gcd (divisor * quotient + 1)
+divisor`, where both fixture factors have degree `degree`, so the first
+Euclidean division has degree gap `O(degree)` and the second division is by the
+constant remainder. Packed long division repeatedly shifts the divisor and XORs
+word arrays of length `O(degree / 64)`; the linear degree map makes the
+quadratic long-division step dominate, so the registration declares `O(n^2)`. -/
 setup_benchmark runPackedGcdCompareChecksum n => n * n
   with prep := prepCompareInput
   where {
@@ -185,6 +188,12 @@ setup_benchmark runPackedGcdCompareChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
+/- Cost model: this registration uses the same `degree = 40 * n + 3` fixture
+and the same Euclidean path as the packed GCD comparison. Dense `FpPoly 2`
+division is array-backed long division: each reduction scans/subtracts across a
+dense divisor of length `O(degree)`, and there are `O(degree)` possible
+reductions in the dominant first division. Since `degree` is linear in `n`, the
+declared model is `O(n^2)`. -/
 setup_benchmark runFp2GcdCompareChecksum n => n * n
   with prep := prepCompareInput
   where {
@@ -197,6 +206,14 @@ setup_benchmark runFp2GcdCompareChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
+/- Cost model: `prepBerlekampCompareInput` maps `n` to
+`degree = 16 * n + 3` and runs `columnCount = degree` iterations. The step is
+`x^2 mod modulus`, a fixed sparse polynomial for this degree range. Each
+iteration multiplies the current reduced column by that sparse step, reduces a
+degree-`< degree + 2` product modulo the degree-`degree` modulus, and checksums
+one packed column. The per-column work is linear in the packed column word
+count, hence linear in `degree` up to the word-size constant; `degree` columns
+make the dominant work quadratic in `n`. -/
 setup_benchmark runPackedBerlekampCompareChecksum n => n * n
   with prep := prepBerlekampCompareInput
   where {
@@ -209,6 +226,13 @@ setup_benchmark runPackedBerlekampCompareChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
+/- Cost model: this dense `FpPoly 2` registration uses the same
+`degree = 16 * n + 3` and `columnCount = degree` schedule. The column update is
+not per-column exponentiation: after precomputing `x^2 mod modulus`, every loop
+iteration multiplies by the fixed degree-2 step, performs at most constant-many
+dense long-division reductions against the degree-`degree` modulus, and
+checksums one dense column. That is `O(degree)` per column and `O(degree^2)`,
+therefore `O(n^2)`, for the full construction. -/
 setup_benchmark runFp2BerlekampCompareChecksum n => n * n
   with prep := prepBerlekampCompareInput
   where {
