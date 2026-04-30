@@ -147,7 +147,8 @@ def prepProductInput (n : Nat) : MultifactorInput :=
 /-- Per-parameter fixture for the two-factor multifactor lifting path. -/
 def prepMultifactorLiftInput (n : Nat) : MultifactorInput :=
   let g := linearZFactor 59
-  let h := denseZPoly (n + 1) 61
+  -- Salt 62 keeps `h` coprime to `g` modulo 5 across the scientific ladder.
+  let h := denseZPoly (n + 1) 62
   let factors := #[g, h]
   let e := denseZPoly (n + 1) 67
   { f := Array.polyProduct factors + DensePoly.scale (5 : Int) e
