@@ -301,6 +301,35 @@ private theorem foldl_det_product_congr {R : Type u} [Mul R] {β : Type v}
       intro y hy
       exact h y (List.mem_cons_of_mem x hy)
 
+private theorem foldl_det_product_perm {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (f : β → R) {xs ys : List β} (hperm : xs.Perm ys) (z : R) :
+    xs.foldl (fun acc x => acc * f x) z =
+      ys.foldl (fun acc x => acc * f x) z := by
+  induction hperm generalizing z with
+  | nil => rfl
+  | cons _ _ ih =>
+      simp only [List.foldl_cons]
+      exact ih (z * _)
+  | swap x y xs =>
+      simp only [List.foldl_cons]
+      congr 1
+      grind
+  | trans _ _ ih₁ ih₂ =>
+      exact (ih₁ z).trans (ih₂ z)
+
+private theorem list_nodup_map_of_injective {α : Type u} {β : Type v}
+    [DecidableEq β] {f : α → β} (hinj : Function.Injective f) :
+    ∀ {xs : List α}, xs.Nodup → (xs.map f).Nodup
+  | [], _ => by simp
+  | x :: xs, hnodup => by
+      simp only [List.map_cons, List.nodup_cons] at hnodup ⊢
+      constructor
+      · intro hmem
+        simp only [List.mem_map] at hmem
+        rcases hmem with ⟨y, hy, hfy⟩
+        exact hnodup.1 (hinj hfy.symm ▸ hy)
+      · exact list_nodup_map_of_injective hinj hnodup.2
+
 /-- Factor a scalar out of a determinant-style finite left fold. -/
 private theorem foldl_det_sum_mul_left {R : Type u} [Lean.Grind.CommRing R] {β : Type v}
     (xs : List β) (c : R) (f : β → R) (z : R) :
@@ -1029,6 +1058,20 @@ private theorem finTranspose_ne_iff {n : Nat} (i j a b : Fin n) :
   · intro h hab
     exact h (finTranspose_injective i j hab)
 
+private theorem finRange_map_finTranspose_perm {n : Nat} (i j : Fin n) :
+    ((List.finRange n).map (finTranspose i j)).Perm (List.finRange n) := by
+  apply (List.perm_ext_iff_of_nodup
+    (list_nodup_map_of_injective (finTranspose_injective i j) (List.nodup_finRange n))
+    (List.nodup_finRange n)).mpr
+  intro r
+  constructor
+  · intro _h
+    exact List.mem_finRange r
+  · intro _h
+    simp only [List.mem_map]
+    exact ⟨finTranspose i j r, List.mem_finRange _, by
+      rw [finTranspose_involutive]⟩
+
 private def transposePermutationValues {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) : Vector (Fin n) n :=
   Vector.ofFn fun r => perm[finTranspose i j r]
@@ -1061,6 +1104,19 @@ private theorem rowSwap_get {R : Type u} {n m : Nat}
       have hrow₂ : ((M.set i M[j]).set j M[i])[r] = (M.set i M[j])[r] := by
         exact Vector.getElem_set_ne (xs := M.set i M[j]) (x := M[i]) j.isLt r.isLt hjr
       exact (congrArg (fun row => row[k]) hrow₂).trans (congrArg (fun row => row[k]) hrow₁)
+
+private theorem rowSwap_get_finTranspose {R : Type u} {n m : Nat}
+    (M : Matrix R n m) (i j r : Fin n) (h : i ≠ j) (k : Fin m) :
+    (rowSwap M i j)[r][k] = M[finTranspose i j r][k] := by
+  rw [rowSwap_get]
+  by_cases hrj : r = j
+  · subst r
+    simp [finTranspose, h.symm]
+  · by_cases hri : r = i
+    · subst r
+      simp [finTranspose, hrj]
+    · rw [if_neg hrj, if_neg hri]
+      exact congrArg (fun row => M[row][k]) (finTranspose_of_ne i j r hri hrj).symm
 
 private theorem transposePermutationValues_get {n : Nat}
     (perm : Vector (Fin n) n) (i j r : Fin n) :
@@ -1325,7 +1381,36 @@ private theorem detProduct_rowSwap_transposeValues {R : Type u}
     (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
     detProduct (rowSwap M i j) perm =
       detProduct M (transposePermutationValues perm i j) := by
-  sorry
+  unfold detProduct
+  calc
+    (List.finRange n).foldl
+        (fun acc r => acc * (rowSwap M i j)[r][perm[r]]) 1 =
+      (List.finRange n).foldl
+        (fun acc r => acc * M[finTranspose i j r][perm[r]]) 1 := by
+        apply foldl_det_product_congr
+        intro r _hmem
+        exact rowSwap_get_finTranspose M i j r h perm[r]
+    _ =
+      ((List.finRange n).map (finTranspose i j)).foldl
+        (fun acc r => acc * M[r][perm[finTranspose i j r]]) 1 := by
+        simp only [List.foldl_map]
+        apply foldl_det_product_congr
+        intro r _hmem
+        exact congrArg (fun k => M[finTranspose i j r][k])
+          (vector_get_fin_congr perm (finTranspose_involutive i j r).symm)
+    _ =
+      (List.finRange n).foldl
+        (fun acc r => acc * M[r][perm[finTranspose i j r]]) 1 := by
+        exact foldl_det_product_perm
+          (fun r => M[r][perm[finTranspose i j r]])
+          (finRange_map_finTranspose_perm i j) 1
+    _ =
+      (List.finRange n).foldl
+        (fun acc r => acc * M[r][(transposePermutationValues perm i j)[r]]) 1 := by
+        apply foldl_det_product_congr
+        intro r _hmem
+        exact congrArg (fun k => M[r][k])
+          (transposePermutationValues_get perm i j r).symm
 
 private theorem detSign_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
