@@ -1,6 +1,7 @@
 import Std
 import Init.Grind.Ring.Field
 import Batteries.Data.Fin.Fold
+import Batteries.Data.List.Lemmas
 import Batteries.Data.Vector.Lemmas
 import HexMatrix.RowEchelon
 
@@ -771,6 +772,115 @@ private theorem finLast_mem_of_full_nodup {n : Nat} {xs : List (Fin (n + 1))}
       rw [List.length_erase]
       simp [List.mem_finRange, List.length_finRange]
     omega
+
+private def lowerFinLast {n : Nat} (x : Fin (n + 1)) (h : x ≠ Fin.last n) :
+    Fin n :=
+  ⟨x.val, by
+    have hxlt : x.val < n + 1 := x.isLt
+    have hxne : x.val ≠ n := by
+      intro hx
+      exact h (Fin.ext hx)
+    omega⟩
+
+private theorem lowerFinLast_castSucc {n : Nat} (x : Fin (n + 1))
+    (h : x ≠ Fin.last n) :
+    (lowerFinLast x h).castSucc = x := by
+  exact Fin.ext rfl
+
+private theorem finLast_idxOf_lt_of_full_nodup {n : Nat} {xs : List (Fin (n + 1))}
+    (hlen : xs.length = n + 1) (hnodup : xs.Nodup) :
+    xs.idxOf (Fin.last n) < xs.length := by
+  exact List.idxOf_lt_length_of_mem (finLast_mem_of_full_nodup hlen hnodup)
+
+private def peelLastVector {n : Nat} (perm : Vector (Fin (n + 1)) (n + 1))
+    (k : Nat) (_hk : k < n + 1)
+    (hidx : perm.toList.idxOf (Fin.last n) = k)
+    (hnodup : perm.toList.Nodup) : Vector (Fin n) n :=
+  Vector.ofFn fun r =>
+    let j := if r.val < k then r.val else r.val + 1
+    have hj : j < n + 1 := by
+      dsimp [j]
+      split
+      · omega
+      · have hr : r.val < n := r.isLt
+        omega
+    let y := perm[(⟨j, hj⟩ : Fin (n + 1))]
+    lowerFinLast y (by
+      intro hy
+      have hjlen : j < perm.toList.length := by
+        simpa [Vector.length_toList] using hj
+      have hjidx :
+          perm.toList.idxOf (perm.toList[j]'hjlen) = j := by
+        exact hnodup.idxOf_getElem j hjlen
+      have hylist : perm.toList[j]'hjlen = Fin.last n := by
+        simpa [Vector.getElem_toList] using hy
+      have hkj : k = j := by
+        rw [← hidx, ← hylist, hjidx]
+      dsimp [j] at hkj
+      split at hkj
+      · omega
+      · omega)
+
+private theorem peelLastVector_castSucc_toList {n : Nat}
+    (perm : Vector (Fin (n + 1)) (n + 1))
+    (k : Nat) (hk : k < n + 1)
+    (hidx : perm.toList.idxOf (Fin.last n) = k)
+    (hnodup : perm.toList.Nodup) :
+    ((peelLastVector perm k hk hidx hnodup).map Fin.castSucc).toList =
+      perm.toList.eraseIdx k := by
+  sorry
+
+private theorem peelLastVector_nodup {n : Nat}
+    (perm : Vector (Fin (n + 1)) (n + 1))
+    (k : Nat) (hk : k < n + 1)
+    (hidx : perm.toList.idxOf (Fin.last n) = k)
+    (hnodup : perm.toList.Nodup) :
+    (peelLastVector perm k hk hidx hnodup).toList.Nodup := by
+  sorry
+
+private theorem insertAt_peelLastVector {n : Nat}
+    (perm : Vector (Fin (n + 1)) (n + 1))
+    (k : Nat) (hk : k < n + 1)
+    (hidx : perm.toList.idxOf (Fin.last n) = k)
+    (hnodup : perm.toList.Nodup) :
+    insertAt (Fin.last n)
+        ((peelLastVector perm k hk hidx hnodup).map Fin.castSucc) ⟨k, hk⟩ =
+      perm := by
+  sorry
+
+private theorem permutationVectors_complete {n : Nat} {perm : Vector (Fin n) n}
+    (hnodup : perm.toList.Nodup) :
+    perm ∈ permutationVectors n := by
+  induction n with
+  | zero =>
+      have hnil : perm.toList = [] := by
+        apply List.eq_nil_iff_length_eq_zero.mpr
+        simp [Vector.length_toList]
+      have hperm : perm = emptyVec := by
+        apply Vector.ext
+        intro i hi
+        omega
+      simp [permutationVectors, hperm]
+  | succ n ih =>
+      let k := perm.toList.idxOf (Fin.last n)
+      have hk : k < n + 1 := by
+        simpa [k, Vector.length_toList] using
+          finLast_idxOf_lt_of_full_nodup (by simp [Vector.length_toList]) hnodup
+      have hidx : perm.toList.idxOf (Fin.last n) = k := rfl
+      let peeled := peelLastVector perm k hk hidx hnodup
+      have hpeeled : peeled ∈ permutationVectors n := by
+        exact ih (peelLastVector_nodup perm k hk hidx hnodup)
+      change perm ∈
+        List.flatMap
+          (fun v =>
+            (List.finRange (n + 1)).map fun i =>
+              insertAt (Fin.last n) (v.map Fin.castSucc) i)
+          (permutationVectors n)
+      rw [List.mem_flatMap]
+      refine ⟨peeled, hpeeled, ?_⟩
+      rw [List.mem_map]
+      refine ⟨(⟨k, hk⟩ : Fin (n + 1)), List.mem_finRange (⟨k, hk⟩ : Fin (n + 1)), ?_⟩
+      exact insertAt_peelLastVector perm k hk hidx hnodup
 
 private theorem permutationVectors_nodup {n : Nat} {perm : Vector (Fin n) n}
     (hmem : perm ∈ permutationVectors n) :
