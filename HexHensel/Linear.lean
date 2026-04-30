@@ -260,6 +260,13 @@ private theorem liftToZ_mulCoeffTerm_congr
     simp [hni, heq, FpPoly.coeff_liftToZ]
     exact zmod_mul_lift_congr p (f.coeff i) (g.coeff (n - i))
 
+private theorem liftToZ_mul_congr
+    (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) :
+    ZPoly.congr (FpPoly.liftToZ (f * g)) (FpPoly.liftToZ f * FpPoly.liftToZ g) p := by
+  intro n
+  rw [FpPoly.coeff_liftToZ, FpPoly.coeff_mul, DensePoly.coeff_mul]
+  sorry
+
 private theorem modP_add
     (p : Nat) [ZMod64.Bounds p] (f g : ZPoly) :
     ZPoly.modP p (f + g) = ZPoly.modP p f + ZPoly.modP p g := by
@@ -289,17 +296,46 @@ private theorem modP_add
 private theorem modP_lift_mul_left
     (p : Nat) [ZMod64.Bounds p] (r : FpPoly p) (h : ZPoly) :
     ZPoly.modP p (FpPoly.liftToZ r * h) = r * ZPoly.modP p h := by
-  apply DensePoly.ext_coeff
-  intro n
-  rw [ZPoly.coeff_modP, FpPoly.coeff_mul]
-  unfold FpPoly.mulCoeffSum
-  sorry
+  let hMod := ZPoly.modP p h
+  have hmulLift :
+      ZPoly.congr (FpPoly.liftToZ (r * hMod)) (FpPoly.liftToZ r * FpPoly.liftToZ hMod) p :=
+    liftToZ_mul_congr p r hMod
+  have hright :
+      ZPoly.congr (FpPoly.liftToZ r * FpPoly.liftToZ hMod) (FpPoly.liftToZ r * h) p :=
+    ZPoly.congr_mul _ _ _ _ p
+      (ZPoly.congr_refl (FpPoly.liftToZ r) p)
+      (FpPoly.congr_liftToZ_modP (p := p) h)
+  have hprod :
+      ZPoly.congr (FpPoly.liftToZ (r * hMod)) (FpPoly.liftToZ r * h) p :=
+    ZPoly.congr_trans _ _ _ p hmulLift hright
+  exact Eq.trans
+    (ZPoly.modP_eq_of_congr p (FpPoly.liftToZ r * h) (FpPoly.liftToZ (r * hMod))
+      (ZPoly.congr_symm _ _ _ hprod))
+    (FpPoly.modP_liftToZ (p := p) (r * hMod))
 
 private theorem modP_lift_mul_right
     (p : Nat) [ZMod64.Bounds p] (g : ZPoly) (hCorrection : FpPoly p) :
     ZPoly.modP p (g * FpPoly.liftToZ hCorrection) =
       ZPoly.modP p g * hCorrection := by
-  sorry
+  let gMod := ZPoly.modP p g
+  have hmulLift :
+      ZPoly.congr (FpPoly.liftToZ (gMod * hCorrection))
+        (FpPoly.liftToZ gMod * FpPoly.liftToZ hCorrection) p :=
+    liftToZ_mul_congr p gMod hCorrection
+  have hleft :
+      ZPoly.congr (FpPoly.liftToZ gMod * FpPoly.liftToZ hCorrection)
+        (g * FpPoly.liftToZ hCorrection) p :=
+    ZPoly.congr_mul _ _ _ _ p
+      (FpPoly.congr_liftToZ_modP (p := p) g)
+      (ZPoly.congr_refl (FpPoly.liftToZ hCorrection) p)
+  have hprod :
+      ZPoly.congr (FpPoly.liftToZ (gMod * hCorrection))
+        (g * FpPoly.liftToZ hCorrection) p :=
+    ZPoly.congr_trans _ _ _ p hmulLift hleft
+  exact Eq.trans
+    (ZPoly.modP_eq_of_congr p (g * FpPoly.liftToZ hCorrection)
+      (FpPoly.liftToZ (gMod * hCorrection)) (ZPoly.congr_symm _ _ _ hprod))
+    (FpPoly.modP_liftToZ (p := p) (gMod * hCorrection))
 
 private theorem modP_add_lift_mul
     (p : Nat) [ZMod64.Bounds p] (g h : ZPoly) (r hCorrection : FpPoly p) :
