@@ -602,7 +602,7 @@ private theorem diagonalSum_neg_right {S : Type _}
           (fun acc i => acc + diagonalMulCoeffTerm p q n i) 0 := by
   exact diagonalSum_neg_right_aux p q n (List.range (n + 1)) 0
 
-private theorem mul_sub_zero_comm {S : Type _}
+theorem mul_sub_zero_comm {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q : DensePoly S) :
     p * (0 - q) = 0 - q * p := by
@@ -615,7 +615,7 @@ private theorem mul_sub_zero_comm {S : Type _}
   rw [diagonalSum_neg_right p q n]
   rw [fold_diagonal_comm p q n]
 
-private theorem mul_comm_poly {S : Type _}
+theorem mul_comm_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q : DensePoly S) :
     p * q = q * p := by
@@ -626,7 +626,7 @@ private theorem mul_comm_poly {S : Type _}
   rw [diagonalSum_eq_degree_bound p q n, diagonalSum_eq_degree_bound q p n]
   rw [fold_diagonal_comm p q n]
 
-private theorem add_sub_add_swap {S : Type _}
+theorem add_sub_add_swap {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (x y z : DensePoly S) :
     (x + y) - (z + x) = y + (0 - z) := by
@@ -640,7 +640,7 @@ private theorem add_sub_add_swap {S : Type _}
   rw [coeff_sub 0 z n hzero_sub, coeff_zero]
   grind
 
-private theorem add_sub_add_left {S : Type _}
+theorem add_sub_add_left {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (x y z : DensePoly S) :
     (x + y) - (x + z) = y + (0 - z) := by
@@ -654,7 +654,7 @@ private theorem add_sub_add_left {S : Type _}
   rw [coeff_sub 0 z n hzero_sub, coeff_zero]
   grind
 
-private theorem add_comm_poly {S : Type _}
+theorem add_comm_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q : DensePoly S) :
     p + q = q + p := by
@@ -662,6 +662,42 @@ private theorem add_comm_poly {S : Type _}
   intro n
   have hzero_add : (0 : S) + (0 : S) = 0 := by grind
   rw [coeff_add p q n hzero_add, coeff_add q p n hzero_add]
+  grind
+
+theorem add_assoc_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) :
+    p + q + r = p + (q + r) := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_add (p + q) r n hzero_add]
+  rw [coeff_add p q n hzero_add]
+  rw [coeff_add p (q + r) n hzero_add]
+  rw [coeff_add q r n hzero_add]
+  grind
+
+theorem add_zero_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    p + 0 = p := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_add p 0 n hzero_add, coeff_zero]
+  grind
+
+theorem sub_eq_add_neg_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q : DensePoly S) :
+    p - q = p + (0 - q) := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  rw [coeff_sub p q n hzero_sub]
+  rw [coeff_add p (0 - q) n hzero_add]
+  rw [coeff_sub 0 q n hzero_sub, coeff_zero]
   grind
 
 private theorem diagonalMulCoeffTerm_one_right {S : Type _}
@@ -1125,7 +1161,7 @@ private theorem fold_diagonal_mul_assoc {S : Type _}
   rw [hleft, hright]
   exact triangular_fold_reindex_commring F n
 
-private theorem mul_assoc_poly {S : Type _}
+theorem mul_assoc_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) :
     (p * q) * r = p * (q * r) := by
@@ -1136,7 +1172,7 @@ private theorem mul_assoc_poly {S : Type _}
   rw [mulCoeffSum_eq_diagonal p (q * r) n]
   exact fold_diagonal_mul_assoc p q r n
 
-private theorem mul_add_right_poly {S : Type _}
+theorem mul_add_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) :
     p * (q + r) = p * q + p * r := by
@@ -1148,14 +1184,14 @@ private theorem mul_add_right_poly {S : Type _}
   rw [mulCoeffSum_eq_diagonal p q n, mulCoeffSum_eq_diagonal p r n]
   exact fold_diagonal_add_right p q r n
 
-private theorem mul_add_left_poly {S : Type _}
+theorem mul_add_left_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) :
     (p + q) * r = p * r + q * r := by
   rw [mul_comm_poly (p + q) r, mul_add_right_poly r p q,
     mul_comm_poly r p, mul_comm_poly r q]
 
-private theorem mul_one_right_poly {S : Type _}
+theorem mul_one_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p : DensePoly S) :
     p * 1 = p := by
@@ -1164,7 +1200,7 @@ private theorem mul_one_right_poly {S : Type _}
   rw [coeff_mul, mulCoeffSum_eq_diagonal]
   exact fold_diagonal_one_right p n
 
-private theorem neg_mul_right_poly {S : Type _}
+theorem neg_mul_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q : DensePoly S) :
     (0 - p) * q = 0 - p * q := by
