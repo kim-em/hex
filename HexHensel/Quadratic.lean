@@ -388,6 +388,35 @@ private theorem coeff_last_eq_leadingCoeff (f : ZPoly) (hpos : 0 < f.size) :
       rw [Array.getElem?_eq_getElem hidx]
       exact (Array.getElem_eq_getD 0).symm
 
+private theorem monic_of_coeff_eq_one_and_high_coeff_zero
+    (f : ZPoly) (n : Nat)
+    (hone : f.coeff n = 1)
+    (hhigh : ∀ i, n < i → f.coeff i = 0) :
+    DensePoly.Monic f := by
+  have hn_lt_size : n < f.size := by
+    by_cases hn : n < f.size
+    · exact hn
+    · have hcoeff := DensePoly.coeff_eq_zero_of_size_le f (Nat.le_of_not_gt hn)
+      rw [hone] at hcoeff
+      exact False.elim (Int.one_ne_zero hcoeff)
+  have hsize_le : f.size ≤ n + 1 := by
+    by_cases hle : f.size ≤ n + 1
+    · exact hle
+    · have hlast_zero : f.coeff (f.size - 1) = 0 := by
+        apply hhigh
+        omega
+      have hlast_ne : f.coeff (f.size - 1) ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size f (by omega)
+      exact False.elim (hlast_ne hlast_zero)
+  have hsize : f.size = n + 1 := by omega
+  unfold DensePoly.Monic
+  have hlast := coeff_last_eq_leadingCoeff f (by omega)
+  rw [hsize] at hlast
+  have hidx : n + 1 - 1 = n := by omega
+  rw [hidx] at hlast
+  rw [← hlast]
+  exact hone
+
 private theorem leadingCoeff_zero_mod_base
     (m : Nat) (f : ZPoly) (hf : ZPoly.congr f 0 m) :
     f.leadingCoeff % (m : Int) = 0 := by
@@ -1688,7 +1717,50 @@ private theorem addModSquare_monic_of_high_remainder_zero
     (hmonic : DensePoly.Monic g)
     (hr : ∀ i, g.size - 1 ≤ i → r.coeff i = 0) :
     DensePoly.Monic (addModSquare g r m) := by
-  sorry
+  have hgpos : 0 < g.size := by
+    by_cases hpos : 0 < g.size
+    · exact hpos
+    · have hsize : g.size = 0 := Nat.eq_zero_of_not_pos hpos
+      have hlead : g.leadingCoeff = 0 := by
+        cases g with
+        | mk coeffs normalized =>
+            simp [DensePoly.leadingCoeff, DensePoly.size] at hsize ⊢
+            simp [hsize]
+      have hmonicLead : g.leadingCoeff = 1 := by
+        simpa [DensePoly.Monic] using hmonic
+      rw [hlead] at hmonicLead
+      exact False.elim (Int.zero_ne_one hmonicLead)
+  apply monic_of_coeff_eq_one_and_high_coeff_zero
+      (QuadraticLiftResult.reduceModSquare (g + r) m) (g.size - 1)
+  · unfold QuadraticLiftResult.reduceModSquare
+    rw [ZPoly.coeff_reduceModPow]
+    have hg : g.coeff (g.size - 1) = 1 := by
+      rw [coeff_last_eq_leadingCoeff g hgpos]
+      exact hmonic
+    have hr' : r.coeff (g.size - 1) = 0 := hr (g.size - 1) (by omega)
+    rw [DensePoly.coeff_add]
+    · rw [hg, hr']
+      change Int.ofNat (Int.toNat ((1 : Int) % Int.ofNat (m ^ 2))) = 1
+      have hmsq_gt_one : 1 < m ^ 2 := by
+        calc
+          1 < 2 ^ 2 := by decide
+          _ ≤ m ^ 2 := Nat.pow_le_pow_left _hm 2
+      have hlt : (1 : Int) < Int.ofNat (m ^ 2) := by
+        simpa using (Int.ofNat_lt.mpr hmsq_gt_one)
+      rw [Int.emod_eq_of_lt (by decide : (0 : Int) ≤ 1) hlt]
+      rfl
+    · rfl
+  · intro i hi
+    unfold QuadraticLiftResult.reduceModSquare
+    rw [ZPoly.coeff_reduceModPow]
+    have hg : g.coeff i = 0 := by
+      exact DensePoly.coeff_eq_zero_of_size_le g (by omega)
+    have hr' : r.coeff i = 0 := hr i (by omega)
+    rw [DensePoly.coeff_add]
+    · rw [hg, hr']
+      change Int.ofNat (Int.toNat ((0 : Int) % Int.ofNat (m ^ 2))) = 0
+      simp
+    · rfl
 
 private theorem addModSquare_divModMonicModSquare_remainder_monic
     (m : Nat)
