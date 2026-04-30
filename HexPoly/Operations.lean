@@ -54,6 +54,14 @@ private theorem list_getD_replicate_append_zero (n k : Nat) (coeffs : List R) :
       | succ k =>
           simpa [Nat.succ_sub_succ_eq_sub] using ih k
 
+omit [DecidableEq R] in
+private theorem list_getD_map_range (size n : Nat) (f : Nat → R) :
+    ((List.range size).map f).getD n (Zero.zero : R) =
+      if n < size then f n else (Zero.zero : R) := by
+  by_cases hn : n < size
+  · simp [hn, List.getD]
+  · simp [hn, List.getD]
+
 theorem coeff_scale [Mul R] (c : R) (p : DensePoly R) (n : Nat)
     (hzero : c * (Zero.zero : R) = (Zero.zero : R)) :
     (scale c p).coeff n = c * p.coeff n := by
@@ -145,34 +153,72 @@ def derivative [NatCast R] [Mul R] (p : DensePoly R) : DensePoly R :=
   ofCoeffs <|
     (List.range (p.size - 1)).map (fun i => ((i + 1 : Nat) : R) * p.coeff (i + 1)) |>.toArray
 
-theorem coeff_add [Add R] (p q : DensePoly R) (n : Nat) :
+/-- Coefficient law for addition. The explicit zero law is needed because the generic
+`Add`/`Zero` interface does not imply `0 + 0 = 0`. -/
+theorem coeff_add [Add R] (p q : DensePoly R) (n : Nat)
+    (hzero : (Zero.zero : R) + (Zero.zero : R) = (Zero.zero : R)) :
     (p + q).coeff n = (p.coeff n + q.coeff n) := by
-  sorry
+  change (add p q).coeff n = (p.coeff n + q.coeff n)
+  unfold add
+  rw [coeff_ofCoeffs_list]
+  rw [list_getD_map_range]
+  by_cases hn : n < max p.size q.size
+  · simp [hn]
+  · have hmax : max p.size q.size ≤ n := Nat.le_of_not_gt hn
+    have hp : p.size ≤ n := Nat.le_trans (Nat.le_max_left p.size q.size) hmax
+    have hq : q.size ≤ n := Nat.le_trans (Nat.le_max_right p.size q.size) hmax
+    simp [hn, coeff_eq_zero_of_size_le p hp, coeff_eq_zero_of_size_le q hq, hzero]
 
-theorem coeff_sub [Sub R] (p q : DensePoly R) (n : Nat) :
+/-- Coefficient law for subtraction. The explicit zero law is needed because the generic
+`Sub`/`Zero` interface does not imply `0 - 0 = 0`. -/
+theorem coeff_sub [Sub R] (p q : DensePoly R) (n : Nat)
+    (hzero : (Zero.zero : R) - (Zero.zero : R) = (Zero.zero : R)) :
     (p - q).coeff n = (p.coeff n - q.coeff n) := by
-  sorry
+  change (sub p q).coeff n = (p.coeff n - q.coeff n)
+  unfold sub
+  rw [coeff_ofCoeffs_list]
+  rw [list_getD_map_range]
+  by_cases hn : n < max p.size q.size
+  · simp [hn]
+  · have hmax : max p.size q.size ≤ n := Nat.le_of_not_gt hn
+    have hp : p.size ≤ n := Nat.le_trans (Nat.le_max_left p.size q.size) hmax
+    have hq : q.size ≤ n := Nat.le_trans (Nat.le_max_right p.size q.size) hmax
+    simp [hn, coeff_eq_zero_of_size_le p hp, coeff_eq_zero_of_size_le q hq, hzero]
 
 @[simp] theorem coeff_zero (n : Nat) :
     (0 : DensePoly R).coeff n = (0 : R) := by
   exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)
 
-theorem coeff_neg [Sub R] (p : DensePoly R) (n : Nat) :
+theorem coeff_neg [Sub R] (p : DensePoly R) (n : Nat)
+    (hzero : (Zero.zero : R) - (Zero.zero : R) = (Zero.zero : R)) :
     (-p).coeff n = ((0 : R) - p.coeff n) := by
   change (neg p).coeff n = ((0 : R) - p.coeff n)
-  simp [neg, coeff_sub]
+  simp [neg, coeff_sub, hzero]
 
 theorem eval_zero [Add R] [Mul R] (x : R) :
     eval (0 : DensePoly R) x = 0 := by
-  sorry
+  rfl
 
-theorem eval_C [Add R] [Mul R] (c x : R) :
+/-- Evaluation of a constant polynomial. The explicit zero laws are needed because the
+generic `Add`/`Mul`/`Zero` interfaces do not provide algebraic simplification rules. -/
+theorem eval_C [Add R] [Mul R] (c x : R)
+    (hzero_mul : (Zero.zero : R) * x = (Zero.zero : R))
+    (hzero_add : (Zero.zero : R) + c = c) :
     eval (C c) x = c := by
-  sorry
+  by_cases hc : c = (0 : R)
+  · rw [hc]
+    change eval (C (Zero.zero : R)) x = (Zero.zero : R)
+    unfold eval toArray
+    rw [show (C (Zero.zero : R)).coeffs = #[] by
+      change (C (0 : R)).coeffs = #[]
+      exact coeffs_C_zero]
+    rfl
+  · change c ≠ Zero.zero at hc
+    simp [eval, toArray, coeffs_C_of_ne_zero hc, hzero_mul, hzero_add]
 
 theorem derivative_zero [NatCast R] [Mul R] :
     derivative (0 : DensePoly R) = 0 := by
-  sorry
+  rfl
 
 end DensePoly
 end Hex
