@@ -26,10 +26,10 @@ Scientific registrations:
   `O(n^2)`.
 * `runModByMonicChecksum`: remainder from division by a monic divisor,
   `O(n^2)`.
-* `runGcdChecksum`: Euclidean gcd over a fixed-size field, `O(n^2)` on the
-  committed Fibonacci-style quotient-chain fixture.
+* `runGcdChecksum`: Euclidean gcd over a fixed-size field, `O(n^2)` worst
+  case on the committed Fibonacci-style quotient-chain fixture.
 * `runXGcdChecksum`: extended Euclidean algorithm over a fixed-size field,
-  `O(n^2)` on the committed Fibonacci-style quotient-chain fixture.
+  `O(n^2)` worst case on the committed Fibonacci-style quotient-chain fixture.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
 * `runPolyCRTChecksum`: polynomial CRT witness construction over coprime
@@ -412,6 +412,11 @@ setup_benchmark runModByMonicChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
+/-
+The prepared inputs are consecutive polynomial Fibonacci values. That shape
+intentionally forces the Euclidean worst case: Theta(n) quotient steps, with
+schoolbook division work across decreasing degrees summing to Theta(n^2).
+-/
 setup_benchmark runGcdChecksum n => n * n
   with prep := prepEuclidWorstInput
   where {
@@ -423,6 +428,11 @@ setup_benchmark runGcdChecksum n => n * n
     signalFloorMultiplier := 1.0
   }
 
+/-
+This uses the same Fibonacci quotient-chain fixture as `runGcdChecksum`.
+Extended gcd carries Bezout updates in the same Euclidean loop, so the declared
+model is the worst-case polynomial Euclidean bound, not an average-case claim.
+-/
 setup_benchmark runXGcdChecksum n => n * n
   with prep := prepEuclidWorstInput
   where {
