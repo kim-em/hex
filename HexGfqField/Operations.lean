@@ -12,63 +12,65 @@ namespace Hex
 
 namespace GFqField
 
-variable {p : Nat} [ZMod64.Bounds p]
+variable {p : Nat} [ZMod64.Bounds p] {hp : Hex.Nat.Prime p}
 
 /-- Natural-number literals reuse the quotient-ring cast and then rewrap the
 resulting reduced residue. -/
-def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
-    (n : Nat) : FiniteField f hf hirr :=
+def natCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) (n : Nat) : FiniteField f hf hp hirr :=
   ofQuotient (n : GFqRing.PolyQuotient f hf)
 
 /-- The additive identity in the finite-field wrapper. -/
-def zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    FiniteField f hf hirr :=
+def zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) :
+    FiniteField f hf hp hirr :=
   ofQuotient 0
 
 /-- The multiplicative identity in the finite-field wrapper. -/
-def one (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    FiniteField f hf hirr :=
+def one (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) :
+    FiniteField f hf hp hirr :=
   ofQuotient 1
 
 /-- Field addition reuses the quotient-ring sum. -/
 def add {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x y : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (x.toQuotient + y.toQuotient)
 
 /-- Field multiplication reuses the quotient-ring product. -/
 def mul {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x y : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (x.toQuotient * y.toQuotient)
 
 /-- Field negation reuses the quotient-ring additive inverse. -/
 def neg {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (-x.toQuotient)
 
 /-- Field subtraction reuses the quotient-ring difference. -/
 def sub {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x y : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (x.toQuotient - y.toQuotient)
 
 /-- Exponentiation reuses the quotient-ring repeated-multiplication path. -/
 def pow {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) (n : Nat) : FiniteField f hf hirr :=
+    (x : FiniteField f hf hp hirr) (n : Nat) : FiniteField f hf hp hirr :=
   ofQuotient (x.toQuotient ^ n)
 
 /-- Natural scalar multiplication reuses the quotient-ring scalar action. -/
 def nsmul {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (n : Nat) (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (n : Nat) (x : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (n • x.toQuotient)
 
 /-- Integer literals reuse the quotient-ring cast and then rewrap the reduced
 residue. -/
-def intCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
-    (i : Int) : FiniteField f hf hirr :=
+def intCast (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p)
+    (hirr : FpPoly.Irreducible f) (i : Int) : FiniteField f hf hp hirr :=
   ofQuotient (i : GFqRing.PolyQuotient f hf)
 
 /-- Integer scalar multiplication reuses the quotient-ring scalar action. -/
 def zsmul {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (i : Int) (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (i : Int) (x : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   ofQuotient (i • x.toQuotient)
 
 /-- Normalize an extended-GCD witness by the gcd's constant-unit factor so the
@@ -173,7 +175,7 @@ private theorem reduceMod_repr_mul_invPoly_eq_scaled_gcd
 bridge from field-level hypotheses to the quotient-level helper lemmas. -/
 private theorem toQuotient_ne_zero
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
     x.toQuotient ≠ (0 : GFqRing.PolyQuotient f hf) := by
   intro hq
   apply hx
@@ -183,7 +185,7 @@ private theorem toQuotient_ne_zero
 normalized xgcd witness reduces to the multiplicative identity. -/
 private theorem reduceMod_repr_mul_invPoly_eq_one
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
     GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) =
       GFqRing.reduceMod f 1 := by
   sorry
@@ -193,142 +195,142 @@ polynomial extended-GCD witness, normalized by the gcd's constant unit factor.
 The `0` case follows the usual junk-value convention required by
 `Lean.Grind.Field`. -/
 def inv {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
-  if _hx : x = zero f hf hirr then
-    zero f hf hirr
+    (x : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
+  if _hx : x = zero f hf hp hirr then
+    zero f hf hp hirr
   else
-    ofPoly f hf hirr (invPoly x.toQuotient)
+    ofPoly f hf hp hirr (invPoly x.toQuotient)
 
 @[simp] theorem toQuotient_inv_of_ne_zero
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x : FiniteField f hf hirr} (hx : x ≠ zero f hf hirr) :
+    {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
     (inv x).toQuotient = GFqRing.ofPoly f hf (invPoly x.toQuotient) := by
   simp [GFqField.inv, hx]
 
 /-- Division is multiplication by the inverse candidate. -/
 def div {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x y : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   mul x (inv y)
 
 /-- Integer exponentiation uses the existing natural-power path together with
 the inverse candidate for negative exponents. -/
 def zpow {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) : Int → FiniteField f hf hirr
+    (x : FiniteField f hf hp hirr) : Int → FiniteField f hf hp hirr
   | .ofNat n => pow x n
   | .negSucc n => inv (pow x (n + 1))
 
 /-- The Frobenius map is the `p`-th power map on the existing quotient
 representation. -/
 def frob {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) : FiniteField f hf hirr :=
+    (x : FiniteField f hf hp hirr) : FiniteField f hf hp hirr :=
   pow x p
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Zero (FiniteField f hf hirr) where
-  zero := zero f hf hirr
+    Zero (FiniteField f hf hp hirr) where
+  zero := zero f hf hp hirr
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    One (FiniteField f hf hirr) where
-  one := one f hf hirr
+    One (FiniteField f hf hp hirr) where
+  one := one f hf hp hirr
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Add (FiniteField f hf hirr) where
+    Add (FiniteField f hf hp hirr) where
   add := add
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Mul (FiniteField f hf hirr) where
+    Mul (FiniteField f hf hp hirr) where
   mul := mul
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Neg (FiniteField f hf hirr) where
+    Neg (FiniteField f hf hp hirr) where
   neg := neg
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Sub (FiniteField f hf hirr) where
+    Sub (FiniteField f hf hp hirr) where
   sub := sub
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Pow (FiniteField f hf hirr) Nat where
+    Pow (FiniteField f hf hp hirr) Nat where
   pow := pow
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    NatCast (FiniteField f hf hirr) where
-  natCast := natCast f hf hirr
+    NatCast (FiniteField f hf hp hirr) where
+  natCast := natCast f hf hp hirr
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (n : Nat) : OfNat (FiniteField f hf hirr) n where
-  ofNat := natCast f hf hirr n
+    (n : Nat) : OfNat (FiniteField f hf hp hirr) n where
+  ofNat := natCast f hf hp hirr n
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    SMul Nat (FiniteField f hf hirr) where
+    SMul Nat (FiniteField f hf hp hirr) where
   smul := nsmul
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    IntCast (FiniteField f hf hirr) where
-  intCast := intCast f hf hirr
+    IntCast (FiniteField f hf hp hirr) where
+  intCast := intCast f hf hp hirr
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    SMul Int (FiniteField f hf hirr) where
+    SMul Int (FiniteField f hf hp hirr) where
   smul := zsmul
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Inv (FiniteField f hf hirr) where
+    Inv (FiniteField f hf hp hirr) where
   inv := inv
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Div (FiniteField f hf hirr) where
+    Div (FiniteField f hf hp hirr) where
   div := div
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    HPow (FiniteField f hf hirr) Int (FiniteField f hf hirr) where
+    HPow (FiniteField f hf hp hirr) Int (FiniteField f hf hp hirr) where
   hPow := zpow
 
 @[simp] theorem toQuotient_zero
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    (0 : FiniteField f hf hirr).toQuotient = 0 :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) :
+    (0 : FiniteField f hf hp hirr).toQuotient = 0 :=
   rfl
 
 @[simp] theorem toQuotient_one
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    (1 : FiniteField f hf hirr).toQuotient = 1 :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) :
+    (1 : FiniteField f hf hp hirr).toQuotient = 1 :=
   rfl
 
 theorem zero_ne_one
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    (0 : FiniteField f hf hirr) ≠ 1 := by
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) :
+    (0 : FiniteField f hf hp hirr) ≠ 1 := by
   intro h
   have hq := congrArg FiniteField.toQuotient h
   exact GFqRing.zero_ne_one f hf (by simpa using hq)
 
 @[simp] theorem toQuotient_natCast
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (n : Nat) :
-    ((n : FiniteField f hf hirr).toQuotient) = (n : GFqRing.PolyQuotient f hf) :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) (n : Nat) :
+    ((n : FiniteField f hf hp hirr).toQuotient) = (n : GFqRing.PolyQuotient f hf) :=
   rfl
 
 @[simp] theorem repr_natCast
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (n : Nat) :
-    repr (n : FiniteField f hf hirr) =
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) (n : Nat) :
+    repr (n : FiniteField f hf hp hirr) =
       GFqRing.reduceMod f (FpPoly.C (n : ZMod64 p)) :=
   rfl
 
 theorem natCast_eq_of_zmod64_natCast_eq
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f)
     {m n : Nat} (h : (m : ZMod64 p) = (n : ZMod64 p)) :
-    (m : FiniteField f hf hirr) = n := by
+    (m : FiniteField f hf hp hirr) = n := by
   apply GFqField.ext
   exact GFqRing.natCast_eq_of_zmod64_natCast_eq f hf h
 
 theorem natCast_eq_of_mod_eq
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f)
     {m n : Nat} (h : m % p = n % p) :
-    (m : FiniteField f hf hirr) = n := by
+    (m : FiniteField f hf hp hirr) = n := by
   apply GFqField.ext
   exact GFqRing.natCast_eq_of_mod_eq f hf h
 
 theorem natCast_eq_natCast_iff_reduceMod_const_eq
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f)
     (m n : Nat) :
-    ((m : FiniteField f hf hirr) = n) ↔
+    ((m : FiniteField f hf hp hirr) = n) ↔
       GFqRing.reduceMod f (FpPoly.C (m : ZMod64 p)) =
         GFqRing.reduceMod f (FpPoly.C (n : ZMod64 p)) := by
   constructor
@@ -340,9 +342,9 @@ theorem natCast_eq_natCast_iff_reduceMod_const_eq
     simpa [repr_natCast] using h
 
 theorem natCast_eq_natCast_iff_mod_eq
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f)
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f)
     (m n : Nat) :
-    ((m : FiniteField f hf hirr) = n) ↔ m % p = n % p := by
+    ((m : FiniteField f hf hp hirr) = n) ↔ m % p = n % p := by
   constructor
   · intro h
     have hq :
@@ -350,62 +352,62 @@ theorem natCast_eq_natCast_iff_mod_eq
       simpa using congrArg FiniteField.toQuotient h
     exact (GFqRing.natCast_eq_natCast_iff_mod_eq f hf m n).1 hq
   · intro h
-    exact natCast_eq_of_mod_eq f hf hirr h
+    exact natCast_eq_of_mod_eq f hf hp hirr h
 
 @[simp] theorem toQuotient_add
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) :
-    (x + y : FiniteField f hf hirr).toQuotient =
+    (x y : FiniteField f hf hp hirr) :
+    (x + y : FiniteField f hf hp hirr).toQuotient =
       x.toQuotient + y.toQuotient :=
   rfl
 
 @[simp] theorem toQuotient_mul
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) :
-    (x * y : FiniteField f hf hirr).toQuotient =
+    (x y : FiniteField f hf hp hirr) :
+    (x * y : FiniteField f hf hp hirr).toQuotient =
       x.toQuotient * y.toQuotient :=
   rfl
 
 @[simp] theorem toQuotient_nsmul
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (n : Nat) (x : FiniteField f hf hirr) :
-    (n • x : FiniteField f hf hirr).toQuotient = n • x.toQuotient :=
+    (n : Nat) (x : FiniteField f hf hp hirr) :
+    (n • x : FiniteField f hf hp hirr).toQuotient = n • x.toQuotient :=
   rfl
 
 @[simp] theorem toQuotient_intCast
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) (i : Int) :
-    ((i : FiniteField f hf hirr).toQuotient) = (i : GFqRing.PolyQuotient f hf) :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) (i : Int) :
+    ((i : FiniteField f hf hp hirr).toQuotient) = (i : GFqRing.PolyQuotient f hf) :=
   rfl
 
 @[simp] theorem toQuotient_zsmul
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (i : Int) (x : FiniteField f hf hirr) :
-    (i • x : FiniteField f hf hirr).toQuotient = i • x.toQuotient :=
+    (i : Int) (x : FiniteField f hf hp hirr) :
+    (i • x : FiniteField f hf hp hirr).toQuotient = i • x.toQuotient :=
   rfl
 
 @[simp] theorem toQuotient_pow
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) (n : Nat) :
-    (x ^ n : FiniteField f hf hirr).toQuotient =
+    (x : FiniteField f hf hp hirr) (n : Nat) :
+    (x ^ n : FiniteField f hf hp hirr).toQuotient =
       x.toQuotient ^ n :=
   rfl
 
 @[simp] theorem inv_zero
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    ((0 : FiniteField f hf hirr) : FiniteField f hf hirr)⁻¹ = 0 := by
-  change (if ((0 : FiniteField f hf hirr) : FiniteField f hf hirr) = 0 then 0 else
-    ofPoly f hf hirr (invPoly ((0 : FiniteField f hf hirr).toQuotient))) = 0
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) :
+    ((0 : FiniteField f hf hp hirr) : FiniteField f hf hp hirr)⁻¹ = 0 := by
+  change (if ((0 : FiniteField f hf hp hirr) : FiniteField f hf hp hirr) = 0 then 0 else
+    ofPoly f hf hp hirr (invPoly ((0 : FiniteField f hf hp hirr).toQuotient))) = 0
   simp
 
 theorem div_eq_mul_inv
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) :
+    (x y : FiniteField f hf hp hirr) :
     x / y = x * y⁻¹ := by
   rfl
 
 theorem mul_inv_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x : FiniteField f hf hirr} (hx : x ≠ 0) :
+    {x : FiniteField f hf hp hirr} (hx : x ≠ 0) :
     x * x⁻¹ = 1 := by
   have hreduced := reduceMod_repr_mul_invPoly_eq_one (x := x) hx
   have hxrepr :
@@ -428,7 +430,7 @@ theorem mul_inv_cancel
   apply GFqField.ext
   apply GFqRing.ext
   calc
-    GFqRing.repr ((x * x⁻¹ : FiniteField f hf hirr).toQuotient)
+    GFqRing.repr ((x * x⁻¹ : FiniteField f hf hp hirr).toQuotient)
         = GFqRing.repr (x.toQuotient * GFqRing.ofPoly f hf (invPoly x.toQuotient)) := by
             rw [toQuotient_mul]
             change GFqRing.repr (x.toQuotient * (inv x).toQuotient) =
@@ -440,50 +442,50 @@ theorem mul_inv_cancel
     _ = GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) :=
         hmulReduce
     _ = GFqRing.reduceMod f 1 := hreduced
-    _ = GFqRing.repr ((1 : FiniteField f hf hirr).toQuotient) := by
+    _ = GFqRing.repr ((1 : FiniteField f hf hp hirr).toQuotient) := by
         rw [toQuotient_one]
         rw [honeQuotient]
         rfl
 
 theorem inv_mul_cancel
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {x : FiniteField f hf hirr} (hx : x ≠ 0) :
+    {x : FiniteField f hf hp hirr} (hx : x ≠ 0) :
     x⁻¹ * x = 1 := by
   have hleft := mul_inv_cancel (x := x) hx
   apply GFqField.ext
   calc
-    (x⁻¹ * x : FiniteField f hf hirr).toQuotient
+    (x⁻¹ * x : FiniteField f hf hp hirr).toQuotient
         = (x⁻¹).toQuotient * x.toQuotient := rfl
     _ = x.toQuotient * (x⁻¹).toQuotient :=
         Lean.Grind.CommSemiring.mul_comm (x⁻¹).toQuotient x.toQuotient
-    _ = (x * x⁻¹ : FiniteField f hf hirr).toQuotient := rfl
-    _ = (1 : FiniteField f hf hirr).toQuotient := congrArg FiniteField.toQuotient hleft
+    _ = (x * x⁻¹ : FiniteField f hf hp hirr).toQuotient := rfl
+    _ = (1 : FiniteField f hf hp hirr).toQuotient := congrArg FiniteField.toQuotient hleft
 
 @[simp] theorem repr_zero
-    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hirr : FpPoly.Irreducible f) :
-    repr (0 : FiniteField f hf hirr) = GFqRing.reduceMod f 0 :=
+    (f : FpPoly p) (hf : 0 < FpPoly.degree f) (hp : Hex.Nat.Prime p) (hirr : FpPoly.Irreducible f) :
+    repr (0 : FiniteField f hf hp hirr) = GFqRing.reduceMod f 0 :=
   rfl
 
 @[simp] theorem repr_add
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) :
+    (x y : FiniteField f hf hp hirr) :
     repr (x + y) = GFqRing.reduceMod f (repr x + repr y) :=
   rfl
 
 @[simp] theorem repr_mul
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x y : FiniteField f hf hirr) :
+    (x y : FiniteField f hf hp hirr) :
     repr (x * y) = GFqRing.reduceMod f (repr x * repr y) :=
   rfl
 
 @[simp] theorem repr_pow
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) (n : Nat) :
+    (x : FiniteField f hf hp hirr) (n : Nat) :
     repr (x ^ n) = GFqRing.repr (x.toQuotient ^ n) :=
   rfl
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Lean.Grind.Semiring (FiniteField f hf hirr) := by
+    Lean.Grind.Semiring (FiniteField f hf hp hirr) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
     apply GFqField.ext
@@ -533,7 +535,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
       Lean.Grind.Semiring.nsmul_eq_natCast_mul (α := GFqRing.PolyQuotient f hf) n a.toQuotient
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Lean.Grind.Ring (FiniteField f hf hirr) := by
+    Lean.Grind.Ring (FiniteField f hf hp hirr) := by
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
     apply GFqField.ext
@@ -555,7 +557,7 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     simpa using Lean.Grind.Ring.intCast_neg (α := GFqRing.PolyQuotient f hf) i
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Lean.Grind.CommRing (FiniteField f hf hirr) := by
+    Lean.Grind.CommRing (FiniteField f hf hp hirr) := by
   refine Lean.Grind.CommRing.mk ?_
   intro a b
   apply GFqField.ext
@@ -563,16 +565,16 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
 
 private theorem eq_inv_of_mul_eq_one
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    {a b : FiniteField f hf hirr} (h : a * b = 1) :
+    {a b : FiniteField f hf hp hirr} (h : a * b = 1) :
     a = b⁻¹ := by
   by_cases hb : b = 0
   · subst b
-    have hmul_zero : a * (0 : FiniteField f hf hirr) = 0 :=
+    have hmul_zero : a * (0 : FiniteField f hf hp hirr) = 0 :=
       Lean.Grind.Semiring.mul_zero a
-    have hzero_one : (0 : FiniteField f hf hirr) = 1 :=
+    have hzero_one : (0 : FiniteField f hf hp hirr) = 1 :=
       hmul_zero.symm.trans h
     exfalso
-    exact zero_ne_one f hf hirr hzero_one
+    exact zero_ne_one f hf hp hirr hzero_one
   · replace h := congrArg (fun x => x * b⁻¹) h
     calc
       a = a * 1 := (Lean.Grind.Semiring.mul_one a).symm
@@ -583,12 +585,12 @@ private theorem eq_inv_of_mul_eq_one
 
 private theorem inv_one
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    (1 : FiniteField f hf hirr)⁻¹ = 1 :=
-  (eq_inv_of_mul_eq_one (Lean.Grind.Semiring.mul_one (1 : FiniteField f hf hirr))).symm
+    (1 : FiniteField f hf hp hirr)⁻¹ = 1 :=
+  (eq_inv_of_mul_eq_one (Lean.Grind.Semiring.mul_one (1 : FiniteField f hf hp hirr))).symm
 
 private theorem inv_inv
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     x⁻¹⁻¹ = x := by
   by_cases hx : x = 0
   · subst x
@@ -599,27 +601,27 @@ private theorem inv_inv
 
 private theorem inv_inv_def
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     (inv x)⁻¹ = x :=
   inv_inv x
 
 private theorem pow_zero_eq_one
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     pow x 0 = 1 := by
   apply GFqField.ext
   simpa using Lean.Grind.Semiring.pow_zero x.toQuotient
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Lean.Grind.Field (FiniteField f hf hirr) := by
+    Lean.Grind.Field (FiniteField f hf hp hirr) := by
   refine Lean.Grind.Field.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a b
     simpa using div_eq_mul_inv a b
   · intro h
-    exact zero_ne_one f hf hirr h
-  · exact inv_zero f hf hirr
+    exact zero_ne_one f hf hp hirr h
+  · exact inv_zero f hf hp hirr
   · intro a ha
-    have ha' : a ≠ (0 : FiniteField f hf hirr) := ha
+    have ha' : a ≠ (0 : FiniteField f hf hp hirr) := ha
     exact mul_inv_cancel (x := a) ha'
   · intro a
     apply GFqField.ext
@@ -642,24 +644,24 @@ instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
         exact (inv_inv_def (pow a (m + 1))).symm
 
 instance {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f} :
-    Lean.Grind.IsCharP (FiniteField f hf hirr) p where
-  ofNat_ext_iff {x y} := natCast_eq_natCast_iff_mod_eq f hf hirr x y
+    Lean.Grind.IsCharP (FiniteField f hf hp hirr) p where
+  ofNat_ext_iff {x y} := natCast_eq_natCast_iff_mod_eq f hf hp hirr x y
 
 theorem frob_eq_pow
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     frob x = x ^ p :=
   rfl
 
 @[simp] theorem toQuotient_frob
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     (frob x).toQuotient = x.toQuotient ^ p :=
   rfl
 
 @[simp] theorem repr_frob
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
-    (x : FiniteField f hf hirr) :
+    (x : FiniteField f hf hp hirr) :
     repr (frob x) = GFqRing.repr (x.toQuotient ^ p) :=
   rfl
 

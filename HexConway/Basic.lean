@@ -91,11 +91,22 @@ theorem luebeckConwayPolynomial?_irreducible
 supported `(p, n)` pair. -/
 structure SupportedEntry (p n : Nat) [ZMod64.Bounds p] where
   poly : FpPoly p
+  prime : Hex.Nat.Prime p
   isSupported : luebeckConwayPolynomial? p n = some poly
 
 /-- The current committed table supports `C(2, 1)`. -/
 def supportedEntry_2_1 : SupportedEntry 2 1 :=
-  ⟨luebeckConwayPolynomial_2_1, rfl⟩
+  ⟨luebeckConwayPolynomial_2_1, by
+    constructor
+    · decide
+    · intro m hm
+      have hmle : m ≤ 2 := Nat.le_of_dvd (by decide : 0 < 2) hm
+      have hcases : m = 0 ∨ m = 1 ∨ m = 2 := by omega
+      rcases hcases with rfl | rfl | rfl
+      · simp at hm
+      · exact Or.inl rfl
+      · exact Or.inr rfl,
+    rfl⟩
 
 /-- Recover the committed Conway modulus for a supported entry. -/
 def conwayPoly (p n : Nat) [ZMod64.Bounds p] (h : SupportedEntry p n) : FpPoly p :=

@@ -184,6 +184,7 @@ entry, using the generic quotient-field representation. -/
 abbrev GFq (p n : Nat) [ZMod64.Bounds p] (h : Conway.SupportedEntry p n) : Type :=
   GFqField.FiniteField (Conway.conwayPoly p n h)
     (Conway.conwayPoly_nonconstant p n h)
+    h.prime
     (Conway.conwayPoly_irreducible p n h)
 
 namespace GFq
@@ -204,10 +205,16 @@ theorem modulus_irreducible (h : Conway.SupportedEntry p n) :
     FpPoly.Irreducible (modulus h) :=
   Conway.conwayPoly_irreducible p n h
 
+/-- The selected Conway modulus lives over a prime base field. -/
+theorem modulus_prime (h : Conway.SupportedEntry p n) :
+    Hex.Nat.Prime p :=
+  h.prime
+
 /-- Reduce a polynomial into the canonical field selected by a committed Conway
 entry. -/
 def ofPoly (h : Conway.SupportedEntry p n) (g : FpPoly p) : GFq p n h :=
-  GFqField.ofPoly (modulus h) (modulus_nonconstant h) (modulus_irreducible h) g
+  GFqField.ofPoly (modulus h) (modulus_nonconstant h) (modulus_prime h)
+    (modulus_irreducible h) g
 
 /-- Project a canonical field element to its reduced polynomial representative. -/
 def repr {h : Conway.SupportedEntry p n} (x : GFq p n h) : FpPoly p :=

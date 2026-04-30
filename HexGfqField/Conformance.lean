@@ -40,6 +40,20 @@ private theorem one_ne_zero_five : (1 : ZMod64 5) ≠ 0 := by
   have hm := (ZMod64.natCast_eq_natCast_iff (p := 5) 1 0).mp h
   simp at hm
 
+private theorem prime_five : Hex.Nat.Prime 5 := by
+  constructor
+  · decide
+  · intro m hm
+    have hmle : m ≤ 5 := Nat.le_of_dvd (by decide : 0 < 5) hm
+    have hcases : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 := by omega
+    rcases hcases with rfl | rfl | rfl | rfl | rfl | rfl
+    · simp at hm
+    · exact Or.inl rfl
+    · simp at hm
+    · simp at hm
+    · simp at hm
+    · exact Or.inr rfl
+
 private def polyFive (coeffs : Array Nat) : FpPoly 5 :=
   FpPoly.ofCoeffs (coeffs.map (fun n => ZMod64.ofNat 5 n))
 
@@ -57,7 +71,7 @@ private theorem modulus_pos_degree : 0 < FpPoly.degree modulus := by
 
 private abbrev Q := GFqRing.PolyQuotient modulus modulus_pos_degree
 private abbrev F (hirr : FpPoly.Irreducible modulus) :=
-  FiniteField modulus modulus_pos_degree hirr
+  FiniteField modulus modulus_pos_degree prime_five hirr
 
 private axiom modulus_irreducible : FpPoly.Irreducible modulus
 
@@ -65,7 +79,7 @@ private def q (coeffs : Array Nat) : Q :=
   GFqRing.ofPoly modulus modulus_pos_degree (polyFive coeffs)
 
 private def ff (hirr : FpPoly.Irreducible modulus) (coeffs : Array Nat) : F hirr :=
-  ofPoly modulus modulus_pos_degree hirr (polyFive coeffs)
+  ofPoly modulus modulus_pos_degree prime_five hirr (polyFive coeffs)
 
 private def reprNats {hirr : FpPoly.Irreducible modulus} (x : F hirr) : List Nat :=
   coeffNats (repr x)
@@ -80,23 +94,23 @@ private def conformanceChecks : Bool :=
     decide (reprNats (ofQuotient (q #[2, 3]) : F hirr) = [2, 3]),
     decide ((ofQuotient (q #[2, 3]) : F hirr).toQuotient = q #[2, 3]),
     decide (reprNats (ofQuotient (q #[0, 0, 0, 1]) : F hirr) = [1]),
-    decide (reprNats (ofPoly modulus modulus_pos_degree hirr (polyFive #[2, 3])) = [2, 3]),
-    decide (reprNats (ofPoly modulus modulus_pos_degree hirr (0 : FpPoly 5)) = []),
-    decide (reprNats (ofPoly modulus modulus_pos_degree hirr (polyFive #[0, 0, 1])) =
+    decide (reprNats (ofPoly modulus modulus_pos_degree prime_five hirr (polyFive #[2, 3])) = [2, 3]),
+    decide (reprNats (ofPoly modulus modulus_pos_degree prime_five hirr (0 : FpPoly 5)) = []),
+    decide (reprNats (ofPoly modulus modulus_pos_degree prime_five hirr (polyFive #[0, 0, 1])) =
       [4, 4]),
-    decide (repr (ofPoly modulus modulus_pos_degree hirr (polyFive #[0, 0, 1])) =
+    decide (repr (ofPoly modulus modulus_pos_degree prime_five hirr (polyFive #[0, 0, 1])) =
       GFqRing.reduceMod modulus (polyFive #[0, 0, 1])),
     decide (reprNats a = [2, 3]),
     decide (reprNats (0 : F hirr) = []),
     decide (reprNats high = [1]),
-    decide (reprNats (zero modulus modulus_pos_degree hirr) = []),
+    decide (reprNats (zero modulus modulus_pos_degree prime_five hirr) = []),
     decide (reprNats (0 : F hirr) = []),
-    decide ((zero modulus modulus_pos_degree hirr : F hirr) =
-      ofPoly modulus modulus_pos_degree hirr 0),
-    decide (reprNats (one modulus modulus_pos_degree hirr) = [1]),
+    decide ((zero modulus modulus_pos_degree prime_five hirr : F hirr) =
+      ofPoly modulus modulus_pos_degree prime_five hirr 0),
+    decide (reprNats (one modulus modulus_pos_degree prime_five hirr) = [1]),
     decide (reprNats (1 : F hirr) = [1]),
-    decide ((one modulus modulus_pos_degree hirr : F hirr) =
-      ofPoly modulus modulus_pos_degree hirr 1),
+    decide ((one modulus modulus_pos_degree prime_five hirr : F hirr) =
+      ofPoly modulus modulus_pos_degree prime_five hirr 1),
     decide (reprNats (a + b) = [1, 4]),
     decide (reprNats (a + 0) = [2, 3]),
     decide (reprNats ((ff hirr #[0, 0, 1]) + b) = [3]),
