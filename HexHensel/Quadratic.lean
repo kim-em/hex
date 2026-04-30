@@ -131,6 +131,57 @@ private theorem quadraticHenselStep_raw_factor_congr
     ZPoly.congr (g' * h') f (m * m) := by
   sorry
 
+private theorem quadraticHenselStep_bezout_error_congr_zero
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hm : 1 < m)
+    (hprod : ZPoly.congr (g * h) f m)
+    (hbez : ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let qFactor := factorQR.1
+    let rFactor := factorQR.2
+    let g' := addModSquare g rFactor m
+    let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+    let h' := addModSquare h hCorrection m
+    let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
+    ZPoly.congr b 0 m := by
+  sorry
+
+private theorem quadraticHenselStep_bezout_correction_congr
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hm : 1 < m)
+    (hprod : ZPoly.congr (g * h) f m)
+    (hbez : ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let qFactor := factorQR.1
+    let rFactor := factorQR.2
+    let g' := addModSquare g rFactor m
+    let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+    let h' := addModSquare h hCorrection m
+    let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
+    let tb := mulModSquare t b m
+    let bezoutQR := divModMonicModSquare tb g' m
+    let qBezout := bezoutQR.1
+    let rBezout := bezoutQR.2
+    let t' := subModSquare t rBezout m
+    let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
+    ZPoly.congr (s' * g' + t' * h') (1 - b * b) (m * m) := by
+  sorry
+
+private theorem congr_one_sub_square_of_congr_zero
+    (m : Nat) (b : ZPoly)
+    (hm : 1 < m)
+    (hb : ZPoly.congr b 0 m) :
+    ZPoly.congr (1 - b * b) 1 (m * m) := by
+  sorry
+
 private theorem quadraticHenselStep_raw_bezout_congr
     (m : Nat)
     (f g h s t : ZPoly)
@@ -154,7 +205,20 @@ private theorem quadraticHenselStep_raw_bezout_congr
     let t' := subModSquare t rBezout m
     let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
     ZPoly.congr (s' * g' + t' * h') 1 (m * m) := by
-  sorry
+  intro e te factorQR qFactor rFactor g' hCorrection h' b tb bezoutQR qBezout rBezout t' s'
+  have hb : ZPoly.congr b 0 m := by
+    simpa [e, te, factorQR, qFactor, rFactor, g', hCorrection, h'] using
+      quadraticHenselStep_bezout_error_congr_zero m f g h s t hm hprod hbez hmonic
+  exact ZPoly.congr_trans
+    (s' * g' + t' * h')
+    (1 - b * b)
+    1
+    (m * m)
+    (by
+      simpa [e, te, factorQR, qFactor, rFactor, g', hCorrection, h', b, tb,
+        bezoutQR, qBezout, rBezout, t', s'] using
+        quadraticHenselStep_bezout_correction_congr m f g h s t hm hprod hbez hmonic)
+    (congr_one_sub_square_of_congr_zero m b hm hb)
 
 private theorem quadraticHenselStep_g_update_monic
     (m : Nat)
