@@ -221,6 +221,45 @@ private theorem liftToZ_add_congr
   rw [FpPoly.coeff_liftToZ, FpPoly.coeff_liftToZ]
   exact zmod_add_lift_congr p (f.coeff i) (g.coeff i)
 
+private theorem zmod_mul_lift_congr
+    (p : Nat) [ZMod64.Bounds p] (a b : ZMod64 p) :
+    (Int.ofNat (a * b).toNat - (Int.ofNat a.toNat * Int.ofNat b.toNat)) %
+      (p : Int) = 0 := by
+  change (Int.ofNat (ZMod64.mul a b).toNat -
+      (Int.ofNat a.toNat * Int.ofNat b.toNat)) % (p : Int) = 0
+  rw [ZMod64.toNat_mul]
+  have hmod :
+      Int.ofNat ((a.toNat * b.toNat) % p) =
+        (Int.ofNat (a.toNat * b.toNat)) % (p : Int) := by
+    exact Int.natCast_emod _ _
+  rw [hmod]
+  have hdiv :
+      (p : Int) ∣
+        (Int.ofNat (a.toNat * b.toNat) % (p : Int) -
+          Int.ofNat (a.toNat * b.toNat)) :=
+    Int.dvd_sub_self_of_emod_eq rfl
+  rw [show Int.ofNat (a.toNat * b.toNat) =
+      Int.ofNat a.toNat * Int.ofNat b.toNat by
+        simp [Int.ofNat_eq_natCast]]
+  exact Int.emod_eq_zero_of_dvd hdiv
+
+private theorem liftToZ_mulCoeffTerm_congr
+    (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) (n i : Nat) :
+    (Int.ofNat (FpPoly.mulCoeffTerm f g n i).toNat -
+        DensePoly.mulCoeffStep (FpPoly.liftToZ f) (FpPoly.liftToZ g) n i 0 (n - i)) %
+      (p : Int) = 0 := by
+  unfold FpPoly.mulCoeffTerm DensePoly.mulCoeffStep
+  by_cases hni : n < i
+  · have hneq : i + (n - i) ≠ n := by omega
+    rw [if_pos hni, if_neg hneq]
+    change (Int.ofNat (ZMod64.zero : ZMod64 p).toNat - 0) % (p : Int) = 0
+    rw [ZMod64.toNat_zero]
+    simp
+  · have hle : i ≤ n := Nat.le_of_not_gt hni
+    have heq : i + (n - i) = n := Nat.add_sub_of_le hle
+    simp [hni, heq, FpPoly.coeff_liftToZ]
+    exact zmod_mul_lift_congr p (f.coeff i) (g.coeff (n - i))
+
 private theorem modP_add
     (p : Nat) [ZMod64.Bounds p] (f g : ZPoly) :
     ZPoly.modP p (f + g) = ZPoly.modP p f + ZPoly.modP p g := by
@@ -250,6 +289,10 @@ private theorem modP_add
 private theorem modP_lift_mul_left
     (p : Nat) [ZMod64.Bounds p] (r : FpPoly p) (h : ZPoly) :
     ZPoly.modP p (FpPoly.liftToZ r * h) = r * ZPoly.modP p h := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [ZPoly.coeff_modP, FpPoly.coeff_mul]
+  unfold FpPoly.mulCoeffSum
   sorry
 
 private theorem modP_lift_mul_right
