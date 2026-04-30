@@ -109,7 +109,27 @@ private theorem scaled_xgcd_repr_bezout
     DensePoly.scale unitInv r.left * GFqRing.repr x +
         DensePoly.scale unitInv r.right * f =
       DensePoly.scale unitInv r.gcd := by
-  sorry
+  dsimp
+  calc
+    DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+          (DensePoly.xgcd (GFqRing.repr x) f).left * GFqRing.repr x +
+        DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+          (DensePoly.xgcd (GFqRing.repr x) f).right * f
+        =
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            ((DensePoly.xgcd (GFqRing.repr x) f).left * GFqRing.repr x) +
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            ((DensePoly.xgcd (GFqRing.repr x) f).right * f) := by
+            rw [FpPoly.scale_mul_left, FpPoly.scale_mul_left]
+    _ =
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            ((DensePoly.xgcd (GFqRing.repr x) f).left * GFqRing.repr x +
+              (DensePoly.xgcd (GFqRing.repr x) f).right * f) := by
+            rw [FpPoly.scale_add]
+    _ =
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            (DensePoly.xgcd (GFqRing.repr x) f).gcd := by
+            rw [xgcd_repr_bezout x]
 
 /-- Modulo `f`, multiplying a representative by the normalized inverse
 candidate reduces to the normalized gcd witness from the same xgcd run. -/
@@ -120,7 +140,34 @@ private theorem reduceMod_repr_mul_invPoly_eq_scaled_gcd
     let unitInv : ZMod64 p := (r.gcd.coeff 0)⁻¹
     GFqRing.reduceMod f (GFqRing.repr x * invPoly x) =
       GFqRing.reduceMod f (DensePoly.scale unitInv r.gcd) := by
-  sorry
+  dsimp [invPoly]
+  calc
+    GFqRing.reduceMod f
+        (GFqRing.repr x *
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            (DensePoly.xgcd (GFqRing.repr x) f).left)
+        =
+      GFqRing.reduceMod f
+        (DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            (DensePoly.xgcd (GFqRing.repr x) f).left *
+          GFqRing.repr x) := by
+          rw [FpPoly.mul_comm]
+    _ =
+      GFqRing.reduceMod f
+        (DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            (DensePoly.xgcd (GFqRing.repr x) f).left * GFqRing.repr x +
+          DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+            (DensePoly.xgcd (GFqRing.repr x) f).right * f) := by
+          exact (GFqRing.reduceMod_add_mul_self_right f hf
+            (DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+              (DensePoly.xgcd (GFqRing.repr x) f).left * GFqRing.repr x)
+            (DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+              (DensePoly.xgcd (GFqRing.repr x) f).right)).symm
+    _ =
+      GFqRing.reduceMod f
+        (DensePoly.scale ((DensePoly.xgcd (GFqRing.repr x) f).gcd.coeff 0)⁻¹
+          (DensePoly.xgcd (GFqRing.repr x) f).gcd) := by
+          rw [scaled_xgcd_repr_bezout x]
 
 /-- Nonzero field elements have nonzero quotient representatives. This is the
 bridge from field-level hypotheses to the quotient-level helper lemmas. -/

@@ -956,5 +956,39 @@ theorem mul_assoc (f g h : FpPoly p) :
     _ = (List.range (n + 1)).foldl
         (fun acc i => acc + mulCoeffTerm f (g * h) n i) 0 := by
             exact (fold_mulCoeff_assoc_right_expand f g h n).symm
+
+theorem scale_add (c : ZMod64 p) (f g : FpPoly p) :
+    DensePoly.scale c (f + g) =
+      DensePoly.scale c f + DensePoly.scale c g := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero : c * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  grind
+
+theorem scale_mul_left (c : ZMod64 p) (f g : FpPoly p) :
+    DensePoly.scale c (f * g) =
+      DensePoly.scale c f * g := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero : c * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  rw [coeff_mul, coeff_mul]
+  rw [mulCoeffSum_eq_degree_bound (DensePoly.scale c f) g n]
+  rw [mulCoeffSum_eq_degree_bound f g n]
+  rw [fold_mul_left]
+  apply fold_add_congr
+  intro i _hi
+  unfold mulCoeffTerm
+  by_cases hn : n < i
+  · simp [hn]
+    exact hzero
+  · simp [hn]
+    rw [DensePoly.coeff_scale _ _ _ hzero]
+    grind
 end FpPoly
 end Hex

@@ -9,16 +9,6 @@ nonconstant polynomial.
 -/
 namespace Hex
 
-namespace ZMod64
-
-variable {p : Nat} [Bounds p]
-
-/-- Division in `ZMod64 p` uses the existing executable inverse candidate. -/
-instance : Div (ZMod64 p) where
-  div a b := a * b⁻¹
-
-end ZMod64
-
 namespace FpPoly
 
 variable {p : Nat} [ZMod64.Bounds p]
@@ -122,6 +112,13 @@ theorem reduceMod_idem (f : FpPoly p) (g : FpPoly p) :
     reduceMod f (reduceMod f g) = reduceMod f g := by
   simpa [reduceMod, DensePoly.mod_eq_divMod] using (DensePoly.mod_mod g f)
 
+/-- The modulus itself reduces to the zero representative modulo itself. -/
+theorem reduceMod_self (f : FpPoly p) :
+    reduceMod f f = 0 := by
+  change (DensePoly.divMod f f).2 = 0
+  simpa [DensePoly.mod_eq_divMod] using
+    (DensePoly.DivModLaws.mod_self_eq_zero f)
+
 /-- Reducing both summands before quotient reduction preserves the canonical representative. -/
 theorem reduceMod_add_reduceMod_congr (f : FpPoly p) (a b : FpPoly p) :
     reduceMod f (a + b) = reduceMod f (reduceMod f a + reduceMod f b) := by
@@ -179,6 +176,25 @@ theorem reduceMod_mul_right_reduceMod (f : FpPoly p) (a b : FpPoly p) :
           simp [reduceMod_idem]
     _ = reduceMod f (a * b) := by
           exact (reduceMod_mul_reduceMod_congr f a b).symm
+
+/-- Adding a right multiple of the modulus does not change the canonical representative. -/
+theorem reduceMod_add_mul_self_right (f : FpPoly p) (hf : 0 < FpPoly.degree f)
+    (q r : FpPoly p) :
+    reduceMod f (q + r * f) = reduceMod f q := by
+  calc
+    reduceMod f (q + r * f)
+        = reduceMod f (q + reduceMod f (r * f)) := by
+          exact (reduceMod_add_right_reduceMod f q (r * f)).symm
+    _ = reduceMod f (q + reduceMod f (f * r)) := by
+          rw [FpPoly.mul_comm r f]
+    _ = reduceMod f (q + reduceMod f (reduceMod f f * r)) := by
+          rw [reduceMod_mul_left_reduceMod]
+    _ = reduceMod f (q + reduceMod f (0 * r)) := by
+          rw [reduceMod_self]
+    _ = reduceMod f (q + reduceMod f 0) := by
+          rw [FpPoly.zero_mul]
+    _ = reduceMod f q := by
+          simp [reduceMod_zero f hf, FpPoly.add_zero]
 
 theorem ofPoly_reduceMod (f : FpPoly p) (hf : 0 < FpPoly.degree f) (g : FpPoly p) :
     ofPoly f hf (reduceMod f g) = ofPoly f hf g := by
