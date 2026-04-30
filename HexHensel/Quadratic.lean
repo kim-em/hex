@@ -113,6 +113,58 @@ def quadraticHenselStep
   let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
   { g := g', h := h', s := s', t := t' }
 
+private theorem quadraticHenselStep_raw_factor_congr
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hprod : ZPoly.congr (g * h) f m)
+    (hbez : ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let qFactor := factorQR.1
+    let rFactor := factorQR.2
+    let g' := addModSquare g rFactor m
+    let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+    let h' := addModSquare h hCorrection m
+    ZPoly.congr (g' * h') f (m * m) := by
+  sorry
+
+private theorem quadraticHenselStep_raw_bezout_congr
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hprod : ZPoly.congr (g * h) f m)
+    (hbez : ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let qFactor := factorQR.1
+    let rFactor := factorQR.2
+    let g' := addModSquare g rFactor m
+    let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+    let h' := addModSquare h hCorrection m
+    let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
+    let tb := mulModSquare t b m
+    let bezoutQR := divModMonicModSquare tb g' m
+    let qBezout := bezoutQR.1
+    let rBezout := bezoutQR.2
+    let t' := subModSquare t rBezout m
+    let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
+    ZPoly.congr (s' * g' + t' * h') 1 (m * m) := by
+  sorry
+
+private theorem quadraticHenselStep_g_update_monic
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let rFactor := factorQR.2
+    DensePoly.Monic (addModSquare g rFactor m) := by
+  sorry
+
 /-- The updated factors multiply to `f` modulo `m^2`. -/
 theorem quadraticHenselStep_factor_spec
     (m : Nat)
@@ -122,7 +174,8 @@ theorem quadraticHenselStep_factor_spec
     (hmonic : DensePoly.Monic g) :
     let r := quadraticHenselStep m f g h s t
     ZPoly.congr (r.g * r.h) f (m * m) := by
-  sorry
+  unfold quadraticHenselStep
+  exact quadraticHenselStep_raw_factor_congr m f g h s t hprod hbez hmonic
 
 /-- The updated Bezout witnesses certify coprimality modulo `m^2`. -/
 theorem quadraticHenselStep_bezout_spec
@@ -133,7 +186,8 @@ theorem quadraticHenselStep_bezout_spec
     (hmonic : DensePoly.Monic g) :
     let r := quadraticHenselStep m f g h s t
     ZPoly.congr (r.s * r.g + r.t * r.h) 1 (m * m) := by
-  sorry
+  unfold quadraticHenselStep
+  exact quadraticHenselStep_raw_bezout_congr m f g h s t hprod hbez hmonic
 
 /-- The quadratic step lifts both factor and Bezout congruences to modulus `m^2`. -/
 theorem quadraticHenselStep_spec
@@ -145,7 +199,9 @@ theorem quadraticHenselStep_spec
     let r := quadraticHenselStep m f g h s t
     ZPoly.congr (r.g * r.h) f (m * m) ∧
       ZPoly.congr (r.s * r.g + r.t * r.h) 1 (m * m) := by
-  sorry
+  exact
+    ⟨quadraticHenselStep_factor_spec m f g h s t hprod hbez hmonic,
+      quadraticHenselStep_bezout_spec m f g h s t hprod hbez hmonic⟩
 
 /-- The monic factor remains monic after the quadratic correction. -/
 theorem quadraticHenselStep_monic
@@ -153,7 +209,8 @@ theorem quadraticHenselStep_monic
     (f g h s t : ZPoly)
     (hmonic : DensePoly.Monic g) :
     DensePoly.Monic (quadraticHenselStep m f g h s t).g := by
-  sorry
+  unfold quadraticHenselStep
+  exact quadraticHenselStep_g_update_monic m f g h s t hmonic
 
 end ZPoly
 end Hex
