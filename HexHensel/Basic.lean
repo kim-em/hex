@@ -87,6 +87,24 @@ theorem congr_reduceModPow_of_congr (f g : ZPoly) (p k : Nat)
   rw [coeff_reduceModPow, coeff_reduceModPow]
   exact intModNat_eq_of_congr (hfg i)
 
+/-- Congruent integer polynomials have the same reduction modulo `p`. -/
+theorem modP_eq_of_congr (p : Nat) [ZMod64.Bounds p] (f g : ZPoly)
+    (hfg : congr f g p) :
+    modP p f = modP p g := by
+  apply DensePoly.ext_coeff
+  intro i
+  rw [coeff_modP, coeff_modP]
+  apply ZMod64.ext
+  apply UInt64.toNat_inj.mp
+  change
+    (ZMod64.ofNat p (intModNat (f.coeff i) p)).toNat =
+      (ZMod64.ofNat p (intModNat (g.coeff i) p)).toNat
+  rw [ZMod64.toNat_ofNat, ZMod64.toNat_ofNat]
+  have hnat :
+      intModNat (f.coeff i) p = intModNat (g.coeff i) p := by
+    exact Int.ofNat.inj (intModNat_eq_of_congr (hfg i))
+  rw [hnat]
+
 end ZPoly
 
 namespace FpPoly
