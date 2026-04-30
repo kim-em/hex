@@ -47,6 +47,43 @@ def inversionCount : List (Fin n) → Nat
   | x :: xs =>
       xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 + inversionCount xs
 
+private def crossInversionCount {n : Nat} : List (Fin n) → List (Fin n) → Nat
+  | [], _ => 0
+  | x :: xs, ys =>
+      ys.foldl (fun acc y => acc + if y < x then 1 else 0) 0 +
+        crossInversionCount xs ys
+
+private theorem inversionFold_start {n : Nat} (xs : List (Fin n)) (x : Fin n)
+    (acc : Nat) :
+    xs.foldl (fun acc y => acc + if y < x then 1 else 0) acc =
+      acc + xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 := by
+  induction xs generalizing acc with
+  | nil => simp
+  | cons y ys ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc + if y < x then 1 else 0), ih (0 + if y < x then 1 else 0)]
+      omega
+
+private theorem inversionFold_append {n : Nat} (xs ys : List (Fin n)) (x : Fin n) :
+    (xs ++ ys).foldl (fun acc y => acc + if y < x then 1 else 0) 0 =
+      xs.foldl (fun acc y => acc + if y < x then 1 else 0) 0 +
+        ys.foldl (fun acc y => acc + if y < x then 1 else 0) 0 := by
+  rw [List.foldl_append, inversionFold_start]
+
+private theorem inversionCount_append {n : Nat} (xs ys : List (Fin n)) :
+    inversionCount (xs ++ ys) =
+      inversionCount xs + inversionCount ys + crossInversionCount xs ys := by
+  induction xs with
+  | nil =>
+      change inversionCount ys =
+        inversionCount ([] : List (Fin n)) + inversionCount ys +
+          crossInversionCount ([] : List (Fin n)) ys
+      simp [inversionCount, crossInversionCount]
+  | cons x xs ih =>
+      simp only [List.cons_append, inversionCount, crossInversionCount]
+      rw [inversionFold_append, ih]
+      omega
+
 /-- The sign of a permutation vector, computed from inversion parity. -/
 def detSign {R : Type u} [Lean.Grind.Ring R] {n : Nat} (perm : Vector (Fin n) n) : R :=
   if inversionCount perm.toList % 2 = 0 then 1 else -1
@@ -114,6 +151,40 @@ private theorem foldl_det_sum_mul_left_zero {R : Type u} [Lean.Grind.CommRing R]
   have hzero : c * 0 = 0 := by grind
   simpa [hzero] using (foldl_det_sum_mul_left (R := R) xs c f 0)
 
+private theorem foldl_det_sum_add_start {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f g : β → R) (a b : R) :
+    xs.foldl (fun acc x => acc + (f x + g x)) (a + b) =
+      xs.foldl (fun acc x => acc + f x) a +
+        xs.foldl (fun acc x => acc + g x) b := by
+  induction xs generalizing a b with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      calc
+        xs.foldl (fun acc x => acc + (f x + g x)) (a + b + (f x + g x)) =
+          xs.foldl (fun acc x => acc + (f x + g x)) ((a + f x) + (b + g x)) := by
+            congr 1
+            grind
+        _ =
+          xs.foldl (fun acc x => acc + f x) (a + f x) +
+            xs.foldl (fun acc x => acc + g x) (b + g x) := by
+            exact ih (a + f x) (b + g x)
+
+private theorem foldl_det_sum_add_zero {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f g : β → R) :
+    xs.foldl (fun acc x => acc + (f x + g x)) 0 =
+      xs.foldl (fun acc x => acc + f x) 0 +
+        xs.foldl (fun acc x => acc + g x) 0 := by
+  calc
+    xs.foldl (fun acc x => acc + (f x + g x)) 0 =
+      xs.foldl (fun acc x => acc + (f x + g x)) ((0 : R) + 0) := by
+        congr 1
+        grind
+    _ =
+      xs.foldl (fun acc x => acc + f x) 0 +
+        xs.foldl (fun acc x => acc + g x) 0 := by
+        exact foldl_det_sum_add_start xs f g 0 0
+
 private theorem foldl_det_product_mul_left {R : Type u} [Lean.Grind.CommRing R]
     {β : Type v} (xs : List β) (c : R) (f : β → R) (z : R) :
     xs.foldl (fun acc x => acc * f x) (c * z) =
@@ -172,6 +243,95 @@ private theorem foldl_det_product_single_scale {R : Type u}
           | inl hxi => exact False.elim (hx hxi.symm)
           | inr htail => exact htail
         exact ih (z * f x) hmemTail hnodup.2
+
+private theorem foldl_det_product_add_start {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f : β → R) (a b : R) :
+    xs.foldl (fun acc x => acc * f x) (a + b) =
+      xs.foldl (fun acc x => acc * f x) a +
+        xs.foldl (fun acc x => acc * f x) b := by
+  induction xs generalizing a b with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      calc
+        xs.foldl (fun acc x => acc * f x) ((a + b) * f x) =
+          xs.foldl (fun acc x => acc * f x) (a * f x + b * f x) := by
+            congr 1
+            grind
+        _ =
+          xs.foldl (fun acc x => acc * f x) (a * f x) +
+            xs.foldl (fun acc x => acc * f x) (b * f x) := by
+            exact ih (a * f x) (b * f x)
+
+private theorem foldl_det_product_single_add {R : Type u}
+    [Lean.Grind.CommRing R] {β : Type v} [DecidableEq β]
+    (xs : List β) (i : β) (c : R) (f g : β → R) (z : R)
+    (hmem : i ∈ xs) (hnodup : xs.Nodup)
+    (hagree : ∀ x, x ∈ xs → x ≠ i → g x = f x) :
+    xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x) z =
+      xs.foldl (fun acc x => acc * f x) z +
+        c * xs.foldl (fun acc x => acc * g x) z := by
+  induction xs generalizing z with
+  | nil =>
+      cases hmem
+  | cons x xs ih =>
+      simp only [List.mem_cons] at hmem
+      simp only [List.nodup_cons] at hnodup
+      simp only [List.foldl_cons]
+      by_cases hx : x = i
+      · subst x
+        rw [if_pos rfl]
+        have hnot : i ∉ xs := hnodup.1
+        calc
+          xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x)
+              (z * (f i + c * g i)) =
+            xs.foldl (fun acc x => acc * f x) (z * (f i + c * g i)) := by
+              apply foldl_det_product_congr
+              intro y hy
+              have hyi : y ≠ i := by
+                intro h
+                exact hnot (h ▸ hy)
+              rw [if_neg hyi]
+          _ = xs.foldl (fun acc x => acc * f x) (z * f i + c * (z * g i)) := by
+              congr 1
+              grind
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              xs.foldl (fun acc x => acc * f x) (c * (z * g i)) := by
+              exact foldl_det_product_add_start xs f (z * f i) (c * (z * g i))
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              c * xs.foldl (fun acc x => acc * f x) (z * g i) := by
+              rw [show
+                xs.foldl (fun acc x => acc * f x) (c * (z * g i)) =
+                  c * xs.foldl (fun acc x => acc * f x) (z * g i) from
+                    foldl_det_product_mul_left xs c f (z * g i)]
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f i) +
+              c * xs.foldl (fun acc x => acc * g x) (z * g i) := by
+              congr 2
+              apply foldl_det_product_congr
+              intro y hy
+              exact (hagree y (List.mem_cons.mpr (Or.inr hy)) (by
+                intro h
+                exact hnot (h ▸ hy))).symm
+      · rw [if_neg hx]
+        have hmemTail : i ∈ xs := by
+          cases hmem with
+          | inl hxi => exact False.elim (hx hxi.symm)
+          | inr htail => exact htail
+        have hgx : g x = f x := hagree x (List.mem_cons.mpr (Or.inl rfl)) hx
+        calc
+          xs.foldl (fun acc x => acc * if x = i then f x + c * g x else f x)
+              (z * f x) =
+            xs.foldl (fun acc x => acc * f x) (z * f x) +
+              c * xs.foldl (fun acc x => acc * g x) (z * f x) := by
+              exact ih (z * f x) hmemTail hnodup.2
+                (fun y hy hyi => hagree y (List.mem_cons.mpr (Or.inr hy)) hyi)
+          _ =
+            xs.foldl (fun acc x => acc * f x) (z * f x) +
+              c * xs.foldl (fun acc x => acc * g x) (z * g x) := by
+              rw [hgx]
 
 private theorem foldl_det_product_zero_start {R : Type u}
     [Lean.Grind.CommRing R] {β : Type v} (xs : List β) (f : β → R) :
@@ -344,6 +504,73 @@ private theorem insertAt_last_toList {α : Type u} {n : Nat} (x : α) (v : Vecto
     simp
   simpa [hidx] using list_insertIdx_length v.toArray.toList x
 
+private theorem insertAt_toList {α : Type u} {n : Nat}
+    (x : α) (v : Vector α n) (i : Fin (n + 1)) :
+    (insertAt x v i).toList = v.toList.insertIdx i.val x := by
+  unfold insertAt
+  simp [Vector.toList]
+
+private theorem list_nodup_map_castSucc {n : Nat} (xs : List (Fin n)) :
+    xs.Nodup → (xs.map Fin.castSucc).Nodup := by
+  induction xs with
+  | nil =>
+      intro _h
+      simp
+  | cons x xs ih =>
+      intro hnodup
+      rw [List.nodup_cons] at hnodup
+      rw [List.map_cons, List.nodup_cons]
+      constructor
+      · intro hmem
+        rw [List.mem_map] at hmem
+        rcases hmem with ⟨y, hy, hxy⟩
+        have hval : x.val = y.val := by
+          simpa using (congrArg Fin.val hxy).symm
+        exact hnodup.1 (Fin.ext hval ▸ hy)
+      · exact ih hnodup.2
+
+private theorem finLast_not_mem_map_castSucc {n : Nat} (xs : List (Fin n)) :
+    Fin.last n ∉ xs.map Fin.castSucc := by
+  intro hmem
+  rw [List.mem_map] at hmem
+  rcases hmem with ⟨x, _hxmem, hxlast⟩
+  have hval : x.val = n := by
+    simpa using congrArg Fin.val hxlast
+  exact Nat.ne_of_lt x.isLt hval
+
+private theorem insertAt_last_castSucc_nodup {n : Nat}
+    (v : Vector (Fin n) n) (i : Fin (n + 1))
+    (hnodup : v.toList.Nodup) :
+    (insertAt (Fin.last n) (v.map Fin.castSucc) i).toList.Nodup := by
+  rw [insertAt_toList]
+  have hmap : (v.map Fin.castSucc).toList.Nodup := by
+    rw [vector_toList_map]
+    exact list_nodup_map_castSucc v.toList hnodup
+  have hlast : Fin.last n ∉ (v.map Fin.castSucc).toList := by
+    rw [vector_toList_map]
+    exact finLast_not_mem_map_castSucc v.toList
+  have hcons : (Fin.last n :: (v.map Fin.castSucc).toList).Nodup := by
+    rw [List.nodup_cons]
+    exact ⟨hlast, hmap⟩
+  have hidx : i.val ≤ (v.map Fin.castSucc).toList.length := by
+    simpa using Nat.lt_succ_iff.mp i.isLt
+  exact (List.perm_insertIdx (Fin.last n) (v.map Fin.castSucc).toList hidx).symm.nodup hcons
+
+private theorem permutationVectors_nodup {n : Nat} {perm : Vector (Fin n) n}
+    (hmem : perm ∈ permutationVectors n) :
+    perm.toList.Nodup := by
+  induction n with
+  | zero =>
+      have hnil : perm.toList = [] := by
+        apply List.eq_nil_iff_length_eq_zero.mpr
+        simp [Vector.length_toList]
+      rw [hnil]
+      simp
+  | succ n ih =>
+      simp [permutationVectors, List.mem_flatMap, List.mem_map] at hmem
+      rcases hmem with ⟨v, hv, i, _hi, rfl⟩
+      exact insertAt_last_castSucc_nodup v i (ih hv)
+
 private theorem detSign_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
     (v : Vector (Fin n) n) :
     detSign (R := R)
@@ -400,6 +627,47 @@ private theorem detProduct_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Na
 private def finTranspose {n : Nat} (i j : Fin n) (r : Fin n) : Fin n :=
   if r = i then j else if r = j then i else r
 
+private theorem finTranspose_left {n : Nat} (i j : Fin n) :
+    finTranspose i j i = j := by
+  simp [finTranspose]
+
+private theorem finTranspose_right {n : Nat} (i j : Fin n) :
+    finTranspose i j j = i := by
+  by_cases h : j = i
+  · subst j
+    simp [finTranspose]
+  · simp [finTranspose, h]
+
+private theorem finTranspose_of_ne {n : Nat} (i j r : Fin n)
+    (hi : r ≠ i) (hj : r ≠ j) :
+    finTranspose i j r = r := by
+  simp [finTranspose, hi, hj]
+
+private theorem finTranspose_involutive {n : Nat} (i j r : Fin n) :
+    finTranspose i j (finTranspose i j r) = r := by
+  by_cases hi : r = i
+  · subst r
+    rw [finTranspose_left, finTranspose_right]
+  · by_cases hj : r = j
+    · subst r
+      rw [finTranspose_right, finTranspose_left]
+    · rw [finTranspose_of_ne i j r hi hj]
+      exact finTranspose_of_ne i j r hi hj
+
+private theorem finTranspose_injective {n : Nat} (i j : Fin n) :
+    Function.Injective (finTranspose i j) := by
+  intro a b h
+  have h' := congrArg (finTranspose i j) h
+  simpa [finTranspose_involutive] using h'
+
+private theorem finTranspose_ne_iff {n : Nat} (i j a b : Fin n) :
+    finTranspose i j a ≠ finTranspose i j b ↔ a ≠ b := by
+  constructor
+  · intro h hab
+    exact h (hab ▸ rfl)
+  · intro h hab
+    exact h (finTranspose_injective i j hab)
+
 private def transposePermutationValues {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) : Vector (Fin n) n :=
   Vector.ofFn fun r => perm[finTranspose i j r]
@@ -433,16 +701,24 @@ private theorem rowSwap_get {R : Type u} {n m : Nat}
         exact Vector.getElem_set_ne (xs := M.set i M[j]) (x := M[i]) j.isLt r.isLt hjr
       exact (congrArg (fun row => row[k]) hrow₂).trans (congrArg (fun row => row[k]) hrow₁)
 
-private theorem finTranspose_self {n : Nat} (i j : Fin n) (r : Fin n) :
-    finTranspose i j (finTranspose i j r) = r := by
-  unfold finTranspose
-  by_cases hri : r = i
-  · subst r
-    simp
-  · by_cases hrj : r = j
-    · subst r
-      simp
-    · simp [hri, hrj]
+private theorem transposePermutationValues_get {n : Nat}
+    (perm : Vector (Fin n) n) (i j r : Fin n) :
+    (transposePermutationValues perm i j)[r] = perm[finTranspose i j r] := by
+  simp [transposePermutationValues]
+
+private theorem transposePermutationValues_involutive {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) :
+    transposePermutationValues (transposePermutationValues perm i j) i j = perm := by
+  apply Vector.ext
+  intro r hr
+  simp [transposePermutationValues, finTranspose_involutive]
+
+private theorem detSign_transposePermutationValues_involutive {R : Type u}
+    [Lean.Grind.Ring R] {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) :
+    detSign (R := R) (transposePermutationValues (transposePermutationValues perm i j) i j) =
+      detSign (R := R) perm := by
+  rw [transposePermutationValues_involutive]
 
 private theorem detProduct_rowSwap_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
@@ -508,6 +784,95 @@ private theorem detTerm_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
   rw [detProduct_rowScale]
   grind
 
+private def rowAddDuplicate {R : Type u} {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) : Matrix R n n :=
+  M.set dst M[src]
+
+private theorem rowAdd_get {R : Type u} [Mul R] [Add R] {n : Nat}
+    (M : Matrix R n n) (src dst r : Fin n) (c : R) (k : Fin n) :
+    (rowAdd M src dst c)[r][k] =
+      if r = dst then M[dst][k] + c * M[src][k] else M[r][k] := by
+  by_cases h : r = dst
+  · subst r
+    simp [rowAdd]
+  · simp [rowAdd, h]
+    have hval : dst.val ≠ r.val := by
+      intro hval
+      exact h (Fin.ext hval.symm)
+    have hrow :
+        (M.set dst (Vector.ofFn fun k => M[dst][k] + c * M[src][k]))[r] = M[r] := by
+      exact
+        (Vector.getElem_set_ne
+          (xs := M) (x := Vector.ofFn fun k => M[dst][k] + c * M[src][k])
+          dst.isLt r.isLt hval)
+    simpa [rowAdd] using congrArg (fun row => row[k]) hrow
+
+private theorem rowAddDuplicate_get {R : Type u} {n : Nat}
+    (M : Matrix R n n) (src dst r : Fin n) (k : Fin n) :
+    (rowAddDuplicate M src dst)[r][k] =
+      if r = dst then M[src][k] else M[r][k] := by
+  by_cases h : r = dst
+  · subst r
+    simp [rowAddDuplicate]
+  · simp [rowAddDuplicate, h]
+    have hval : dst.val ≠ r.val := by
+      intro hval
+      exact h (Fin.ext hval.symm)
+    have hrow : (M.set dst M[src])[r] = M[r] := by
+      exact (Vector.getElem_set_ne (xs := M) (x := M[src]) dst.isLt r.isLt hval)
+    simpa [rowAddDuplicate] using congrArg (fun row => row[k]) hrow
+
+private theorem detProduct_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (c : R) (perm : Vector (Fin n) n) :
+    detProduct (rowAdd M src dst c) perm =
+      detProduct M perm + c * detProduct (rowAddDuplicate M src dst) perm := by
+  unfold detProduct
+  calc
+    (List.finRange n).foldl
+        (fun acc r => acc * (rowAdd M src dst c)[r][perm[r]]) 1 =
+      (List.finRange n).foldl
+        (fun acc r =>
+          acc * if r = dst then
+            M[r][perm[r]] + c * (rowAddDuplicate M src dst)[r][perm[r]]
+          else
+            M[r][perm[r]]) 1 := by
+        apply foldl_det_product_congr
+        intro r _hmem
+        by_cases h : r = dst
+        · subst r
+          rw [rowAdd_get M src dst dst c perm[dst]]
+          rw [rowAddDuplicate_get M src dst dst perm[dst]]
+          simp
+        · rw [rowAdd_get, rowAddDuplicate_get]
+          simp [h]
+    _ =
+      (List.finRange n).foldl (fun acc r => acc * M[r][perm[r]]) 1 +
+        c * (List.finRange n).foldl
+          (fun acc r => acc * (rowAddDuplicate M src dst)[r][perm[r]]) 1 := by
+        exact foldl_det_product_single_add
+          (List.finRange n) dst c
+          (fun r => M[r][perm[r]])
+          (fun r => (rowAddDuplicate M src dst)[r][perm[r]]) 1
+          (List.mem_finRange dst) (List.nodup_finRange n)
+          (fun r _hmem hne => by
+            change (rowAddDuplicate M src dst)[r][perm[r]] = M[r][perm[r]]
+            rw [rowAddDuplicate_get]
+            simp [hne])
+
+private theorem detTerm_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (c : R) (perm : Vector (Fin n) n) :
+    detTerm (rowAdd M src dst c) perm =
+      detTerm M perm + c * detTerm (rowAddDuplicate M src dst) perm := by
+  unfold detTerm
+  rw [detProduct_rowAdd]
+  grind
+
+private theorem permutationVectors_duplicateRow_sum {R : Type u} [Lean.Grind.CommRing R]
+    {n : Nat} (M : Matrix R n n) (src dst : Fin n) (h : src ≠ dst) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowAddDuplicate M src dst) perm) 0 = 0 := by
+  sorry
+
 /-- The multilinear expansion of a row addition has zero total duplicate-row
 contribution, so the Leibniz sum is unchanged. -/
 private theorem permutationVectors_rowAdd_sum {R : Type u} [Lean.Grind.CommRing R]
@@ -515,7 +880,30 @@ private theorem permutationVectors_rowAdd_sum {R : Type u} [Lean.Grind.CommRing 
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowAdd M src dst c) perm) 0 =
       (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 := by
-  sorry
+  calc
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowAdd M src dst c) perm) 0 =
+      (permutationVectors n).foldl
+        (fun acc perm =>
+          acc + (detTerm M perm + c * detTerm (rowAddDuplicate M src dst) perm)) 0 := by
+        apply foldl_det_sum_congr
+        intro perm _hmem
+        exact detTerm_rowAdd M src dst c perm
+    _ =
+      (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 +
+        (permutationVectors n).foldl
+          (fun acc perm => acc + c * detTerm (rowAddDuplicate M src dst) perm) 0 := by
+        exact foldl_det_sum_add_zero
+          (permutationVectors n) (detTerm M) (fun perm => c * detTerm (rowAddDuplicate M src dst) perm)
+    _ =
+      (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 +
+        c * (permutationVectors n).foldl
+          (fun acc perm => acc + detTerm (rowAddDuplicate M src dst) perm) 0 := by
+        rw [foldl_det_sum_mul_left_zero]
+    _ =
+      (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 := by
+        rw [permutationVectors_duplicateRow_sum M src dst h]
+        grind
 
 /-- The Leibniz sum for the identity matrix has exactly the identity
 permutation as its nonzero contribution. -/
