@@ -416,17 +416,40 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
     (p q m : DensePoly S) : Prop :=
   m ∣ (p - q)
 
+private theorem congr_mod_core {S : Type _}
+    [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    (p m : DensePoly S) :
+    m ∣ (p % m - p) := by
+  sorry
+
 /-- Reduction modulo the modulus is congruent to the original polynomial. -/
 theorem congr_mod {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
     (p m : DensePoly S) :
     Congr (p % m) p m := by
+  exact congr_mod_core p m
+
+private theorem mod_eq_mod_of_dvd_sub {S : Type _}
+    [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    {p q m : DensePoly S} :
+    m ∣ (p - q) -> p % m = q % m := by
   sorry
 
 /-- Congruent polynomials have the same canonical remainder. -/
 theorem mod_eq_mod_of_congr {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
     {p q m : DensePoly S} :
     Congr p q m -> p % m = q % m := by
-  intro _h
+  exact mod_eq_mod_of_dvd_sub
+
+private theorem polyCRT_congr_fst :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
+    Congr (polyCRT a b u v s t) u a := by
+  sorry
+
+private theorem polyCRT_congr_snd :
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    (a b u v s t : DensePoly S) -> s * a + t * b = 1 ->
+    Congr (polyCRT a b u v s t) v b := by
   sorry
 
 /-- The CRT witness reduces to the prescribed first residue modulo `a` via monic reduction. -/
@@ -434,7 +457,11 @@ theorem polyCRT_modByMonic_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) a ha = modByMonic u a ha := by
-  sorry
+  intro S _ _ a b u v s t ha hbez
+  letI : Div S := ⟨fun x _ => x⟩
+  rw [modByMonic_eq_mod]
+  rw [modByMonic_eq_mod]
+  exact mod_eq_mod_of_congr (polyCRT_congr_fst a b u v s t hbez)
 
 /-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
 theorem polyCRT_mod_fst :
@@ -449,7 +476,11 @@ theorem polyCRT_modByMonic_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
     (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) b hb = modByMonic v b hb := by
-  sorry
+  intro S _ _ a b u v s t hb hbez
+  letI : Div S := ⟨fun x _ => x⟩
+  rw [modByMonic_eq_mod]
+  rw [modByMonic_eq_mod]
+  exact mod_eq_mod_of_congr (polyCRT_congr_snd a b u v s t hbez)
 
 /-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
 theorem polyCRT_mod_snd :
