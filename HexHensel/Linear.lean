@@ -200,7 +200,14 @@ theorem linearHenselStep_spec
 theorem linearHenselStep_monic
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
-    (hmonic : DensePoly.Monic g) :
+    (hp : 1 < p)
+    (hmonic : DensePoly.Monic g)
+    (hgCorrectionDegree :
+      let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+      let gMod := ZPoly.modP p g
+      let eMod := ZPoly.modP p e
+      let qr := DensePoly.divMod (t * eMod) gMod
+      (LinearLiftResult.liftScaledIncrement p k qr.2).degree?.getD 0 < g.degree?.getD 0) :
     DensePoly.Monic (linearHenselStep p k f g h s t).g := by
   sorry
 
@@ -208,7 +215,14 @@ theorem linearHenselStep_monic
 theorem linearHenselStep_g_degree?_eq
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
-    (hmonic : DensePoly.Monic g) :
+    (hp : 1 < p)
+    (hmonic : DensePoly.Monic g)
+    (hgCorrectionDegree :
+      let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+      let gMod := ZPoly.modP p g
+      let eMod := ZPoly.modP p e
+      let qr := DensePoly.divMod (t * eMod) gMod
+      (LinearLiftResult.liftScaledIncrement p k qr.2).degree?.getD 0 < g.degree?.getD 0) :
     (linearHenselStep p k f g h s t).g.degree? = g.degree? := by
   sorry
 
@@ -216,7 +230,26 @@ theorem linearHenselStep_g_degree?_eq
 theorem linearHenselStep_h_degree?_eq
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
-    (hprod : ZPoly.congr (g * h) f (p ^ k)) :
+    (hp : 1 < p)
+    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (hhRawDegree :
+      let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+      let gMod := ZPoly.modP p g
+      let hMod := ZPoly.modP p h
+      let eMod := ZPoly.modP p e
+      let qr := DensePoly.divMod (t * eMod) gMod
+      let hCorrection := s * eMod + qr.1 * hMod
+      let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+      h'.degree? = h.degree?)
+    (hhReducedDegree :
+      let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+      let gMod := ZPoly.modP p g
+      let hMod := ZPoly.modP p h
+      let eMod := ZPoly.modP p e
+      let qr := DensePoly.divMod (t * eMod) gMod
+      let hCorrection := s * eMod + qr.1 * hMod
+      let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+      (ZPoly.reduceModPow h' p (k + 1)).degree? = h'.degree?) :
     (linearHenselStep p k f g h s t).h.degree? = h.degree? := by
   sorry
 
@@ -240,6 +273,7 @@ theorem henselLift_monic
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
+    (hp : 1 < p)
     (hmonic : DensePoly.Monic g) :
     DensePoly.Monic (henselLift p k f g h s t).g := by
   sorry
