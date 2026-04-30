@@ -704,6 +704,10 @@ private theorem zmod64_zero_add (a : ZMod64 p) : (0 : ZMod64 p) + a = a := by
   rw [h]
   rw [ZMod64.toNat_eq_val, ZMod64.toNat_eq_val, hz, Nat.zero_add, hmod]
 
+private theorem zmod64_zero_add_zero :
+    (Zero.zero : ZMod64 p) + (Zero.zero : ZMod64 p) = (Zero.zero : ZMod64 p) :=
+  zmod64_zero_add Zero.zero
+
 private theorem fpPoly_C_add (a b : ZMod64 p) :
     FpPoly.C (a + b) = (FpPoly.C a + FpPoly.C b : FpPoly p) := by
   apply DensePoly.ext_coeff
@@ -712,11 +716,13 @@ private theorem fpPoly_C_add (a b : ZMod64 p) :
   · subst i
     change DensePoly.coeff (DensePoly.C (a + b)) 0 =
       DensePoly.coeff (DensePoly.C a + DensePoly.C b) 0
-    rw [DensePoly.coeff_add, DensePoly.coeff_C, DensePoly.coeff_C, DensePoly.coeff_C]
+    rw [DensePoly.coeff_add _ _ _ zmod64_zero_add_zero, DensePoly.coeff_C,
+      DensePoly.coeff_C, DensePoly.coeff_C]
     simp
   · change DensePoly.coeff (DensePoly.C (a + b)) i =
       DensePoly.coeff (DensePoly.C a + DensePoly.C b) i
-    rw [DensePoly.coeff_add, DensePoly.coeff_C, DensePoly.coeff_C, DensePoly.coeff_C]
+    rw [DensePoly.coeff_add _ _ _ zmod64_zero_add_zero, DensePoly.coeff_C,
+      DensePoly.coeff_C, DensePoly.coeff_C]
     simp [hi]
     exact (zmod64_zero_add (p := p) (0 : ZMod64 p)).symm
 
