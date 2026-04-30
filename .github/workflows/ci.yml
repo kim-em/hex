@@ -45,3 +45,6 @@ jobs:
       - run: |
           lake exe hexgfqfield_bench list
           lake exe hexgfqfield_bench verify
+      - run: |
+          lake exe hexlll_bench list
+          lake exe hexlll_bench verify
