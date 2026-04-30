@@ -169,16 +169,29 @@ private theorem modP_one (p : Nat) [ZMod64.Bounds p] :
   exact Eq.trans (ZPoly.modP_eq_of_congr p _ _ (ZPoly.congr_symm _ _ _ hcong))
     (FpPoly.modP_liftToZ (p := p) (1 : FpPoly p))
 
+private theorem linearHenselStep_raw_factor_congr_from_correction
+    (p k : Nat) [ZMod64.Bounds p]
+    (f g h : ZPoly) (r hCorrection e : FpPoly p)
+    (_hk : 1 ≤ k)
+    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (hcorr :
+      r * ZPoly.modP p h + ZPoly.modP p g * hCorrection =
+        ZPoly.modP p (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))) :
+    let g' := g + LinearLiftResult.liftScaledIncrement p k r
+    let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+    ZPoly.congr (g' * h') f (p ^ (k + 1)) := by
+  sorry
+
 private theorem linearHenselStep_raw_factor_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
-    (_hk : 1 ≤ k)
+    (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
     (hbez :
       ZPoly.congr
         (FpPoly.liftToZ (s * ZPoly.modP p g + t * ZPoly.modP p h))
         1 p)
-    (hmonic : DensePoly.Monic g) :
+    (_hmonic : DensePoly.Monic g) :
     let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
     let gMod := ZPoly.modP p g
     let hMod := ZPoly.modP p h
@@ -190,7 +203,20 @@ private theorem linearHenselStep_raw_factor_congr
     let hCorrection := s * eMod + q * hMod
     let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
     ZPoly.congr (g' * h') f (p ^ (k + 1)) := by
-  sorry
+  intro e gMod hMod eMod qr q r g' hCorrection h'
+  have hdiv : q * gMod + r = t * eMod := by
+    simpa [qr, q, r] using DensePoly.divMod_spec (t * eMod) gMod
+  have hbezFp : s * gMod + t * hMod = 1 := by
+    have hmod := ZPoly.modP_eq_of_congr p _ _ hbez
+    rw [FpPoly.modP_liftToZ, modP_one] at hmod
+    exact hmod
+  have hcorr :
+      r * hMod + gMod * hCorrection = eMod := by
+    simpa [hCorrection] using
+      linearHenselStep_correction_identity p gMod hMod eMod s t q r hdiv hbezFp
+  exact
+    linearHenselStep_raw_factor_congr_from_correction
+      p k f g h r hCorrection eMod hk hprod hcorr
 
 private theorem linearHenselStep_reduced_factor_congr
     (p k : Nat) [ZMod64.Bounds p]
