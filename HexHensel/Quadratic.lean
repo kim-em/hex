@@ -1672,6 +1672,24 @@ private theorem quadraticHenselStep_raw_bezout_congr
         quadraticHenselStep_bezout_correction_congr m f g h s t hm hprod hbez hmonic)
     (congr_one_sub_square_of_congr_zero m b hm hb)
 
+private theorem divModMonicModSquare_remainder_coeff_eq_zero_of_monic
+    (m : Nat)
+    (p g : ZPoly)
+    (_hm : 1 < m)
+    (_hmonic : DensePoly.Monic g) :
+    let qr := divModMonicModSquare p g m
+    ∀ i, g.size - 1 ≤ i → qr.2.coeff i = 0 := by
+  sorry
+
+private theorem addModSquare_monic_of_high_remainder_zero
+    (m : Nat)
+    (g r : ZPoly)
+    (_hm : 1 < m)
+    (hmonic : DensePoly.Monic g)
+    (hr : ∀ i, g.size - 1 ≤ i → r.coeff i = 0) :
+    DensePoly.Monic (addModSquare g r m) := by
+  sorry
+
 private theorem addModSquare_divModMonicModSquare_remainder_monic
     (m : Nat)
     (p g : ZPoly)
@@ -1679,7 +1697,11 @@ private theorem addModSquare_divModMonicModSquare_remainder_monic
     (hmonic : DensePoly.Monic g) :
     let qr := divModMonicModSquare p g m
     DensePoly.Monic (addModSquare g qr.2 m) := by
-  sorry
+  let qr := divModMonicModSquare p g m
+  have hr : ∀ i, g.size - 1 ≤ i → qr.2.coeff i = 0 := by
+    simpa [qr] using
+      divModMonicModSquare_remainder_coeff_eq_zero_of_monic m p g hm hmonic
+  exact addModSquare_monic_of_high_remainder_zero m g qr.2 hm hmonic hr
 
 private theorem quadraticHenselStep_g_update_monic
     (m : Nat)
