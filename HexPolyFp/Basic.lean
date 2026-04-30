@@ -115,19 +115,15 @@ private theorem zmod_add_zero_zero :
 
 private theorem zmod_sub_zero_zero :
     (Zero.zero : ZMod64 p) - (Zero.zero : ZMod64 p) = (Zero.zero : ZMod64 p) := by
-  have hzval : (Zero.zero : ZMod64 p).val = 0 := rfl
   change ZMod64.sub (Zero.zero : ZMod64 p) Zero.zero = Zero.zero
-  unfold ZMod64.sub
-  split
-  · apply ZMod64.ext
-    simp [hzval]
-  · split
-    · apply ZMod64.ext
-      simp [hzval]
-    · exfalso
-      apply (show ¬(Zero.zero : ZMod64 p).val ≤ (Zero.zero : ZMod64 p).val from ‹_›)
-      rw [hzval]
-      exact Nat.le_refl 0
+  apply zmod_eq_of_toNat_eq
+  change (ZMod64.sub (Zero.zero : ZMod64 p) Zero.zero).toNat =
+    (Zero.zero : ZMod64 p).toNat
+  rw [ZMod64.toNat_sub]
+  have hz : (Zero.zero : ZMod64 p).val.toNat = 0 := by
+    change (Zero.zero : ZMod64 p).toNat = 0
+    exact ZMod64.toNat_zero
+  simp [hz]
 
 private theorem zmod_mul_zero (a : ZMod64 p) : a * 0 = 0 := by
   grind

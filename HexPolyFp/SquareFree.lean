@@ -74,51 +74,61 @@ private def normalizeMonic (f : FpPoly p) : ZMod64 p × FpPoly p :=
 
 /--
 Yun's inner loop: peel off the factors with multiplicities `i`, `i + 1`, ...
-from the coprime/repeated split `(c, w)`.
+from the coprime/repeated split `(c, w)`, consing each discovered factor onto
+the reverse-order accumulator.
 -/
 private def yunFactors
     (c w : FpPoly p) (i : Nat) (fuel : Nat)
-    (acc : List (SquareFreeFactor p)) :
+    (accRev : List (SquareFreeFactor p)) :
     List (SquareFreeFactor p) × FpPoly p :=
   match fuel with
-  | 0 => (acc, w)
+  | 0 => (accRev, w)
   | fuel + 1 =>
       if isOne c then
-        (acc, w)
+        (accRev, w)
       else
         let y := DensePoly.gcd c w
         let z := c / y
-        let acc' :=
+        let accRev' :=
           if isOne z then
-            acc
+            accRev
           else
-            acc ++ [{ factor := z, multiplicity := i }]
-        yunFactors y (w / y) (i + 1) fuel acc'
+            { factor := z, multiplicity := i } :: accRev
+        yunFactors y (w / y) (i + 1) fuel accRev'
+
+/--
+Tail-recursive square-free decomposition over `F_p[x]`, accumulating factors
+in reverse output order. A derivative-zero branch descends through the formal
+`p`-th root and scales multiplicities by `p`.
+-/
+private def squareFreeAuxRev (f : FpPoly p) (multiplicity : Nat) :
+    Nat → List (SquareFreeFactor p) → List (SquareFreeFactor p)
+  | 0, accRev => accRev
+  | fuel + 1, accRev =>
+      if f.isZero then
+        accRev
+      else
+        let df := DensePoly.derivative f
+        if df.isZero then
+          squareFreeAuxRev (pthRoot f) (multiplicity * p) fuel accRev
+        else
+          let g := DensePoly.gcd f df
+          let c := f / g
+          let loop := yunFactors c g multiplicity fuel accRev
+          let accRev' := loop.1
+          let repeated := loop.2
+          if isOne repeated then
+            accRev'
+          else
+            squareFreeAuxRev (pthRoot repeated) (multiplicity * p) fuel accRev'
 
 /--
 Recursive square-free decomposition over `F_p[x]`. A derivative-zero branch
 descends through the formal `p`-th root and scales multiplicities by `p`.
 -/
-private def squareFreeAux (f : FpPoly p) (multiplicity : Nat) :
-    Nat → List (SquareFreeFactor p)
-  | 0 => []
-  | fuel + 1 =>
-      if f.isZero then
-        []
-      else
-        let df := DensePoly.derivative f
-        if df.isZero then
-          squareFreeAux (pthRoot f) (multiplicity * p) fuel
-        else
-          let g := DensePoly.gcd f df
-          let c := f / g
-          let loop := yunFactors c g multiplicity fuel []
-          let factors := loop.1
-          let repeated := loop.2
-          if isOne repeated then
-            factors
-          else
-            factors ++ squareFreeAux (pthRoot repeated) (multiplicity * p) fuel
+private def squareFreeAux (f : FpPoly p) (multiplicity : Nat)
+    (fuel : Nat) : List (SquareFreeFactor p) :=
+  (squareFreeAuxRev f multiplicity fuel []).reverse
 
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
