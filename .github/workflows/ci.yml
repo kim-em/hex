@@ -36,3 +36,6 @@ jobs:
       - run: |
           lake exe hexgf2_bench list
           lake exe hexgf2_bench verify
+      - run: |
+          lake exe hexpolyfp_bench list
+          lake exe hexpolyfp_bench verify

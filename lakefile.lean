@@ -136,5 +136,8 @@ lean_exe hexmodarith_bench where
 lean_exe hexgf2_bench where
   root := `HexGF2Bench
 
+lean_exe hexpolyfp_bench where
+  root := `HexPolyFp.Bench
+
 @[default_target]
 lean_lib HexManual where
