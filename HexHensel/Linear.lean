@@ -9,6 +9,13 @@ initial theorem surface describing its computational invariants.
 -/
 namespace Hex
 
+private theorem list_getD_map_range {α : Type} [Zero α] (size n : Nat) (f : Nat → α) :
+    ((List.range size).map f).getD n (Zero.zero : α) =
+      if n < size then f n else (Zero.zero : α) := by
+  by_cases hn : n < size
+  · simp [hn, List.getD]
+  · simp [hn, List.getD]
+
 namespace ZPoly
 
 /-- Divide every coefficient by `m` using Lean's truncating integer division. -/
@@ -18,7 +25,14 @@ def coeffwiseDiv (f : ZPoly) (m : Nat) : ZPoly :=
 
 @[simp] theorem coeff_coeffwiseDiv (f : ZPoly) (m i : Nat) :
     (coeffwiseDiv f m).coeff i = f.coeff i / Int.ofNat m := by
-  sorry
+  unfold coeffwiseDiv
+  rw [DensePoly.coeff_ofCoeffs_list]
+  rw [list_getD_map_range]
+  by_cases hi : i < f.size
+  · simp [hi]
+  · have hcoeff : f.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le f (Nat.le_of_not_gt hi)
+    simp [hi, hcoeff]
+    rfl
 
 end ZPoly
 
