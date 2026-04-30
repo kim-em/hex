@@ -1,3 +1,5 @@
+import Std
+
 /-!
 Wide-word helper operations for `UInt64`.
 
@@ -43,17 +45,35 @@ def subBorrow (a b : UInt64) (bin : Bool) : UInt64 × Bool :=
   else
     (.ofNat (word + a.toNat - rhs), true)
 
+private theorem toNat_ofNat_quot_mul_lt_word (a b : UInt64) :
+    (UInt64.ofNat (a.toNat * b.toNat / word)).toNat =
+      a.toNat * b.toNat / word := by
+  have ha : a.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size a
+  have hb : b.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size b
+  have hprod : a.toNat * b.toNat < word * word := Nat.mul_lt_mul'' ha hb
+  have hquot : a.toNat * b.toNat / word < word := Nat.div_lt_of_lt_mul hprod
+  simpa [UInt64.toNat_ofNat, word] using Nat.mod_eq_of_lt hquot
+
+private theorem toNat_ofNat_word (n : Nat) :
+    (UInt64.ofNat n).toNat = n % word := by
+  simp [word]
+
 /-- `mulHi` agrees with Nat-level division by `2^64`. -/
 theorem toNat_mulHi (a b : UInt64) :
     (mulHi a b).toNat = a.toNat * b.toNat / word := by
-  sorry
+  simpa [mulHi] using toNat_ofNat_quot_mul_lt_word a b
 
 /-- `mulFull` agrees with Nat-level division and remainder by `2^64`. -/
 theorem toNat_mulFull (a b : UInt64) :
     let (hi, lo) := mulFull a b
     hi.toNat = a.toNat * b.toNat / word ∧
     lo.toNat = a.toNat * b.toNat % word := by
-  sorry
+  dsimp [mulFull]
+  constructor
+  · exact toNat_ofNat_quot_mul_lt_word a b
+  · simp [word]
 
 /--
 Splitting the product into high and low words reconstructs the original
@@ -61,7 +81,9 @@ Nat-level product.
 -/
 theorem mulHi_mulLo (a b : UInt64) :
     (mulHi a b).toNat * word + (a * b).toNat = a.toNat * b.toNat := by
-  sorry
+  have h := Nat.div_add_mod (a.toNat * b.toNat) word
+  simpa [toNat_mulHi, UInt64.toNat_mul, Nat.mul_comm, Nat.mul_left_comm,
+    Nat.mul_assoc] using h
 
 /--
 `addCarry` represents exact Nat addition split into a low word and a carry bit.
@@ -69,14 +91,64 @@ theorem mulHi_mulLo (a b : UInt64) :
 theorem toNat_addCarry (a b : UInt64) (cin : Bool) :
     let (s, cout) := addCarry a b cin
     s.toNat + cout.toNat * word = a.toNat + b.toNat + cin.toNat := by
-  sorry
+  let total := a.toNat + b.toNat + cin.toNat
+  have ha : a.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size a
+  have hb : b.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size b
+  have htotal_lt : total < 2 * word := by
+    cases cin <;> simp [total] at * <;> omega
+  dsimp [addCarry]
+  change (UInt64.ofNat total).toNat +
+      (decide (word ≤ total)).toNat * word = total
+  by_cases hcarry : word ≤ total
+  · have hdiv : total / word = 1 :=
+      Nat.div_eq_of_lt_le (by simpa using hcarry) (by omega)
+    have hsplit := Nat.mod_add_div total word
+    rw [toNat_ofNat_word,
+      show (decide (word ≤ total)).toNat = 1 by simp [hcarry]]
+    rw [hdiv] at hsplit
+    omega
+  · have htotal_word : total < word := by omega
+    rw [toNat_ofNat_word,
+      show (decide (word ≤ total)).toNat = 0 by simp [hcarry],
+      Nat.mod_eq_of_lt htotal_word]
+    omega
 
 /--
 `subBorrow` represents exact subtraction with borrow after one-word wrapping.
 -/
 theorem toNat_subBorrow (a b : UInt64) (bin : Bool) :
     let (d, bout) := subBorrow a b bin
-    d.toNat + bout.toNat * word + (b.toNat + bin.toNat) = a.toNat + word := by
-  sorry
+    d.toNat + (b.toNat + bin.toNat) = a.toNat + bout.toNat * word := by
+  have ha : a.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size a
+  have hb : b.toNat < word := by
+    simpa [word, UInt64.size] using UInt64.toNat_lt_size b
+  by_cases hle : b.toNat + bin.toNat ≤ a.toNat
+  · have hdiff_lt' : a.toNat - (b.toNat + bin.toNat) < 2 ^ 64 := by
+      have : a.toNat - (b.toNat + bin.toNat) < word := by omega
+      simpa [word] using this
+    have hsub_eq :
+        a.toNat - (b.toNat + bin.toNat) + (b.toNat + bin.toNat) =
+          a.toNat :=
+      Nat.sub_add_cancel hle
+    dsimp [subBorrow]
+    simp [hle]
+    rw [Nat.mod_eq_of_lt hdiff_lt']
+    exact hsub_eq
+  · have hwrap_lt' :
+        word + a.toNat - (b.toNat + bin.toNat) < 2 ^ 64 := by
+      have : word + a.toNat - (b.toNat + bin.toNat) < word := by
+        cases bin <;> simp at * <;> omega
+      simpa [word] using this
+    have hwrap_eq :
+        word + a.toNat - (b.toNat + bin.toNat) + (b.toNat + bin.toNat) =
+          a.toNat + word := by
+      cases bin <;> simp at * <;> omega
+    dsimp [subBorrow]
+    simp [hle]
+    rw [Nat.mod_eq_of_lt hwrap_lt']
+    exact hwrap_eq
 
 end UInt64
