@@ -190,6 +190,21 @@ def gcd [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R :=
   (xgcd p q).gcd
 
+/-- Law package for the executable dense-polynomial division operations.
+
+The algorithms remain available for any coefficient type with the required operations, but
+theorems that use long-division invariants should require this class rather than claiming
+those invariants for arbitrary, potentially unlawful `Div` and `Sub` instances. -/
+class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [Mul R]
+    [Div R] : Prop where
+  divMod_remainder_degree_lt_of_pos_degree :
+    ∀ p q : DensePoly R,
+      0 < q.degree?.getD 0 → (divMod p q).2.degree?.getD 0 < q.degree?.getD 0
+  divModMonic_eq_divMod_of_monic :
+    ∀ (p q : DensePoly R) (hq : Monic q), divModMonic p q hq = divMod p q
+  mod_mod_of_not_pos_degree :
+    ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
+
 theorem divMod_spec [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
     let qr := divMod p q
@@ -236,16 +251,18 @@ theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
 /-- Core division invariant: for positive-degree divisors, `divMod` returns a remainder whose
 degree is strictly smaller than the divisor degree. -/
 theorem divMod_remainder_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) :
     0 < q.degree?.getD 0 → (divMod p q).2.degree?.getD 0 < q.degree?.getD 0 := by
-  sorry
+  exact DivModLaws.divMod_remainder_degree_lt_of_pos_degree p q
 
 /-- Monic division agrees with field-style division when the divisor is monic. This is the
 implementation invariant relating the specialized `divModMonic` path to `divMod`. -/
 theorem divModMonic_eq_divMod_of_monic [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) (hq : Monic q) :
     divModMonic p q hq = divMod p q := by
-  sorry
+  exact DivModLaws.divModMonic_eq_divMod_of_monic p q hq
 
 /-- A polynomial whose degree is already below the divisor is its own remainder. -/
 theorem mod_eq_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
@@ -257,12 +274,14 @@ theorem mod_eq_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
 
 /-- Constant-degree divisors are an idempotent edge case for `%`. -/
 theorem mod_mod_of_not_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) :
     ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q := by
-  sorry
+  exact DivModLaws.mod_mod_of_not_pos_degree p q
 
 /-- The computed remainder has degree below a positive-degree divisor. -/
 theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) :
     0 < q.degree?.getD 0 → (p % q).degree?.getD 0 < q.degree?.getD 0 := by
   simpa [DensePoly.mod] using divMod_remainder_degree_lt_of_pos_degree p q
@@ -273,11 +292,13 @@ theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
   simpa [DensePoly.div, DensePoly.mod] using divMod_spec p q
 
 theorem modByMonic_eq_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) (hq : Monic q) :
     modByMonic p q hq = p % q := by
   rw [modByMonic_eq_divModMonic, mod_eq_divMod, divModMonic_eq_divMod_of_monic p q hq]
 
 theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q : DensePoly R) :
     (p % q) % q = p % q := by
   by_cases hq : 0 < q.degree?.getD 0
@@ -454,11 +475,11 @@ private theorem polyCRT_congr_snd :
 
 /-- The CRT witness reduces to the prescribed first residue modulo `a` via monic reduction. -/
 theorem polyCRT_modByMonic_fst :
-    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    [DivModLaws S] ->
     (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) a ha = modByMonic u a ha := by
-  intro S _ _ a b u v s t ha hbez
-  letI : Div S := ⟨fun x _ => x⟩
+  intro S _ _ _ _ a b u v s t ha hbez
   rw [modByMonic_eq_mod]
   rw [modByMonic_eq_mod]
   exact mod_eq_mod_of_congr (polyCRT_congr_fst a b u v s t hbez)
@@ -466,18 +487,19 @@ theorem polyCRT_modByMonic_fst :
 /-- The CRT witness reduces to the prescribed first residue modulo `a`. -/
 theorem polyCRT_mod_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    [DivModLaws S] ->
     (a b u v s t : DensePoly S) -> (ha : Monic a) -> s * a + t * b = 1 ->
     polyCRT a b u v s t % a = u % a := by
-  intro S _ _ _ a b u v s t ha hbez
+  intro S _ _ _ _ a b u v s t ha hbez
   simpa [modByMonic_eq_mod] using polyCRT_modByMonic_fst a b u v s t ha hbez
 
 /-- The CRT witness reduces to the prescribed second residue modulo `b` via monic reduction. -/
 theorem polyCRT_modByMonic_snd :
-    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
+    {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    [DivModLaws S] ->
     (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
     modByMonic (polyCRT a b u v s t) b hb = modByMonic v b hb := by
-  intro S _ _ a b u v s t hb hbez
-  letI : Div S := ⟨fun x _ => x⟩
+  intro S _ _ _ _ a b u v s t hb hbez
   rw [modByMonic_eq_mod]
   rw [modByMonic_eq_mod]
   exact mod_eq_mod_of_congr (polyCRT_congr_snd a b u v s t hbez)
@@ -485,9 +507,10 @@ theorem polyCRT_modByMonic_snd :
 /-- The CRT witness reduces to the prescribed second residue modulo `b`. -/
 theorem polyCRT_mod_snd :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] -> [Div S] ->
+    [DivModLaws S] ->
     (a b u v s t : DensePoly S) -> (hb : Monic b) -> s * a + t * b = 1 ->
     polyCRT a b u v s t % b = v % b := by
-  intro S _ _ _ a b u v s t hb hbez
+  intro S _ _ _ _ a b u v s t hb hbez
   simpa [modByMonic_eq_mod] using polyCRT_modByMonic_snd a b u v s t hb hbez
 
 end DensePoly
