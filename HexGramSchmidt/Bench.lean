@@ -294,6 +294,10 @@ setup_benchmark runAdjacentSwapChecksum n => rowUpdateComplexity n
     targetInnerNanos := 200000000
   }
 
+/- `prepUpdateInput n` produces `rows = n + 3`, and
+`runAdjacentSwapDenom` calls `gramDet b k` with `k = rows - 1`. The dominant
+work is building the leading Gram surface and Bareiss-eliminating it, so the
+fixture parameter maps to `gramSurfaceComplexity (n + 3)`. -/
 setup_benchmark runAdjacentSwapDenom n => updateGramComplexity n
   with prep := prepUpdateInput
   where {
@@ -305,6 +309,10 @@ setup_benchmark runAdjacentSwapDenom n => updateGramComplexity n
     signalFloorMultiplier := 1.0
   }
 
+/- `prepUpdateInput n` uses `rows = n + 3`. The pivot coefficient reads one
+entry from `scaledCoeffs b`; because matrices are dense vectors, constructing
+that surface is the dominant step, giving `scaledCoeffSurfaceComplexity
+(n + 3)`. -/
 setup_benchmark runAdjacentSwapPivotCoeff n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
@@ -316,6 +324,10 @@ setup_benchmark runAdjacentSwapPivotCoeff n => updateScaledCoeffComplexity n
     signalFloorMultiplier := 1.0
   }
 
+/- The numerator combines two Gram determinants with the pivot coefficient.
+Under `prepUpdateInput n`, `rows = n + 3`; the pivot coefficient constructs
+the dense `scaledCoeffs` surface, which dominates the scalar arithmetic and
+Gram determinant calls. -/
 setup_benchmark runAdjacentSwapGramDetNumerator n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
@@ -327,6 +339,9 @@ setup_benchmark runAdjacentSwapGramDetNumerator n => updateScaledCoeffComplexity
     signalFloorMultiplier := 1.0
   }
 
+/- The quotient adds one denominator call to the numerator path. With
+`rows = n + 3`, the numerator's dense `scaledCoeffs` construction remains the
+dominant step, so the model is still `scaledCoeffSurfaceComplexity (n + 3)`. -/
 setup_benchmark runAdjacentSwapGramDetQuotient n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
@@ -339,6 +354,10 @@ setup_benchmark runAdjacentSwapGramDetQuotient n => updateScaledCoeffComplexity 
     verdictWarmupFraction := 0.25
   }
 
+/- For the above-row previous-column update, `prepUpdateInput n` supplies
+`rows = n + 3`. The formula reads two `scaledCoeffs` entries and the adjacent
+swap quotient; dense `scaledCoeffs` construction dominates, so the declared
+model uses `scaledCoeffSurfaceComplexity (n + 3)`. -/
 setup_benchmark runAdjacentSwapScaledCoeffAbovePrevNumerator n =>
     updateScaledCoeffComplexity n
   with prep := prepUpdateInput
@@ -351,6 +370,10 @@ setup_benchmark runAdjacentSwapScaledCoeffAbovePrevNumerator n =>
     signalFloorMultiplier := 1.0
   }
 
+/- For the above-row current-column update, `prepUpdateInput n` again maps to
+`rows = n + 3`. The dominant operation is constructing the dense `scaledCoeffs`
+surface for the two coefficient entries, while the Gram determinant and scalar
+operations are lower-order. -/
 setup_benchmark runAdjacentSwapScaledCoeffAboveCurrNumerator n =>
     updateScaledCoeffComplexity n
   with prep := prepUpdateInput
