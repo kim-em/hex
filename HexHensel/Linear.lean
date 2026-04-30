@@ -175,10 +175,77 @@ private theorem congr_liftToZ_of_modP_eq
     ZPoly.congr (FpPoly.liftToZ u) z p := by
   simpa [← h] using FpPoly.congr_liftToZ_modP (p := p) z
 
+private theorem zmod_add_lift_congr
+    (p : Nat) [ZMod64.Bounds p] (a b : ZMod64 p) :
+    (Int.ofNat (a + b).toNat - (Int.ofNat a.toNat + Int.ofNat b.toNat)) %
+      (p : Int) = 0 := by
+  change (Int.ofNat (ZMod64.add a b).toNat -
+      (Int.ofNat a.toNat + Int.ofNat b.toNat)) % (p : Int) = 0
+  rw [ZMod64.toNat_add]
+  have hp : 0 < p := ZMod64.Bounds.pPos (p := p)
+  have hmod :
+      Int.ofNat ((a.toNat + b.toNat) % p) =
+        (Int.ofNat (a.toNat + b.toNat)) % (p : Int) := by
+    exact Int.natCast_emod _ _
+  rw [hmod]
+  have hdiv :
+      (p : Int) ∣
+        (Int.ofNat (a.toNat + b.toNat) % (p : Int) -
+          Int.ofNat (a.toNat + b.toNat)) :=
+    Int.dvd_sub_self_of_emod_eq rfl
+  rw [show Int.ofNat (a.toNat + b.toNat) =
+      Int.ofNat a.toNat + Int.ofNat b.toNat by
+        simp [Int.ofNat_eq_natCast]]
+  exact Int.emod_eq_zero_of_dvd hdiv
+
+private theorem zmod_add_zero_zero (p : Nat) [ZMod64.Bounds p] :
+    (Zero.zero : ZMod64 p) + (Zero.zero : ZMod64 p) = (Zero.zero : ZMod64 p) := by
+  apply ZMod64.ext
+  apply UInt64.toNat_inj.mp
+  have hto :
+      ((Zero.zero : ZMod64 p) + (Zero.zero : ZMod64 p)).toNat = 0 := by
+    change (ZMod64.add (ZMod64.zero : ZMod64 p) ZMod64.zero).toNat = 0
+    rw [ZMod64.toNat_add]
+    have hzero : (ZMod64.zero : ZMod64 p).toNat = 0 := ZMod64.toNat_zero
+    rw [hzero]
+    simp
+  simpa [ZMod64.toNat_eq_val, ZMod64.toNat_zero] using hto
+
+private theorem liftToZ_add_congr
+    (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) :
+    ZPoly.congr (FpPoly.liftToZ (f + g)) (FpPoly.liftToZ f + FpPoly.liftToZ g) p := by
+  intro i
+  rw [FpPoly.coeff_liftToZ]
+  rw [DensePoly.coeff_add f g i (zmod_add_zero_zero p)]
+  rw [DensePoly.coeff_add (FpPoly.liftToZ f) (FpPoly.liftToZ g) i (by rfl)]
+  rw [FpPoly.coeff_liftToZ, FpPoly.coeff_liftToZ]
+  exact zmod_add_lift_congr p (f.coeff i) (g.coeff i)
+
 private theorem modP_add
     (p : Nat) [ZMod64.Bounds p] (f g : ZPoly) :
     ZPoly.modP p (f + g) = ZPoly.modP p f + ZPoly.modP p g := by
-  sorry
+  have hliftAdd :
+      ZPoly.congr
+        (FpPoly.liftToZ (ZPoly.modP p f + ZPoly.modP p g))
+        (FpPoly.liftToZ (ZPoly.modP p f) + FpPoly.liftToZ (ZPoly.modP p g)) p :=
+    liftToZ_add_congr p (ZPoly.modP p f) (ZPoly.modP p g)
+  have hpieces :
+      ZPoly.congr
+        (FpPoly.liftToZ (ZPoly.modP p f) + FpPoly.liftToZ (ZPoly.modP p g))
+        (f + g) p :=
+    ZPoly.congr_add _ _ _ _ p
+      (FpPoly.congr_liftToZ_modP (p := p) f)
+      (FpPoly.congr_liftToZ_modP (p := p) g)
+  have hsum :
+      ZPoly.congr
+        (FpPoly.liftToZ (ZPoly.modP p f + ZPoly.modP p g))
+        (f + g) p :=
+    ZPoly.congr_trans _ _ _ p hliftAdd hpieces
+  exact Eq.trans
+    (ZPoly.modP_eq_of_congr p (f + g)
+      (FpPoly.liftToZ (ZPoly.modP p f + ZPoly.modP p g))
+      (ZPoly.congr_symm _ _ _ hsum))
+    (FpPoly.modP_liftToZ (p := p) (ZPoly.modP p f + ZPoly.modP p g))
 
 private theorem modP_lift_mul_left
     (p : Nat) [ZMod64.Bounds p] (r : FpPoly p) (h : ZPoly) :
