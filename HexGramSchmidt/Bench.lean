@@ -12,9 +12,12 @@ instead of the full vector or matrix value.
 Scientific registrations:
 
 * `runGramDetVecChecksum`: one Bareiss pass over the Gram matrix, with model
-  `O(n^3 + n^2*m)` on deterministic `n x (2n + 1)` integer inputs.
+  `O(n^3 + n^2*m)` on deterministic `n x (2n + 1)` integer inputs. This wraps
+  a fixed hot loop so the fast determinant-vector surface clears the
+  child-process signal floor.
 * `runScaledCoeffsChecksum`: the full scaled-coefficient matrix surface, using
-  the determinant formula for each lower-triangular entry.
+  the determinant formula for each lower-triangular entry. This also wraps a
+  fixed hot loop for signal-floor stability.
 * `runSizeReduceChecksum` and `runAdjacentSwapChecksum`: executable row-update
   matrix helpers, checking only affected rows. These wrap a fixed hot loop so
   the timed call clears the child-process signal floor without changing the
@@ -197,6 +200,23 @@ child-process measurement floor. This is independent of `n`, so it changes only
 the constant factor in the declared linear model. -/
 def rowUpdateHotRepeats : Nat := 4096
 
+/-- Fixed repeat count used to lift the Gram determinant-vector benchmark above
+the child-process measurement floor. This is independent of `n`, so it changes
+only the constant factor in the declared textbook model. -/
+def gramDetVecHotRepeats : Nat := 128
+
+/-- Fixed repeat count used to lift the scaled-coefficient benchmark above the
+child-process measurement floor while keeping the upper scientific rungs under
+the per-call wallclock cap. This is independent of `n`, so it changes only the
+constant factor in the declared textbook model. -/
+def scaledCoeffsHotRepeats : Nat := 32
+
+/-- Repeat a deterministic natural-valued target with a rolling checksum. -/
+def repeatNatChecksum (repeats : Nat) (f : Unit → Nat) : Nat :=
+  (List.range repeats).foldl
+    (fun acc _ => acc * 65_537 + f ())
+    0
+
 /-- Repeat a deterministic integer-valued target with a rolling checksum. -/
 def repeatIntChecksum (repeats : Nat) (f : Unit → Int) : Int :=
   (List.range repeats).foldl
@@ -205,11 +225,13 @@ def repeatIntChecksum (repeats : Nat) (f : Unit → Int) : Int :=
 
 /-- Benchmark target: compute all leading Gram determinants and checksum them. -/
 def runGramDetVecChecksum (input : IntBasisInput) : Nat :=
-  natVectorChecksum (GramSchmidt.Int.gramDetVec (matrixOfFlat input))
+  repeatNatChecksum gramDetVecHotRepeats fun _ =>
+    natVectorChecksum (GramSchmidt.Int.gramDetVec (matrixOfFlat input))
 
 /-- Benchmark target: compute the scaled-coefficient matrix and checksum it. -/
 def runScaledCoeffsChecksum (input : IntBasisInput) : Int :=
-  intMatrixChecksum (GramSchmidt.Int.scaledCoeffs (matrixOfFlat input))
+  repeatIntChecksum scaledCoeffsHotRepeats fun _ =>
+    intMatrixChecksum (GramSchmidt.Int.scaledCoeffs (matrixOfFlat input))
 
 /-- Benchmark target: size-reduce the final row against the first row and
 checksum the changed row plus source row. -/
@@ -257,21 +279,23 @@ def runAdjacentSwapScaledCoeffAboveCurrNumerator (input : UpdateInput) : Int :=
 setup_benchmark runGramDetVecChecksum n => gramSurfaceComplexity n
   with prep := prepIntBasisInput
   where {
-    paramFloor := 8
-    paramCeiling := 24
-    paramSchedule := .custom #[8, 12, 16, 20, 24]
+    paramFloor := 24
+    paramCeiling := 40
+    paramSchedule := .custom #[24, 28, 32, 36, 40]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runScaledCoeffsChecksum n => scaledCoeffSurfaceComplexity n
   with prep := prepIntBasisInput
   where {
-    paramFloor := 3
-    paramCeiling := 7
-    paramSchedule := .custom #[3, 4, 5, 6, 7]
+    paramFloor := 16
+    paramCeiling := 28
+    paramSchedule := .custom #[16, 19, 22, 25, 28]
     maxSecondsPerCall := 5.0
     targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
   }
 
 setup_benchmark runSizeReduceChecksum n => rowUpdateComplexity n
