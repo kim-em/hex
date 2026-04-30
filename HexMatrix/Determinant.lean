@@ -857,7 +857,34 @@ private theorem peelLastVector_castSucc_toList {n : Nat}
     (hnodup : perm.toList.Nodup) :
     ((peelLastVector perm k hk hidx hnodup).map Fin.castSucc).toList =
       perm.toList.eraseIdx k := by
-  sorry
+  apply List.ext_getElem
+  · have hklist : k < perm.toList.length := by
+      simpa [Vector.length_toList] using hk
+    rw [List.length_eraseIdx_of_lt hklist]
+    simp [Vector.length_toList]
+  · intro i hi₁ hi₂
+    by_cases hik : i < k
+    · simp [peelLastVector, hik, lowerFinLast_castSucc, List.getElem_eraseIdx]
+    · have hikle : k ≤ i := Nat.le_of_not_gt hik
+      have hklist : k < perm.toList.length := by
+        simpa [Vector.length_toList] using hk
+      have heraseLen : (perm.toList.eraseIdx k).length = n := by
+        rw [List.length_eraseIdx_of_lt hklist]
+        simp [Vector.length_toList]
+      have hi : i < n := by
+        simpa [heraseLen] using hi₂
+      simp [peelLastVector, hik, lowerFinLast_castSucc, List.getElem_eraseIdx]
+
+private theorem list_nodup_of_map_injective {α β : Type u} {f : α → β}
+    (hinj : Function.Injective f) :
+    ∀ {xs : List α}, (xs.map f).Nodup → xs.Nodup
+  | [], _ => by simp
+  | x :: xs, hnodup => by
+      simp only [List.map_cons, List.nodup_cons] at hnodup ⊢
+      constructor
+      · intro hxmem
+        exact hnodup.1 (List.mem_map.mpr ⟨x, hxmem, rfl⟩)
+      · exact list_nodup_of_map_injective hinj hnodup.2
 
 private theorem peelLastVector_nodup {n : Nat}
     (perm : Vector (Fin (n + 1)) (n + 1))
@@ -865,7 +892,26 @@ private theorem peelLastVector_nodup {n : Nat}
     (hidx : perm.toList.idxOf (Fin.last n) = k)
     (hnodup : perm.toList.Nodup) :
     (peelLastVector perm k hk hidx hnodup).toList.Nodup := by
-  sorry
+  apply list_nodup_of_map_injective (f := Fin.castSucc)
+  · intro x y hxy
+    exact Fin.ext (by simpa using congrArg Fin.val hxy)
+  · rw [← vector_toList_map]
+    rw [peelLastVector_castSucc_toList perm k hk hidx hnodup]
+    exact hnodup.eraseIdx k
+
+private theorem list_insertIdx_eraseIdx_getElem {α : Type u} {xs : List α} {i : Nat}
+    (hi : i < xs.length) :
+    (xs.eraseIdx i).insertIdx i (xs[i]'hi) = xs := by
+  induction xs generalizing i with
+  | nil =>
+      cases hi
+  | cons x xs ih =>
+      cases i with
+      | zero =>
+          simp
+      | succ i =>
+          simp only [List.length_cons, Nat.succ_lt_succ_iff] at hi
+          simp [ih hi]
 
 private theorem insertAt_peelLastVector {n : Nat}
     (perm : Vector (Fin (n + 1)) (n + 1))
@@ -875,7 +921,22 @@ private theorem insertAt_peelLastVector {n : Nat}
     insertAt (Fin.last n)
         ((peelLastVector perm k hk hidx hnodup).map Fin.castSucc) ⟨k, hk⟩ =
       perm := by
-  sorry
+  apply Vector.toArray_inj.mp
+  apply Array.toList_inj.mp
+  change (insertAt (Fin.last n)
+        ((peelLastVector perm k hk hidx hnodup).map Fin.castSucc) ⟨k, hk⟩).toList =
+      perm.toList
+  rw [insertAt_toList]
+  rw [peelLastVector_castSucc_toList perm k hk hidx hnodup]
+  have hklist : k < perm.toList.length := by
+    simpa [Vector.length_toList] using hk
+  have hget : perm.toList[k]'hklist = Fin.last n := by
+    have hidxLt : perm.toList.idxOf (Fin.last n) < perm.toList.length := by
+      simpa [hidx] using hklist
+    simpa [hidx] using
+      (List.getElem_idxOf (x := Fin.last n) (xs := perm.toList) hidxLt)
+  simpa [hget] using
+    (list_insertIdx_eraseIdx_getElem (xs := perm.toList) (i := k) hklist)
 
 private theorem permutationVectors_complete {n : Nat} {perm : Vector (Fin n) n}
     (hnodup : perm.toList.Nodup) :
