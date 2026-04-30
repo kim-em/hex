@@ -34,24 +34,83 @@ end QuadraticLiftResult
 
 namespace ZPoly
 
+private def quadraticModulus (m : Nat) : Nat :=
+  m * m
+
+private def canonicalMod (z : Int) (modulus : Nat) : Int :=
+  Int.ofNat <| Int.toNat (z % Int.ofNat modulus)
+
+private def reduceCoeffModSquare (z : Int) (m : Nat) : Int :=
+  canonicalMod z (quadraticModulus m)
+
+private def addModSquare (f g : ZPoly) (m : Nat) : ZPoly :=
+  QuadraticLiftResult.reduceModSquare (f + g) m
+
+private def subModSquare (f g : ZPoly) (m : Nat) : ZPoly :=
+  QuadraticLiftResult.reduceModSquare (f - g) m
+
+private def mulModSquare (f g : ZPoly) (m : Nat) : ZPoly :=
+  if f.isZero || g.isZero then
+    0
+  else
+    let modulus := quadraticModulus m
+    let fCoeffs := (Array.range f.size).map fun i => canonicalMod (f.coeff i) modulus
+    let gCoeffs := (Array.range g.size).map fun j => canonicalMod (g.coeff j) modulus
+    let coeffs := Id.run do
+      let mut acc := Array.replicate (f.size + g.size - 1) (0 : Int)
+      for i in [0:f.size] do
+        let fi := fCoeffs.getD i 0
+        for j in [0:g.size] do
+          let k := i + j
+          let next := acc.getD k 0 + fi * gCoeffs.getD j 0
+          acc := acc.set! k (canonicalMod next modulus)
+      return acc
+    DensePoly.ofCoeffs coeffs
+
+-- The Hensel theorem surface supplies monic divisors; this executable helper
+-- uses that invariant to avoid coefficient division in the modular hot path.
+private def divModMonicModSquareAux
+    (m : Nat) (q : ZPoly) : Nat → ZPoly → ZPoly → ZPoly × ZPoly
+  | 0, quot, rem => (quot, rem)
+  | fuel + 1, quot, rem =>
+      if q.isZero then
+        (0, QuadraticLiftResult.reduceModSquare rem m)
+      else
+        match rem.degree?, q.degree? with
+        | some rd, some qd =>
+            if rd < qd then
+              (quot, rem)
+            else
+              let k := rd - qd
+              let coeff := reduceCoeffModSquare rem.leadingCoeff m
+              let term := DensePoly.monomial k coeff
+              let quot := addModSquare quot term m
+              let rem := subModSquare rem (mulModSquare term q m) m
+              divModMonicModSquareAux m q fuel quot rem
+        | _, _ => (quot, rem)
+
+private def divModMonicModSquare (p q : ZPoly) (m : Nat) : ZPoly × ZPoly :=
+  let p := QuadraticLiftResult.reduceModSquare p m
+  divModMonicModSquareAux m q p.size 0 p
+
 /-- One quadratic Hensel correction step from modulus `m` to modulus `m^2`. -/
 def quadraticHenselStep
     (m : Nat) (f g h s t : ZPoly) : QuadraticLiftResult :=
   let e := QuadraticLiftResult.factorError f g h
-  let te := QuadraticLiftResult.reduceModSquare (t * e) m
-  let factorQR := DensePoly.divMod te g
+  let te := mulModSquare t e m
+  let factorQR := divModMonicModSquare te g m
   let qFactor := factorQR.1
   let rFactor := factorQR.2
-  let g' := QuadraticLiftResult.reduceModSquare (g + rFactor) m
-  let hCorrection := s * e + qFactor * h
-  let h' := QuadraticLiftResult.reduceModSquare (h + hCorrection) m
-  let b := QuadraticLiftResult.bezoutError g' h' s t
-  let tb := QuadraticLiftResult.reduceModSquare (t * b) m
-  let bezoutQR := DensePoly.divMod tb g'
+  let g' := addModSquare g rFactor m
+  let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+  let h' := addModSquare h hCorrection m
+  let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
+  let tb := mulModSquare t b m
+  let bezoutQR := divModMonicModSquare tb g' m
   let qBezout := bezoutQR.1
   let rBezout := bezoutQR.2
-  let t' := QuadraticLiftResult.reduceModSquare (t - rBezout) m
-  let s' := QuadraticLiftResult.reduceModSquare (s - s * b - qBezout * h') m
+  let t' := subModSquare t rBezout m
+  let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
   { g := g', h := h', s := s', t := t' }
 
 /-- The updated factors multiply to `f` modulo `m^2`. -/
