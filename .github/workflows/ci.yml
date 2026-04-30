@@ -39,3 +39,6 @@ jobs:
       - run: |
           lake exe hexpolyfp_bench list
           lake exe hexpolyfp_bench verify
+      - run: |
+          lake exe hexgfqring_bench list
+          lake exe hexgfqring_bench verify
