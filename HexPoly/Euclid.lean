@@ -519,7 +519,22 @@ private theorem zero_mod_eq_zero {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (m : DensePoly S) :
     (0 : DensePoly S) % m = 0 := by
-  sorry
+  change (divMod (0 : DensePoly S) m).2 = 0
+  unfold divMod
+  have hzero : (0 : DensePoly S).coeffs = #[] := rfl
+  have hdeg_zero : (0 : DensePoly S).degree?.getD 0 = 0 := by
+    simp [degree?, size, hzero]
+  rw [hdeg_zero]
+  by_cases hpos : 0 < m.degree?.getD 0
+  · simp [hpos]
+  · rw [if_neg hpos]
+    unfold divModArray
+    simp [hzero, isZero, size, toArray, divModArrayAux]
+    by_cases hm : m.coeffs = #[]
+    · rw [if_pos hm]
+    · rw [if_neg hm]
+      change (ofCoeffs #[] : DensePoly S) = 0
+      rfl
 
 private theorem mod_mul_self_left {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
