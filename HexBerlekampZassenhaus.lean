@@ -292,14 +292,16 @@ private def normalizedConstantFactors (d : FactorNormalizationData) : Array ZPol
 Per-prime modular irreducibility evidence for integer irreducibility
 certificates.
 
-The degree list records the modular factor degrees observed at this prime, and
-`factorCerts` carries one Rabin irreducibility certificate for each recorded
-degree over the same prime field.
+The factor array records the modular factors observed at this prime. The degree
+list and Rabin certificates are zipped with those concrete factors so the
+checker can validate certificate metadata and the executable Rabin witness
+against the polynomial it is meant to certify.
 -/
 structure PrimeFactorData where
   p : Nat
   [bounds : ZMod64.Bounds p]
   factorDegrees : Array Nat
+  factorPolys : Array (FpPoly p)
   factorCerts : Array Berlekamp.IrreducibilityCertificate
 
 /--
@@ -332,6 +334,11 @@ namespace PrimeFactorData
 def degreeSum (d : PrimeFactorData) : Nat :=
   d.factorDegrees.toList.foldl (fun acc n => acc + n) 0
 
+/-- Ordered product of the recorded modular factors for one prime. -/
+def factorProduct (d : PrimeFactorData) : @FpPoly d.p d.bounds :=
+  letI := d.bounds
+  d.factorPolys.foldl (· * ·) 1
+
 /-- Does the recorded degree multiset contain `n`? -/
 def containsDegree (d : PrimeFactorData) (n : Nat) : Bool :=
   d.factorDegrees.toList.any fun degree => degree == n
@@ -348,20 +355,32 @@ Does some subset of this prime block's modular factor degrees sum to `target`?
 def hasSubsetDegree (d : PrimeFactorData) (target : Nat) : Bool :=
   hasSubsetDegreeAux d.factorDegrees.toList target
 
-/-- Check one nested finite-field irreducibility certificate against its degree slot. -/
-def checkCertAtDegree
-    (d : PrimeFactorData) (degree : Nat)
+/--
+Check one nested finite-field irreducibility certificate against its degree slot
+and the concrete modular factor occupying that slot.
+-/
+def checkCertAtFactor
+    (d : PrimeFactorData) (degree : Nat) (factor : @FpPoly d.p d.bounds)
     (cert : Berlekamp.IrreducibilityCertificate) : Bool :=
   letI := d.bounds
   decide (cert.p = d.p) &&
     decide (cert.n = degree) &&
-    d.containsDegree cert.n
+    d.containsDegree cert.n &&
+    factor.degree? == some degree &&
+    if hmonic : factor.leadingCoeff = 1 then
+      Berlekamp.checkIrreducibilityCertificate factor (by exact hmonic) cert
+    else
+      false
 
-/-- Check that nested certificates match the enclosing prime and degree array. -/
+/--
+Check that nested certificates match the enclosing prime, degree array, and
+concrete modular factor array.
+-/
 def checkFactorCerts (d : PrimeFactorData) : Bool :=
   d.factorDegrees.size == d.factorCerts.size &&
-    (d.factorDegrees.toList.zip d.factorCerts.toList).all fun pair =>
-      checkCertAtDegree d pair.1 pair.2
+    d.factorDegrees.size == d.factorPolys.size &&
+    (d.factorDegrees.toList.zip (d.factorPolys.toList.zip d.factorCerts.toList)).all fun pair =>
+      checkCertAtFactor d pair.1 pair.2.1 pair.2.2
 
 /-- Check one prime block against the integer polynomial being certified. -/
 def checkForPolynomial (f : ZPoly) (d : PrimeFactorData) : Bool :=
@@ -369,6 +388,7 @@ def checkForPolynomial (f : ZPoly) (d : PrimeFactorData) : Bool :=
   isGoodPrime f d.p &&
     d.factorDegrees.all (fun degree => 0 < degree) &&
     d.degreeSum == (ZPoly.modP d.p f).degree?.getD 0 &&
+    d.factorProduct == ZPoly.modP d.p f &&
     d.checkFactorCerts
 
 end PrimeFactorData
@@ -428,9 +448,9 @@ end ZPolyIrreducibilityCertificate
 Executable surface checker for integer-polynomial irreducibility certificates.
 
 This validates all computational alignment data available at this layer: every
-prime block must use an admissible prime for `f`, its factor degrees must cover
-the modular image degree, each nested finite-field certificate must match the
-enclosing prime and its corresponding factor degree, and every nontrivial
+prime block must use an admissible prime for `f`, its recorded modular factors
+must multiply back to the modular image, each nested finite-field certificate
+must match the enclosing prime and its concrete factor, and every nontrivial
 integer factor degree must be excluded by explicit per-prime degree data.
 -/
 def checkIrreducibleCert
@@ -657,6 +677,12 @@ theorem checkIrreducibleCert_prime_data
       primeData.checkForPolynomial f = true := by
   sorry
 
+/--
+A successful integer certificate exposes the per-prime nested Rabin checks:
+`checkFactorCerts` validates the concrete modular factor array, the recorded
+degrees, and the upstream `Berlekamp.checkIrreducibilityCertificate` result for
+each aligned entry.
+-/
 theorem checkIrreducibleCert_certificate_alignment
     (f : ZPoly) (cert : ZPolyIrreducibilityCertificate)
     (hcert : checkIrreducibleCert f cert = true) :
