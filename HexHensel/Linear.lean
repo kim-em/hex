@@ -117,6 +117,7 @@ private theorem congr_mul_reduceModPow_pair
 private theorem linearHenselStep_raw_factor_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
+    (_hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
     (hbez :
       ZPoly.congr
@@ -139,6 +140,7 @@ private theorem linearHenselStep_raw_factor_congr
 private theorem linearHenselStep_reduced_factor_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
+    (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
     (hbez :
       ZPoly.congr
@@ -168,7 +170,7 @@ private theorem linearHenselStep_reduced_factor_congr
     (congr_mul_reduceModPow_pair p (k + 1) g' h')
     (by
       simpa [e, gMod, hMod, eMod, qr, q, r, g', hCorrection, h'] using
-        linearHenselStep_raw_factor_congr p k f g h s t hprod hbez hmonic)
+        linearHenselStep_raw_factor_congr p k f g h s t hk hprod hbez hmonic)
 
 private theorem congr_liftToZ_of_modP_eq
     (p : Nat) [ZMod64.Bounds p] (u : FpPoly p) (z : ZPoly)
@@ -208,6 +210,7 @@ def henselLift
 theorem linearHenselStep_spec
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
+    (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
     (hbez :
       ZPoly.congr
@@ -218,7 +221,7 @@ theorem linearHenselStep_spec
     ZPoly.congr (r.g * r.h) f (p ^ (k + 1)) := by
   unfold linearHenselStep
   simpa using
-    linearHenselStep_reduced_factor_congr p k f g h s t hprod hbez hmonic
+    linearHenselStep_reduced_factor_congr p k f g h s t hk hprod hbez hmonic
 
 /-- The linear step preserves monicity of the lifted `g` factor. -/
 theorem linearHenselStep_monic
