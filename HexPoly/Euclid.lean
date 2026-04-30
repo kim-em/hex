@@ -653,17 +653,176 @@ private theorem add_comm_poly {S : Type _}
   rw [coeff_add p q n hzero_add, coeff_add q p n hzero_add]
   grind
 
+private theorem diagonalMulCoeffTerm_one_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) (n i : Nat) :
+    diagonalMulCoeffTerm p 1 n i = if i = n then p.coeff n else 0 := by
+  unfold diagonalMulCoeffTerm
+  by_cases hlt : n < i
+  · have hne : i ≠ n := by omega
+    simp [hlt, hne]
+  · by_cases hin : i = n
+    · subst i
+      have hone : (1 : DensePoly S).coeff 0 = (1 : S) := by
+        change (C (1 : S)).coeff 0 = (1 : S)
+        simp [coeff_C]
+      simp [hone]
+      exact Lean.Grind.Semiring.mul_one (p.coeff n)
+    · have hsub_pos : n - i ≠ 0 := by omega
+      have hone : (1 : DensePoly S).coeff (n - i) = (0 : S) := by
+        change (C (1 : S)).coeff (n - i) = (0 : S)
+        simp [coeff_C, hsub_pos]
+        rfl
+      simp [hlt, hin, hone]
+      grind
+
+private theorem fold_single_index {S : Type _}
+    [Lean.Grind.CommRing S] (n m : Nat) (x : S) :
+    (List.range m).foldl (fun acc i => acc + if i = n then x else 0) 0 =
+      if n < m then x else 0 := by
+  induction m with
+  | zero =>
+      simp
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      by_cases hn : n < m
+      · have hne : m ≠ n := by omega
+        simp [hn, hne]
+        grind
+      · by_cases hmn : m = n
+        · subst n
+          simp
+          grind
+        · have hn_succ : ¬ n < m + 1 := by omega
+          simp [hn, hn_succ, hmn]
+          grind
+
+private theorem fold_diagonal_one_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) (n : Nat) :
+    (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p 1 n i) 0 =
+      p.coeff n := by
+  have hfold : ∀ (xs : List Nat) (acc : S),
+      xs.foldl (fun acc i => acc + diagonalMulCoeffTerm p 1 n i) acc =
+        xs.foldl (fun acc i => acc + if i = n then p.coeff n else 0) acc := by
+    intro xs
+    induction xs with
+    | nil =>
+        intro acc
+        rfl
+    | cons i xs ih =>
+        intro acc
+        simp only [List.foldl_cons]
+        rw [diagonalMulCoeffTerm_one_right p n i]
+        exact ih (acc + if i = n then p.coeff n else 0)
+  rw [show
+      (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p 1 n i) 0 =
+        (List.range p.size).foldl (fun acc i => acc + if i = n then p.coeff n else 0) 0 by
+    exact hfold (List.range p.size) 0]
+  rw [fold_single_index]
+  by_cases hn : n < p.size
+  · simp [hn]
+  · have hcoeff : p.coeff n = 0 := coeff_eq_zero_of_size_le p (Nat.le_of_not_gt hn)
+    simp [hn, hcoeff]
+
+private theorem diagonalMulCoeffTerm_add_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) (n i : Nat) :
+    diagonalMulCoeffTerm p (q + r) n i =
+      diagonalMulCoeffTerm p q n i + diagonalMulCoeffTerm p r n i := by
+  unfold diagonalMulCoeffTerm
+  by_cases hlt : n < i
+  · simp [hlt]
+    grind
+  · have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+    rw [coeff_add q r (n - i) hzero_add]
+    simp [hlt]
+    grind
+
+private theorem fold_add_pair_commring {S : Type _} [Lean.Grind.CommRing S]
+    (xs : List Nat) (f g : Nat → S) (a b : S) :
+    xs.foldl (fun acc i => acc + (f i + g i)) (a + b) =
+      xs.foldl (fun acc i => acc + f i) a +
+        xs.foldl (fun acc i => acc + g i) b := by
+  induction xs generalizing a b with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hacc : a + b + (f i + g i) = (a + f i) + (b + g i) := by grind
+      rw [hacc]
+      exact ih (a + f i) (b + g i)
+
+private theorem fold_diagonal_add_right {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) (n : Nat) :
+    (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p (q + r) n i) 0 =
+      (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p q n i) 0 +
+        (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p r n i) 0 := by
+  have hfold : ∀ (xs : List Nat) (acc : S),
+      xs.foldl (fun acc i => acc + diagonalMulCoeffTerm p (q + r) n i) acc =
+        xs.foldl
+          (fun acc i => acc + (diagonalMulCoeffTerm p q n i + diagonalMulCoeffTerm p r n i))
+          acc := by
+    intro xs
+    induction xs with
+    | nil =>
+        intro acc
+        rfl
+    | cons i xs ih =>
+        intro acc
+        simp only [List.foldl_cons]
+        rw [diagonalMulCoeffTerm_add_right p q r n i]
+        exact ih (acc + (diagonalMulCoeffTerm p q n i + diagonalMulCoeffTerm p r n i))
+  rw [hfold (List.range p.size) 0]
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  calc
+    (List.range p.size).foldl
+        (fun acc i => acc + (diagonalMulCoeffTerm p q n i + diagonalMulCoeffTerm p r n i)) 0 =
+        (List.range p.size).foldl
+          (fun acc i => acc + (diagonalMulCoeffTerm p q n i + diagonalMulCoeffTerm p r n i))
+          (0 + 0) := by rw [hzero_add]
+    _ =
+        (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p q n i) 0 +
+          (List.range p.size).foldl (fun acc i => acc + diagonalMulCoeffTerm p r n i) 0 := by
+        exact
+          fold_add_pair_commring (S := S) (List.range p.size)
+            (fun i => diagonalMulCoeffTerm p q n i)
+            (fun i => diagonalMulCoeffTerm p r n i) 0 0
+
+private theorem fold_diagonal_mul_assoc {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) (n : Nat) :
+    (List.range (p * q).size).foldl
+        (fun acc i => acc + diagonalMulCoeffTerm (p * q) r n i) 0 =
+      (List.range p.size).foldl
+        (fun acc i => acc + diagonalMulCoeffTerm p (q * r) n i) 0 := by
+  sorry
+
 private theorem mul_assoc_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) :
     (p * q) * r = p * (q * r) := by
-  sorry
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mul]
+  rw [mulCoeffSum_eq_diagonal (p * q) r n]
+  rw [mulCoeffSum_eq_diagonal p (q * r) n]
+  exact fold_diagonal_mul_assoc p q r n
 
 private theorem mul_add_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) :
     p * (q + r) = p * q + p * r := by
-  sorry
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_mul, coeff_add (p * q) (p * r) n hzero_add, coeff_mul, coeff_mul]
+  rw [mulCoeffSum_eq_diagonal p (q + r) n]
+  rw [mulCoeffSum_eq_diagonal p q n, mulCoeffSum_eq_diagonal p r n]
+  exact fold_diagonal_add_right p q r n
 
 private theorem mul_add_left_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
@@ -676,7 +835,10 @@ private theorem mul_one_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p : DensePoly S) :
     p * 1 = p := by
-  sorry
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, mulCoeffSum_eq_diagonal]
+  exact fold_diagonal_one_right p n
 
 private theorem neg_mul_right_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
