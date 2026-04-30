@@ -170,6 +170,12 @@ private theorem linearHenselStep_reduced_factor_congr
       simpa [e, gMod, hMod, eMod, qr, q, r, g', hCorrection, h'] using
         linearHenselStep_raw_factor_congr p k f g h s t hprod hbez hmonic)
 
+private theorem congr_liftToZ_of_modP_eq
+    (p : Nat) [ZMod64.Bounds p] (u : FpPoly p) (z : ZPoly)
+    (h : ZPoly.modP p z = u) :
+    ZPoly.congr (FpPoly.liftToZ u) z p := by
+  simpa [← h] using FpPoly.congr_liftToZ_modP (p := p) z
+
 private def henselLiftLoop
     (p : Nat) [ZMod64.Bounds p]
     (steps current : Nat)
