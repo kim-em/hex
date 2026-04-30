@@ -438,25 +438,28 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
   m ∣ (p - q)
 
 private theorem congr_mod_core {S : Type _}
-    [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
     (p m : DensePoly S) :
     m ∣ (p % m - p) := by
   sorry
 
-/-- Reduction modulo the modulus is congruent to the original polynomial. -/
-theorem congr_mod {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+/-- Reduction modulo the modulus is congruent to the original polynomial over a lawful
+coefficient ring. -/
+theorem congr_mod {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
     (p m : DensePoly S) :
     Congr (p % m) p m := by
   exact congr_mod_core p m
 
 private theorem mod_eq_mod_of_dvd_sub {S : Type _}
-    [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     {p q m : DensePoly S} :
     m ∣ (p - q) -> p % m = q % m := by
   sorry
 
-/-- Congruent polynomials have the same canonical remainder. -/
-theorem mod_eq_mod_of_congr {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Sub S] [Mul S] [Div S]
+/-- Congruent polynomials have the same canonical remainder once the divisor law package
+supplies the executable `%` invariants. -/
+theorem mod_eq_mod_of_congr {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [DivModLaws S]
     {p q m : DensePoly S} :
     Congr p q m -> p % m = q % m := by
   exact mod_eq_mod_of_dvd_sub
