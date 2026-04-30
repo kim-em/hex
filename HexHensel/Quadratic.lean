@@ -255,12 +255,244 @@ private theorem divModMonicModSquare_reconstruct_congr
         exact ZPoly.congr_trans _ _ _ (m * m)
           (reduceModSquare_congr m pRed hm) hpRed
 
+private theorem coeff_last_eq_leadingCoeff (f : ZPoly) (hpos : 0 < f.size) :
+    f.coeff (f.size - 1) = f.leadingCoeff := by
+  cases f with
+  | mk coeffs normalized =>
+      have hcoeffs : 0 < coeffs.size := by simpa [DensePoly.size] using hpos
+      have hidx : coeffs.size - 1 < coeffs.size := Nat.sub_one_lt (Nat.ne_of_gt hcoeffs)
+      change coeffs.getD (coeffs.size - 1) 0 = coeffs.back?.getD 0
+      rw [Array.back?_eq_getElem?]
+      rw [Array.getElem?_eq_getElem hidx]
+      exact (Array.getElem_eq_getD 0).symm
+
+private theorem leadingCoeff_zero_mod_base
+    (m : Nat) (f : ZPoly) (hf : ZPoly.congr f 0 m) :
+    f.leadingCoeff % (m : Int) = 0 := by
+  by_cases hpos : 0 < f.size
+  · have hcoeff := hf (f.size - 1)
+    rw [DensePoly.coeff_zero] at hcoeff
+    rw [coeff_last_eq_leadingCoeff f hpos] at hcoeff
+    simpa [Int.sub_zero] using hcoeff
+  · have hsize : f.size = 0 := Nat.eq_zero_of_not_pos hpos
+    have hlead : f.leadingCoeff = 0 := by
+      cases f with
+      | mk coeffs normalized =>
+          simp [DensePoly.leadingCoeff, DensePoly.size] at hsize ⊢
+          simp [hsize]
+    simp [hlead]
+
+private theorem canonicalMod_congr_self
+    (z : Int) (n : Nat) (hn : 0 < n) :
+    (canonicalMod z n - z) % (n : Int) = 0 := by
+  unfold canonicalMod
+  have hnat :
+      Int.ofNat (Int.toNat (z % (n : Int))) = z % (n : Int) :=
+    Int.toNat_of_nonneg (Int.emod_nonneg _ (Int.ofNat_ne_zero.mpr (Nat.ne_of_gt hn)))
+  change (Int.ofNat (Int.toNat (z % (n : Int))) - z) % (n : Int) = 0
+  rw [hnat]
+  exact Int.emod_eq_zero_of_dvd (Int.dvd_sub_self_of_emod_eq rfl)
+
+private theorem reduceCoeffModSquare_zero_mod_base
+    (m : Nat) (z : Int)
+    (hz : z % (m : Int) = 0) :
+    reduceCoeffModSquare z m % (m : Int) = 0 := by
+  by_cases hm : m = 0
+  · subst m
+    simp [reduceCoeffModSquare, canonicalMod] at hz ⊢
+    simp [hz]
+  · have hmpos : 0 < m := Nat.pos_of_ne_zero hm
+    have hsqpos : 0 < m * m := Nat.mul_pos hmpos hmpos
+    have hsq :
+        (canonicalMod z (m * m) - z) % (((m * m : Nat) : Int)) = 0 :=
+      canonicalMod_congr_self z (m * m) hsqpos
+    have hz_dvd : (m : Int) ∣ z := Int.dvd_of_emod_eq_zero hz
+    have hsq_dvd :
+        ((m * m : Nat) : Int) ∣ canonicalMod z (m * m) - z :=
+      Int.dvd_of_emod_eq_zero hsq
+    have hm_dvd_sq : (m : Int) ∣ ((m * m : Nat) : Int) := by
+      refine ⟨(m : Int), ?_⟩
+      rw [Int.natCast_mul]
+    have hm_dvd_diff : (m : Int) ∣ canonicalMod z (m * m) - z :=
+      Int.dvd_trans hm_dvd_sq hsq_dvd
+    have hm_dvd_canon : (m : Int) ∣ canonicalMod z (m * m) := by
+      rcases hm_dvd_diff with ⟨a, ha⟩
+      rcases hz_dvd with ⟨b, hb⟩
+      refine ⟨a + b, ?_⟩
+      calc
+        canonicalMod z (m * m)
+            = (canonicalMod z (m * m) - z) + z := by omega
+        _ = (m : Int) * a + (m : Int) * b := by rw [ha, hb]
+        _ = (m : Int) * (a + b) := by grind
+    simpa [reduceCoeffModSquare, quadraticModulus] using
+      Int.emod_eq_zero_of_dvd hm_dvd_canon
+
+private theorem reduceModSquare_zero_mod_base
+    (m : Nat) (f : ZPoly)
+    (hf : ZPoly.congr f 0 m) :
+    ZPoly.congr (QuadraticLiftResult.reduceModSquare f m) 0 m := by
+  intro i
+  by_cases hm : m = 0
+  · subst m
+    unfold QuadraticLiftResult.reduceModSquare
+    have hfi : f.coeff i = 0 := by simpa using hf i
+    rw [ZPoly.coeff_reduceModPow, DensePoly.coeff_zero, hfi]
+    rfl
+  · have hmpos : 0 < m := Nat.pos_of_ne_zero hm
+    have hsq : ZPoly.congr (QuadraticLiftResult.reduceModSquare f m) f (m * m) :=
+      reduceModSquare_congr m f hmpos
+    have hsq_i :
+        ((QuadraticLiftResult.reduceModSquare f m).coeff i - f.coeff i) %
+            (((m * m : Nat) : Int)) = 0 :=
+      hsq i
+    have hdiff_dvd :
+        ((m * m : Nat) : Int) ∣
+          (QuadraticLiftResult.reduceModSquare f m).coeff i - f.coeff i :=
+      Int.dvd_of_emod_eq_zero hsq_i
+    have hm_dvd_sq : (m : Int) ∣ ((m * m : Nat) : Int) := by
+      refine ⟨(m : Int), ?_⟩
+      rw [Int.natCast_mul]
+    have hm_dvd_diff :
+        (m : Int) ∣ (QuadraticLiftResult.reduceModSquare f m).coeff i - f.coeff i :=
+      Int.dvd_trans hm_dvd_sq hdiff_dvd
+    have hf_i : (m : Int) ∣ f.coeff i := by
+      exact Int.dvd_of_emod_eq_zero (by simpa using hf i)
+    have hred_dvd : (m : Int) ∣ (QuadraticLiftResult.reduceModSquare f m).coeff i := by
+      rcases hm_dvd_diff with ⟨a, ha⟩
+      rcases hf_i with ⟨b, hb⟩
+      refine ⟨a + b, ?_⟩
+      calc
+        (QuadraticLiftResult.reduceModSquare f m).coeff i
+            =
+              ((QuadraticLiftResult.reduceModSquare f m).coeff i - f.coeff i) +
+                f.coeff i := by omega
+        _ = (m : Int) * a + (m : Int) * b := by rw [ha, hb]
+        _ = (m : Int) * (a + b) := by grind
+    rw [DensePoly.coeff_zero]
+    simpa using Int.emod_eq_zero_of_dvd hred_dvd
+
+private theorem addModSquare_zero_mod_base
+    (m : Nat) (f g : ZPoly)
+    (hf : ZPoly.congr f 0 m) (hg : ZPoly.congr g 0 m) :
+    ZPoly.congr (addModSquare f g m) 0 m := by
+  unfold addModSquare
+  apply reduceModSquare_zero_mod_base
+  intro i
+  rw [DensePoly.coeff_add]
+  · have hfi : (f.coeff i) % (m : Int) = 0 := by simpa using hf i
+    have hgi : (g.coeff i) % (m : Int) = 0 := by simpa using hg i
+    simpa [Int.sub_zero] using
+      Int.emod_eq_zero_of_dvd (Int.dvd_add
+        (Int.dvd_of_emod_eq_zero hfi) (Int.dvd_of_emod_eq_zero hgi))
+  · rfl
+
+private theorem subModSquare_zero_mod_base
+    (m : Nat) (f g : ZPoly)
+    (hf : ZPoly.congr f 0 m) (hg : ZPoly.congr g 0 m) :
+    ZPoly.congr (subModSquare f g m) 0 m := by
+  unfold subModSquare
+  apply reduceModSquare_zero_mod_base
+  intro i
+  rw [DensePoly.coeff_sub]
+  · have hfi : (f.coeff i) % (m : Int) = 0 := by simpa using hf i
+    have hgi : (g.coeff i) % (m : Int) = 0 := by simpa using hg i
+    simpa [Int.sub_zero] using
+      Int.emod_eq_zero_of_dvd (Int.dvd_sub
+        (Int.dvd_of_emod_eq_zero hfi) (Int.dvd_of_emod_eq_zero hgi))
+  · rfl
+
+private theorem mulModSquare_left_zero_mod_base
+    (m : Nat) (f g : ZPoly)
+    (hf : ZPoly.congr f 0 m) :
+    ZPoly.congr (mulModSquare f g m) 0 m := by
+  unfold mulModSquare
+  apply reduceModSquare_zero_mod_base
+  simpa [DensePoly.zero_mul] using
+    ZPoly.congr_mul f g 0 g m hf (ZPoly.congr_refl g m)
+
+private theorem monomial_zero_mod_base
+    (m k : Nat) (c : Int)
+    (hc : c % (m : Int) = 0) :
+    ZPoly.congr (DensePoly.monomial k c) 0 m := by
+  intro i
+  rw [DensePoly.coeff_monomial, DensePoly.coeff_zero]
+  by_cases hi : i = k
+  · simp [hi, hc]
+  · rw [if_neg hi]
+    change ((0 : Int) - 0) % (m : Int) = 0
+    simp
+
+private theorem divModMonicModSquareAux_zero_mod_base
+    (m : Nat) (q : ZPoly) (fuel : Nat) (quot rem qOut rOut : ZPoly)
+    (hquot : ZPoly.congr quot 0 m)
+    (hrem : ZPoly.congr rem 0 m)
+    (hqr : (qOut, rOut) = divModMonicModSquareAux m q fuel quot rem) :
+    ZPoly.congr qOut 0 m ∧ ZPoly.congr rOut 0 m := by
+  induction fuel generalizing quot rem qOut rOut with
+  | zero =>
+      simp [divModMonicModSquareAux] at hqr
+      rcases hqr with ⟨hqOut, hrOut⟩
+      rw [hqOut, hrOut]
+      exact ⟨hquot, hrem⟩
+  | succ fuel ih =>
+      cases hq : q.isZero with
+      | true =>
+          simp [divModMonicModSquareAux, hq] at hqr
+          rcases hqr with ⟨hqOut, hrOut⟩
+          rw [hqOut, hrOut]
+          exact ⟨ZPoly.congr_refl 0 m, reduceModSquare_zero_mod_base m rem hrem⟩
+      | false =>
+          cases hremDeg : rem.degree? with
+          | none =>
+              simp [divModMonicModSquareAux, hq, hremDeg] at hqr
+              rcases hqr with ⟨hqOut, hrOut⟩
+              rw [hqOut, hrOut]
+              exact ⟨hquot, hrem⟩
+          | some rd =>
+              cases hqdeg : q.degree? with
+              | none =>
+                  simp [divModMonicModSquareAux, hq, hremDeg, hqdeg] at hqr
+                  rcases hqr with ⟨hqOut, hrOut⟩
+                  rw [hqOut, hrOut]
+                  exact ⟨hquot, hrem⟩
+              | some qd =>
+                  by_cases hlt : rd < qd
+                  · simp [divModMonicModSquareAux, hq, hremDeg, hqdeg, hlt] at hqr
+                    rcases hqr with ⟨hqOut, hrOut⟩
+                    rw [hqOut, hrOut]
+                    exact ⟨hquot, hrem⟩
+                  · simp [divModMonicModSquareAux, hq, hremDeg, hqdeg, hlt] at hqr
+                    let k := rd - qd
+                    let coeff := reduceCoeffModSquare rem.leadingCoeff m
+                    let term := DensePoly.monomial k coeff
+                    have hcoeff : coeff % (m : Int) = 0 := by
+                      exact reduceCoeffModSquare_zero_mod_base m rem.leadingCoeff
+                        (leadingCoeff_zero_mod_base m rem hrem)
+                    have hterm : ZPoly.congr term 0 m :=
+                      monomial_zero_mod_base m k coeff hcoeff
+                    have hquot' : ZPoly.congr (addModSquare quot term m) 0 m :=
+                      addModSquare_zero_mod_base m quot term hquot hterm
+                    have hmul : ZPoly.congr (mulModSquare term q m) 0 m :=
+                      mulModSquare_left_zero_mod_base m term q hterm
+                    have hrem' :
+                        ZPoly.congr (subModSquare rem (mulModSquare term q m) m) 0 m :=
+                      subModSquare_zero_mod_base m rem (mulModSquare term q m) hrem hmul
+                    exact ih (addModSquare quot term m)
+                      (subModSquare rem (mulModSquare term q m) m)
+                      qOut rOut hquot' hrem' hqr
+
 private theorem divModMonicModSquare_zero_mod_base
     (m : Nat) (p q qOut rOut : ZPoly)
     (hp : ZPoly.congr p 0 m)
     (hqr : (qOut, rOut) = divModMonicModSquare p q m) :
     ZPoly.congr qOut 0 m ∧ ZPoly.congr rOut 0 m := by
-  sorry
+  unfold divModMonicModSquare at hqr
+  let pRed := QuadraticLiftResult.reduceModSquare p m
+  change (qOut, rOut) = divModMonicModSquareAux m q pRed.size 0 pRed at hqr
+  exact divModMonicModSquareAux_zero_mod_base m q pRed.size 0 pRed qOut rOut
+    (ZPoly.congr_refl 0 m)
+    (reduceModSquare_zero_mod_base m p hp)
+    hqr
 
 private theorem quadraticHenselStep_bezout_error_definition_congr
     (m : Nat) (s t g' h' b : ZPoly) (hm : 0 < m)
