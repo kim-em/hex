@@ -63,12 +63,78 @@ def detTerm {R : Type u} [Lean.Grind.Ring R] {n : Nat}
 def det {R : Type u} [Lean.Grind.Ring R] {n : Nat} (M : Matrix R n n) : R :=
   (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0
 
+/-- Congruence for the determinant-style left fold over a finite list. -/
+private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
+    (xs : List β) (f g : β → R) (z : R)
+    (h : ∀ x, x ∈ xs → f x = g x) :
+    xs.foldl (fun acc x => acc + f x) z =
+      xs.foldl (fun acc x => acc + g x) z := by
+  induction xs generalizing z with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      rw [h x (by simp)]
+      apply ih
+      intro y hy
+      exact h y (List.mem_cons_of_mem x hy)
+
+/-- Factor a scalar out of a determinant-style finite left fold. -/
+private theorem foldl_det_sum_mul_left {R : Type u} [Lean.Grind.CommRing R] {β : Type v}
+    (xs : List β) (c : R) (f : β → R) (z : R) :
+    xs.foldl (fun acc x => acc + c * f x) (c * z) =
+      c * xs.foldl (fun acc x => acc + f x) z := by
+  induction xs generalizing z with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      rw [← show c * (z + f x) = c * z + c * f x by grind]
+      exact ih (z + f x)
+
+/-- Factor a scalar out of a determinant-style finite left fold from zero. -/
+private theorem foldl_det_sum_mul_left_zero {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (c : R) (f : β → R) :
+    xs.foldl (fun acc x => acc + c * f x) 0 =
+      c * xs.foldl (fun acc x => acc + f x) 0 := by
+  have hzero : c * 0 = 0 := by grind
+  simpa [hzero] using (foldl_det_sum_mul_left (R := R) xs c f 0)
+
+/-- The permutation-vector enumeration contributes `1` on the identity
+matrix: all non-identity terms vanish and the identity vector appears once. -/
+private theorem permutationVectors_identity_sum {R : Type u} [Lean.Grind.CommRing R]
+    {n : Nat} :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (1 : Matrix R n n) perm) 0 = 1 := by
+  sorry
+
+/-- Row swapping pairs the permutation-vector Leibniz terms with opposite sign. -/
+private theorem permutationVectors_rowSwap_sum {R : Type u} [Lean.Grind.CommRing R]
+    {n : Nat} (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowSwap M i j) perm) 0 =
+      -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+  sorry
+
+/-- Scaling one matrix row scales each Leibniz term by the same scalar. -/
+private theorem detTerm_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i : Fin n) (c : R) (perm : Vector (Fin n) n) :
+    detTerm (rowScale M i c) perm = c * detTerm M perm := by
+  sorry
+
+/-- The multilinear expansion of a row addition has zero total duplicate-row
+contribution, so the Leibniz sum is unchanged. -/
+private theorem permutationVectors_rowAdd_sum {R : Type u} [Lean.Grind.CommRing R]
+    {n : Nat} (M : Matrix R n n) (src dst : Fin n) (c : R) (h : src ≠ dst) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowAdd M src dst c) perm) 0 =
+      (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 := by
+  sorry
+
 /-- The Leibniz sum for the identity matrix has exactly the identity
 permutation as its nonzero contribution. -/
 private theorem det_identity_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat} :
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (1 : Matrix R n n) perm) 0 = 1 := by
-  sorry
+  exact permutationVectors_identity_sum
 
 /-- Swapping two rows pairs each Leibniz summand with the corresponding
 transposed permutation and flips the computed inversion parity. -/
@@ -77,7 +143,7 @@ private theorem det_rowSwap_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Na
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowSwap M i j) perm) 0 =
       -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
-  sorry
+  exact permutationVectors_rowSwap_sum M i j h
 
 /-- Scaling one row factors the scalar out of every nonzero Leibniz summand. -/
 private theorem det_rowScale_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
@@ -85,7 +151,16 @@ private theorem det_rowScale_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : N
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowScale M i c) perm) 0 =
       c * ((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
-  sorry
+  calc
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowScale M i c) perm) 0 =
+      (permutationVectors n).foldl
+        (fun acc perm => acc + c * detTerm M perm) 0 := by
+        apply foldl_det_sum_congr
+        intro perm _hmem
+        exact detTerm_rowScale M i c perm
+    _ = c * ((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+        exact foldl_det_sum_mul_left_zero (permutationVectors n) c (detTerm M)
 
 /-- Adding a multiple of one row to a distinct row leaves the Leibniz sum
 unchanged; the extra multilinear contribution has two equal rows. -/
@@ -94,7 +169,7 @@ private theorem det_rowAdd_leibniz {R : Type u} [Lean.Grind.CommRing R] {n : Nat
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowAdd M src dst c) perm) 0 =
       (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0 := by
-  sorry
+  exact permutationVectors_rowAdd_sum M src dst c h
 
 theorem det_one {R : Type u} [Lean.Grind.CommRing R] {n : Nat} :
     det (1 : Matrix R n n) = 1 := by
