@@ -128,6 +128,31 @@ theorem modP_liftToZ_coeff (f : FpPoly p) (i : Nat) :
     · exact Int.ofNat_lt.mpr (f.coeff i).toNat_lt
   rw [ZMod64.toNat_ofNat, hmod, Nat.mod_eq_of_lt (f.coeff i).toNat_lt]
 
+/-- Reducing a canonical lift back modulo `p` recovers the original polynomial. -/
+theorem modP_liftToZ (f : FpPoly p) :
+    ZPoly.modP p (liftToZ f) = f := by
+  apply DensePoly.ext_coeff
+  intro i
+  exact modP_liftToZ_coeff f i
+
+/-- A polynomial is congruent modulo `p` to the canonical integer lift of its reduction. -/
+theorem congr_liftToZ_modP (f : ZPoly) :
+    ZPoly.congr (liftToZ (ZPoly.modP p f)) f p := by
+  intro i
+  rw [coeff_liftToZ, ZPoly.coeff_modP]
+  rw [ZMod64.toNat_ofNat]
+  have hp : 0 < p := ZMod64.Bounds.pPos (p := p)
+  have hmod : ZPoly.intModNat (f.coeff i) p % p = ZPoly.intModNat (f.coeff i) p := by
+    rw [Nat.mod_eq_of_lt]
+    unfold ZPoly.intModNat
+    have hlt :
+        Int.toNat (f.coeff i % (p : Int)) < Int.toNat (p : Int) :=
+      (Int.toNat_lt_toNat (by exact_mod_cast hp)).2
+        (Int.emod_lt_of_pos _ (by exact_mod_cast hp))
+    simpa using hlt
+  rw [hmod]
+  exact ZPoly.intModNat_sub_self_emod (f.coeff i) hp
+
 /-- The canonical integer lift is congruent to itself after reduction modulo `p^k`. -/
 theorem congr_reduceModPow_liftToZ (f : FpPoly p) (k : Nat) :
     ZPoly.congr (ZPoly.reduceModPow (liftToZ f) p k) (liftToZ f) (p ^ k) := by
