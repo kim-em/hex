@@ -260,12 +260,213 @@ private theorem liftToZ_mulCoeffTerm_congr
     simp [hni, heq, FpPoly.coeff_liftToZ]
     exact zmod_mul_lift_congr p (f.coeff i) (g.coeff (n - i))
 
+private def intDiagonalMulCoeffTerm
+    (p q : ZPoly) (n i : Nat) : Int :=
+  if n < i then 0 else p.coeff i * q.coeff (n - i)
+
+private def intBoundedDiagonalMulCoeffTerm
+    (p q : ZPoly) (n i m : Nat) : Int :=
+  if n < i then 0 else if n - i < m then p.coeff i * q.coeff (n - i) else 0
+
+private theorem fold_mulCoeffStep_eq_bounded_diagonal_int
+    (p q : ZPoly) (n i m : Nat) (acc : Int) :
+    (List.range m).foldl (DensePoly.mulCoeffStep p q n i) acc =
+      acc + intBoundedDiagonalMulCoeffTerm p q n i m := by
+  induction m generalizing acc with
+  | zero =>
+      simp [intBoundedDiagonalMulCoeffTerm]
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      unfold DensePoly.mulCoeffStep intBoundedDiagonalMulCoeffTerm
+      by_cases hlt : n < i
+      · have hne : i + m ≠ n := by omega
+        simp [hlt, hne]
+      · by_cases hm : n - i < m
+        · have hne : i + m ≠ n := by omega
+          simp [hlt, hm, hne]
+          omega
+        · by_cases heq : i + m = n
+          · have hsub : n - i = m := by omega
+            simp [hlt, heq, hsub]
+          · have hm' : ¬ n - i < m + 1 := by omega
+            simp [hlt, hm, hm', heq]
+
+private theorem fold_mulCoeffStep_eq_diagonal_int
+    (p q : ZPoly) (n i : Nat) (acc : Int) :
+    (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc =
+      acc + intDiagonalMulCoeffTerm p q n i := by
+  rw [fold_mulCoeffStep_eq_bounded_diagonal_int]
+  unfold intBoundedDiagonalMulCoeffTerm intDiagonalMulCoeffTerm
+  by_cases hlt : n < i
+  · simp [hlt]
+  · by_cases hbound : n - i < q.size
+    · simp [hlt, hbound]
+    · have hcoeff : q.coeff (n - i) = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le q (Nat.le_of_not_gt hbound)
+      simp [hlt, hbound, hcoeff]
+
+private theorem fold_mulCoeff_outer_eq_diagonal_int
+    (p q : ZPoly) (n : Nat) (xs : List Nat) (acc : Int) :
+    xs.foldl
+        (fun coeff i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) coeff)
+        acc =
+      xs.foldl (fun coeff i => coeff + intDiagonalMulCoeffTerm p q n i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [fold_mulCoeffStep_eq_diagonal_int]
+      exact ih (acc + intDiagonalMulCoeffTerm p q n i)
+
+private theorem mulCoeffSum_eq_diagonal_int (p q : ZPoly) (n : Nat) :
+    DensePoly.mulCoeffSum p q n =
+      (List.range p.size).foldl (fun acc i => acc + intDiagonalMulCoeffTerm p q n i) 0 := by
+  unfold DensePoly.mulCoeffSum
+  exact fold_mulCoeff_outer_eq_diagonal_int p q n (List.range p.size) 0
+
+private theorem intDiagonalMulCoeffTerm_eq_zero_of_size_le
+    (p q : ZPoly) (n i : Nat) (hi : p.size ≤ i) :
+    intDiagonalMulCoeffTerm p q n i = 0 := by
+  unfold intDiagonalMulCoeffTerm
+  by_cases hn : n < i
+  · simp [hn]
+  · have hcoeff : p.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le p hi
+    simp [hn, hcoeff]
+
+private theorem fold_diagonal_extend_int (p q : ZPoly) (n d : Nat) :
+    (List.range (p.size + d)).foldl (fun acc i => acc + intDiagonalMulCoeffTerm p q n i) 0 =
+      (List.range p.size).foldl (fun acc i => acc + intDiagonalMulCoeffTerm p q n i) 0 := by
+  induction d with
+  | zero =>
+      simp
+  | succ d ih =>
+      rw [Nat.add_succ, List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      have hterm : intDiagonalMulCoeffTerm p q n (p.size + d) = 0 :=
+        intDiagonalMulCoeffTerm_eq_zero_of_size_le p q n (p.size + d) (by omega)
+      simp [hterm]
+
+private theorem diagonalSum_eq_bound_int
+    (p q : ZPoly) (n m : Nat) (hm : p.size ≤ m) :
+    (List.range p.size).foldl (fun acc i => acc + intDiagonalMulCoeffTerm p q n i) 0 =
+      (List.range m).foldl (fun acc i => acc + intDiagonalMulCoeffTerm p q n i) 0 := by
+  have hm' : p.size + (m - p.size) = m := by omega
+  rw [← hm']
+  exact (fold_diagonal_extend_int p q n (m - p.size)).symm
+
+private theorem liftToZ_size_le
+    (p : Nat) [ZMod64.Bounds p] (f : FpPoly p) :
+    (FpPoly.liftToZ f).size ≤ f.size := by
+  by_cases hle : (FpPoly.liftToZ f).size ≤ f.size
+  · exact hle
+  · exfalso
+    have hlt : f.size < (FpPoly.liftToZ f).size := Nat.lt_of_not_ge hle
+    have hpos : 0 < (FpPoly.liftToZ f).size := Nat.lt_of_le_of_lt (Nat.zero_le _) hlt
+    have hlast :=
+      DensePoly.coeff_last_ne_zero_of_pos_size (FpPoly.liftToZ f) hpos
+    have hidx : f.size ≤ (FpPoly.liftToZ f).size - 1 := by omega
+    have hf : f.coeff ((FpPoly.liftToZ f).size - 1) = 0 :=
+      DensePoly.coeff_eq_zero_of_size_le f hidx
+    rw [FpPoly.coeff_liftToZ, hf] at hlast
+    exact hlast (by
+      change Int.ofNat (ZMod64.zero : ZMod64 p).toNat = (0 : Int)
+      rw [ZMod64.toNat_zero]
+      rfl)
+
+private theorem liftToZ_mulCoeffTerm_diagonal_congr
+    (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) (n i : Nat) :
+    (Int.ofNat (FpPoly.mulCoeffTerm f g n i).toNat -
+        intDiagonalMulCoeffTerm (FpPoly.liftToZ f) (FpPoly.liftToZ g) n i) %
+      (p : Int) = 0 := by
+  unfold intDiagonalMulCoeffTerm
+  by_cases hni : n < i
+  · simp [hni, FpPoly.mulCoeffTerm]
+    change (Int.ofNat (ZMod64.zero : ZMod64 p).toNat - 0) % (p : Int) = 0
+    rw [ZMod64.toNat_zero]
+    simp
+  · have hle : i ≤ n := Nat.le_of_not_gt hni
+    have heq : i + (n - i) = n := Nat.add_sub_of_le hle
+    simpa [hni, DensePoly.mulCoeffStep, heq] using liftToZ_mulCoeffTerm_congr p f g n i
+
+private theorem zmod_add_lift_congr_of_terms
+    (p : Nat) [ZMod64.Bounds p] (a b : ZMod64 p) (x y : Int)
+    (ha : (Int.ofNat a.toNat - x) % (p : Int) = 0)
+    (hb : (Int.ofNat b.toNat - y) % (p : Int) = 0) :
+    (Int.ofNat (a + b).toNat - (x + y)) % (p : Int) = 0 := by
+  have hadd := zmod_add_lift_congr p a b
+  have hxy : ((Int.ofNat a.toNat + Int.ofNat b.toNat) - (x + y)) % (p : Int) = 0 := by
+    have hsum :
+        (p : Int) ∣
+          (Int.ofNat a.toNat + Int.ofNat b.toNat) - (x + y) := by
+      have hda : (p : Int) ∣ Int.ofNat a.toNat - x := Int.dvd_of_emod_eq_zero ha
+      have hdb : (p : Int) ∣ Int.ofNat b.toNat - y := Int.dvd_of_emod_eq_zero hb
+      rcases hda with ⟨ka, hka⟩
+      rcases hdb with ⟨kb, hkb⟩
+      refine ⟨ka + kb, ?_⟩
+      calc
+        Int.ofNat a.toNat + Int.ofNat b.toNat - (x + y)
+            = (Int.ofNat a.toNat - x) + (Int.ofNat b.toNat - y) := by omega
+        _ = (p : Int) * ka + (p : Int) * kb := by rw [hka, hkb]
+        _ = (p : Int) * (ka + kb) := by grind
+    exact Int.emod_eq_zero_of_dvd hsum
+  have htotal :
+      (p : Int) ∣
+        (Int.ofNat (a + b).toNat - (x + y)) := by
+    have h1 : (p : Int) ∣
+        Int.ofNat (a + b).toNat - (Int.ofNat a.toNat + Int.ofNat b.toNat) :=
+      Int.dvd_of_emod_eq_zero hadd
+    have h2 : (p : Int) ∣
+        (Int.ofNat a.toNat + Int.ofNat b.toNat) - (x + y) :=
+      Int.dvd_of_emod_eq_zero hxy
+    rcases h1 with ⟨k1, hk1⟩
+    rcases h2 with ⟨k2, hk2⟩
+    refine ⟨k1 + k2, ?_⟩
+    calc
+      Int.ofNat (a + b).toNat - (x + y)
+          =
+            (Int.ofNat (a + b).toNat - (Int.ofNat a.toNat + Int.ofNat b.toNat)) +
+              ((Int.ofNat a.toNat + Int.ofNat b.toNat) - (x + y)) := by omega
+      _ = (p : Int) * k1 + (p : Int) * k2 := by rw [hk1, hk2]
+      _ = (p : Int) * (k1 + k2) := by grind
+  exact Int.emod_eq_zero_of_dvd htotal
+
+private theorem fold_liftToZ_mulCoeffTerm_congr
+    (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) (n : Nat) (xs : List Nat)
+    (acc : ZMod64 p) (accZ : Int)
+    (hacc : (Int.ofNat acc.toNat - accZ) % (p : Int) = 0) :
+    (Int.ofNat
+        (xs.foldl (fun coeff i => coeff + FpPoly.mulCoeffTerm f g n i) acc).toNat -
+        xs.foldl
+          (fun coeff i =>
+            coeff + intDiagonalMulCoeffTerm (FpPoly.liftToZ f) (FpPoly.liftToZ g) n i)
+          accZ) %
+      (p : Int) = 0 := by
+  induction xs generalizing acc accZ with
+  | nil =>
+      simpa using hacc
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      apply ih
+      exact zmod_add_lift_congr_of_terms p acc (FpPoly.mulCoeffTerm f g n i) accZ
+        (intDiagonalMulCoeffTerm (FpPoly.liftToZ f) (FpPoly.liftToZ g) n i)
+        hacc (liftToZ_mulCoeffTerm_diagonal_congr p f g n i)
+
 private theorem liftToZ_mul_congr
     (p : Nat) [ZMod64.Bounds p] (f g : FpPoly p) :
     ZPoly.congr (FpPoly.liftToZ (f * g)) (FpPoly.liftToZ f * FpPoly.liftToZ g) p := by
   intro n
   rw [FpPoly.coeff_liftToZ, FpPoly.coeff_mul, DensePoly.coeff_mul]
-  sorry
+  rw [mulCoeffSum_eq_diagonal_int]
+  rw [diagonalSum_eq_bound_int (FpPoly.liftToZ f) (FpPoly.liftToZ g) n f.size
+    (liftToZ_size_le p f)]
+  exact fold_liftToZ_mulCoeffTerm_congr p f g n (List.range f.size) 0 0 (by
+    change (Int.ofNat (ZMod64.zero : ZMod64 p).toNat - 0) % (p : Int) = 0
+    rw [ZMod64.toNat_zero]
+    simp)
 
 private theorem modP_add
     (p : Nat) [ZMod64.Bounds p] (f g : ZPoly) :
