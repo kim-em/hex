@@ -307,14 +307,15 @@ setup_benchmark runPowChecksum n => n * n * Nat.log2 (n + 1)
 /-
 Inversion computes one polynomial extended gcd against a degree-`n` modulus and
 reduces the inverse candidate. Division adds one quadratic field
-multiplication after that inverse.
+multiplication after that inverse. The wider doubling ladder keeps the small
+extended-gcd constants from dominating the fitted quadratic slope.
 -/
 setup_benchmark runInvDivChecksum n => n * n
   with prep := prepBinaryInput
   where {
     paramFloor := 32
-    paramCeiling := 256
-    paramSchedule := .custom #[32, 48, 64, 96, 128, 192, 256]
+    paramCeiling := 1024
+    paramSchedule := .custom #[32, 64, 128, 256, 512, 1024]
     maxSecondsPerCall := 4.0
     targetInnerNanos := 200000000
     signalFloorMultiplier := 1.0

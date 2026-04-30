@@ -70,7 +70,7 @@ libraries:
   HexGfqField:
     deps: [HexGfqRing]
     mathlib: false
-    done_through: 3
+    done_through: 4
 
   # ---------- Factoring pipeline ----------
   HexBerlekamp:
