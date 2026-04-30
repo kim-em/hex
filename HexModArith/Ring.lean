@@ -14,6 +14,52 @@ namespace ZMod64
 
 variable {p : Nat} [Bounds p]
 
+private theorem neg_nonzero_toNat (a : ZMod64 p) {hpLt : p < UInt64.word}
+    (hzero : a.val ≠ 0) :
+    (-a.val - complementWord p hpLt).toNat = p - a.toNat := by
+  have hzeroNat : a.toNat ≠ 0 := by
+    intro h
+    apply hzero
+    apply UInt64.toNat_inj.mp
+    simpa [toNat_eq_val] using h
+  have hneg_toNat : (-a.val).toNat = UInt64.word - a.toNat := by
+    rw [UInt64.toNat_neg]
+    have hlt : UInt64.word - a.toNat < UInt64.word := by
+      have hpos : 0 < a.toNat := Nat.pos_of_ne_zero hzeroNat
+      omega
+    rw [Nat.mod_eq_of_lt (by simpa [toNat_eq_val, UInt64.word, UInt64.size] using hlt)]
+    simp [toNat_eq_val, UInt64.word, UInt64.size]
+  have hge :
+      UInt64.word ≤ UInt64.word - (UInt64.word - p) + (UInt64.word - a.toNat) := by
+    have ha : a.toNat < p := a.isLt
+    omega
+  have hlt :
+      UInt64.word - (UInt64.word - p) + (UInt64.word - a.toNat) -
+          UInt64.word < UInt64.word := by
+    have ha : a.toNat < p := a.isLt
+    omega
+  rw [UInt64.toNat_sub, hneg_toNat]
+  simp [complementWord, UInt64.toNat_ofNatLT]
+  rw [Nat.mod_eq_sub_mod (by simpa [UInt64.word] using hge),
+    Nat.mod_eq_of_lt (by simpa [UInt64.word] using hlt)]
+  have hfinal :
+      UInt64.word - (UInt64.word - p) + (UInt64.word - a.toNat) - UInt64.word =
+        p - a.toNat := by
+    omega
+  simpa [UInt64.word] using hfinal
+
+private theorem neg_nonzero_lt (a : ZMod64 p) {hpLt : p < UInt64.word}
+    (hzero : a.val ≠ 0) :
+    (-a.val - complementWord p hpLt).toNat < p := by
+  rw [neg_nonzero_toNat a hzero]
+  have hzeroNat : a.toNat ≠ 0 := by
+    intro h
+    apply hzero
+    apply UInt64.toNat_inj.mp
+    simpa [toNat_eq_val] using h
+  have ha : a.toNat < p := a.isLt
+  omega
+
 /-- The additive inverse represented by the complementary residue mod `p`. -/
 def neg (a : ZMod64 p) : ZMod64 p := by
   by_cases hp : p = UInt64.word
@@ -24,7 +70,7 @@ def neg (a : ZMod64 p) : ZMod64 p := by
     by_cases hzero : a.val = 0
     · refine ⟨0, ?_⟩
       simp [Bounds.pPos (p := p)]
-    · exact ⟨-a.val - c64, by sorry⟩
+    · exact ⟨-a.val - c64, by simpa [c64] using neg_nonzero_lt a hzero⟩
 
 /-- Natural-number literals in `ZMod64`. -/
 def natCast (p : Nat) [Bounds p] (n : Nat) : ZMod64 p :=
@@ -67,7 +113,32 @@ instance : SMul Int (ZMod64 p) where
   rw [natCast, toNat_ofNat]
 
 @[simp] theorem toNat_neg (a : ZMod64 p) : (neg a).toNat = (p - a.toNat) % p := by
-  sorry
+  unfold neg
+  by_cases hp : p = UInt64.word
+  · rw [dif_pos hp]
+    change (-a.val).toNat = (p - a.toNat) % p
+    rw [UInt64.toNat_neg]
+    simp [toNat_eq_val, hp, UInt64.word]
+  · have hpLt : p < UInt64.word := Nat.lt_of_le_of_ne (Bounds.pLeR (p := p)) hp
+    rw [dif_neg hp]
+    by_cases hzero : a.val = 0
+    · rw [dif_pos hzero]
+      change (0 : UInt64).toNat = (p - a.toNat) % p
+      have htoNat : a.toNat = 0 := by simp [toNat_eq_val, hzero]
+      have hval : a.val.toNat = 0 := by simpa [toNat_eq_val] using htoNat
+      simp [toNat_eq_val, hval]
+    · rw [dif_neg hzero]
+      change (-a.val - complementWord p hpLt).toNat = (p - a.toNat) % p
+      rw [neg_nonzero_toNat a hzero]
+      have hzeroNat : a.toNat ≠ 0 := by
+        intro h
+        apply hzero
+        apply UInt64.toNat_inj.mp
+        simpa [toNat_eq_val] using h
+      have hlt : p - a.toNat < p := by
+        have ha : a.toNat < p := a.isLt
+        omega
+      rw [Nat.mod_eq_of_lt hlt]
 
 @[simp] theorem toNat_nsmul (n : Nat) (a : ZMod64 p) :
     (nsmul n a).toNat = (n * a.toNat) % p := by
