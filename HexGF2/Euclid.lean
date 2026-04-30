@@ -476,7 +476,7 @@ private theorem nonzero_degree_zero_eq_one {p : GF2Poly}
       rw [coeff_eq_false_of_degree?_lt hd (by omega)]
       rw [coeff_monomial_ne (by omega)]
 
-private theorem degree_le_of_dvd_nonzero {p q : GF2Poly}
+theorem degree_le_of_dvd_nonzero {p q : GF2Poly}
     (hp : p ≠ 0) (hq : q ≠ 0) :
     p ∣ q → p.degree ≤ q.degree := by
   sorry

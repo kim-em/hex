@@ -37,11 +37,136 @@ class PackedGF2Entry (n : Nat) where
   degree_lt_word : n < 64
   packed_irreducible : GF2Poly.Irreducible (GF2Poly.ofUInt64Monic lower n)
 
+private theorem gf2poly_degree_one_eq_monomial_or_x_plus_one {p : GF2Poly}
+    (hp : p.degree = 1) :
+    p = GF2Poly.monomial 1 ∨ p = GF2Poly.ofUInt64Monic 1 1 := by
+  have hpNonzero : p ≠ 0 := by
+    intro hzero
+    simp [hzero] at hp
+  have hpzeroFalse : p.isZero = false := by
+    cases hzero : p.isZero
+    · rfl
+    · exact False.elim (hpNonzero (GF2Poly.eq_zero_of_isZero hzero))
+  obtain ⟨d, hd⟩ := GF2Poly.degree?_isSome_of_isZero_false hpzeroFalse
+  have hd1 : d = 1 := by
+    simpa [GF2Poly.degree, hd] using hp
+  subst d
+  by_cases h0 : p.coeff 0 = true
+  · right
+    apply GF2Poly.ext_coeff
+    intro n
+    cases n with
+    | zero =>
+        rw [h0]
+        decide
+    | succ n =>
+        cases n with
+        | zero =>
+            rw [GF2Poly.coeff_eq_true_of_degree?_eq_some hd]
+            decide
+        | succ n =>
+            rw [GF2Poly.coeff_eq_false_of_degree?_lt hd (by omega)]
+            have hxDegree : (GF2Poly.ofUInt64Monic 1 1).degree? = some 1 := by
+              decide
+            rw [GF2Poly.coeff_eq_false_of_degree?_lt hxDegree (by omega)]
+  · left
+    apply GF2Poly.ext_coeff
+    intro n
+    cases n with
+    | zero =>
+        have hp0 : p.coeff 0 = false := by
+          cases h : p.coeff 0
+          · rfl
+          · exact False.elim (h0 h)
+        rw [hp0]
+        decide
+    | succ n =>
+        cases n with
+        | zero =>
+            rw [GF2Poly.coeff_eq_true_of_degree?_eq_some hd]
+            decide
+        | succ n =>
+            rw [GF2Poly.coeff_eq_false_of_degree?_lt hd (by omega)]
+            rw [GF2Poly.coeff_monomial_ne
+              (n := 1) (m := Nat.succ (Nat.succ n)) (by omega)]
+
+private theorem gf2poly_x_plus_one_ne_zero :
+    GF2Poly.ofUInt64Monic 1 1 ≠ 0 := by
+  intro hzero
+  have hwords := congrArg GF2Poly.toWords hzero
+  have hbad :
+      GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1) ≠
+        GF2Poly.toWords (0 : GF2Poly) := by
+    decide
+  exact hbad hwords
+
 /-- The packed modulus corresponding to the committed Conway entry `C(2, 1) =
 X + 1`. -/
 theorem packedGF2Entry_2_1_irreducible :
     GF2Poly.Irreducible (GF2Poly.ofUInt64Monic 1 1) := by
-  sorry
+  constructor
+  · exact gf2poly_x_plus_one_ne_zero
+  · intro a b hab
+    by_cases ha0 : a.degree = 0
+    · exact Or.inl ha0
+    by_cases hb0 : b.degree = 0
+    · exact Or.inr hb0
+    exfalso
+    have habWords := congrArg GF2Poly.toWords hab
+    have haNonzero : a ≠ 0 := by
+      intro hzero
+      apply ha0
+      simp [hzero]
+    have hbNonzero : b ≠ 0 := by
+      intro hzero
+      apply hb0
+      simp [hzero]
+    have hfNonzero : GF2Poly.ofUInt64Monic 1 1 ≠ 0 :=
+      gf2poly_x_plus_one_ne_zero
+    have hfDegree : (GF2Poly.ofUInt64Monic 1 1).degree = 1 := by
+      decide
+    have haDegree : a.degree = 1 := by
+      have haDvd : a ∣ GF2Poly.ofUInt64Monic 1 1 := ⟨b, by simp [hab]⟩
+      have hle := GF2Poly.degree_le_of_dvd_nonzero
+        haNonzero hfNonzero haDvd
+      rw [hfDegree] at hle
+      omega
+    have hbDegree : b.degree = 1 := by
+      have hbDvd : b ∣ GF2Poly.ofUInt64Monic 1 1 := ⟨a, by simp [GF2Poly.mul_comm, hab]⟩
+      have hle := GF2Poly.degree_le_of_dvd_nonzero
+        hbNonzero hfNonzero hbDvd
+      rw [hfDegree] at hle
+      omega
+    rcases gf2poly_degree_one_eq_monomial_or_x_plus_one haDegree with ha | ha <;>
+      rcases gf2poly_degree_one_eq_monomial_or_x_plus_one hbDegree with hb | hb
+    · subst a
+      subst b
+      have hbad :
+          GF2Poly.toWords (GF2Poly.monomial 1 * GF2Poly.monomial 1) ≠
+            GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1) := by
+        decide
+      exact hbad habWords
+    · subst a
+      subst b
+      have hbad :
+          GF2Poly.toWords (GF2Poly.monomial 1 * GF2Poly.ofUInt64Monic 1 1) ≠
+            GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1) := by
+        decide
+      exact hbad habWords
+    · subst a
+      subst b
+      have hbad :
+          GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1 * GF2Poly.monomial 1) ≠
+            GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1) := by
+        decide
+      exact hbad habWords
+    · subst a
+      subst b
+      have hbad :
+          GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1 * GF2Poly.ofUInt64Monic 1 1) ≠
+            GF2Poly.toWords (GF2Poly.ofUInt64Monic 1 1) := by
+        decide
+      exact hbad habWords
 
 /-- The current committed table supports a packed `GF2n` view of `C(2, 1)`. -/
 instance packedGF2Entry_2_1 : PackedGF2Entry 1 where
