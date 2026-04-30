@@ -1,5 +1,6 @@
 import Std
 import Init.Grind.Ring.Field
+import Batteries.Data.Vector.Lemmas
 import HexMatrix.RowEchelon
 
 /-!
@@ -170,6 +171,81 @@ private theorem foldl_det_product_single_scale {R : Type u}
           | inl hxi => exact False.elim (hx hxi.symm)
           | inr htail => exact htail
         exact ih (z * f x) hmemTail hnodup.2
+
+private theorem foldl_det_product_zero_start {R : Type u}
+    [Lean.Grind.CommRing R] {β : Type v} (xs : List β) (f : β → R) :
+    xs.foldl (fun acc x => acc * f x) 0 = 0 := by
+  induction xs with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      have hzero : (0 : R) * f x = 0 := by grind
+      simpa [hzero] using ih
+
+private theorem foldl_det_product_zero_of_mem {R : Type u}
+    [Lean.Grind.CommRing R] {β : Type v} [DecidableEq β]
+    (xs : List β) (i : β) (f : β → R) (z : R)
+    (hmem : i ∈ xs) (hzero : f i = 0) :
+    xs.foldl (fun acc x => acc * f x) z = 0 := by
+  induction xs generalizing z with
+  | nil =>
+      cases hmem
+  | cons x xs ih =>
+      simp only [List.mem_cons] at hmem
+      simp only [List.foldl_cons]
+      by_cases hx : x = i
+      · subst x
+        rw [hzero]
+        have hz : z * (0 : R) = 0 := by grind
+        simpa [hz] using foldl_det_product_zero_start xs f
+      · have htail : i ∈ xs := by
+          cases hmem with
+          | inl hxi => exact False.elim (hx hxi.symm)
+          | inr htail => exact htail
+        exact ih (z * f x) htail
+
+private theorem identity_get {R : Type u} [OfNat R 0] [OfNat R 1] {n : Nat}
+    (i j : Fin n) :
+    (1 : Matrix R n n)[i][j] = if i = j then 1 else 0 := by
+  change Matrix.identity[i][j] = if i = j then 1 else 0
+  simp [Matrix.identity, Matrix.ofFn]
+
+private theorem detProduct_identity_zero_of_mismatch {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (perm : Vector (Fin n) n)
+    (i : Fin n) (h : perm[i] ≠ i) :
+    detProduct (1 : Matrix R n n) perm = 0 := by
+  unfold detProduct
+  have hsymm : i ≠ perm[i] := by
+    intro hi
+    exact h hi.symm
+  exact foldl_det_product_zero_of_mem
+    (List.finRange n) i (fun r => (1 : Matrix R n n)[r][perm[r]]) 1
+    (List.mem_finRange i) (by
+      change (1 : Matrix R n n)[i][perm[i]] = 0
+      rw [identity_get]
+      rw [if_neg hsymm])
+
+private theorem insertAt_get_self {α : Type u} {n : Nat}
+    (x : α) (v : Vector α n) (i : Fin (n + 1)) :
+    (insertAt x v i)[i] = x := by
+  unfold insertAt
+  simp [List.getElem_insertIdx_self]
+
+private theorem insertAt_last_get_castSucc {α : Type u} {n : Nat}
+    (x : α) (v : Vector α n) (i : Fin n) :
+    (insertAt x v (Fin.last n))[i.castSucc] = v[i] := by
+  unfold insertAt
+  simp [List.getElem_insertIdx_of_lt]
+
+private theorem detProduct_identity_insertAt_not_last_zero {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (v : Vector (Fin n) n)
+    (i : Fin (n + 1)) (h : i ≠ Fin.last n) :
+    detProduct (1 : Matrix R (n + 1) (n + 1))
+      (insertAt (Fin.last n) (v.map Fin.castSucc) i) = 0 := by
+  apply detProduct_identity_zero_of_mismatch
+  exact by
+    rw [insertAt_get_self]
+    exact h.symm
 
 private theorem rowScale_get {R : Type u} [Mul R] {n m : Nat}
     (M : Matrix R n m) (i r : Fin n) (c : R) (k : Fin m) :
