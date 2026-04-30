@@ -142,5 +142,8 @@ lean_exe hexpolyfp_bench where
 lean_exe hexgfqring_bench where
   root := `HexGfqRing.Bench
 
+lean_exe hexgfqfield_bench where
+  root := `HexGfqField.Bench
+
 @[default_target]
 lean_lib HexManual where
