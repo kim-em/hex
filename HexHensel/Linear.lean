@@ -169,6 +169,53 @@ private theorem modP_one (p : Nat) [ZMod64.Bounds p] :
   exact Eq.trans (ZPoly.modP_eq_of_congr p _ _ (ZPoly.congr_symm _ _ _ hcong))
     (FpPoly.modP_liftToZ (p := p) (1 : FpPoly p))
 
+private theorem congr_liftToZ_of_modP_eq
+    (p : Nat) [ZMod64.Bounds p] (u : FpPoly p) (z : ZPoly)
+    (h : ZPoly.modP p z = u) :
+    ZPoly.congr (FpPoly.liftToZ u) z p := by
+  simpa [← h] using FpPoly.congr_liftToZ_modP (p := p) z
+
+private theorem modP_add_lift_mul
+    (p : Nat) [ZMod64.Bounds p] (g h : ZPoly) (r hCorrection : FpPoly p) :
+    ZPoly.modP p (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection) =
+      r * ZPoly.modP p h + ZPoly.modP p g * hCorrection := by
+  sorry
+
+private theorem scale_congr_of_congr_mod_base
+    (p k : Nat) (first e : ZPoly)
+    (_hk : 1 ≤ k)
+    (hfirst : ZPoly.congr first e p) :
+    ZPoly.congr
+      (DensePoly.scale (Int.ofNat (p ^ k)) first)
+      (DensePoly.scale (Int.ofNat (p ^ k)) e)
+      (p ^ (k + 1)) := by
+  sorry
+
+private theorem linearHenselStep_product_expansion_identity_congr
+    (p k : Nat) [ZMod64.Bounds p]
+    (g h : ZPoly) (r hCorrection : FpPoly p)
+    (_hk : 1 ≤ k) :
+    let g' := g + LinearLiftResult.liftScaledIncrement p k r
+    let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+    ZPoly.congr
+      (g' * h')
+      (g * h +
+        DensePoly.scale (Int.ofNat (p ^ k))
+          (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection))
+      (p ^ (k + 1)) := by
+  sorry
+
+private theorem linearHenselStep_recombine_error_congr
+    (p k : Nat) (f g h : ZPoly) :
+    ZPoly.congr (g * h + (f - g * h)) f (p ^ (k + 1)) := by
+  intro i
+  rw [DensePoly.coeff_add _ _ _ (by rfl), DensePoly.coeff_sub _ _ _ (by rfl)]
+  have hzero :
+      (g * h).coeff i + (f.coeff i - (g * h).coeff i) - f.coeff i = 0 := by
+    omega
+  rw [hzero]
+  simp
+
 private theorem linearHenselStep_first_order_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (r hCorrection : FpPoly p)
@@ -179,7 +226,37 @@ private theorem linearHenselStep_first_order_congr
       (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection)
       (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))
       p := by
-  sorry
+  have hmod :
+      ZPoly.modP p
+        (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection) =
+        r * ZPoly.modP p h + ZPoly.modP p g * hCorrection :=
+    modP_add_lift_mul p g h r hCorrection
+  have hlift :
+      ZPoly.congr
+        (FpPoly.liftToZ (r * ZPoly.modP p h + ZPoly.modP p g * hCorrection))
+        (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection)
+        p :=
+    congr_liftToZ_of_modP_eq p
+      (r * ZPoly.modP p h + ZPoly.modP p g * hCorrection)
+      (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection)
+      hmod
+  have he :
+      ZPoly.congr
+        (FpPoly.liftToZ (ZPoly.modP p (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))))
+        (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))
+        p :=
+    FpPoly.congr_liftToZ_modP
+      (p := p) (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))
+  have hcorr' :
+      ZPoly.congr
+        (FpPoly.liftToZ (r * ZPoly.modP p h + ZPoly.modP p g * hCorrection))
+        (FpPoly.liftToZ (ZPoly.modP p (ZPoly.coeffwiseDiv (f - g * h) (p ^ k))))
+        p := by
+    rw [hcorr]
+    exact ZPoly.congr_refl _ p
+  exact ZPoly.congr_trans _ _ _ p
+    (ZPoly.congr_symm _ _ _ hlift)
+    (ZPoly.congr_trans _ _ _ p hcorr' he)
 
 private theorem linearHenselStep_scaled_first_order_congr
     (p k : Nat) [ZMod64.Bounds p]
@@ -191,13 +268,14 @@ private theorem linearHenselStep_scaled_first_order_congr
       (DensePoly.scale (Int.ofNat (p ^ k)) first)
       (f - g * h)
       (p ^ (k + 1)) := by
-  sorry
+  rw [← hbase]
+  exact scale_congr_of_congr_mod_base p k first e _hk hfirst
 
 private theorem linearHenselStep_product_expansion_congr
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (r hCorrection : FpPoly p)
     (_hk : 1 ≤ k)
-    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (_hprod : ZPoly.congr (g * h) f (p ^ k))
     (hfirst :
       ZPoly.congr
         (DensePoly.scale (Int.ofNat (p ^ k))
@@ -207,7 +285,28 @@ private theorem linearHenselStep_product_expansion_congr
     let g' := g + LinearLiftResult.liftScaledIncrement p k r
     let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
     ZPoly.congr (g' * h') f (p ^ (k + 1)) := by
-  sorry
+  intro g' h'
+  have hexpand :
+      ZPoly.congr
+        (g' * h')
+        (g * h +
+          DensePoly.scale (Int.ofNat (p ^ k))
+            (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection))
+        (p ^ (k + 1)) := by
+    simpa [g', h', LinearLiftResult.liftScaledIncrement] using
+      linearHenselStep_product_expansion_identity_congr p k g h r hCorrection _hk
+  have hsum :
+      ZPoly.congr
+        (g * h +
+          DensePoly.scale (Int.ofNat (p ^ k))
+            (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection))
+        (g * h + (f - g * h))
+        (p ^ (k + 1)) :=
+    ZPoly.congr_add _ _ _ _ _
+      (ZPoly.congr_refl (g * h) (p ^ (k + 1))) hfirst
+  exact ZPoly.congr_trans _ _ _ _ hexpand
+    (ZPoly.congr_trans _ _ _ _
+      hsum (linearHenselStep_recombine_error_congr p k f g h))
 
 private theorem linearHenselStep_raw_factor_congr_from_correction
     (p k : Nat) [ZMod64.Bounds p]
@@ -307,12 +406,6 @@ private theorem linearHenselStep_reduced_factor_congr
     (by
       simpa [e, gMod, hMod, eMod, qr, q, r, g', hCorrection, h'] using
         linearHenselStep_raw_factor_congr p k f g h s t hk hprod hbez hmonic)
-
-private theorem congr_liftToZ_of_modP_eq
-    (p : Nat) [ZMod64.Bounds p] (u : FpPoly p) (z : ZPoly)
-    (h : ZPoly.modP p z = u) :
-    ZPoly.congr (FpPoly.liftToZ u) z p := by
-  simpa [← h] using FpPoly.congr_liftToZ_modP (p := p) z
 
 private def henselLiftLoop
     (p : Nat) [ZMod64.Bounds p]
