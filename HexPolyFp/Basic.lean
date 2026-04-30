@@ -91,6 +91,26 @@ private theorem zmod_add_zero (a : ZMod64 p) : a + 0 = a := by
 private theorem zmod_zero_add (a : ZMod64 p) : 0 + a = a := by
   grind
 
+private theorem zmod_add_zero_zero :
+    (Zero.zero : ZMod64 p) + (Zero.zero : ZMod64 p) = (Zero.zero : ZMod64 p) :=
+  zmod_add_zero Zero.zero
+
+private theorem zmod_sub_zero_zero :
+    (Zero.zero : ZMod64 p) - (Zero.zero : ZMod64 p) = (Zero.zero : ZMod64 p) := by
+  have hzval : (Zero.zero : ZMod64 p).val = 0 := rfl
+  change ZMod64.sub (Zero.zero : ZMod64 p) Zero.zero = Zero.zero
+  unfold ZMod64.sub
+  split
+  · apply ZMod64.ext
+    simp [hzval]
+  · split
+    · apply ZMod64.ext
+      simp [hzval]
+    · exfalso
+      apply (show ¬(Zero.zero : ZMod64 p).val ≤ (Zero.zero : ZMod64 p).val from ‹_›)
+      rw [hzval]
+      exact Nat.le_refl 0
+
 private theorem zmod_mul_zero (a : ZMod64 p) : a * 0 = 0 := by
   grind
 
@@ -109,56 +129,68 @@ theorem add_zero (f : FpPoly p) :
     f + 0 = f := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem zero_add (f : FpPoly p) :
     0 + f = f := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem add_comm (f g : FpPoly p) :
     f + g = g + f := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
   grind
 
 theorem add_assoc (f g h : FpPoly p) :
     f + g + h = f + (g + h) := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add]
+  rw [DensePoly.coeff_add (f + g) h i zmod_add_zero_zero]
+  rw [DensePoly.coeff_add f (g + h) i zmod_add_zero_zero]
+  rw [DensePoly.coeff_add f g i zmod_add_zero_zero]
+  rw [DensePoly.coeff_add g h i zmod_add_zero_zero]
   grind
 
 theorem neg_zero :
     -(0 : FpPoly p) = 0 := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_neg]
+  rw [DensePoly.coeff_neg _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem add_left_neg (f : FpPoly p) :
     -f + f = 0 := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add, DensePoly.coeff_neg]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_neg _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem add_right_neg (f : FpPoly p) :
     f + -f = 0 := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add, DensePoly.coeff_neg]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_neg _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem sub_zero (f : FpPoly p) :
     f - 0 = f := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_sub]
+  rw [DensePoly.coeff_sub _ _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem zero_sub (f : FpPoly p) :
@@ -169,14 +201,17 @@ theorem sub_self (f : FpPoly p) :
     f - f = 0 := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_sub]
+  rw [DensePoly.coeff_sub _ _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_zero]
   grind
 
 theorem sub_eq_add_neg (f g : FpPoly p) :
     f - g = f + -g := by
   apply DensePoly.ext_coeff
   intro i
-  simp [DensePoly.coeff_add, DensePoly.coeff_sub, DensePoly.coeff_neg]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  rw [DensePoly.coeff_sub _ _ _ zmod_sub_zero_zero]
+  rw [DensePoly.coeff_neg _ _ zmod_sub_zero_zero]
   grind
 
 @[simp] theorem zero_mul (f : FpPoly p) :
@@ -198,7 +233,7 @@ private theorem coeff_mul_one_fold (f : FpPoly p) (n k : Nat) :
   | succ n ih =>
       rw [List.range_succ, List.foldl_append]
       simp only [List.foldl_cons, List.foldl_nil]
-      rw [DensePoly.coeff_add, ih]
+      rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero, ih]
       rw [DensePoly.coeff_shift_scale]
       · rw [coeff_one]
         by_cases hk : k < n
@@ -243,7 +278,8 @@ private theorem coeff_mul_fold (xs : List Nat) (acc f g : FpPoly p) (n : Nat) :
       rw [ih]
       congr 1
       have hzero : f.coeff i * (0 : ZMod64 p) = 0 := by grind
-      rw [DensePoly.coeff_add, DensePoly.coeff_shift_scale i (f.coeff i) g n hzero]
+      rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero,
+        DensePoly.coeff_shift_scale i (f.coeff i) g n hzero]
       rfl
 
 theorem coeff_mul (f g : FpPoly p) (n : Nat) :
@@ -415,7 +451,8 @@ private theorem mulCoeffTerm_left_distrib (f g h : FpPoly p) (n i : Nat) :
   by_cases hi : n < i
   · simp [hi]
     grind
-  · simp [hi, DensePoly.coeff_add]
+  · rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+    simp [hi]
     grind
 
 private theorem mulCoeffTerm_right_distrib (f g h : FpPoly p) (n i : Nat) :
@@ -425,7 +462,8 @@ private theorem mulCoeffTerm_right_distrib (f g h : FpPoly p) (n i : Nat) :
   by_cases hi : n < i
   · simp [hi]
     grind
-  · simp [hi, DensePoly.coeff_add]
+  · rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+    simp [hi]
     grind
 
 private theorem fold_distrib_acc
@@ -865,14 +903,15 @@ theorem left_distrib (f g h : FpPoly p) :
     f * (g + h) = f * g + f * h := by
   apply DensePoly.ext_coeff
   intro n
-  simp [DensePoly.coeff_add, coeff_mul, mulCoeffSum, fold_left_distrib]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
+  simp [coeff_mul, mulCoeffSum, fold_left_distrib]
 
 theorem right_distrib (f g h : FpPoly p) :
     (f + g) * h = f * h + g * h := by
   apply DensePoly.ext_coeff
   intro n
   let m := max (max (f + g).size f.size) g.size
-  rw [DensePoly.coeff_add]
+  rw [DensePoly.coeff_add _ _ _ zmod_add_zero_zero]
   rw [coeff_mul_of_size_le (f + g) h n m (by dsimp [m]; omega)]
   rw [coeff_mul_of_size_le f h n m (by dsimp [m]; omega)]
   rw [coeff_mul_of_size_le g h n m (by dsimp [m]; omega)]
