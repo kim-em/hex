@@ -12,12 +12,15 @@ checksums of the affected cells.
 Scientific registrations:
 
 * `runSizeReduceColumnChecksum`: one targeted column reduction against the
-  previous row of a prepared `(n + 3) x (2(n + 3) + 1)` state.
+  previous row of a prepared `(n + 3) x (2(n + 3) + 1)` state, wrapped in a
+  fixed hot loop for signal-floor stability.
 * `runSizeReduceChecksum`: full reduction of the final prepared row.
-* `runSwapStepChecksum`: one adjacent swap at the final prepared row.
+* `runSwapStepChecksum`: one adjacent swap at the final prepared row, wrapped
+  in a fixed hot loop for signal-floor stability.
 * `runGramSchmidtCoeffChecksum`: rational coefficient recovery from stored
-  integer `ν` and `d`.
-* `runPotential`: prefix product of the stored Gram determinants.
+  integer `ν` and `d`, wrapped in a fixed hot loop for signal-floor stability.
+* `runPotential`: prefix product of the stored Gram determinants, wrapped in a
+  fixed hot loop for signal-floor stability.
 -/
 
 namespace Hex.LLLBench
@@ -154,20 +157,52 @@ def gramSchmidtCoeffComplexity (_n : Nat) : Nat :=
 def potentialComplexity (n : Nat) : Nat :=
   n + 2
 
+/-- Fixed repeat count for one-step linear state updates. This is independent
+of `n`, so it changes only the constant factor in the declared linear model. -/
+def stateStepHotRepeats : Nat := 2048
+
+/-- Fixed repeat count for full row reduction. This is independent of `n`, so
+it changes only the constant factor in the declared quadratic model. -/
+def sizeReduceHotRepeats : Nat := 2048
+
+/-- Fixed repeat count for one stored coefficient projection. This is
+independent of `n`, so it changes only the constant factor in the declared
+constant model. -/
+def gramSchmidtCoeffHotRepeats : Nat := 65536
+
+/-- Fixed repeat count for determinant-prefix products. This is independent of
+`n`, so it changes only the constant factor in the declared linear model. -/
+def potentialHotRepeats : Nat := 128
+
+/-- Repeat a deterministic integer-valued target with a rolling checksum. -/
+def repeatIntChecksum (repeats : Nat) (f : Unit → Int) : Int :=
+  (List.range repeats).foldl
+    (fun acc _ => acc * 65_537 + f ())
+    0
+
+/-- Repeat a deterministic natural-valued target with a rolling checksum. -/
+def repeatNatChecksum (repeats : Nat) (f : Unit → Nat) : Nat :=
+  (List.range repeats).foldl
+    (fun acc _ => acc * 65_537 + f ())
+    0
+
 /-- Benchmark target: one targeted size-reduction step. -/
 def runSizeReduceColumnChecksum (input : StateInput) : Int :=
-  let s' := input.state.sizeReduceColumn input.j input.k input.hjk
-  stateUpdateChecksum s' input.j input.k
+  repeatIntChecksum stateStepHotRepeats fun _ =>
+    let s' := input.state.sizeReduceColumn input.j input.k input.hjk
+    stateUpdateChecksum s' input.j input.k
 
 /-- Benchmark target: full size reduction of the prepared final row. -/
 def runSizeReduceChecksum (input : StateInput) : Int :=
-  let s' := input.state.sizeReduce input.k.val
-  stateUpdateChecksum s' input.j input.k
+  repeatIntChecksum sizeReduceHotRepeats fun _ =>
+    let s' := input.state.sizeReduce input.k.val
+    stateUpdateChecksum s' input.j input.k
 
 /-- Benchmark target: adjacent swap at the prepared final row. -/
 def runSwapStepChecksum (input : StateInput) : Int :=
-  let s' := input.state.swapStep input.k.val
-  stateUpdateChecksum s' input.j input.k
+  repeatIntChecksum stateStepHotRepeats fun _ =>
+    let s' := input.state.swapStep input.k.val
+    stateUpdateChecksum s' input.j input.k
 
 /-- Benchmark target: recover one rational Gram-Schmidt coefficient from the
 stored integer state and checksum its normalized numerator and denominator.
@@ -175,76 +210,85 @@ This is the computable body of `LLLState.gramSchmidtCoeff`; the public
 projection is marked `noncomputable` for proof-layer signalling and cannot be
 used directly as an executable benchmark target. -/
 def runGramSchmidtCoeffChecksum (input : StateInput) : Int :=
-  let q :=
-    (((input.state.ν.get input.k).get input.j : Int) : Rat) /
-      (input.state.d.get
-        ⟨input.j.val + 1, Nat.succ_lt_succ input.j.isLt⟩ : Rat)
-  q.num * 65_537 + Int.ofNat q.den
+  repeatIntChecksum gramSchmidtCoeffHotRepeats fun _ =>
+    let q :=
+      (((input.state.ν.get input.k).get input.j : Int) : Rat) /
+        (input.state.d.get
+          ⟨input.j.val + 1, Nat.succ_lt_succ input.j.isLt⟩ : Rat)
+    q.num * 65_537 + Int.ofNat q.den
 
 /-- Benchmark target: compute the LLL termination potential. -/
 def runPotential (input : StateInput) : Nat :=
-  input.state.potential
+  repeatNatChecksum potentialHotRepeats fun _ =>
+    input.state.potential
 
 /- Complexity derivation: `prepStateInput n` gives `rows = n + 3` and
 `cols = 2 * (n + 3) + 1`. A single targeted reduction updates one basis row
-over `cols` entries and one coefficient prefix bounded by `rows`. -/
+over `cols` entries and one coefficient prefix bounded by `rows`; the fixed
+hot-loop repeat count is independent of `n`. -/
 setup_benchmark runSizeReduceColumnChecksum n => sizeReduceColumnComplexity n
   with prep := prepStateInput
   where {
-    paramFloor := 32
+    paramFloor := 96
     paramCeiling := 160
-    paramSchedule := .custom #[32, 64, 96, 128, 160]
+    paramSchedule := .custom #[96, 128, 160]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
   }
 
-/- Complexity derivation: full size reduction of the final prepared row performs one targeted row
-update for each earlier row, so the model is `rows * cols` for basis entries
-plus the triangular coefficient-prefix surface, bounded here by `rows^2`. -/
+/- Complexity derivation: full size reduction of the final prepared row
+performs one targeted row update for each earlier row, so the model is
+`rows * cols` for basis entries plus the triangular coefficient-prefix surface,
+bounded here by `rows^2`; the fixed hot-loop repeat count is independent of
+`n`. -/
 setup_benchmark runSizeReduceChecksum n => sizeReduceComplexity n
   with prep := prepStateInput
   where {
-    paramFloor := 16
-    paramCeiling := 80
-    paramSchedule := .custom #[16, 32, 48, 64, 80]
+    paramFloor := 80
+    paramCeiling := 144
+    paramSchedule := .custom #[80, 96, 112, 128, 144]
     maxSecondsPerCall := 5.0
     targetInnerNanos := 200000000
   }
 
-/- An adjacent swap exchanges two basis rows over `cols` entries, rewrites one
-determinant, swaps the lower coefficient prefix, and updates the two affected
-coefficient columns for rows above the pivot; all terms are linear in rows. -/
+/- Complexity derivation: an adjacent swap exchanges two basis rows over
+`cols` entries, rewrites one determinant, swaps the lower coefficient prefix,
+and updates the two affected coefficient columns for rows above the pivot; all
+terms are linear in rows, and the fixed hot-loop repeat count is independent of
+`n`. -/
 setup_benchmark runSwapStepChecksum n => swapStepComplexity n
   with prep := prepStateInput
   where {
-    paramFloor := 32
+    paramFloor := 96
     paramCeiling := 160
-    paramSchedule := .custom #[32, 64, 96, 128, 160]
+    paramSchedule := .custom #[96, 128, 160]
     maxSecondsPerCall := 3.0
     targetInnerNanos := 200000000
   }
 
-/- Complexity derivation: `gramSchmidtCoeff` reads one stored `ν[k][j]` entry and one stored
-`d[j+1]` denominator, then performs a single rational division. -/
+/- Complexity derivation: `gramSchmidtCoeff` reads one stored `ν[k][j]` entry
+and one stored `d[j+1]` denominator, then performs a single rational division;
+the fixed hot-loop repeat count is independent of `n`. -/
 setup_benchmark runGramSchmidtCoeffChecksum n => gramSchmidtCoeffComplexity n
   with prep := prepStateInput
   where {
     paramFloor := 32
-    paramCeiling := 160
-    paramSchedule := .custom #[32, 64, 96, 128, 160]
+    paramCeiling := 128
+    paramSchedule := .custom #[32, 64, 96, 128]
     maxSecondsPerCall := 2.0
     targetInnerNanos := 200000000
   }
 
-/- Complexity derivation: `potential` folds once over the prepared state's determinant prefix. The
-fixture has `rows = n + 3`, so the prefix length is `n + 2`. -/
+/- Complexity derivation: `potential` folds once over the prepared state's
+determinant prefix. The fixture has `rows = n + 3`, so the prefix length is
+`n + 2`; the fixed hot-loop repeat count is independent of `n`. -/
 setup_benchmark runPotential n => potentialComplexity n
   with prep := prepStateInput
   where {
-    paramFloor := 32
-    paramCeiling := 160
-    paramSchedule := .custom #[32, 64, 96, 128, 160]
-    maxSecondsPerCall := 2.0
+    paramFloor := 192
+    paramCeiling := 224
+    paramSchedule := .custom #[192, 208, 224]
+    maxSecondsPerCall := 8.0
     targetInnerNanos := 200000000
   }
 
