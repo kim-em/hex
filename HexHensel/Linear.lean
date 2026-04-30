@@ -34,6 +34,24 @@ def coeffwiseDiv (f : ZPoly) (m : Nat) : ZPoly :=
     simp [hi, hcoeff]
     rfl
 
+private theorem scale_coeffwiseDiv_sub_of_congr
+    (f g : ZPoly) (m : Nat) (hfg : ZPoly.congr g f m) :
+    DensePoly.scale (Int.ofNat m) (coeffwiseDiv (f - g) m) = f - g := by
+  apply DensePoly.ext_coeff
+  intro i
+  rw [DensePoly.coeff_scale]
+  · rw [coeff_coeffwiseDiv]
+    rw [DensePoly.coeff_sub]
+    · have hdvd_gf : (m : Int) ∣ g.coeff i - f.coeff i :=
+        Int.dvd_of_emod_eq_zero (hfg i)
+      have hdvd : (m : Int) ∣ f.coeff i - g.coeff i := by
+        rw [← Int.neg_sub]
+        exact Int.dvd_neg.mpr hdvd_gf
+      rw [Int.mul_comm]
+      exact Int.ediv_mul_cancel hdvd
+    · rfl
+  · exact Int.mul_zero _
+
 end ZPoly
 
 /-- Result of one linear Hensel lift step. -/
