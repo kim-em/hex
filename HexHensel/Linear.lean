@@ -47,6 +47,24 @@ namespace LinearLiftResult
 def liftScaledIncrement (p k : Nat) [ZMod64.Bounds p] (r : FpPoly p) : ZPoly :=
   DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r)
 
+@[simp] theorem coeff_liftScaledIncrement
+    (p k : Nat) [ZMod64.Bounds p] (r : FpPoly p) (i : Nat) :
+    (liftScaledIncrement p k r).coeff i =
+      Int.ofNat (p ^ k) * Int.ofNat (r.coeff i).toNat := by
+  unfold liftScaledIncrement
+  rw [DensePoly.coeff_scale]
+  · rw [FpPoly.coeff_liftToZ]
+  · exact Int.mul_zero _
+
+/-- A scaled lift is coefficientwise zero modulo the scaling modulus. -/
+theorem congr_liftScaledIncrement_zero
+    (p k : Nat) [ZMod64.Bounds p] (r : FpPoly p) :
+    ZPoly.congr (liftScaledIncrement p k r) 0 (p ^ k) := by
+  intro i
+  rw [coeff_liftScaledIncrement]
+  rw [DensePoly.coeff_zero]
+  simp
+
 end LinearLiftResult
 
 namespace ZPoly
