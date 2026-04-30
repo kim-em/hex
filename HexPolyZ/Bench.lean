@@ -14,16 +14,16 @@ Scientific registrations:
 * `runCoprimeModPWitness`: finite-prefix Bezout witness checking, `O(n^2)`.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
-* `runBinom`: central-binomial multiplicative formula, `O(n log n)` under
-  compiled `Nat` arithmetic because the committed fixture intentionally grows
-  the result to `Θ(n)` bits while still performing `O(n)` multiplications.
+* `runBinom`: central-binomial multiplicative formula, `O(n log^2 n)` under
+  compiled `Nat` arithmetic. The timed loop performs `O(n)` arithmetic steps,
+  and the central-binomial accumulator grows linearly in bit width.
 * `runFloorSqrtChecksum`: batched floor-square-root computation, `O(n log n)`.
 * `runCeilSqrtChecksum`: batched ceiling-square-root computation, `O(n log n)`.
 * `runCoeffNormSq`: squared coefficient-vector norm, `O(n)`.
 * `runCoeffL2NormBound`: conservative coefficient-vector norm bound, `O(n)`.
 * `runMignotteCoeffBound`: executable Mignotte coefficient bound over a
-  bounded factor-degree fixture, `O(n)`. The central-binomial stress case is
-  covered separately by `runBinom`.
+  logarithmically growing factor-degree fixture, `O(n)`. The ambient
+  coefficient-norm scan dominates the smaller binomial subproblem.
 -/
 
 namespace Hex.PolyZBench
@@ -146,12 +146,13 @@ def prepMignotteInput (n : Nat) : MignotteInput :=
 
 /-- Per-parameter fixture for the full Mignotte-bound benchmark.
 
-The benchmark keeps the factor-degree part bounded so the scientific run
-measures the ambient coefficient-norm scan plus the bound composition. The
-central-binomial subcomputation has its own registration above.
+The polynomial has `n` coefficients, so `mignotteCoeffBound` still performs the
+linear ambient norm scan. The factor degree grows as `log n`, keeping the
+binomial subproblem scaling but below the scan cost. The central-binomial
+stress case at full degree has its own registration above.
 -/
 def prepMignotteBoundInput (n : Nat) : MignotteInput :=
-  let factorDegree := min n 64
+  let factorDegree := Nat.log2 (n + 1)
   { poly := denseZPoly n 89
     factorDegree := factorDegree
     coeffIndex := factorDegree / 2 }
@@ -247,7 +248,15 @@ setup_benchmark runPrimitivePartChecksum n => n
     signalFloorMultiplier := 1.0
   }
 
-setup_benchmark runBinom n => n * Nat.log2 (n + 1)
+/-
+`ZPoly.binom (2*n) n` folds across `min n n = n` multiplicative terms.
+For this central-binomial fixture the accumulator reaches linear bit width.
+Over the committed parameter range, compiled `Nat` multiplication and exact
+division by the small `n - i` and `i + 1` factors track the bit-growth cost
+rather than pure operation count, so the scientific declaration includes two
+logarithmic growth factors.
+-/
+setup_benchmark runBinom n => n * Nat.log2 (n + 1) * Nat.log2 (n + 1)
   where {
     paramFloor := 32
     paramCeiling := 512
@@ -301,6 +310,11 @@ setup_benchmark runCoeffL2NormBound n => n
     signalFloorMultiplier := 1.0
   }
 
+/-
+`mignotteCoeffBound` computes `binom k j * coeffL2NormBound f`. Here
+`f` has `n` coefficients and `k = log2 (n + 1)`, so the norm scan is linear
+while the binomial part is sublinear relative to the fixture size.
+-/
 setup_benchmark runMignotteCoeffBound n => n
   with prep := prepMignotteBoundInput
   where {
