@@ -116,6 +116,7 @@ def quadraticHenselStep
 private theorem quadraticHenselStep_raw_factor_congr
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 0 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
     (hmonic : DensePoly.Monic g) :
@@ -133,6 +134,7 @@ private theorem quadraticHenselStep_raw_factor_congr
 private theorem quadraticHenselStep_raw_bezout_congr
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 1 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
     (hmonic : DensePoly.Monic g) :
@@ -157,6 +159,7 @@ private theorem quadraticHenselStep_raw_bezout_congr
 private theorem quadraticHenselStep_g_update_monic
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 1 < m)
     (hmonic : DensePoly.Monic g) :
     let e := QuadraticLiftResult.factorError f g h
     let te := mulModSquare t e m
@@ -169,30 +172,33 @@ private theorem quadraticHenselStep_g_update_monic
 theorem quadraticHenselStep_factor_spec
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 0 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
     (hmonic : DensePoly.Monic g) :
     let r := quadraticHenselStep m f g h s t
     ZPoly.congr (r.g * r.h) f (m * m) := by
   unfold quadraticHenselStep
-  exact quadraticHenselStep_raw_factor_congr m f g h s t hprod hbez hmonic
+  exact quadraticHenselStep_raw_factor_congr m f g h s t hm hprod hbez hmonic
 
 /-- The updated Bezout witnesses certify coprimality modulo `m^2`. -/
 theorem quadraticHenselStep_bezout_spec
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 1 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
     (hmonic : DensePoly.Monic g) :
     let r := quadraticHenselStep m f g h s t
     ZPoly.congr (r.s * r.g + r.t * r.h) 1 (m * m) := by
   unfold quadraticHenselStep
-  exact quadraticHenselStep_raw_bezout_congr m f g h s t hprod hbez hmonic
+  exact quadraticHenselStep_raw_bezout_congr m f g h s t hm hprod hbez hmonic
 
 /-- The quadratic step lifts both factor and Bezout congruences to modulus `m^2`. -/
 theorem quadraticHenselStep_spec
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 1 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
     (hmonic : DensePoly.Monic g) :
@@ -200,17 +206,19 @@ theorem quadraticHenselStep_spec
     ZPoly.congr (r.g * r.h) f (m * m) ∧
       ZPoly.congr (r.s * r.g + r.t * r.h) 1 (m * m) := by
   exact
-    ⟨quadraticHenselStep_factor_spec m f g h s t hprod hbez hmonic,
-      quadraticHenselStep_bezout_spec m f g h s t hprod hbez hmonic⟩
+    ⟨quadraticHenselStep_factor_spec m f g h s t (Nat.lt_trans Nat.zero_lt_one hm)
+        hprod hbez hmonic,
+      quadraticHenselStep_bezout_spec m f g h s t hm hprod hbez hmonic⟩
 
 /-- The monic factor remains monic after the quadratic correction. -/
 theorem quadraticHenselStep_monic
     (m : Nat)
     (f g h s t : ZPoly)
+    (hm : 1 < m)
     (hmonic : DensePoly.Monic g) :
     DensePoly.Monic (quadraticHenselStep m f g h s t).g := by
   unfold quadraticHenselStep
-  exact quadraticHenselStep_g_update_monic m f g h s t hmonic
+  exact quadraticHenselStep_g_update_monic m f g h s t hm hmonic
 
 end ZPoly
 end Hex
