@@ -67,6 +67,31 @@ private theorem trimTrailingZerosList_getD (coeffs : List R) (n : Nat) :
             simp
           · simpa [trimTrailingZerosList, htrim] using ih n
 
+private theorem trimTrailingZerosList_normalized (coeffs : List R) :
+    trimTrailingZerosList coeffs = [] ∨
+      (trimTrailingZerosList coeffs).getLast? ≠ some (Zero.zero : R) := by
+  induction coeffs with
+  | nil =>
+      simp [trimTrailingZerosList]
+  | cons a as ih =>
+      by_cases htrim : trimTrailingZerosList as = [] ∧ a = (Zero.zero : R)
+      · simp [trimTrailingZerosList, htrim]
+      · cases htail : trimTrailingZerosList as with
+        | nil =>
+            right
+            intro hlast
+            have ha_ne : a ≠ (Zero.zero : R) := by
+              intro ha
+              exact htrim ⟨htail, ha⟩
+            simp [trimTrailingZerosList, htail, ha_ne] at hlast
+        | cons b bs =>
+            right
+            intro hlast
+            rcases ih with has_empty | has_last
+            · simp [htail] at has_empty
+            · apply has_last
+              simpa [trimTrailingZerosList, htrim, htail] using hlast
+
 /-- Normalize a coefficient array by discarding all trailing zeros. -/
 def trimTrailingZeros (coeffs : Array R) : Array R :=
   (trimTrailingZerosList coeffs.toList).toArray
@@ -75,8 +100,8 @@ def trimTrailingZeros (coeffs : Array R) : Array R :=
 def ofCoeffs (coeffs : Array R) : DensePoly R :=
   { coeffs := trimTrailingZeros coeffs
     normalized := by
-      classical
-      sorry }
+      unfold trimTrailingZeros DensePolyNormalized
+      simpa using trimTrailingZerosList_normalized (R := R) coeffs.toList }
 
 /-- The zero polynomial. -/
 def zero : DensePoly R :=
@@ -96,11 +121,16 @@ def C (c : R) : DensePoly R :=
 
 /-- Build the monomial `c * x^n`. The zero coefficient collapses to the zero polynomial. -/
 def monomial (n : Nat) (c : R) : DensePoly R :=
-  if c = (Zero.zero : R) then 0 else
+  if hc : c = (Zero.zero : R) then 0 else
     { coeffs := (Array.replicate n (Zero.zero : R)).push c
       normalized := by
-        classical
-        sorry }
+        right
+        intro hback
+        have hlast :
+            ((Array.replicate n (Zero.zero : R)).push c).back? = some c := by
+          simp
+        rw [hlast] at hback
+        exact hc (Option.some.inj hback) }
 
 /-- The number of stored coefficients. For a normalized polynomial this is one more than the
 degree, except for the zero polynomial where it is `0`. -/
