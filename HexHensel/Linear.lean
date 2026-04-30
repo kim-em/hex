@@ -704,6 +704,132 @@ private theorem linearHenselStep_product_expansion_cross_congr
     foldl_mulCoeffSum_liftScaled_dvd_next p k r hCorrection _hk i
       (List.range (LinearLiftResult.liftScaledIncrement p k r).size) 0 ⟨0, by simp⟩
 
+private theorem mulCoeffStep_scale_left_int
+    (c : Int) (f g : ZPoly) (n i : Nat) (acc : Int) (j : Nat) :
+    DensePoly.mulCoeffStep (DensePoly.scale c f) g n i (c * acc) j =
+      c * DensePoly.mulCoeffStep f g n i acc j := by
+  unfold DensePoly.mulCoeffStep
+  by_cases hij : i + j = n
+  · rw [if_pos hij, if_pos hij]
+    rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c)]
+    grind
+  · rw [if_neg hij, if_neg hij]
+
+private theorem foldl_mulCoeffStep_scale_left_int
+    (c : Int) (f g : ZPoly) (n i : Nat) (xs : List Nat) (acc : Int) :
+    xs.foldl (DensePoly.mulCoeffStep (DensePoly.scale c f) g n i) (c * acc) =
+      c * xs.foldl (DensePoly.mulCoeffStep f g n i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [mulCoeffStep_scale_left_int]
+      exact ih (DensePoly.mulCoeffStep f g n i acc j)
+
+private theorem foldl_mulCoeffSum_scale_left_int
+    (c : Int) (f g : ZPoly) (n : Nat) (xs : List Nat) (acc : Int) :
+    xs.foldl
+        (fun acc i => (List.range g.size).foldl
+          (DensePoly.mulCoeffStep (DensePoly.scale c f) g n i) acc)
+        (c * acc) =
+      c *
+        xs.foldl
+          (fun acc i => (List.range g.size).foldl
+            (DensePoly.mulCoeffStep f g n i) acc)
+          acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [foldl_mulCoeffStep_scale_left_int]
+      exact ih
+        ((List.range g.size).foldl (DensePoly.mulCoeffStep f g n i) acc)
+
+private theorem dense_size_scale_int_of_ne_zero
+    (c : Int) (hc : c ≠ 0) (f : ZPoly) :
+    (DensePoly.scale c f).size = f.size := by
+  apply Nat.le_antisymm
+  · by_cases hle : (DensePoly.scale c f).size ≤ f.size
+    · exact hle
+    · exfalso
+      have hlt : f.size < (DensePoly.scale c f).size := Nat.lt_of_not_ge hle
+      let i := (DensePoly.scale c f).size - 1
+      have hpos : 0 < (DensePoly.scale c f).size := by omega
+      have hf_le : f.size ≤ i := by omega
+      have hcoeff_zero : f.coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le f hf_le
+      have hscale_ne :
+          (DensePoly.scale c f).coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size (DensePoly.scale c f) hpos
+      rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c), hcoeff_zero] at hscale_ne
+      exact hscale_ne (Int.mul_zero c)
+  · by_cases hle : f.size ≤ (DensePoly.scale c f).size
+    · exact hle
+    · exfalso
+      have hlt : (DensePoly.scale c f).size < f.size := Nat.lt_of_not_ge hle
+      let i := f.size - 1
+      have hfpos : 0 < f.size := by omega
+      have hscale_le : (DensePoly.scale c f).size ≤ i := by omega
+      have hscale_zero : (DensePoly.scale c f).coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le (DensePoly.scale c f) hscale_le
+      have hf_ne : f.coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size f hfpos
+      rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c)] at hscale_zero
+      exact (Int.mul_ne_zero hc hf_ne) hscale_zero
+
+private theorem dense_scale_mul_left_int
+    (c : Int) (hc : c ≠ 0) (f g : ZPoly) :
+    DensePoly.scale c f * g = DensePoly.scale c (f * g) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_mul, DensePoly.coeff_scale _ _ _ (Int.mul_zero c),
+    DensePoly.coeff_mul]
+  unfold DensePoly.mulCoeffSum
+  rw [dense_size_scale_int_of_ne_zero c hc f]
+  simpa [Zero.zero] using
+    (foldl_mulCoeffSum_scale_left_int c f g n (List.range f.size) 0)
+
+private theorem dense_scale_mul_right_int
+    (c : Int) (hc : c ≠ 0) (f g : ZPoly) :
+    f * DensePoly.scale c g = DensePoly.scale c (f * g) := by
+  rw [DensePoly.mul_comm_poly f (DensePoly.scale c g)]
+  rw [dense_scale_mul_left_int c hc]
+  rw [DensePoly.mul_comm_poly g f]
+
+private theorem dense_scale_add_int
+    (c : Int) (f g : ZPoly) :
+    DensePoly.scale c (f + g) = DensePoly.scale c f + DensePoly.scale c g := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c)]
+  rw [DensePoly.coeff_scale _ _ _ (Int.mul_zero c)]
+  grind
+
+private theorem add_cross_congr
+    (m : Nat) (base a b cross : ZPoly)
+    (hcross : ZPoly.congr cross 0 m) :
+    ZPoly.congr (base + a + (b + cross)) (base + (a + b)) m := by
+  intro i
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  rw [DensePoly.coeff_add _ _ _ (by rfl)]
+  have hx := hcross i
+  rw [DensePoly.coeff_zero] at hx
+  have hdiff :
+      (base.coeff i + a.coeff i + (b.coeff i + cross.coeff i) -
+          (base.coeff i + (a.coeff i + b.coeff i))) =
+        cross.coeff i := by
+    omega
+  rw [hdiff]
+  simpa using hx
+
 private theorem linearHenselStep_product_expansion_identity_congr_core
     (p k : Nat) [ZMod64.Bounds p]
     (g h : ZPoly) (r hCorrection : FpPoly p)
@@ -715,7 +841,34 @@ private theorem linearHenselStep_product_expansion_identity_congr_core
         DensePoly.scale (Int.ofNat (p ^ k))
           (FpPoly.liftToZ r * h + g * FpPoly.liftToZ hCorrection))
       (p ^ (k + 1)) := by
-  sorry
+  have hscale_ne : Int.ofNat (p ^ k) ≠ 0 := by
+    exact Int.ofNat_ne_zero.mpr
+      (Nat.ne_of_gt (Nat.pow_pos (ZMod64.Bounds.pPos (p := p)) : 0 < p ^ k))
+  unfold LinearLiftResult.liftScaledIncrement
+  rw [DensePoly.mul_add_right_poly]
+  rw [DensePoly.mul_add_left_poly g
+    (DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r))
+    (DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ hCorrection))]
+  rw [DensePoly.mul_add_left_poly g
+    (DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r))
+    h]
+  rw [dense_scale_mul_left_int (Int.ofNat (p ^ k)) hscale_ne (FpPoly.liftToZ r) h]
+  rw [dense_scale_mul_right_int (Int.ofNat (p ^ k)) hscale_ne g
+    (FpPoly.liftToZ hCorrection)]
+  rw [dense_scale_add_int (Int.ofNat (p ^ k)) (FpPoly.liftToZ r * h)
+    (g * FpPoly.liftToZ hCorrection)]
+  let cross :=
+    DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r) *
+      DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ hCorrection)
+  have hcross :
+      ZPoly.congr cross 0 (p ^ (k + 1)) := by
+    simpa [cross, LinearLiftResult.liftScaledIncrement] using
+      linearHenselStep_product_expansion_cross_congr p k r hCorrection _hk
+  simpa [cross] using
+    add_cross_congr (p ^ (k + 1)) (g * h)
+      (DensePoly.scale (Int.ofNat (p ^ k)) (FpPoly.liftToZ r * h))
+      (DensePoly.scale (Int.ofNat (p ^ k)) (g * FpPoly.liftToZ hCorrection))
+      cross hcross
 
 private theorem linearHenselStep_product_expansion_identity_congr
     (p k : Nat) [ZMod64.Bounds p]
