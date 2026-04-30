@@ -960,6 +960,112 @@ private theorem fold_diagonal_add_right {S : Type _}
             (fun i => diagonalMulCoeffTerm p q n i)
             (fun i => diagonalMulCoeffTerm p r n i) 0 0
 
+private theorem fold_add_congr {S : Type _} [Add S]
+    (xs : List Nat) (f g : Nat → S)
+    (hfg : ∀ i, i ∈ xs → f i = g i) (acc : S) :
+    xs.foldl (fun acc i => acc + f i) acc =
+      xs.foldl (fun acc i => acc + g i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [hfg i (by simp)]
+      exact ih
+        (by
+          intro j hj
+          exact hfg j (by simp [hj]))
+        (acc + g i)
+
+/-- Distribute right multiplication by a constant through an additive fold. -/
+private theorem fold_add_mul_right_commring {S : Type _} [Lean.Grind.CommRing S]
+    (xs : List Nat) (f : Nat → S) (c : S) :
+    xs.foldl (fun acc i => acc + f i) 0 * c =
+      xs.foldl (fun acc i => acc + f i * c) 0 := by
+  induction xs with
+  | nil =>
+      grind
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hzero_f : (0 : S) + f i = f i := by grind
+      have hzero_fc : (0 : S) + f i * c = f i * c := by grind
+      rw [hzero_f, hzero_fc]
+      rw [fold_add_acc_commring xs f (f i)]
+      rw [fold_add_acc_commring xs (fun i => f i * c) (f i * c)]
+      rw [← ih]
+      grind
+
+/-- Distribute left multiplication by a constant through an additive fold. -/
+private theorem fold_add_mul_left_commring {S : Type _} [Lean.Grind.CommRing S]
+    (xs : List Nat) (f : Nat → S) (c : S) :
+    c * xs.foldl (fun acc i => acc + f i) 0 =
+      xs.foldl (fun acc i => acc + c * f i) 0 := by
+  induction xs with
+  | nil =>
+      grind
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hzero_f : (0 : S) + f i = f i := by grind
+      have hzero_cf : (0 : S) + c * f i = c * f i := by grind
+      rw [hzero_f, hzero_cf]
+      rw [fold_add_acc_commring xs f (f i)]
+      rw [fold_add_acc_commring xs (fun i => c * f i) (c * f i)]
+      rw [← ih]
+      grind
+
+private theorem diagonal_mul_left_expand {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) (n i : Nat) (hi : i < n + 1) :
+    diagonalMulCoeffTerm (p * q) r n i =
+      (List.range (i + 1)).foldl
+        (fun acc j => acc + (p.coeff j * q.coeff (i - j)) * r.coeff (n - i)) 0 := by
+  have hnot : ¬ n < i := by omega
+  simp [diagonalMulCoeffTerm, hnot]
+  rw [coeff_mul, mulCoeffSum_eq_diagonal p q i, diagonalSum_eq_degree_bound p q i]
+  calc
+    (List.range (i + 1)).foldl (fun acc j => acc + diagonalMulCoeffTerm p q i j) 0 *
+        r.coeff (n - i) =
+        (List.range (i + 1)).foldl
+          (fun acc j => acc + diagonalMulCoeffTerm p q i j * r.coeff (n - i)) 0 := by
+      exact fold_add_mul_right_commring
+        (S := S) (List.range (i + 1))
+        (fun j => diagonalMulCoeffTerm p q i j) (r.coeff (n - i))
+    _ =
+        (List.range (i + 1)).foldl
+          (fun acc j => acc + (p.coeff j * q.coeff (i - j)) * r.coeff (n - i)) 0 := by
+      apply fold_add_congr
+      intro j hj
+      have hjlt : j < i + 1 := List.mem_range.mp hj
+      have hnotji : ¬ i < j := by omega
+      simp [diagonalMulCoeffTerm, hnotji]
+
+private theorem diagonal_mul_right_expand {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) (n j : Nat) (hj : j < n + 1) :
+    diagonalMulCoeffTerm p (q * r) n j =
+      (List.range (n - j + 1)).foldl
+        (fun acc k => acc + p.coeff j * (q.coeff k * r.coeff (n - j - k))) 0 := by
+  have hnot : ¬ n < j := by omega
+  simp [diagonalMulCoeffTerm, hnot]
+  rw [coeff_mul, mulCoeffSum_eq_diagonal q r (n - j), diagonalSum_eq_degree_bound q r (n - j)]
+  calc
+    p.coeff j *
+        (List.range (n - j + 1)).foldl
+          (fun acc k => acc + diagonalMulCoeffTerm q r (n - j) k) 0 =
+        (List.range (n - j + 1)).foldl
+          (fun acc k => acc + p.coeff j * diagonalMulCoeffTerm q r (n - j) k) 0 := by
+      exact fold_add_mul_left_commring
+        (S := S) (List.range (n - j + 1))
+        (fun k => diagonalMulCoeffTerm q r (n - j) k) (p.coeff j)
+    _ =
+        (List.range (n - j + 1)).foldl
+          (fun acc k => acc + p.coeff j * (q.coeff k * r.coeff (n - j - k))) 0 := by
+      apply fold_add_congr
+      intro k hk
+      have hklt : k < n - j + 1 := List.mem_range.mp hk
+      have hnotkn : ¬ n - j < k := by omega
+      simp [diagonalMulCoeffTerm, hnotkn]
+
 private theorem fold_diagonal_mul_assoc {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) (n : Nat) :
@@ -967,7 +1073,46 @@ private theorem fold_diagonal_mul_assoc {S : Type _}
         (fun acc i => acc + diagonalMulCoeffTerm (p * q) r n i) 0 =
       (List.range p.size).foldl
         (fun acc i => acc + diagonalMulCoeffTerm p (q * r) n i) 0 := by
-  sorry
+  rw [diagonalSum_eq_degree_bound (p * q) r n]
+  rw [diagonalSum_eq_degree_bound p (q * r) n]
+  let F : Nat → Nat → S := fun j k => p.coeff j * q.coeff k * r.coeff (n - (j + k))
+  have hleft :
+      (List.range (n + 1)).foldl
+          (fun acc i => acc + diagonalMulCoeffTerm (p * q) r n i) 0 =
+        (List.range (n + 1)).foldl
+          (fun acc i =>
+            acc + (List.range (i + 1)).foldl (fun acc j => acc + F j (i - j)) 0)
+          0 := by
+    apply fold_add_congr
+    intro i hi
+    have hi' : i < n + 1 := List.mem_range.mp hi
+    rw [diagonal_mul_left_expand p q r n i hi']
+    apply fold_add_congr
+    intro j hj
+    have hj' : j < i + 1 := List.mem_range.mp hj
+    simp [F]
+    have hidx : n - i = n - (j + (i - j)) := by omega
+    rw [hidx]
+  have hright :
+      (List.range (n + 1)).foldl
+          (fun acc j => acc + diagonalMulCoeffTerm p (q * r) n j) 0 =
+        (List.range (n + 1)).foldl
+          (fun acc j =>
+            acc + (List.range (n - j + 1)).foldl (fun acc k => acc + F j k) 0)
+          0 := by
+    apply fold_add_congr
+    intro j hj
+    have hj' : j < n + 1 := List.mem_range.mp hj
+    rw [diagonal_mul_right_expand p q r n j hj']
+    apply fold_add_congr
+    intro k hk
+    have hk' : k < n - j + 1 := List.mem_range.mp hk
+    simp [F]
+    have hidx : n - (j + k) = n - j - k := by omega
+    rw [hidx]
+    grind
+  rw [hleft, hright]
+  exact triangular_fold_reindex_commring F n
 
 private theorem mul_assoc_poly {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
