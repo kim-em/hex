@@ -6,7 +6,7 @@ import Mathlib.Data.Fintype.Card
 Bridge definitions between the packed `HexGF2` extension-field wrappers and the
 generic quotient-ring finite-field construction.
 
-This Phase 1 module reuses the packed-polynomial conversion layer from
+This module reuses the packed-polynomial conversion layer from
 `HexGF2Mathlib.Basic` to package both the single-word `GF2n` surface and the
 arbitrary-degree `GF2nPoly` surface as project-local ring equivalences with the
 generic `Hex.GFqField.FiniteField` model over `Hex.FpPoly 2`.

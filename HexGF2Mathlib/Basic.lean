@@ -5,7 +5,7 @@ import HexPolyFp
 Bridge definitions between packed `Hex.GF2Poly` values and the generic
 `Hex.FpPoly 2` representation.
 
-This Phase 1 module exposes the concrete unpack/repack conversions between the
+This module exposes the concrete unpack/repack conversions between the
 bit-packed `GF(2)` polynomial execution path and the generic dense polynomial
 over `Hex.ZMod64 2`, together with the ring equivalence and immediate simp
 lemmas needed by later `GF(2^n)` bridge modules.
