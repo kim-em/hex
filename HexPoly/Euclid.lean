@@ -604,6 +604,86 @@ private theorem mul_sub_zero_comm {S : Type _}
   rw [diagonalSum_neg_right p q n]
   rw [fold_diagonal_comm p q n]
 
+private theorem mul_comm_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q : DensePoly S) :
+    p * q = q * p := by
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mul]
+  rw [mulCoeffSum_eq_diagonal p q n, mulCoeffSum_eq_diagonal q p n]
+  rw [diagonalSum_eq_degree_bound p q n, diagonalSum_eq_degree_bound q p n]
+  rw [fold_diagonal_comm p q n]
+
+private theorem add_sub_add_swap {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (x y z : DensePoly S) :
+    (x + y) - (z + x) = y + (0 - z) := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  rw [coeff_sub (x + y) (z + x) n hzero_sub]
+  rw [coeff_add x y n hzero_add, coeff_add z x n hzero_add]
+  rw [coeff_add y (0 - z) n hzero_add]
+  rw [coeff_sub 0 z n hzero_sub, coeff_zero]
+  grind
+
+private theorem add_sub_add_left {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (x y z : DensePoly S) :
+    (x + y) - (x + z) = y + (0 - z) := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  rw [coeff_sub (x + y) (x + z) n hzero_sub]
+  rw [coeff_add x y n hzero_add, coeff_add x z n hzero_add]
+  rw [coeff_add y (0 - z) n hzero_add]
+  rw [coeff_sub 0 z n hzero_sub, coeff_zero]
+  grind
+
+private theorem add_comm_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q : DensePoly S) :
+    p + q = q + p := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  rw [coeff_add p q n hzero_add, coeff_add q p n hzero_add]
+  grind
+
+private theorem mul_assoc_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) :
+    (p * q) * r = p * (q * r) := by
+  sorry
+
+private theorem mul_add_right_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) :
+    p * (q + r) = p * q + p * r := by
+  sorry
+
+private theorem mul_add_left_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q r : DensePoly S) :
+    (p + q) * r = p * r + q * r := by
+  rw [mul_comm_poly (p + q) r, mul_add_right_poly r p q,
+    mul_comm_poly r p, mul_comm_poly r q]
+
+private theorem mul_one_right_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p : DensePoly S) :
+    p * 1 = p := by
+  sorry
+
+private theorem neg_mul_right_poly {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (p q : DensePoly S) :
+    (0 - p) * q = 0 - p * q := by
+  rw [mul_comm_poly (0 - p) q, mul_sub_zero_comm q p]
+
 /-- The nonnegative gcd of the coefficients of an integer polynomial. -/
 private def contentNat (p : DensePoly Int) : Nat :=
   p.toArray.toList.foldl (fun acc coeff => Nat.gcd acc coeff.natAbs) 0
@@ -850,14 +930,50 @@ private theorem polyCRT_sub_left_factor {S : Type _}
     (a b u v s t : DensePoly S) :
     s * a + t * b = 1 ->
     polyCRT a b u v s t - u = a * (v * s + (0 - u * s)) := by
-  sorry
+  intro hbez
+  have hu_bez : u * (s * a + t * b) = u := by
+    rw [hbez, mul_one_right_poly]
+  calc
+    polyCRT a b u v s t - u =
+        (u * t * b + v * s * a) - u * (s * a + t * b) := by
+          rw [hu_bez]
+          rfl
+    _ = (u * t * b + v * s * a) - (u * (s * a) + u * (t * b)) := by
+          rw [mul_add_right_poly]
+    _ = (u * t * b + v * s * a) - (u * s * a + u * t * b) := by
+          rw [← mul_assoc_poly u s a, ← mul_assoc_poly u t b]
+    _ = v * s * a + (0 - u * s * a) := by
+          rw [add_sub_add_swap (u * t * b) (v * s * a) (u * s * a)]
+    _ = (v * s + (0 - u * s)) * a := by
+          rw [mul_add_left_poly, neg_mul_right_poly]
+    _ = a * (v * s + (0 - u * s)) := by
+          rw [mul_comm_poly]
 
 private theorem polyCRT_sub_right_factor {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (a b u v s t : DensePoly S) :
     s * a + t * b = 1 ->
     polyCRT a b u v s t - v = b * (u * t + (0 - v * t)) := by
-  sorry
+  intro hbez
+  have hv_bez : v * (s * a + t * b) = v := by
+    rw [hbez, mul_one_right_poly]
+  calc
+    polyCRT a b u v s t - v =
+        (u * t * b + v * s * a) - v * (s * a + t * b) := by
+          rw [hv_bez]
+          rfl
+    _ = (u * t * b + v * s * a) - (v * (s * a) + v * (t * b)) := by
+          rw [mul_add_right_poly]
+    _ = (u * t * b + v * s * a) - (v * s * a + v * t * b) := by
+          rw [← mul_assoc_poly v s a, ← mul_assoc_poly v t b]
+    _ = (v * s * a + u * t * b) - (v * s * a + v * t * b) := by
+          rw [add_comm_poly (u * t * b) (v * s * a)]
+    _ = u * t * b + (0 - v * t * b) := by
+          rw [add_sub_add_left (v * s * a) (u * t * b) (v * t * b)]
+    _ = (u * t + (0 - v * t)) * b := by
+          rw [mul_add_left_poly, neg_mul_right_poly]
+    _ = b * (u * t + (0 - v * t)) := by
+          rw [mul_comm_poly]
 
 private theorem polyCRT_congr_fst :
     {S : Type _} -> [Lean.Grind.CommRing S] -> [DecidableEq S] ->
