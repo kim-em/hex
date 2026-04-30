@@ -50,22 +50,7 @@ private def subModSquare (f g : ZPoly) (m : Nat) : ZPoly :=
   QuadraticLiftResult.reduceModSquare (f - g) m
 
 private def mulModSquare (f g : ZPoly) (m : Nat) : ZPoly :=
-  if f.isZero || g.isZero then
-    0
-  else
-    let modulus := quadraticModulus m
-    let fCoeffs := (Array.range f.size).map fun i => canonicalMod (f.coeff i) modulus
-    let gCoeffs := (Array.range g.size).map fun j => canonicalMod (g.coeff j) modulus
-    let coeffs := Id.run do
-      let mut acc := Array.replicate (f.size + g.size - 1) (0 : Int)
-      for i in [0:f.size] do
-        let fi := fCoeffs.getD i 0
-        for j in [0:g.size] do
-          let k := i + j
-          let next := acc.getD k 0 + fi * gCoeffs.getD j 0
-          acc := acc.set! k (canonicalMod next modulus)
-      return acc
-    DensePoly.ofCoeffs coeffs
+  QuadraticLiftResult.reduceModSquare (f * g) m
 
 -- The Hensel theorem surface supplies monic divisors; this executable helper
 -- uses that invariant to avoid coefficient division in the modular hot path.
@@ -115,7 +100,8 @@ private theorem subModSquare_congr
 private theorem mulModSquare_congr
     (m : Nat) (f g : ZPoly) (hm : 0 < m) :
     ZPoly.congr (mulModSquare f g m) (f * g) (m * m) := by
-  sorry
+  unfold mulModSquare
+  exact reduceModSquare_congr m (f * g) hm
 
 private theorem divModMonicModSquare_reconstruct_congr
     (m : Nat) (p q qOut rOut : ZPoly) (hm : 0 < m)
@@ -136,7 +122,70 @@ private theorem quadraticHenselStep_bezout_error_definition_congr
       b =
         subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m) :
     ZPoly.congr b (s * g' + t * h' - 1) (m * m) := by
-  sorry
+  rw [hb]
+  have hsg : ZPoly.congr (mulModSquare s g' m) (s * g') (m * m) :=
+    mulModSquare_congr m s g' hm
+  have hth : ZPoly.congr (mulModSquare t h' m) (t * h') (m * m) :=
+    mulModSquare_congr m t h' hm
+  have hadd₀ :
+      ZPoly.congr
+        (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m)
+        (mulModSquare s g' m + mulModSquare t h' m)
+        (m * m) :=
+    addModSquare_congr m (mulModSquare s g' m) (mulModSquare t h' m) hm
+  have hadd₁ :
+      ZPoly.congr
+        (mulModSquare s g' m + mulModSquare t h' m)
+        (s * g' + t * h')
+        (m * m) :=
+    ZPoly.congr_add (mulModSquare s g' m) (mulModSquare t h' m) (s * g') (t * h')
+      (m * m) hsg hth
+  have hadd :
+      ZPoly.congr
+        (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m)
+        (s * g' + t * h')
+        (m * m) :=
+    ZPoly.congr_trans _ _ _ (m * m) hadd₀ hadd₁
+  have hsub₀ :
+      ZPoly.congr
+        (subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m)
+        (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m - 1)
+        (m * m) :=
+    subModSquare_congr m
+      (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 hm
+  have hsub₁ :
+      ZPoly.congr
+        (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m - 1)
+        (s * g' + t * h' - 1)
+        (m * m) :=
+    by
+      intro i
+      rw [DensePoly.coeff_sub, DensePoly.coeff_sub]
+      · have hcoeff :
+            DensePoly.coeff
+                (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) i -
+                DensePoly.coeff (s * g' + t * h') i =
+              DensePoly.coeff
+                  (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) i -
+                  DensePoly.coeff (1 : ZPoly) i -
+                (DensePoly.coeff (s * g' + t * h') i -
+                  DensePoly.coeff (1 : ZPoly) i) := by
+          omega
+        rw [← hcoeff]
+        exact hadd i
+      · show (0 : Int) - (0 : Int) = 0
+        omega
+      · show (0 : Int) - (0 : Int) = 0
+        omega
+  exact
+    ZPoly.congr_trans
+      (subModSquare
+        (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m)
+      (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m - 1)
+      (s * g' + t * h' - 1)
+      (m * m)
+      hsub₀
+      hsub₁
 
 private theorem quadraticHenselStep_bezout_correction_algebra
     (m : Nat)
