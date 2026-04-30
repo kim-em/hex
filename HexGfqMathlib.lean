@@ -1,4 +1,4 @@
-import HexGfq
+import HexGfqMathlib.Basic
 import HexGF2Mathlib.Field
 import Mathlib.Algebra.Ring.Equiv
 
