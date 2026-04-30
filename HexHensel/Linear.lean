@@ -86,6 +86,72 @@ def linearHenselStep
   { g := reduceModPow g' p (k + 1)
     h := reduceModPow h' p (k + 1) }
 
+private theorem congr_mul_reduceModPow_pair
+    (p k : Nat) [ZMod64.Bounds p] (g h : ZPoly) :
+    ZPoly.congr
+      (ZPoly.reduceModPow g p k * ZPoly.reduceModPow h p k)
+      (g * h)
+      (p ^ k) := by
+  apply ZPoly.congr_mul
+  · exact ZPoly.congr_reduceModPow g p k (Nat.pow_pos (ZMod64.Bounds.pPos (p := p)))
+  · exact ZPoly.congr_reduceModPow h p k (Nat.pow_pos (ZMod64.Bounds.pPos (p := p)))
+
+private theorem linearHenselStep_raw_factor_congr
+    (p k : Nat) [ZMod64.Bounds p]
+    (f g h : ZPoly) (s t : FpPoly p)
+    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (hbez :
+      ZPoly.congr
+        (FpPoly.liftToZ (s * ZPoly.modP p g + t * ZPoly.modP p h))
+        1 p)
+    (hmonic : DensePoly.Monic g) :
+    let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+    let gMod := ZPoly.modP p g
+    let hMod := ZPoly.modP p h
+    let eMod := ZPoly.modP p e
+    let qr := DensePoly.divMod (t * eMod) gMod
+    let q := qr.1
+    let r := qr.2
+    let g' := g + LinearLiftResult.liftScaledIncrement p k r
+    let hCorrection := s * eMod + q * hMod
+    let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+    ZPoly.congr (g' * h') f (p ^ (k + 1)) := by
+  sorry
+
+private theorem linearHenselStep_reduced_factor_congr
+    (p k : Nat) [ZMod64.Bounds p]
+    (f g h : ZPoly) (s t : FpPoly p)
+    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (hbez :
+      ZPoly.congr
+        (FpPoly.liftToZ (s * ZPoly.modP p g + t * ZPoly.modP p h))
+        1 p)
+    (hmonic : DensePoly.Monic g) :
+    let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+    let gMod := ZPoly.modP p g
+    let hMod := ZPoly.modP p h
+    let eMod := ZPoly.modP p e
+    let qr := DensePoly.divMod (t * eMod) gMod
+    let q := qr.1
+    let r := qr.2
+    let g' := g + LinearLiftResult.liftScaledIncrement p k r
+    let hCorrection := s * eMod + q * hMod
+    let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+    ZPoly.congr
+      (ZPoly.reduceModPow g' p (k + 1) * ZPoly.reduceModPow h' p (k + 1))
+      f
+      (p ^ (k + 1)) := by
+  intro e gMod hMod eMod qr q r g' hCorrection h'
+  exact ZPoly.congr_trans
+    (ZPoly.reduceModPow g' p (k + 1) * ZPoly.reduceModPow h' p (k + 1))
+    (g' * h')
+    f
+    (p ^ (k + 1))
+    (congr_mul_reduceModPow_pair p (k + 1) g' h')
+    (by
+      simpa [e, gMod, hMod, eMod, qr, q, r, g', hCorrection, h'] using
+        linearHenselStep_raw_factor_congr p k f g h s t hprod hbez hmonic)
+
 private def henselLiftLoop
     (p : Nat) [ZMod64.Bounds p]
     (steps current : Nat)
@@ -126,7 +192,9 @@ theorem linearHenselStep_spec
     (hmonic : DensePoly.Monic g) :
     let r := linearHenselStep p k f g h s t
     ZPoly.congr (r.g * r.h) f (p ^ (k + 1)) := by
-  sorry
+  unfold linearHenselStep
+  simpa using
+    linearHenselStep_reduced_factor_congr p k f g h s t hprod hbez hmonic
 
 /-- The linear step preserves monicity of the lifted `g` factor. -/
 theorem linearHenselStep_monic
