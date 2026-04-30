@@ -102,6 +102,10 @@ namespace LLLState
 private def nearestQuotient (νjk : Int) (dj1 : Nat) : Int :=
   Int.fdiv (2 * νjk + Int.ofNat dj1) (2 * Int.ofNat dj1)
 
+/-- Targeted matrix entry update for LLL's integer coefficient state. -/
+private def setEntry (M : Matrix Int n n) (i j : Fin n) (x : Int) : Matrix Int n n :=
+  M.set i ((M.get i).set j x)
+
 /-- Single-column size reduction update for row `k` against row `j`. -/
 def sizeReduceColumn (s : LLLState n m) (j k : Fin n) (hjk : j.val < k.val) :
     LLLState n m :=
@@ -110,17 +114,15 @@ def sizeReduceColumn (s : LLLState n m) (j k : Fin n) (hjk : j.val < k.val) :
   if hreduce : 2 * Int.natAbs νjk > dj1 then
     let r := nearestQuotient νjk dj1
     let b' := GramSchmidt.Int.sizeReduce s.b j k r
+    let rowK :=
+      (List.finRange j.val).foldl
+        (fun row l =>
+          let lFin : Fin n := ⟨l.val, Nat.lt_trans l.isLt j.isLt⟩
+          row.set lFin ((s.ν.get k).get lFin - r * (s.ν.get j).get lFin))
+        (s.ν.get k)
+    let rowK := rowK.set j ((s.ν.get k).get j - r * Int.ofNat dj1)
     let ν' : Matrix Int n n :=
-      Matrix.ofFn fun i l =>
-        if hik : i = k then
-          if hlj : l.val < j.val then
-            (s.ν.get i).get l - r * (s.ν.get j).get l
-          else if hljEq : l = j then
-            (s.ν.get i).get l - r * Int.ofNat dj1
-          else
-            (s.ν.get i).get l
-        else
-          (s.ν.get i).get l
+      s.ν.set k rowK
     { b := b'
       ν := ν'
       d := s.d
@@ -161,32 +163,30 @@ def swapStep (s : LLLState n m) (k : Nat) : LLLState n m :=
         Int.toNat (((Int.ofNat dkNext * Int.ofNat dkPrev + B ^ 2) / Int.ofNat dk))
       let b' := GramSchmidt.Int.adjacentSwap s.b kFin hk0
       let d' : Vector Nat (n + 1) :=
-        Vector.ofFn fun i => if i.val = k then dk' else s.d.get i
+        s.d.set k dk' (h := Nat.lt_succ_of_lt hk)
+      let νRowsSwapped :=
+        (List.finRange km1.val).foldl
+          (fun ν j =>
+            let jFin : Fin n := ⟨j.val, Nat.lt_trans j.isLt km1.isLt⟩
+            let ν := setEntry ν km1 jFin ((s.ν.get kFin).get jFin)
+            setEntry ν kFin jFin ((s.ν.get km1).get jFin))
+          s.ν
+      let νPivot := setEntry νRowsSwapped kFin km1 B
       let ν' : Matrix Int n n :=
-        Matrix.ofFn fun i j =>
-          if hikm1 : i = km1 then
-            if hjlt : j.val < km1.val then
-              (s.ν.get kFin).get j
+        (List.finRange n).foldl
+          (fun ν i =>
+            if hklt : k < i.val then
+              let prev :=
+                (((s.ν.get i).get km1 * Int.ofNat dk') + ((s.ν.get i).get kFin * B)) /
+                  Int.ofNat dk
+              let curr :=
+                (((s.ν.get i).get kFin * Int.ofNat dkPrev) - ((s.ν.get i).get km1 * B)) /
+                  Int.ofNat dk
+              let ν := setEntry ν i km1 prev
+              setEntry ν i kFin curr
             else
-              (s.ν.get i).get j
-          else if hik : i = kFin then
-            if hjEq : j = km1 then
-              B
-            else if hjlt : j.val < km1.val then
-              (s.ν.get km1).get j
-            else
-              (s.ν.get i).get j
-          else if hklt : k < i.val then
-            if hjEq : j = km1 then
-              (((s.ν.get i).get km1 * Int.ofNat dk') + ((s.ν.get i).get kFin * B)) /
-                Int.ofNat dk
-            else if hjEq' : j = kFin then
-              (((s.ν.get i).get kFin * Int.ofNat dkPrev) - ((s.ν.get i).get km1 * B)) /
-                Int.ofNat dk
-            else
-              (s.ν.get i).get j
-          else
-            (s.ν.get i).get j
+              ν)
+          νPivot
       { b := b'
         ν := ν'
         d := d'
