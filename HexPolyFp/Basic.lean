@@ -49,6 +49,21 @@ instance : DecidableEq (ZMod64 p) := by
       apply h
       exact congrArg ZMod64.val hab)
 
+/-- The `F_p[x]` division law obligations used by quotient constructions.
+
+These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
+surface; the executable division operations themselves are inherited from `DensePoly`. -/
+instance : DensePoly.DivModLaws (ZMod64 p) where
+  divMod_remainder_degree_lt_of_pos_degree := by
+    intro f g hdegree
+    sorry
+  divModMonic_eq_divMod_of_monic := by
+    intro f g hmonic
+    sorry
+  mod_mod_of_not_pos_degree := by
+    intro f g hdegree
+    sorry
+
 end ZMod64
 
 /-- Executable dense polynomials over the prime-field candidate `ZMod64 p`. -/
