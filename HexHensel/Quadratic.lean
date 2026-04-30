@@ -106,12 +106,83 @@ private theorem quadraticHenselStep_bezout_correction_congr_core
     ZPoly.congr (s' * g' + t' * h') (1 - b * b) (m * m) := by
   sorry
 
+private theorem coeff_product_dvd_mod_square
+    (m : Nat) (b : ZPoly)
+    (hb : ZPoly.congr b 0 m) (i j : Nat) :
+    ((m * m : Nat) : Int) ∣ b.coeff i * b.coeff j := by
+  have hi_mod : (b.coeff i) % (m : Int) = 0 := by
+    simpa using hb i
+  have hj_mod : (b.coeff j) % (m : Int) = 0 := by
+    simpa using hb j
+  rcases Int.dvd_of_emod_eq_zero hi_mod with ⟨ai, hai⟩
+  rcases Int.dvd_of_emod_eq_zero hj_mod with ⟨aj, haj⟩
+  refine ⟨ai * aj, ?_⟩
+  calc
+    b.coeff i * b.coeff j
+        = ((m : Int) * ai) * ((m : Int) * aj) := by rw [← hai, ← haj]
+    _ = ((m * m : Nat) : Int) * (ai * aj) := by
+          grind
+
+private theorem mulCoeffStep_dvd_mod_square
+    (m : Nat) (b : ZPoly)
+    (hb : ZPoly.congr b 0 m) (n i : Nat) (acc : Int) (j : Nat)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣ DensePoly.mulCoeffStep b b n i acc j := by
+  by_cases hij : i + j = n
+  · rcases hacc with ⟨a, ha⟩
+    rcases coeff_product_dvd_mod_square m b hb i j with ⟨c, hc⟩
+    refine ⟨a + c, ?_⟩
+    calc
+      DensePoly.mulCoeffStep b b n i acc j
+          = acc + b.coeff i * b.coeff j := by simp [DensePoly.mulCoeffStep, hij]
+      _ = ((m * m : Nat) : Int) * a + ((m * m : Nat) : Int) * c := by rw [ha, hc]
+      _ = ((m * m : Nat) : Int) * (a + c) := by grind
+  · simpa [DensePoly.mulCoeffStep, hij] using hacc
+
+private theorem foldl_mulCoeffStep_dvd_mod_square
+    (m : Nat) (b : ZPoly)
+    (hb : ZPoly.congr b 0 m) (n i : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣
+      xs.foldl (DensePoly.mulCoeffStep b b n i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons j xs ih =>
+      simpa using
+        ih (DensePoly.mulCoeffStep b b n i acc j)
+          (mulCoeffStep_dvd_mod_square m b hb n i acc j hacc)
+
+private theorem foldl_mulCoeffSum_dvd_mod_square
+    (m : Nat) (b : ZPoly)
+    (hb : ZPoly.congr b 0 m) (n : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣
+      xs.foldl
+        (fun acc i => (List.range b.size).foldl (DensePoly.mulCoeffStep b b n i) acc)
+        acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons i xs ih =>
+      have hinner :
+          ((m * m : Nat) : Int) ∣
+            (List.range b.size).foldl (DensePoly.mulCoeffStep b b n i) acc :=
+        foldl_mulCoeffStep_dvd_mod_square m b hb n i (List.range b.size) acc hacc
+      simpa using ih
+        ((List.range b.size).foldl (DensePoly.mulCoeffStep b b n i) acc) hinner
+
 private theorem square_congr_zero_mod_square
     (m : Nat) (b : ZPoly)
-    (hm : 1 < m)
+    (_hm : 1 < m)
     (hb : ZPoly.congr b 0 m) :
     ZPoly.congr (b * b) 0 (m * m) := by
-  sorry
+  intro n
+  have hdvd :
+      ((m * m : Nat) : Int) ∣ (b * b).coeff n := by
+    rw [DensePoly.coeff_mul, DensePoly.mulCoeffSum]
+    exact foldl_mulCoeffSum_dvd_mod_square m b hb n (List.range b.size) 0 ⟨0, by simp⟩
+  simpa using Int.emod_eq_zero_of_dvd hdvd
 
 private theorem one_sub_square_congr_one_of_square_congr_zero
     (m : Nat) (b : ZPoly)
