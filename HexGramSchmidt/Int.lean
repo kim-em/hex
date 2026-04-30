@@ -101,17 +101,101 @@ def gramDetVec (b : Matrix Int n m) : Vector Nat (n + 1) :=
   let data := Matrix.bareissNoPivotData gram
   Vector.ofFn fun k => gramDetVecEntry data k
 
+private structure ScaledCoeffArrayState where
+  step : Nat
+  matrix : Array (Array Int)
+  coeffs : Array (Array Int)
+  prevPivot : Int
+
+@[inline] private def getArrayEntry (rows : Array (Array Int)) (row col : Nat) : Int :=
+  rows[row]![col]!
+
+private def zeroRows (n : Nat) : Array (Array Int) :=
+  (Array.range n).map fun _ => (Array.range n).map fun _ => 0
+
+private def gramRows (b : Matrix Int n m) : Array (Array Int) :=
+  (Array.range n).map fun row =>
+    (Array.range n).map fun col =>
+      if hrow : row < n then
+        if hcol : col < n then
+          let i : Fin n := ⟨row, hrow⟩
+          let j : Fin n := ⟨col, hcol⟩
+          Matrix.dot (b.row i) (b.row j)
+        else
+          0
+      else
+        0
+
+private def rowsToMatrix (rows : Array (Array Int)) (n : Nat) : Matrix Int n n :=
+  Matrix.ofFn fun i j => getArrayEntry rows i.val j.val
+
+private def setArrayEntry (rows : Array (Array Int)) (row col : Nat) (value : Int) :
+    Array (Array Int) :=
+  rows.set! row (rows[row]!.set! col value)
+
+private def writeScaledColumn (coeffs rows : Array (Array Int)) (n k : Nat) :
+    Array (Array Int) :=
+  Id.run do
+    let mut next := setArrayEntry coeffs k k (getArrayEntry rows k k)
+    for i in [k + 1:n] do
+      next := setArrayEntry next i k (getArrayEntry rows i k)
+    return next
+
+private def stepScaledRows (rows : Array (Array Int)) (n k : Nat)
+    (pivot prevPivot : Int) : Array (Array Int) :=
+  Id.run do
+    let mut next := rows
+    for i in [k + 1:n] do
+      let sourceRow := rows[i]!
+      let entryIK := sourceRow[k]!
+      let mut nextRow := sourceRow.set! k 0
+      for j in [k + 1:n] do
+        let value :=
+          (pivot * sourceRow[j]! - entryIK * getArrayEntry rows k j) / prevPivot
+        nextRow := nextRow.set! j value
+      next := next.set! i nextRow
+    return next
+
+private def scaledCoeffArrayLoop (n fuel : Nat) (state : ScaledCoeffArrayState) :
+    ScaledCoeffArrayState :=
+  match fuel with
+  | 0 => state
+  | fuel + 1 =>
+      if state.step < n then
+        let k := state.step
+        let coeffs := writeScaledColumn state.coeffs state.matrix n k
+        let pivot := getArrayEntry state.matrix k k
+        if k + 1 < n then
+          if pivot = 0 then
+            { state with coeffs := coeffs }
+          else
+            let next : ScaledCoeffArrayState :=
+              { step := state.step + 1
+                matrix := stepScaledRows state.matrix n k pivot state.prevPivot
+                coeffs := coeffs
+                prevPivot := pivot }
+            scaledCoeffArrayLoop n fuel next
+        else
+          { state with step := state.step + 1, coeffs := coeffs }
+      else
+        state
+
+/-- Run one no-pivot fraction-free Gram elimination and record each scaled
+coefficient column immediately before the elimination step zeroes it. -/
+private def scaledCoeffRows (b : Matrix Int n m) : Array (Array Int) :=
+  let state :=
+    scaledCoeffArrayLoop n n
+      { step := 0
+        matrix := gramRows b
+        coeffs := zeroRows n
+        prevPivot := 1 }
+  state.coeffs
+
 /-- Integral scaled Gram-Schmidt coefficients. For `j < i`, the entry is the
 determinant formula corresponding to `d_{j+1} * μ_{i,j}`; on the diagonal we
 store `d_{j+1}`, and entries above the diagonal are zero. -/
 def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n :=
-  Matrix.ofFn fun i j =>
-    if hji : j.val < i.val then
-      Matrix.bareiss (GramSchmidt.scaledCoeffMatrix b i j hji)
-    else if i = j then
-      Int.ofNat (gramDet b (j.val + 1) (Nat.succ_le_of_lt j.isLt))
-    else
-      0
+  rowsToMatrix (scaledCoeffRows b) n
 
 theorem gramDet_zero (b : Matrix Int n m) :
     gramDet b 0 (Nat.zero_le n) = 1 := by

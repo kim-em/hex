@@ -16,8 +16,8 @@ Scientific registrations:
   a fixed hot loop so the fast determinant-vector surface clears the
   child-process signal floor.
 * `runScaledCoeffsChecksum`: the full scaled-coefficient matrix surface, using
-  the determinant formula for each lower-triangular entry. This also wraps a
-  fixed hot loop for signal-floor stability.
+  one shared fraction-free Gram elimination pass. This also wraps a fixed hot
+  loop for signal-floor stability.
 * `runSizeReduceChecksum` and `runAdjacentSwapChecksum`: executable row-update
   matrix helpers, checking only affected rows. These wrap a fixed hot loop so
   the timed call clears the child-process signal floor without changing the
@@ -176,9 +176,10 @@ def intRowPairChecksum (M : Matrix Int n m) (i j : Fin n) : Int :=
 def gramSurfaceComplexity (n : Nat) : Nat :=
   n * n * n + n * n * (2 * n + 1)
 
-/-- Textbook model for the current full scaled-coefficient determinant surface. -/
+/-- Textbook model for the full scaled-coefficient surface, which shares the
+same Gram build plus one Bareiss-style elimination shape as `gramDetVec`. -/
 def scaledCoeffSurfaceComplexity (n : Nat) : Nat :=
-  n * n * gramSurfaceComplexity n
+  gramSurfaceComplexity n
 
 /-- Model for a row update plus checksumming the affected rows in the prepared
 `(n + 3) x (2(n + 3) + 1)` fixture. -/
@@ -335,10 +336,10 @@ setup_benchmark runAdjacentSwapDenom n => updateGramComplexity n
 
 /- `prepUpdateInput n` uses `rows = n + 3`. The pivot coefficient reads one
 entry from `scaledCoeffs b`; because matrices are dense vectors, constructing
-that surface is the dominant step, giving `scaledCoeffSurfaceComplexity
-(n + 3)`. The ladder starts after the smallest cold rungs used for the full
-surface benchmark because this scalar helper otherwise spends too much of its
-signal on fixed evaluator overhead. -/
+that shared-elimination surface is the dominant step, giving
+`scaledCoeffSurfaceComplexity (n + 3)`. The ladder starts after the smallest
+cold rungs used for the full surface benchmark because this scalar helper
+otherwise spends too much of its signal on fixed evaluator overhead. -/
 setup_benchmark runAdjacentSwapPivotCoeff n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
