@@ -93,10 +93,86 @@ private def divModMonicModSquare (p q : ZPoly) (m : Nat) : ZPoly × ZPoly :=
   let p := QuadraticLiftResult.reduceModSquare p m
   divModMonicModSquareAux m q p.size 0 p
 
+private theorem reduceModSquare_congr
+    (m : Nat) (f : ZPoly) (hm : 0 < m) :
+    ZPoly.congr (QuadraticLiftResult.reduceModSquare f m) f (m * m) := by
+  unfold QuadraticLiftResult.reduceModSquare
+  have hpow : 0 < m ^ 2 := Nat.pow_pos hm
+  simpa [Nat.pow_two] using ZPoly.congr_reduceModPow f m 2 hpow
+
+private theorem addModSquare_congr
+    (m : Nat) (f g : ZPoly) (hm : 0 < m) :
+    ZPoly.congr (addModSquare f g m) (f + g) (m * m) := by
+  unfold addModSquare
+  exact reduceModSquare_congr m (f + g) hm
+
+private theorem subModSquare_congr
+    (m : Nat) (f g : ZPoly) (hm : 0 < m) :
+    ZPoly.congr (subModSquare f g m) (f - g) (m * m) := by
+  unfold subModSquare
+  exact reduceModSquare_congr m (f - g) hm
+
+private theorem mulModSquare_congr
+    (m : Nat) (f g : ZPoly) (hm : 0 < m) :
+    ZPoly.congr (mulModSquare f g m) (f * g) (m * m) := by
+  sorry
+
+private theorem divModMonicModSquare_reconstruct_congr
+    (m : Nat) (p q qOut rOut : ZPoly) (hm : 0 < m)
+    (hqr : (qOut, rOut) = divModMonicModSquare p q m) :
+    ZPoly.congr (qOut * q + rOut) p (m * m) := by
+  sorry
+
+private theorem divModMonicModSquare_zero_mod_base
+    (m : Nat) (p q qOut rOut : ZPoly)
+    (hp : ZPoly.congr p 0 m)
+    (hqr : (qOut, rOut) = divModMonicModSquare p q m) :
+    ZPoly.congr qOut 0 m ∧ ZPoly.congr rOut 0 m := by
+  sorry
+
+private theorem quadraticHenselStep_bezout_error_definition_congr
+    (m : Nat) (s t g' h' b : ZPoly) (hm : 0 < m)
+    (hb :
+      b =
+        subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m) :
+    ZPoly.congr b (s * g' + t * h' - 1) (m * m) := by
+  sorry
+
+private theorem quadraticHenselStep_bezout_correction_algebra
+    (m : Nat)
+    (g' h' s t b qBezout rBezout : ZPoly)
+    (hm : 0 < m)
+    (hb : ZPoly.congr b (s * g' + t * h' - 1) (m * m))
+    (hdiv : ZPoly.congr (qBezout * g' + rBezout) (t * b) (m * m)) :
+    let t' := subModSquare t rBezout m
+    let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
+    ZPoly.congr (s' * g' + t' * h') (1 - b * b) (m * m) := by
+  sorry
+
+private theorem quadraticHenselStep_bezout_error_from_factor_update
+    (m : Nat)
+    (f g h s t : ZPoly)
+    (hm : 1 < m)
+    (hprod : ZPoly.congr (g * h) f m)
+    (hbez : ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : DensePoly.Monic g) :
+    let e := QuadraticLiftResult.factorError f g h
+    let te := mulModSquare t e m
+    let factorQR := divModMonicModSquare te g m
+    let qFactor := factorQR.1
+    let rFactor := factorQR.2
+    let g' := addModSquare g rFactor m
+    let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
+    let h' := addModSquare h hCorrection m
+    let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
+    ZPoly.congr b 0 m := by
+  sorry
+
 private theorem quadraticHenselStep_bezout_correction_congr_core
     (m : Nat)
     (g' h' s t b qBezout rBezout : ZPoly)
     (hm : 1 < m)
+    (hb : ZPoly.congr b (s * g' + t * h' - 1) (m * m))
     (hbezoutQR :
       let tb := mulModSquare t b m
       let bezoutQR := divModMonicModSquare tb g' m
@@ -104,7 +180,22 @@ private theorem quadraticHenselStep_bezout_correction_congr_core
     let t' := subModSquare t rBezout m
     let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
     ZPoly.congr (s' * g' + t' * h') (1 - b * b) (m * m) := by
-  sorry
+  have hm0 : 0 < m := Nat.lt_trans Nat.zero_lt_one hm
+  let tb := mulModSquare t b m
+  let bezoutQR := divModMonicModSquare tb g' m
+  have hpair : (qBezout, rBezout) = bezoutQR := by
+    rcases hbezoutQR with ⟨hq, hr⟩
+    exact Prod.ext hq hr
+  have hdivMod :
+      ZPoly.congr (qBezout * g' + rBezout) tb (m * m) :=
+    divModMonicModSquare_reconstruct_congr m tb g' qBezout rBezout hm0 hpair
+  have hmul : ZPoly.congr tb (t * b) (m * m) :=
+    mulModSquare_congr m t b hm0
+  have hdiv : ZPoly.congr (qBezout * g' + rBezout) (t * b) (m * m) :=
+    ZPoly.congr_trans (qBezout * g' + rBezout) tb (t * b) (m * m) hdivMod hmul
+  simpa [tb] using
+    quadraticHenselStep_bezout_correction_algebra
+      m g' h' s t b qBezout rBezout hm0 hb hdiv
 
 private theorem coeff_product_dvd_mod_square
     (m : Nat) (b : ZPoly)
@@ -222,7 +313,7 @@ private theorem quadraticHenselStep_bezout_error_congr_zero_core
     let h' := addModSquare h hCorrection m
     let b := subModSquare (addModSquare (mulModSquare s g' m) (mulModSquare t h' m) m) 1 m
     ZPoly.congr b 0 m := by
-  sorry
+  exact quadraticHenselStep_bezout_error_from_factor_update m f g h s t hm hprod hbez hmonic
 
 /-- One quadratic Hensel correction step from modulus `m` to modulus `m^2`. -/
 def quadraticHenselStep
@@ -310,9 +401,14 @@ private theorem quadraticHenselStep_bezout_correction_congr
        let bezoutQR := divModMonicModSquare tb g' m
        qBezout = bezoutQR.1 ∧ rBezout = bezoutQR.2) := by
     simp [tb, bezoutQR, qBezout, rBezout]
+  have hb :
+      ZPoly.congr b (s * g' + t * h' - 1) (m * m) :=
+    quadraticHenselStep_bezout_error_definition_congr m s t g' h' b
+      (Nat.lt_trans Nat.zero_lt_one hm)
+      (by simp [b])
   simpa [t', s'] using
     quadraticHenselStep_bezout_correction_congr_core
-      m g' h' s t b qBezout rBezout hm hbezoutQR
+      m g' h' s t b qBezout rBezout hm hb hbezoutQR
 
 private theorem congr_one_sub_square_of_congr_zero
     (m : Nat) (b : ZPoly)
