@@ -1843,11 +1843,233 @@ private theorem detTerm_rowAdd {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
   rw [detProduct_rowAdd]
   grind
 
+private theorem foldl_det_sum_filter_split_start {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (p : β → Bool) (f : β → R) :
+    ∀ a b : R,
+      xs.foldl (fun acc x => acc + f x) (a + b) =
+        (xs.filter p).foldl (fun acc x => acc + f x) a +
+          (xs.filter fun x => !p x).foldl (fun acc x => acc + f x) b := by
+  induction xs with
+  | nil =>
+      intro a b
+      rfl
+  | cons x xs ih =>
+      intro a b
+      simp only [List.foldl_cons]
+      by_cases hp : p x
+      · simp [hp]
+        have hstart : a + b + f x = a + f x + b := by grind
+        rw [hstart]
+        exact ih (a + f x) b
+      · simp [hp]
+        have hstart : a + b + f x = a + (b + f x) := by grind
+        rw [hstart]
+        exact ih a (b + f x)
+
+private theorem foldl_det_sum_filter_split {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (p : β → Bool) (f : β → R) :
+    xs.foldl (fun acc x => acc + f x) 0 =
+      (xs.filter p).foldl (fun acc x => acc + f x) 0 +
+        (xs.filter fun x => !p x).foldl (fun acc x => acc + f x) 0 := by
+  calc
+    xs.foldl (fun acc x => acc + f x) 0 =
+      xs.foldl (fun acc x => acc + f x) ((0 : R) + 0) := by
+        have hzero : (0 : R) + 0 = 0 := by grind
+        rw [hzero]
+    _ =
+      (xs.filter p).foldl (fun acc x => acc + f x) 0 +
+        (xs.filter fun x => !p x).foldl (fun acc x => acc + f x) 0 := by
+      exact foldl_det_sum_filter_split_start xs p f 0 0
+
+private theorem foldl_det_sum_map {R : Type u} [Zero R] [Add R]
+    {β : Type v} {γ : Type w} (xs : List β) (map : β → γ) (f : γ → R) :
+    (xs.map map).foldl (fun acc x => acc + f x) 0 =
+      xs.foldl (fun acc x => acc + f (map x)) 0 := by
+  simp [List.foldl_map]
+
+private theorem rowSwap_rowAddDuplicate_eq {R : Type u} {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (_h : src ≠ dst) :
+    rowSwap (rowAddDuplicate M src dst) src dst = rowAddDuplicate M src dst := by
+  apply Vector.ext
+  intro r hr
+  apply Vector.ext
+  intro k hk
+  change
+    (rowSwap (rowAddDuplicate M src dst) src dst)[(⟨r, hr⟩ : Fin n)][(⟨k, hk⟩ : Fin n)] =
+      (rowAddDuplicate M src dst)[(⟨r, hr⟩ : Fin n)][(⟨k, hk⟩ : Fin n)]
+  rw [rowSwap_get]
+  let fr : Fin n := ⟨r, hr⟩
+  let fk : Fin n := ⟨k, hk⟩
+  change
+    (if fr = dst then (rowAddDuplicate M src dst)[src][fk]
+      else if fr = src then (rowAddDuplicate M src dst)[dst][fk]
+      else (rowAddDuplicate M src dst)[fr][fk]) =
+      (rowAddDuplicate M src dst)[fr][fk]
+  by_cases hrd : fr = dst
+  · rw [if_pos hrd]
+    rw [rowAddDuplicate_get M src dst src fk, rowAddDuplicate_get M src dst fr fk]
+    simp [hrd]
+  · by_cases hrs : fr = src
+    · rw [if_neg hrd, if_pos hrs]
+      rw [rowAddDuplicate_get M src dst dst fk, rowAddDuplicate_get M src dst fr fk]
+      simp [hrs]
+    · simp [hrd, hrs]
+
+private theorem detProduct_rowAddDuplicate_transposeValues {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (h : src ≠ dst)
+    (perm : Vector (Fin n) n) :
+    detProduct (rowAddDuplicate M src dst) perm =
+      detProduct (rowAddDuplicate M src dst)
+        (transposePermutationValues perm src dst) := by
+  have hswap :=
+    detProduct_rowSwap_transposeValues
+      (rowAddDuplicate M src dst) src dst h perm
+  rw [rowSwap_rowAddDuplicate_eq M src dst h] at hswap
+  exact hswap
+
+private theorem detTerm_rowAddDuplicate_transposeValues {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (src dst : Fin n) (h : src ≠ dst)
+    (perm : Vector (Fin n) n) (hnodup : perm.toList.Nodup) :
+    detTerm (rowAddDuplicate M src dst) perm =
+      -detTerm (rowAddDuplicate M src dst)
+        (transposePermutationValues perm src dst) := by
+  unfold detTerm
+  rw [detProduct_rowAddDuplicate_transposeValues M src dst h perm]
+  rw [detSign_transposeValues (R := R) perm src dst hnodup h]
+  grind
+
 private theorem permutationVectors_duplicateRow_sum {R : Type u} [Lean.Grind.CommRing R]
     {n : Nat} (M : Matrix R n n) (src dst : Fin n) (h : src ≠ dst) :
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowAddDuplicate M src dst) perm) 0 = 0 := by
-  sorry
+  let p : Vector (Fin n) n → Bool := fun perm => perm[src] < perm[dst]
+  let term : Vector (Fin n) n → R := detTerm (rowAddDuplicate M src dst)
+  have hsplit :=
+    foldl_det_sum_filter_split (R := R) (permutationVectors n) p term
+  rw [hsplit]
+  have hright :
+      ((permutationVectors n).filter fun perm => !p perm).foldl
+          (fun acc perm => acc + term perm) 0 =
+        ((permutationVectors n).filter p).foldl
+          (fun acc perm =>
+            acc + term (transposePermutationValues perm src dst)) 0 := by
+    have hperm :
+        (((permutationVectors n).filter p).map
+            fun perm => transposePermutationValues perm src dst).Perm
+          ((permutationVectors n).filter fun perm => !p perm) := by
+      have hleftNodup :
+          (((permutationVectors n).filter p).map
+              fun perm => transposePermutationValues perm src dst).Nodup := by
+        exact list_nodup_map_of_injective
+          (f := fun perm => transposePermutationValues perm src dst)
+          (fun a b hab => by
+            have h' := congrArg (fun perm => transposePermutationValues perm src dst) hab
+            change
+              transposePermutationValues (transposePermutationValues a src dst) src dst =
+                transposePermutationValues (transposePermutationValues b src dst) src dst at h'
+            rw [transposePermutationValues_involutive] at h'
+            rw [transposePermutationValues_involutive] at h'
+            exact h')
+          (permutationVectors_nodup_list.filter p)
+      have hrightNodup :
+          ((permutationVectors n).filter fun perm => !p perm).Nodup :=
+        permutationVectors_nodup_list.filter _
+      apply (List.perm_ext_iff_of_nodup hleftNodup hrightNodup).mpr
+      intro perm
+      constructor
+      · intro hmem
+        simp only [List.mem_map, List.mem_filter] at hmem ⊢
+        rcases hmem with ⟨pre, ⟨hpreMem, hpreP⟩, rfl⟩
+        constructor
+        · exact transposePermutationValues_mem_permutationVectors src dst hpreMem
+        · have hsrc : (transposePermutationValues pre src dst)[src] = pre[dst] := by
+            rw [transposePermutationValues_get]
+            exact vector_get_fin_congr pre (finTranspose_left src dst)
+          have hdst : (transposePermutationValues pre src dst)[dst] = pre[src] := by
+            rw [transposePermutationValues_get]
+            exact vector_get_fin_congr pre (finTranspose_right src dst)
+          simp [p] at hpreP ⊢
+          calc
+            (transposePermutationValues pre src dst)[dst] = pre[src] := hdst
+            _ ≤ pre[dst] := by
+              change pre[src].val ≤ pre[dst].val
+              have hpreP' : pre[src].val < pre[dst].val := hpreP
+              omega
+            _ = (transposePermutationValues pre src dst)[src] := hsrc.symm
+      · intro hmem
+        simp only [List.mem_filter] at hmem
+        rcases hmem with ⟨hpermMem, hpfalse⟩
+        simp only [List.mem_map, List.mem_filter]
+        refine ⟨transposePermutationValues perm src dst,
+          ⟨transposePermutationValues_mem_permutationVectors src dst hpermMem, ?_⟩, ?_⟩
+        · have hsrc : (transposePermutationValues perm src dst)[src] = perm[dst] := by
+            rw [transposePermutationValues_get]
+            exact vector_get_fin_congr perm (finTranspose_left src dst)
+          have hdst : (transposePermutationValues perm src dst)[dst] = perm[src] := by
+            rw [transposePermutationValues_get]
+            exact vector_get_fin_congr perm (finTranspose_right src dst)
+          simp [p] at hpfalse
+          have hne_values : perm[src] ≠ perm[dst] := by
+            intro hvals
+            have hnodup := permutationVectors_nodup hpermMem
+            have hsrcidx : perm.toList.idxOf perm[src] = src.val := by
+              simpa [Vector.getElem_toList, Vector.length_toList] using
+                hnodup.idxOf_getElem src.val (by simp [Vector.length_toList])
+            have hdstidx : perm.toList.idxOf perm[dst] = dst.val := by
+              simpa [Vector.getElem_toList, Vector.length_toList] using
+                hnodup.idxOf_getElem dst.val (by simp [Vector.length_toList])
+            have hvals_idx : perm.toList.idxOf perm[src] = perm.toList.idxOf perm[dst] := by
+              rw [hvals]
+            have hvaleq : src.val = dst.val := by
+              rw [← hsrcidx, ← hdstidx]
+              exact hvals_idx
+            exact h (Fin.ext hvaleq)
+          rw [show p (transposePermutationValues perm src dst) =
+              decide ((transposePermutationValues perm src dst)[src] <
+                (transposePermutationValues perm src dst)[dst]) by rfl]
+          exact decide_eq_true (by
+            rw [hsrc, hdst]
+            change perm[dst].val < perm[src].val
+            have hle : perm[dst].val ≤ perm[src].val := hpfalse
+            have hneVal : perm[dst].val ≠ perm[src].val := by
+              intro hval
+              exact hne_values.symm (Fin.ext hval)
+            omega)
+        · exact transposePermutationValues_involutive perm src dst
+    calc
+      ((permutationVectors n).filter fun perm => !p perm).foldl
+          (fun acc perm => acc + term perm) 0 =
+        (((permutationVectors n).filter p).map
+            fun perm => transposePermutationValues perm src dst).foldl
+          (fun acc perm => acc + term perm) 0 := by
+          exact (foldl_det_sum_perm term hperm 0).symm
+      _ =
+        ((permutationVectors n).filter p).foldl
+          (fun acc perm => acc + term (transposePermutationValues perm src dst)) 0 := by
+          exact foldl_det_sum_map ((permutationVectors n).filter p)
+            (fun perm => transposePermutationValues perm src dst) term
+  rw [hright]
+  calc
+    ((permutationVectors n).filter p).foldl (fun acc perm => acc + term perm) 0 +
+        ((permutationVectors n).filter p).foldl
+          (fun acc perm => acc + term (transposePermutationValues perm src dst)) 0 =
+      ((permutationVectors n).filter p).foldl
+          (fun acc perm =>
+            acc + (term perm + term (transposePermutationValues perm src dst))) 0 := by
+        exact (foldl_det_sum_add_zero
+          ((permutationVectors n).filter p) term
+          (fun perm => term (transposePermutationValues perm src dst))).symm
+    _ = ((permutationVectors n).filter p).foldl (fun acc _ => acc + 0) 0 := by
+        apply foldl_det_sum_congr
+        intro perm hmem
+        simp only [term]
+        rw [detTerm_rowAddDuplicate_transposeValues M src dst h perm]
+        · grind
+        · exact permutationVectors_nodup (List.mem_filter.mp hmem).1
+    _ = 0 := by
+        exact foldl_det_sum_zero ((permutationVectors n).filter p) 0
 
 /-- The multilinear expansion of a row addition has zero total duplicate-row
 contribution, so the Leibniz sum is unchanged. -/
