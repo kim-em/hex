@@ -148,5 +148,8 @@ lean_exe hexgfqfield_bench where
 lean_exe hexlll_bench where
   root := `HexLLL.Bench
 
+lean_exe hexhensel_bench where
+  root := `HexHensel.Bench
+
 @[default_target]
 lean_lib HexManual where
