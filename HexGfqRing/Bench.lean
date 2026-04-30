@@ -166,13 +166,17 @@ def prepUnaryInput (n : Nat) : UnaryInput :=
     modulusDegreePos := input.modulusDegreePos
     value := input.lhs }
 
+/-- Exponent with all bits set at the benchmark parameter's bit length. -/
+def denseExponent (n : Nat) : Nat :=
+  2 ^ (Nat.log2 (n + 1) + 1) - 1
+
 /-- Per-parameter fixture for quotient exponentiation. -/
 def prepPowInput (n : Nat) : PowInput :=
   let input := prepUnaryInput n
   { modulus := input.modulus
     modulusDegreePos := input.modulusDegreePos
     value := input.value
-    exponent := n + 1 }
+    exponent := denseExponent n }
 
 /-- Per-parameter fixture for natural scalar multiplication and casts. -/
 def prepNatInput (n : Nat) : NatInput :=
@@ -288,8 +292,9 @@ setup_benchmark runNegSubChecksum n => n
   }
 
 /-
-Square-and-multiply uses Theta(log n) quotient multiplications for the prepared
-exponent, and each quotient multiplication is quadratic in the modulus degree.
+The prepared all-ones exponent has Theta(log n) bits and exercises both the
+square and multiply-by-base branch on every bit. Each quotient multiplication is
+quadratic in the modulus degree.
 -/
 setup_benchmark runPowChecksum n => n * n * Nat.log2 (n + 1)
   with prep := prepPowInput
