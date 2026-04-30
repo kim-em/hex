@@ -132,7 +132,7 @@ libraries:
     mathlib: true
     done_through: 0
   HexGfqMathlib:
-    deps: [HexGfq]
+    deps: [HexGfq, HexGF2Mathlib]
     mathlib: true
     done_through: 0
   HexBerlekampZassenhausMathlib:
