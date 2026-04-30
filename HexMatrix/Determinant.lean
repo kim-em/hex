@@ -404,12 +404,68 @@ private def transposePermutationValues {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) : Vector (Fin n) n :=
   Vector.ofFn fun r => perm[finTranspose i j r]
 
+private theorem rowSwap_get {R : Type u} {n m : Nat}
+    (M : Matrix R n m) (i j r : Fin n) (k : Fin m) :
+    (rowSwap M i j)[r][k] =
+      if r = j then M[i][k] else if r = i then M[j][k] else M[r][k] := by
+  by_cases hrj : r = j
+  · subst r
+    simp [rowSwap]
+  · by_cases hri : r = i
+    · subst r
+      simp [rowSwap, hrj]
+      have hval : j.val ≠ i.val := by
+        intro hval
+        exact hrj (Fin.ext hval.symm)
+      have hrow : ((M.set i M[j]).set j M[i])[i] = (M.set i M[j])[i] := by
+        exact Vector.getElem_set_ne (xs := M.set i M[j]) (x := M[i]) j.isLt i.isLt hval
+      simpa using congrArg (fun row => row[k]) hrow
+    · simp [rowSwap, hrj, hri]
+      have hir : i.val ≠ r.val := by
+        intro hval
+        exact hri (Fin.ext hval.symm)
+      have hjr : j.val ≠ r.val := by
+        intro hval
+        exact hrj (Fin.ext hval.symm)
+      have hrow₁ : (M.set i M[j])[r] = M[r] := by
+        exact Vector.getElem_set_ne (xs := M) (x := M[j]) i.isLt r.isLt hir
+      have hrow₂ : ((M.set i M[j]).set j M[i])[r] = (M.set i M[j])[r] := by
+        exact Vector.getElem_set_ne (xs := M.set i M[j]) (x := M[i]) j.isLt r.isLt hjr
+      exact (congrArg (fun row => row[k]) hrow₂).trans (congrArg (fun row => row[k]) hrow₁)
+
+private theorem finTranspose_self {n : Nat} (i j : Fin n) (r : Fin n) :
+    finTranspose i j (finTranspose i j r) = r := by
+  unfold finTranspose
+  by_cases hri : r = i
+  · subst r
+    simp
+  · by_cases hrj : r = j
+    · subst r
+      simp
+    · simp [hri, hrj]
+
+private theorem detProduct_rowSwap_transposeValues {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
+    detProduct (rowSwap M i j) perm =
+      detProduct M (transposePermutationValues perm i j) := by
+  sorry
+
+private theorem detSign_transposeValues {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) (h : i ≠ j) :
+    detSign (R := R) perm = -detSign (R := R) (transposePermutationValues perm i j) := by
+  sorry
+
 private theorem detTerm_rowSwap_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
     detTerm (rowSwap M i j) perm =
       -detTerm M (transposePermutationValues perm i j) := by
-  sorry
+  unfold detTerm
+  rw [detProduct_rowSwap_transposeValues M i j h perm]
+  rw [detSign_transposeValues (R := R) perm i j h]
+  grind
 
 private theorem permutationVectors_transposeValues_neg_sum {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
