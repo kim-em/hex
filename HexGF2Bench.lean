@@ -169,14 +169,23 @@ def runFp2BerlekampCompareChecksum (input : BerlekampCompareInput) : UInt64 :=
           (mixWord acc (checksumFp2Coeffs col))
   go input.columnCount 1 0
 
+def packedGcdCompareComplexity (n : Nat) : Nat :=
+  n * (((80 * n + 6) / 64) + 1)
+
+def packedBerlekampCompareComplexity (n : Nat) : Nat :=
+  n * (((16 * n + 5) / 64) + 1)
+
 /- Cost model: `prepCompareInput` maps parameter `n` to
 `degree = 40 * n + 3`. The target computes `gcd (divisor * quotient + 1)
 divisor`, where both fixture factors have degree `degree`, so the first
 Euclidean division has degree gap `O(degree)` and the second division is by the
 constant remainder. Packed long division repeatedly shifts the divisor and XORs
-word arrays of length `O(degree / 64)`; the linear degree map makes the
-quadratic long-division step dominate, so the registration declares `O(n^2)`. -/
-setup_benchmark runPackedGcdCompareChecksum n => n * n
+word arrays whose maximum live length is bounded by the dividend degree
+`2 * degree = 80 * n + 6`, hence `floor((80 * n + 6) / 64) + 1` packed words.
+The registration declares the finite word-RAM model `n * words` rather than the
+coarser asymptotic `n^2`, because the scientific ladder remains in the range
+where 64-bit packing changes only at word boundaries. -/
+setup_benchmark runPackedGcdCompareChecksum n => packedGcdCompareComplexity n
   with prep := prepCompareInput
   where {
     paramFloor := 8
@@ -211,10 +220,13 @@ setup_benchmark runFp2GcdCompareChecksum n => n * n
 `x^2 mod modulus`, a fixed sparse polynomial for this degree range. Each
 iteration multiplies the current reduced column by that sparse step, reduces a
 degree-`< degree + 2` product modulo the degree-`degree` modulus, and checksums
-one packed column. The per-column work is linear in the packed column word
-count, hence linear in `degree` up to the word-size constant; `degree` columns
-make the dominant work quadratic in `n`. -/
-setup_benchmark runPackedBerlekampCompareChecksum n => n * n
+one packed column. The packed multiplication/reduction path touches at most
+`floor((degree + 2) / 64) + 1 = floor((16 * n + 5) / 64) + 1` words per
+column. The registration therefore uses the finite word-count model
+`n * words`; asymptotically this is still the quadratic packed-column surface,
+but it avoids treating the 64-bit word width as invisible on the small
+scientific comparison ladder. -/
+setup_benchmark runPackedBerlekampCompareChecksum n => packedBerlekampCompareComplexity n
   with prep := prepBerlekampCompareInput
   where {
     paramFloor := 8
