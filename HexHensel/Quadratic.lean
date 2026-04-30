@@ -103,11 +103,157 @@ private theorem mulModSquare_congr
   unfold mulModSquare
   exact reduceModSquare_congr m (f * g) hm
 
+private theorem divModMonicModSquare_step_reconstruct_congr
+    (m : Nat) (quot rem term q : ZPoly) (hm : 0 < m) :
+    ZPoly.congr
+      (addModSquare quot term m * q + subModSquare rem (mulModSquare term q m) m)
+      (quot * q + rem)
+      (m * m) := by
+  have hquot :
+      ZPoly.congr (addModSquare quot term m) (quot + term) (m * m) :=
+    addModSquare_congr m quot term hm
+  have hrem :
+      ZPoly.congr
+        (subModSquare rem (mulModSquare term q m) m)
+        (rem - mulModSquare term q m)
+        (m * m) :=
+    subModSquare_congr m rem (mulModSquare term q m) hm
+  have hmulMod : ZPoly.congr (mulModSquare term q m) (term * q) (m * m) :=
+    mulModSquare_congr m term q hm
+  have hrem' :
+      ZPoly.congr
+        (rem - mulModSquare term q m)
+        (rem - term * q)
+        (m * m) := by
+    intro i
+    rw [DensePoly.coeff_sub, DensePoly.coeff_sub]
+    · have hcoeff :
+          rem.coeff i - (mulModSquare term q m).coeff i -
+              (rem.coeff i - (term * q).coeff i) =
+            -((mulModSquare term q m).coeff i - (term * q).coeff i) := by
+        omega
+      rw [hcoeff]
+      exact Int.emod_eq_zero_of_dvd
+        (Int.dvd_neg.mpr (Int.dvd_of_emod_eq_zero (hmulMod i)))
+    · show (0 : Int) - (0 : Int) = 0
+      omega
+    · show (0 : Int) - (0 : Int) = 0
+      omega
+  have hleft :
+      ZPoly.congr
+        (addModSquare quot term m * q + subModSquare rem (mulModSquare term q m) m)
+        ((quot + term) * q + (rem - term * q))
+        (m * m) :=
+    ZPoly.congr_add _ _ _ _ (m * m)
+      (ZPoly.congr_mul _ _ _ _ (m * m) hquot (ZPoly.congr_refl q (m * m)))
+      (ZPoly.congr_trans _ _ _ (m * m) hrem hrem')
+  have hright :
+      ZPoly.congr ((quot + term) * q + (rem - term * q)) (quot * q + rem) (m * m) := by
+    rw [DensePoly.add_mul_sub_cancel_right]
+    exact ZPoly.congr_refl (quot * q + rem) (m * m)
+  exact ZPoly.congr_trans _ _ _ (m * m) hleft hright
+
+private theorem divModMonicModSquareAux_reconstruct_congr_of_not_zero
+    (m : Nat) (q : ZPoly) (fuel : Nat) (quot rem qOut rOut : ZPoly)
+    (hm : 0 < m) (hq : q.isZero = false)
+    (hqr : (qOut, rOut) = divModMonicModSquareAux m q fuel quot rem) :
+    ZPoly.congr (qOut * q + rOut) (quot * q + rem) (m * m) := by
+  induction fuel generalizing quot rem qOut rOut with
+  | zero =>
+      simp [divModMonicModSquareAux] at hqr
+      have hqOut : qOut = quot := hqr.1
+      have hrOut : rOut = rem := hqr.2
+      subst qOut
+      subst rOut
+      exact ZPoly.congr_refl (quot * q + rem) (m * m)
+  | succ fuel ih =>
+      cases hrem : rem.degree? with
+      | none =>
+          simp [divModMonicModSquareAux, hq, hrem] at hqr
+          have hqOut : qOut = quot := hqr.1
+          have hrOut : rOut = rem := hqr.2
+          subst qOut
+          subst rOut
+          exact ZPoly.congr_refl (quot * q + rem) (m * m)
+      | some rd =>
+          cases hqdeg : q.degree? with
+          | none =>
+              simp [divModMonicModSquareAux, hq, hrem, hqdeg] at hqr
+              have hqOut : qOut = quot := hqr.1
+              have hrOut : rOut = rem := hqr.2
+              subst qOut
+              subst rOut
+              exact ZPoly.congr_refl (quot * q + rem) (m * m)
+          | some qd =>
+              by_cases hlt : rd < qd
+              · simp [divModMonicModSquareAux, hq, hrem, hqdeg, hlt] at hqr
+                have hqOut : qOut = quot := hqr.1
+                have hrOut : rOut = rem := hqr.2
+                subst qOut
+                subst rOut
+                exact ZPoly.congr_refl (quot * q + rem) (m * m)
+              · simp [divModMonicModSquareAux, hq, hrem, hqdeg, hlt] at hqr
+                let k := rd - qd
+                let coeff := reduceCoeffModSquare rem.leadingCoeff m
+                let term := DensePoly.monomial k coeff
+                have hrec :
+                    ZPoly.congr (qOut * q + rOut)
+                      (addModSquare quot term m * q +
+                        subModSquare rem (mulModSquare term q m) m)
+                      (m * m) :=
+                  ih (addModSquare quot term m)
+                    (subModSquare rem (mulModSquare term q m) m)
+                    qOut rOut hqr
+                have hstep :
+                    ZPoly.congr
+                      (addModSquare quot term m * q +
+                        subModSquare rem (mulModSquare term q m) m)
+                      (quot * q + rem)
+                      (m * m) :=
+                  divModMonicModSquare_step_reconstruct_congr m quot rem term q hm
+                exact ZPoly.congr_trans _ _ _ (m * m) hrec hstep
+
 private theorem divModMonicModSquare_reconstruct_congr
     (m : Nat) (p q qOut rOut : ZPoly) (hm : 0 < m)
     (hqr : (qOut, rOut) = divModMonicModSquare p q m) :
     ZPoly.congr (qOut * q + rOut) p (m * m) := by
-  sorry
+  unfold divModMonicModSquare at hqr
+  let pRed := QuadraticLiftResult.reduceModSquare p m
+  change (qOut, rOut) = divModMonicModSquareAux m q pRed.size 0 pRed at hqr
+  have hpRed : ZPoly.congr pRed p (m * m) :=
+    reduceModSquare_congr m p hm
+  cases hq : q.isZero with
+  | false =>
+    have haux :
+        ZPoly.congr (qOut * q + rOut) ((0 : ZPoly) * q + pRed) (m * m) :=
+      divModMonicModSquareAux_reconstruct_congr_of_not_zero
+        m q pRed.size 0 pRed qOut rOut hm hq hqr
+    have hzero :
+        ((0 : ZPoly) * q + pRed) = pRed := by
+      rw [DensePoly.zero_mul, DensePoly.zero_add]
+    exact ZPoly.congr_trans _ _ _ (m * m) haux
+      (by
+        rw [hzero]
+        exact hpRed)
+  | true =>
+    cases hsize : pRed.size with
+    | zero =>
+        simp [divModMonicModSquareAux, hsize] at hqr
+        have hqOut : qOut = 0 := hqr.1
+        have hrOut : rOut = pRed := hqr.2
+        subst qOut
+        subst rOut
+        rw [DensePoly.zero_mul, DensePoly.zero_add]
+        exact hpRed
+    | succ fuel =>
+        simp [divModMonicModSquareAux, hq, hsize] at hqr
+        have hqOut : qOut = 0 := hqr.1
+        have hrOut : rOut = QuadraticLiftResult.reduceModSquare pRed m := hqr.2
+        subst qOut
+        subst rOut
+        rw [DensePoly.zero_mul, DensePoly.zero_add]
+        exact ZPoly.congr_trans _ _ _ (m * m)
+          (reduceModSquare_congr m pRed hm) hpRed
 
 private theorem divModMonicModSquare_zero_mod_base
     (m : Nat) (p q qOut rOut : ZPoly)
