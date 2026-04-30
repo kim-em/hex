@@ -645,6 +645,18 @@ private theorem divModMonicModSquare_zero_mod_base
     (reduceModSquare_zero_mod_base m p hp)
     hqr
 
+private theorem divModMonicModSquareAux_remainder_coeff_eq_zero_of_monic
+    (m : Nat)
+    (q : ZPoly)
+    (fuel : Nat)
+    (quot rem qOut rOut : ZPoly)
+    (_hm : 1 < m)
+    (_hmonic : DensePoly.Monic q)
+    (_hfuel : rem.size ≤ fuel)
+    (_hqr : (qOut, rOut) = divModMonicModSquareAux m q fuel quot rem) :
+    ∀ i, q.size - 1 ≤ i → rOut.coeff i = 0 := by
+  sorry
+
 private theorem quadraticHenselStep_bezout_error_definition_congr
     (m : Nat) (s t g' h' b : ZPoly) (hm : 0 < m)
     (hb :
@@ -1708,7 +1720,14 @@ private theorem divModMonicModSquare_remainder_coeff_eq_zero_of_monic
     (_hmonic : DensePoly.Monic g) :
     let qr := divModMonicModSquare p g m
     ∀ i, g.size - 1 ≤ i → qr.2.coeff i = 0 := by
-  sorry
+  unfold divModMonicModSquare
+  let pRed := QuadraticLiftResult.reduceModSquare p m
+  exact
+    divModMonicModSquareAux_remainder_coeff_eq_zero_of_monic
+      m g pRed.size 0 pRed
+      (divModMonicModSquareAux m g pRed.size 0 pRed).1
+      (divModMonicModSquareAux m g pRed.size 0 pRed).2
+      _hm _hmonic (by omega) rfl
 
 private theorem addModSquare_monic_of_high_remainder_zero
     (m : Nat)
