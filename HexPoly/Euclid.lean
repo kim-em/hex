@@ -755,6 +755,174 @@ private theorem fold_add_pair_commring {S : Type _} [Lean.Grind.CommRing S]
       rw [hacc]
       exact ih (a + f i) (b + g i)
 
+/-- Pull the initial accumulator out of an additive fold. -/
+private theorem fold_add_acc_commring {S : Type _} [Lean.Grind.CommRing S]
+    (xs : List Nat) (f : Nat → S) (acc : S) :
+    xs.foldl (fun acc i => acc + f i) acc =
+      acc + xs.foldl (fun acc i => acc + f i) 0 := by
+  have h :=
+    fold_add_right_commring (S := S) (xs.map f) 0 acc
+  simp [List.foldl_map] at h
+  rw [← show (0 : S) + acc = acc by grind]
+  rw [h]
+  grind
+
+/-- Flatten a nested additive fold over a mapped list of rows. -/
+private theorem fold_add_nested_map_commring {S : Type _} [Lean.Grind.CommRing S]
+    (xs : List Nat) (row : Nat → List Nat) (F : Nat → Nat → S) (acc : S) :
+    xs.foldl
+        (fun acc i => acc + (row i).foldl (fun acc j => acc + F i j) 0)
+        acc =
+      xs.foldl
+        (fun acc i => (row i).foldl (fun acc j => acc + F i j) acc)
+        acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [← fold_add_acc_commring (row i) (F i) acc]
+      exact ih ((row i).foldl (fun acc j => acc + F i j) acc)
+
+/-- Extending a bounded row by one appends exactly the new boundary term. -/
+private theorem triangular_row_succ_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n j : Nat) (hj : j < n + 1) :
+    (List.range (n + 1 - j + 1)).foldl (fun acc k => acc + F j k) 0 =
+      (List.range (n - j + 1)).foldl (fun acc k => acc + F j k) 0 +
+        F j (n + 1 - j) := by
+  have hlen : n + 1 - j + 1 = (n - j + 1) + 1 := by omega
+  rw [hlen, List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  have hidx : n - j + 1 = n + 1 - j := by omega
+  rw [hidx]
+
+/-- The first `n + 1` rows of the larger triangle split into the old triangle
+plus the new diagonal boundary. -/
+private theorem triangular_prefix_succ_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc j =>
+          acc + (List.range (n + 1 - j + 1)).foldl (fun acc k => acc + F j k) 0)
+        0 =
+      (List.range (n + 1)).foldl
+          (fun acc j =>
+            acc + (List.range (n - j + 1)).foldl (fun acc k => acc + F j k) 0)
+          0 +
+        (List.range (n + 1)).foldl
+          (fun acc j => acc + F j (n + 1 - j)) 0 := by
+  let oldRow := fun j =>
+    (List.range (n - j + 1)).foldl (fun acc k => acc + F j k) 0
+  let newTerm := fun j => F j (n + 1 - j)
+  have hfold :
+      ∀ (xs : List Nat),
+        (∀ j, j ∈ xs → j < n + 1) →
+        ∀ acc : S,
+        xs.foldl
+            (fun acc j =>
+              acc + (List.range (n + 1 - j + 1)).foldl (fun acc k => acc + F j k) 0)
+            acc =
+          xs.foldl (fun acc j => acc + (oldRow j + newTerm j)) acc := by
+    intro xs
+    induction xs with
+    | nil =>
+        intro _hxs acc
+        rfl
+    | cons j xs ih =>
+        intro hxs acc
+        simp only [List.foldl_cons]
+        rw [triangular_row_succ_commring F n j (hxs j (by simp))]
+        exact ih (by
+          intro k hk
+          exact hxs k (by simp [hk])) (acc + (oldRow j + newTerm j))
+  rw [hfold (List.range (n + 1)) (by
+    intro j hj
+    exact List.mem_range.mp hj) 0]
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  calc
+    (List.range (n + 1)).foldl (fun acc j => acc + (oldRow j + newTerm j)) 0 =
+        (List.range (n + 1)).foldl (fun acc j => acc + (oldRow j + newTerm j)) (0 + 0) := by
+          rw [hzero_add]
+    _ =
+        (List.range (n + 1)).foldl (fun acc j => acc + oldRow j) 0 +
+          (List.range (n + 1)).foldl (fun acc j => acc + newTerm j) 0 := by
+        exact fold_add_pair_commring (S := S) (List.range (n + 1)) oldRow newTerm 0 0
+
+/-- Advancing the total-degree triangular enumeration appends the new diagonal. -/
+private theorem triangular_total_succ_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n : Nat) :
+    (List.range (n + 1 + 1)).foldl
+        (fun acc i =>
+          acc + (List.range (i + 1)).foldl (fun acc j => acc + F j (i - j)) 0)
+        0 =
+      (List.range (n + 1)).foldl
+          (fun acc i =>
+            acc + (List.range (i + 1)).foldl (fun acc j => acc + F j (i - j)) 0)
+          0 +
+        (List.range (n + 1 + 1)).foldl
+          (fun acc j => acc + F j (n + 1 - j)) 0 := by
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  rw [← List.range_succ]
+
+/-- Advancing the first-coordinate triangular enumeration appends the last singleton row. -/
+private theorem triangular_first_succ_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n : Nat) :
+    (List.range (n + 1 + 1)).foldl
+        (fun acc j =>
+          acc + (List.range (n + 1 - j + 1)).foldl (fun acc k => acc + F j k) 0)
+        0 =
+      (List.range (n + 1)).foldl
+          (fun acc j =>
+            acc + (List.range (n + 1 - j + 1)).foldl (fun acc k => acc + F j k) 0)
+          0 +
+        F (n + 1) 0 := by
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  have hidx : n + 1 - (n + 1) = 0 := by omega
+  simp [hidx]
+  grind
+
+/-- The new diagonal splits into the old rows' boundary plus the last corner. -/
+private theorem triangular_boundary_succ_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n : Nat) :
+    (List.range (n + 1 + 1)).foldl
+        (fun acc j => acc + F j (n + 1 - j)) 0 =
+      (List.range (n + 1)).foldl
+          (fun acc j => acc + F j (n + 1 - j)) 0 +
+        F (n + 1) 0 := by
+  rw [List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  have hidx : n + 1 - (n + 1) = 0 := by omega
+  rw [hidx]
+
+/-- The row-major triangular fold over total degree reindexed by first coordinate.
+
+This is the generic finite reindexing behind convolution associativity:
+`i` is the total degree, `j` the first coordinate, and `i - j` the second
+coordinate.  The right-hand side enumerates the same finite triangle by
+choosing the first coordinate first.
+-/
+private theorem triangular_fold_reindex_commring {S : Type _} [Lean.Grind.CommRing S]
+    (F : Nat → Nat → S) (n : Nat) :
+    (List.range (n + 1)).foldl
+        (fun acc i =>
+          acc + (List.range (i + 1)).foldl (fun acc j => acc + F j (i - j)) 0)
+        0 =
+      (List.range (n + 1)).foldl
+        (fun acc j =>
+          acc + (List.range (n - j + 1)).foldl (fun acc k => acc + F j k) 0)
+        0 := by
+  induction n with
+  | zero =>
+      simp
+  | succ n ih =>
+      rw [triangular_total_succ_commring F n]
+      rw [triangular_first_succ_commring F n]
+      rw [ih]
+      rw [triangular_prefix_succ_commring F n]
+      rw [triangular_boundary_succ_commring F n]
+      grind
+
 private theorem fold_diagonal_add_right {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p q r : DensePoly S) (n : Nat) :
