@@ -1,0 +1,337 @@
+import HexPolyFp.Frobenius
+import HexPolyFp.ModCompose
+import HexPolyFp.SquareFree
+import LeanBench
+
+/-!
+Benchmark registrations for `hex-poly-fp`.
+
+This Phase 4 slice measures the executable finite-field polynomial operations
+over fixed word-prime fields: the quotient-ring benchmarks use `F_65537`, and
+the square-free/product benchmarks use `F_5`. Input construction is hoisted into
+`prep`; timed targets return compact checksums or decomposition summaries.
+
+Scientific registrations:
+
+* `runPowModMonicChecksum`: quotient-ring square-and-multiply with a growing
+  exponent, `O(n^2 log n)`.
+* `runFrobeniusXModChecksum`: a batch of `n` calls to `X^p mod f` on degree
+  `n` moduli, `O(n^3)`.
+* `runFrobeniusXPowModChecksum`: `X^(p^n) mod f`, `O(n^3)` for growing modulus
+  degree and Frobenius exponent height.
+* `runComposeModMonicChecksum`: Horner modular composition, `O(n^3)`.
+* `runWeightedProductChecksum`: product of `n` linear factors, `O(n^2)`.
+* `runSquareFreeDecompositionSummary`: Yun-style square-free decomposition on
+  deterministic product-shaped inputs, `O(n^2)`.
+-/
+
+namespace Hex
+namespace FpPolyBench
+
+open FpPoly
+
+private instance benchBoundsFive : ZMod64.Bounds 5 := ⟨by decide, by decide⟩
+private instance benchBoundsLarge : ZMod64.Bounds 65537 := ⟨by decide, by decide⟩
+
+private theorem one_ne_zero_five : (1 : ZMod64 5) ≠ 0 := by
+  intro h
+  have hm := (ZMod64.natCast_eq_natCast_iff (p := 5) 1 0).mp h
+  simp at hm
+
+private theorem one_ne_zero_large : (1 : ZMod64 65537) ≠ 0 := by
+  intro h
+  have hm := (ZMod64.natCast_eq_natCast_iff (p := 65537) 1 0).mp h
+  simp at hm
+
+private theorem prime_five : Hex.Nat.Prime 5 := by
+  constructor
+  · decide
+  · intro m hm
+    have hmle : m ≤ 5 := Nat.le_of_dvd (by decide : 0 < 5) hm
+    have hcases : m = 0 ∨ m = 1 ∨ m = 2 ∨ m = 3 ∨ m = 4 ∨ m = 5 := by omega
+    rcases hcases with rfl | rfl | rfl | rfl | rfl | rfl
+    · simp at hm
+    · exact Or.inl rfl
+    · simp at hm
+    · simp at hm
+    · simp at hm
+    · exact Or.inr rfl
+
+instance {p : Nat} [ZMod64.Bounds p] : Hashable (ZMod64 p) where
+  hash a := hash a.toNat
+
+instance {p : Nat} [ZMod64.Bounds p] : Hashable (FpPoly p) where
+  hash f := hash f.toArray
+
+instance : Hashable (SquareFreeFactor 5) where
+  hash sf := mixHash (hash sf.factor) (hash sf.multiplicity)
+
+/-- Prepared input for quotient-ring exponentiation and Frobenius operations. -/
+structure ModInput where
+  base : FpPoly 65537
+  degree : Nat
+  exponent : Nat
+  deriving Hashable
+
+/-- Prepared batched input for fixed-prime Frobenius. -/
+structure FrobeniusBatchInput where
+  count : Nat
+  degree : Nat
+  deriving Hashable
+
+/-- Prepared input for modular composition. -/
+structure ComposeInput where
+  outer : FpPoly 65537
+  inner : FpPoly 65537
+  degree : Nat
+  deriving Hashable
+
+/-- Prepared input for weighted products. -/
+structure WeightedInput where
+  factors : List (SquareFreeFactor 5)
+  deriving Hashable
+
+/-- Prepared input for square-free decomposition. -/
+structure SquareFreeInput where
+  poly : FpPoly 5
+  deriving Hashable
+
+/-- Deterministic coefficient generator keyed by size, index, and salt. -/
+def coeffValueFive (n i salt : Nat) : ZMod64 5 :=
+  ZMod64.ofNat 5 <|
+    ((i + 1) * (salt + 17) + (i + 3) * (i + 5) * 13 + n * 29) % 5
+
+/-- Deterministic large-prime coefficient generator keyed by size, index, and salt. -/
+def coeffValueLarge (n i salt : Nat) : ZMod64 65537 :=
+  ZMod64.ofNat 65537 <|
+    ((i + 1) * (salt + 17) + (i + 3) * (i + 5) * 13 + n * 29) % 65537
+
+/-- Deterministic dense finite-field polynomial with `n` generated coefficients. -/
+def densePolyFive (n salt : Nat) : FpPoly 5 :=
+  ofCoeffs <| (Array.range n).map fun i => coeffValueFive n i salt
+
+/-- Deterministic dense polynomial over the large benchmark prime field. -/
+def densePolyLarge (n salt : Nat) : FpPoly 65537 :=
+  ofCoeffs <| (Array.range n).map fun i => coeffValueLarge n i salt
+
+/-- Deterministic monic modulus of degree `degree` over `F_5`. -/
+def monicModulusFive (degree : Nat) : FpPoly 5 :=
+  DensePoly.monomial degree (1 : ZMod64 5)
+
+/-- Generated monomial moduli over `F_5` are monic. -/
+theorem monicModulusFive_monic (degree : Nat) : DensePoly.Monic (monicModulusFive degree) := by
+  unfold monicModulusFive DensePoly.Monic DensePoly.leadingCoeff DensePoly.monomial
+  by_cases h : (1 : ZMod64 5) = 0
+  · exact False.elim (one_ne_zero_five h)
+  · change ((Array.replicate degree (0 : ZMod64 5)).push 1).back?.getD 0 = 1
+    simp
+
+/-- Deterministic monic modulus of degree `degree` over the large benchmark prime. -/
+def monicModulusLarge (degree : Nat) : FpPoly 65537 :=
+  { coeffs := ((Array.range degree).map fun i => coeffValueLarge degree i 503).push 1
+    normalized := by
+      right
+      intro hback
+      have hlast :
+          (((Array.range degree).map fun i => coeffValueLarge degree i 503).push
+              (1 : ZMod64 65537)).back? = some 1 := by
+        simp
+      rw [hlast] at hback
+      exact one_ne_zero_large (Option.some.inj hback) }
+
+/-- Generated monomial moduli over the large benchmark prime are monic. -/
+theorem monicModulusLarge_monic (degree : Nat) :
+    DensePoly.Monic (monicModulusLarge degree) := by
+  unfold monicModulusLarge DensePoly.Monic DensePoly.leadingCoeff
+  change (((Array.range degree).map fun i => coeffValueLarge degree i 503).push
+    (1 : ZMod64 65537)).back?.getD 0 = 1
+  simp
+
+/-- Deterministic linear square-free factor. -/
+def linearFactor (i : Nat) : FpPoly 5 :=
+  ofCoeffs #[coeffValueFive i 0 211, 1]
+
+/-- Deterministic factor record used by weighted-product benchmarks. -/
+def weightedFactor (i : Nat) : SquareFreeFactor 5 :=
+  { factor := linearFactor i, multiplicity := 1 }
+
+/-- Stable checksum for polynomial-valued benchmark results. -/
+def checksumPoly {p : Nat} [ZMod64.Bounds p] (f : FpPoly p) : UInt64 :=
+  f.toArray.foldl (fun acc coeff => mixHash acc (hash coeff)) 0
+
+/-- Stable bounded summary for square-free decompositions. -/
+def checksumSquareFree (d : SquareFreeDecomposition 5) : UInt64 :=
+  d.factors.foldl
+    (fun acc sf => mixHash (mixHash acc (checksumPoly sf.factor)) (hash sf.multiplicity))
+    (hash d.unit)
+
+/-- Per-parameter fixture for quotient-ring exponentiation. -/
+def prepPowModInput (n : Nat) : ModInput :=
+  { base := densePolyLarge (n + 1) 11
+    degree := n + 1
+    exponent := n + 1 }
+
+/-- Per-parameter fixture for fixed-prime Frobenius batches. -/
+def prepFrobeniusInput (n : Nat) : FrobeniusBatchInput :=
+  { count := n
+    degree := n + 1 }
+
+/-- Per-parameter fixture for Frobenius powers. -/
+def prepFrobeniusPowInput (n : Nat) : ModInput :=
+  { base := X
+    degree := n + 1
+    exponent := n + 1 }
+
+/-- Per-parameter fixture for same-size modular composition. -/
+def prepComposeInput (n : Nat) : ComposeInput :=
+  { outer := densePolyLarge (n + 1) 37
+    inner := densePolyLarge (n + 1) 71
+    degree := n + 1 }
+
+/-- Per-parameter fixture for weighted products of linear factors. -/
+def prepWeightedInput (n : Nat) : WeightedInput :=
+  { factors := (List.range n).map weightedFactor }
+
+/-- Per-parameter fixture for square-free decomposition. -/
+def prepSquareFreeInput (n : Nat) : SquareFreeInput :=
+  { poly := weightedProduct ((List.range n).map weightedFactor) }
+
+/-- Benchmark target: compute `base^exponent mod modulus`. -/
+def runPowModMonicChecksum (input : ModInput) : UInt64 :=
+  checksumPoly <|
+    powModMonic input.base (monicModulusLarge input.degree)
+      (monicModulusLarge_monic input.degree)
+      input.exponent
+
+/-- Benchmark target: compute a batch of `X^p mod modulus` calls. -/
+def runFrobeniusXModChecksum (input : FrobeniusBatchInput) : UInt64 :=
+  (Array.range input.count).foldl
+    (fun acc _ =>
+      mixHash acc <| checksumPoly <|
+        frobeniusXMod (monicModulusLarge input.degree) (monicModulusLarge_monic input.degree))
+    0
+
+/-- Benchmark target: compute `X^(p^k) mod modulus`. -/
+def runFrobeniusXPowModChecksum (input : ModInput) : UInt64 :=
+  checksumPoly <|
+    frobeniusXPowMod (monicModulusLarge input.degree) (monicModulusLarge_monic input.degree)
+      input.exponent
+
+/-- Benchmark target: compute modular composition and checksum the result. -/
+def runComposeModMonicChecksum (input : ComposeInput) : UInt64 :=
+  checksumPoly <|
+    composeModMonic input.outer input.inner (monicModulusLarge input.degree)
+      (monicModulusLarge_monic input.degree)
+
+/-- Benchmark target: multiply weighted square-free factors. -/
+def runWeightedProductChecksum (input : WeightedInput) : UInt64 :=
+  checksumPoly <| weightedProduct input.factors
+
+/-- Benchmark target: compute a square-free decomposition summary. -/
+def runSquareFreeDecompositionSummary (input : SquareFreeInput) : UInt64 :=
+  checksumSquareFree <| squareFreeDecomposition prime_five input.poly
+
+/-
+The modulus degree, reduced base degree, and exponent all scale with `n`.
+Square-and-multiply performs Theta(log n) quotient-ring multiplications, and
+each reduced dense multiplication/reduction is quadratic in the modulus degree.
+-/
+setup_benchmark runPowModMonicChecksum n => n * n * Nat.log2 (n + 1)
+  with prep := prepPowModInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+/-
+This registration batches `n` fixed-prime Frobenius calls on dense degree-`n`
+monic moduli. Each call performs a constant number of quotient-ring
+square-and-multiply steps with quadratic dense multiplication/reduction, so the
+batch is cubic.
+-/
+setup_benchmark runFrobeniusXModChecksum n => n * n * n
+  with prep := prepFrobeniusInput
+  where {
+    paramFloor := 8
+    paramCeiling := 48
+    paramSchedule := .custom #[8, 12, 16, 24, 32, 48]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+    slopeTolerance := 0.25
+  }
+
+/-
+Here both the modulus degree and Frobenius height scale with `n`. The exponent
+`65537^n` has Theta(n) bits, so the quotient-ring square-and-multiply loop performs
+Theta(n) quadratic reduced multiplications.
+-/
+setup_benchmark runFrobeniusXPowModChecksum n => n * n * n
+  with prep := prepFrobeniusPowInput
+  where {
+    paramFloor := 16
+    paramCeiling := 128
+    paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+/-
+Horner modular composition does one reduced multiplication per coefficient of
+the outer polynomial. With all reduced polynomials bounded by degree `n`, each
+step is quadratic, for Theta(n^3) total work.
+-/
+setup_benchmark runComposeModMonicChecksum n => n * n * n
+  with prep := prepComposeInput
+  where {
+    paramFloor := 32
+    paramCeiling := 256
+    paramSchedule := .custom #[32, 48, 64, 96, 128, 192, 256]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+/-
+The prepared family multiplies `n` linear factors, all with multiplicity one.
+The accumulator degree grows linearly, so the schoolbook multiplications by a
+linear polynomial sum to Theta(n^2).
+-/
+setup_benchmark runWeightedProductChecksum n => n * n
+  with prep := prepWeightedInput
+  where {
+    paramFloor := 256
+    paramCeiling := 4096
+    paramSchedule := .custom #[256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+/-
+This prepared family is a degree-`n` product of linear factors, built in `prep`.
+The timed Yun-style decomposition is dominated by dense Euclidean gcd/division
+work on degree-`n` inputs for this family, so the declared model is quadratic.
+-/
+setup_benchmark runSquareFreeDecompositionSummary n => n * n
+  with prep := prepSquareFreeInput
+  where {
+    paramFloor := 16
+    paramCeiling := 128
+    paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128]
+    maxSecondsPerCall := 4.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+    slopeTolerance := 0.35
+  }
+
+end FpPolyBench
+end Hex
+
+def main (args : List String) : IO UInt32 :=
+  LeanBench.Cli.dispatch args
