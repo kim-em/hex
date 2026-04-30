@@ -745,6 +745,33 @@ private theorem insertAt_last_castSucc_nodup {n : Nat}
     simpa using Nat.lt_succ_iff.mp i.isLt
   exact (List.perm_insertIdx (Fin.last n) (v.map Fin.castSucc).toList hidx).symm.nodup hcons
 
+private theorem finList_length_le_card {n : Nat} {xs : List (Fin n)}
+    (hnodup : xs.Nodup) :
+    xs.length ≤ n := by
+  have hsub : List.Subperm xs (List.finRange n) := by
+    exact List.subperm_of_subset hnodup (fun x _hx => List.mem_finRange x)
+  simpa [List.length_finRange] using List.Subperm.length_le hsub
+
+private theorem finLast_mem_of_full_nodup {n : Nat} {xs : List (Fin (n + 1))}
+    (hlen : xs.length = n + 1) (hnodup : xs.Nodup) :
+    Fin.last n ∈ xs := by
+  by_cases hmem : Fin.last n ∈ xs
+  · exact hmem
+  · exfalso
+    have hsub : List.Subperm xs ((List.finRange (n + 1)).erase (Fin.last n)) := by
+      apply List.subperm_of_subset hnodup
+      intro x hx
+      exact (List.mem_erase_of_ne (by
+        intro hxlast
+        exact hmem (hxlast ▸ hx))).2 (List.mem_finRange x)
+    have hle : xs.length ≤ ((List.finRange (n + 1)).erase (Fin.last n)).length :=
+      List.Subperm.length_le hsub
+    have herase :
+        ((List.finRange (n + 1)).erase (Fin.last n)).length = n := by
+      rw [List.length_erase]
+      simp [List.mem_finRange, List.length_finRange]
+    omega
+
 private theorem permutationVectors_nodup {n : Nat} {perm : Vector (Fin n) n}
     (hmem : perm ∈ permutationVectors n) :
     perm.toList.Nodup := by
