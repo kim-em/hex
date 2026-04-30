@@ -43,7 +43,7 @@ structure IntBasisInput where
 
 /-- Prepared typed matrix plus stable row indices for update-helper
 benchmarks. `prepUpdateInput n` uses `n + 3` rows so the adjacent-swap
-benchmarks always have a previous row and an above-row sample. -/
+benchmarks always have a previous row and a scaling above-row sample. -/
 structure UpdateInput where
   rows : Nat
   cols : Nat
@@ -126,8 +126,8 @@ def prepUpdateInput (n : Nat) : UpdateInput :=
       entries := flatUpdateBasis rows cols 83 }
   let sizeReduceSrc : Fin rows := ⟨0, by simp [rows]⟩
   let pivotK : Fin rows := ⟨n + 2, by simp [rows]⟩
-  let aboveK : Fin rows := ⟨1, by simp [rows]⟩
-  let aboveI : Fin rows := ⟨2, by simp [rows]⟩
+  let aboveK : Fin rows := ⟨n + 1, by simp [rows]⟩
+  let aboveI : Fin rows := ⟨n + 2, by simp [rows]⟩
   { rows := rows
     cols := cols
     matrix := matrixOfFlat flat
@@ -138,7 +138,7 @@ def prepUpdateInput (n : Nat) : UpdateInput :=
       omega
     aboveK := aboveK
     aboveHK := by
-      change 0 < 1
+      change 0 < n + 1
       omega
     aboveI := aboveI
     coeff := Int.ofNat ((n * 17 + 5) % 9) - 4 }
@@ -312,15 +312,17 @@ setup_benchmark runAdjacentSwapDenom n => updateGramComplexity n
 /- `prepUpdateInput n` uses `rows = n + 3`. The pivot coefficient reads one
 entry from `scaledCoeffs b`; because matrices are dense vectors, constructing
 that surface is the dominant step, giving `scaledCoeffSurfaceComplexity
-(n + 3)`. -/
+(n + 3)`. The ladder starts after the smallest cold rungs used for the full
+surface benchmark because this scalar helper otherwise spends too much of its
+signal on fixed evaluator overhead. -/
 setup_benchmark runAdjacentSwapPivotCoeff n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
-    paramFloor := 3
-    paramCeiling := 6
-    paramSchedule := .custom #[3, 4, 5, 6]
+    paramFloor := 8
+    paramCeiling := 16
+    paramSchedule := .custom #[8, 10, 12, 14, 16]
     maxSecondsPerCall := 5.0
-    targetInnerNanos := 200000000
+    targetInnerNanos := 1000000000
     signalFloorMultiplier := 1.0
   }
 
@@ -345,44 +347,48 @@ dominant step, so the model is still `scaledCoeffSurfaceComplexity (n + 3)`. -/
 setup_benchmark runAdjacentSwapGramDetQuotient n => updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
-    paramFloor := 3
-    paramCeiling := 6
-    paramSchedule := .custom #[3, 4, 5, 6]
+    paramFloor := 8
+    paramCeiling := 16
+    paramSchedule := .custom #[8, 10, 12, 14, 16]
     maxSecondsPerCall := 5.0
     targetInnerNanos := 200000000
     signalFloorMultiplier := 1.0
-    verdictWarmupFraction := 0.25
+    verdictWarmupFraction := 0.4
   }
 
 /- For the above-row previous-column update, `prepUpdateInput n` supplies
-`rows = n + 3`. The formula reads two `scaledCoeffs` entries and the adjacent
-swap quotient; dense `scaledCoeffs` construction dominates, so the declared
-model uses `scaledCoeffSurfaceComplexity (n + 3)`. -/
+`rows = n + 3` and chooses `aboveK = rows - 2`, `aboveI = rows - 1`, so the
+sampled scaled-coefficient entries have prefixes that grow with the fixture.
+The formula reads two `scaledCoeffs` entries and the adjacent-swap quotient;
+dense `scaledCoeffs` construction dominates, so the declared model uses
+`scaledCoeffSurfaceComplexity (n + 3)`. -/
 setup_benchmark runAdjacentSwapScaledCoeffAbovePrevNumerator n =>
     updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
-    paramFloor := 3
-    paramCeiling := 6
-    paramSchedule := .custom #[3, 4, 5, 6]
+    paramFloor := 4
+    paramCeiling := 12
+    paramSchedule := .custom #[4, 6, 8, 10, 12]
     maxSecondsPerCall := 5.0
     targetInnerNanos := 200000000
     signalFloorMultiplier := 1.0
+    verdictWarmupFraction := 0.4
   }
 
 /- For the above-row current-column update, `prepUpdateInput n` again maps to
-`rows = n + 3`. The dominant operation is constructing the dense `scaledCoeffs`
-surface for the two coefficient entries, while the Gram determinant and scalar
-operations are lower-order. -/
+`rows = n + 3` and uses the final above-row sample, so the coefficient prefixes
+scale with the prepared fixture. The dominant operation is constructing the
+dense `scaledCoeffs` surface for the two coefficient entries, while the Gram
+determinant and scalar operations are lower-order. -/
 setup_benchmark runAdjacentSwapScaledCoeffAboveCurrNumerator n =>
     updateScaledCoeffComplexity n
   with prep := prepUpdateInput
   where {
-    paramFloor := 3
-    paramCeiling := 6
-    paramSchedule := .custom #[3, 4, 5, 6]
+    paramFloor := 4
+    paramCeiling := 12
+    paramSchedule := .custom #[4, 6, 8, 10, 12]
     maxSecondsPerCall := 5.0
-    targetInnerNanos := 200000000
+    targetInnerNanos := 1000000000
     signalFloorMultiplier := 1.0
   }
 
