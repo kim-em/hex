@@ -1181,6 +1181,88 @@ private theorem square_congr_zero_mod_square
     exact foldl_mulCoeffSum_dvd_mod_square m b hb n (List.range b.size) 0 ⟨0, by simp⟩
   simpa using Int.emod_eq_zero_of_dvd hdvd
 
+private theorem coeff_product_dvd_mod_square_of_congr_zero
+    (m : Nat) (a b : ZPoly)
+    (ha : ZPoly.congr a 0 m) (hb : ZPoly.congr b 0 m) (i j : Nat) :
+    ((m * m : Nat) : Int) ∣ a.coeff i * b.coeff j := by
+  have hi_mod : (a.coeff i) % (m : Int) = 0 := by
+    simpa using ha i
+  have hj_mod : (b.coeff j) % (m : Int) = 0 := by
+    simpa using hb j
+  rcases Int.dvd_of_emod_eq_zero hi_mod with ⟨ai, hai⟩
+  rcases Int.dvd_of_emod_eq_zero hj_mod with ⟨bj, hbj⟩
+  refine ⟨ai * bj, ?_⟩
+  calc
+    a.coeff i * b.coeff j
+        = ((m : Int) * ai) * ((m : Int) * bj) := by rw [← hai, ← hbj]
+    _ = ((m * m : Nat) : Int) * (ai * bj) := by
+          grind
+
+private theorem mulCoeffStep_dvd_mod_square_of_congr_zero
+    (m : Nat) (a b : ZPoly)
+    (ha : ZPoly.congr a 0 m) (hb : ZPoly.congr b 0 m)
+    (n i : Nat) (acc : Int) (j : Nat)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣ DensePoly.mulCoeffStep a b n i acc j := by
+  by_cases hij : i + j = n
+  · rcases hacc with ⟨c, hc⟩
+    rcases coeff_product_dvd_mod_square_of_congr_zero m a b ha hb i j with ⟨d, hd⟩
+    refine ⟨c + d, ?_⟩
+    calc
+      DensePoly.mulCoeffStep a b n i acc j
+          = acc + a.coeff i * b.coeff j := by simp [DensePoly.mulCoeffStep, hij]
+      _ = ((m * m : Nat) : Int) * c + ((m * m : Nat) : Int) * d := by rw [hc, hd]
+      _ = ((m * m : Nat) : Int) * (c + d) := by grind
+  · simpa [DensePoly.mulCoeffStep, hij] using hacc
+
+private theorem foldl_mulCoeffStep_dvd_mod_square_of_congr_zero
+    (m : Nat) (a b : ZPoly)
+    (ha : ZPoly.congr a 0 m) (hb : ZPoly.congr b 0 m)
+    (n i : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣
+      xs.foldl (DensePoly.mulCoeffStep a b n i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons j xs ih =>
+      simpa using
+        ih (DensePoly.mulCoeffStep a b n i acc j)
+          (mulCoeffStep_dvd_mod_square_of_congr_zero m a b ha hb n i acc j hacc)
+
+private theorem foldl_mulCoeffSum_dvd_mod_square_of_congr_zero
+    (m : Nat) (a b : ZPoly)
+    (ha : ZPoly.congr a 0 m) (hb : ZPoly.congr b 0 m)
+    (n : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((m * m : Nat) : Int) ∣ acc) :
+    ((m * m : Nat) : Int) ∣
+      xs.foldl
+        (fun acc i => (List.range b.size).foldl (DensePoly.mulCoeffStep a b n i) acc)
+        acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons i xs ih =>
+      have hinner :
+          ((m * m : Nat) : Int) ∣
+            (List.range b.size).foldl (DensePoly.mulCoeffStep a b n i) acc :=
+        foldl_mulCoeffStep_dvd_mod_square_of_congr_zero
+          m a b ha hb n i (List.range b.size) acc hacc
+      simpa using ih
+        ((List.range b.size).foldl (DensePoly.mulCoeffStep a b n i) acc) hinner
+
+private theorem mul_congr_zero_mod_square_of_congr_zero
+    (m : Nat) (a b : ZPoly)
+    (ha : ZPoly.congr a 0 m) (hb : ZPoly.congr b 0 m) :
+    ZPoly.congr (a * b) 0 (m * m) := by
+  intro n
+  have hdvd :
+      ((m * m : Nat) : Int) ∣ (a * b).coeff n := by
+    rw [DensePoly.coeff_mul, DensePoly.mulCoeffSum]
+    exact foldl_mulCoeffSum_dvd_mod_square_of_congr_zero
+      m a b ha hb n (List.range a.size) 0 ⟨0, by simp⟩
+  simpa using Int.emod_eq_zero_of_dvd hdvd
+
 private theorem one_sub_square_congr_one_of_square_congr_zero
     (m : Nat) (b : ZPoly)
     (_hm : 1 < m)
@@ -1221,6 +1303,102 @@ private theorem quadraticHenselStep_bezout_error_congr_zero_core
     ZPoly.congr b 0 m := by
   exact quadraticHenselStep_bezout_error_from_factor_update m f g h s t hm hprod hbez hmonic
 
+private theorem mul_sub_right_exact
+    (x y z : ZPoly) :
+    x * z - y * z = (x - y) * z := by
+  calc
+    x * z - y * z
+        = x * z + (0 - y * z) := by
+          exact DensePoly.sub_eq_add_neg_poly (x * z) (y * z)
+    _ = x * z + (0 - y) * z := by
+          rw [DensePoly.neg_mul_right_poly y z]
+    _ = (x + (0 - y)) * z := by
+          exact (DensePoly.mul_add_left_poly x (0 - y) z).symm
+    _ = (x - y) * z := by
+          rw [DensePoly.sub_eq_add_neg_poly x y]
+
+private theorem congr_mul_right_zero_mod_square
+    (m : Nat) (x y z : ZPoly)
+    (hxy : ZPoly.congr x y m)
+    (hz : ZPoly.congr z 0 m) :
+    ZPoly.congr (x * z) (y * z) (m * m) := by
+  have hdiffBase : ZPoly.congr (x - y) 0 m := by
+    have hsub : ZPoly.congr (x - y) (y - y) m :=
+      congr_sub x y y y m hxy (ZPoly.congr_refl y m)
+    simpa [sub_self_eq_zero y] using hsub
+  have hmul :
+      ZPoly.congr ((x - y) * z) 0 (m * m) :=
+    mul_congr_zero_mod_square_of_congr_zero m (x - y) z hdiffBase hz
+  intro i
+  have hi : ((x * z - y * z).coeff i - (0 : ZPoly).coeff i) %
+      (((m * m : Nat) : Int)) = 0 := by
+    simpa [mul_sub_right_exact x y z] using hmul i
+  rw [DensePoly.coeff_sub, DensePoly.coeff_zero] at hi
+  · simpa [Int.sub_zero] using hi
+  · rfl
+
+private theorem quadraticHenselStep_factor_update_expand_exact
+    (g h r c : ZPoly) :
+    (g + r) * (h + c) = g * h + (g * c + r * h) + r * c := by
+  calc
+    (g + r) * (h + c)
+        = (g + r) * h + (g + r) * c := by
+          rw [DensePoly.mul_add_right_poly]
+    _ = (g * h + r * h) + (g * c + r * c) := by
+          rw [DensePoly.mul_add_left_poly, DensePoly.mul_add_left_poly]
+    _ = g * h + (g * c + r * h) + r * c := by
+          apply DensePoly.ext_coeff
+          intro n
+          repeat rw [DensePoly.coeff_add]
+          all_goals try rfl
+          omega
+
+private theorem quadraticHenselStep_factor_first_order_exact
+    (g h s e q r : ZPoly) :
+    g * (s * e + q * h) + r * h =
+      (s * g) * e + (q * g + r) * h := by
+  calc
+    g * (s * e + q * h) + r * h
+        = (g * (s * e) + g * (q * h)) + r * h := by
+          rw [DensePoly.mul_add_right_poly]
+    _ = ((s * g) * e + (q * g) * h) + r * h := by
+          rw [← DensePoly.mul_assoc_poly g s e]
+          rw [DensePoly.mul_comm_poly g s]
+          rw [← DensePoly.mul_assoc_poly g q h]
+          rw [DensePoly.mul_comm_poly g q]
+    _ = (s * g) * e + ((q * g) * h + r * h) := by
+          apply DensePoly.ext_coeff
+          intro n
+          repeat rw [DensePoly.coeff_add]
+          all_goals try rfl
+          omega
+    _ = (s * g) * e + (q * g + r) * h := by
+          rw [DensePoly.mul_add_left_poly]
+
+private theorem quadraticHenselStep_factor_first_order_bezout_exact
+    (g h s t e : ZPoly) :
+    (s * g) * e + (t * e) * h = (s * g + t * h) * e := by
+  calc
+    (s * g) * e + (t * e) * h
+        = (s * g) * e + (t * h) * e := by
+          rw [DensePoly.mul_assoc_poly t e h]
+          rw [DensePoly.mul_comm_poly e h]
+          rw [← DensePoly.mul_assoc_poly t h e]
+    _ = (s * g + t * h) * e := by
+          rw [DensePoly.mul_add_left_poly]
+
+private theorem quadraticHenselStep_factor_error_add_exact
+    (f g h e : ZPoly)
+    (he : e = QuadraticLiftResult.factorError f g h) :
+    g * h + e = f := by
+  rw [he, QuadraticLiftResult.factorError]
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_add, DensePoly.coeff_sub]
+  · omega
+  · rfl
+  · rfl
+
 /-- One quadratic Hensel correction step from modulus `m` to modulus `m^2`. -/
 def quadraticHenselStep
     (m : Nat) (f g h s t : ZPoly) : QuadraticLiftResult :=
@@ -1241,13 +1419,14 @@ def quadraticHenselStep
   let s' := subModSquare (subModSquare s (mulModSquare s b m) m) (mulModSquare qBezout h' m) m
   { g := g', h := h', s := s', t := t' }
 
+set_option maxHeartbeats 2000000 in
 private theorem quadraticHenselStep_raw_factor_congr
     (m : Nat)
     (f g h s t : ZPoly)
     (hm : 0 < m)
     (hprod : ZPoly.congr (g * h) f m)
     (hbez : ZPoly.congr (s * g + t * h) 1 m)
-    (hmonic : DensePoly.Monic g) :
+    (_hmonic : DensePoly.Monic g) :
     let e := QuadraticLiftResult.factorError f g h
     let te := mulModSquare t e m
     let factorQR := divModMonicModSquare te g m
@@ -1257,7 +1436,138 @@ private theorem quadraticHenselStep_raw_factor_congr
     let hCorrection := addModSquare (mulModSquare s e m) (mulModSquare qFactor h m) m
     let h' := addModSquare h hCorrection m
     ZPoly.congr (g' * h') f (m * m) := by
-  sorry
+  intro e te factorQR qFactor rFactor g' hCorrection h'
+  have heq : e = QuadraticLiftResult.factorError f g h := rfl
+  have he : ZPoly.congr e 0 m := by
+    have hf : ZPoly.congr f (g * h) m := ZPoly.congr_symm (g * h) f m hprod
+    simpa [e, QuadraticLiftResult.factorError, sub_self_eq_zero (g * h)] using
+      congr_sub f (g * h) (g * h) (g * h) m hf (ZPoly.congr_refl (g * h) m)
+  have hteSq : ZPoly.congr te (t * e) (m * m) := by
+    simpa [te] using mulModSquare_congr m t e hm
+  have hteBase : ZPoly.congr te 0 m := by
+    have htBase : ZPoly.congr (t * e) 0 m :=
+      mul_right_zero_mod_base m t e he
+    exact ZPoly.congr_trans te (t * e) 0 m
+      (congr_of_square_mod m te (t * e) hteSq) htBase
+  have hpair : (qFactor, rFactor) = divModMonicModSquare te g m := by
+    simp [factorQR, qFactor, rFactor]
+  have hqr : ZPoly.congr qFactor 0 m ∧ ZPoly.congr rFactor 0 m :=
+    divModMonicModSquare_zero_mod_base m te g qFactor rFactor hteBase hpair
+  have hdivMod :
+      ZPoly.congr (qFactor * g + rFactor) te (m * m) :=
+    divModMonicModSquare_reconstruct_congr m te g qFactor rFactor hm hpair
+  have hdiv :
+      ZPoly.congr (qFactor * g + rFactor) (t * e) (m * m) :=
+    ZPoly.congr_trans _ _ _ (m * m) hdivMod hteSq
+  let c := s * e + qFactor * h
+  have hseBase : ZPoly.congr (s * e) 0 m :=
+    mul_right_zero_mod_base m s e he
+  have hqhBase : ZPoly.congr (qFactor * h) 0 m := by
+    simpa [DensePoly.zero_mul] using
+      ZPoly.congr_mul qFactor h 0 h m hqr.1 (ZPoly.congr_refl h m)
+  have hcBase : ZPoly.congr c 0 m := by
+    simpa [c, DensePoly.zero_add] using
+      ZPoly.congr_add (s * e) (qFactor * h) 0 0 m hseBase hqhBase
+  have hseSq :
+      ZPoly.congr (mulModSquare s e m) (s * e) (m * m) :=
+    mulModSquare_congr m s e hm
+  have hqhSq :
+      ZPoly.congr (mulModSquare qFactor h m) (qFactor * h) (m * m) :=
+    mulModSquare_congr m qFactor h hm
+  have hCorrectionSq : ZPoly.congr hCorrection c (m * m) := by
+    have haddRed :
+        ZPoly.congr hCorrection
+          (mulModSquare s e m + mulModSquare qFactor h m) (m * m) := by
+      simpa [hCorrection] using
+        addModSquare_congr m (mulModSquare s e m) (mulModSquare qFactor h m) hm
+    have haddPlain :
+        ZPoly.congr
+          (mulModSquare s e m + mulModSquare qFactor h m)
+          c
+          (m * m) := by
+      simpa [c] using
+        ZPoly.congr_add (mulModSquare s e m) (mulModSquare qFactor h m)
+          (s * e) (qFactor * h) (m * m) hseSq hqhSq
+    exact ZPoly.congr_trans _ _ _ (m * m) haddRed haddPlain
+  have hg'Sq : ZPoly.congr g' (g + rFactor) (m * m) := by
+    simpa [g'] using addModSquare_congr m g rFactor hm
+  have hh'Sq : ZPoly.congr h' (h + c) (m * m) := by
+    have haddRed : ZPoly.congr h' (h + hCorrection) (m * m) := by
+      simpa [h'] using addModSquare_congr m h hCorrection hm
+    have haddPlain : ZPoly.congr (h + hCorrection) (h + c) (m * m) :=
+      ZPoly.congr_add h hCorrection h c (m * m) (ZPoly.congr_refl h (m * m)) hCorrectionSq
+    exact ZPoly.congr_trans _ _ _ (m * m) haddRed haddPlain
+  have hprodExpanded :
+      ZPoly.congr (g' * h') ((g + rFactor) * (h + c)) (m * m) :=
+    ZPoly.congr_mul g' h' (g + rFactor) (h + c) (m * m) hg'Sq hh'Sq
+  have hcross :
+      ZPoly.congr (rFactor * c) 0 (m * m) :=
+    mul_congr_zero_mod_square_of_congr_zero m rFactor c hqr.2 hcBase
+  have hfirstExact :
+      g * c + rFactor * h =
+        (s * g) * e + (qFactor * g + rFactor) * h := by
+    simpa [c] using
+      quadraticHenselStep_factor_first_order_exact g h s e qFactor rFactor
+  have hdivH :
+      ZPoly.congr ((qFactor * g + rFactor) * h) ((t * e) * h) (m * m) :=
+    ZPoly.congr_mul (qFactor * g + rFactor) h (t * e) h
+      (m * m) hdiv (ZPoly.congr_refl h (m * m))
+  have hfirstToBez :
+      ZPoly.congr (g * c + rFactor * h) ((s * g + t * h) * e) (m * m) := by
+    have hstep :
+        ZPoly.congr
+          ((s * g) * e + (qFactor * g + rFactor) * h)
+          ((s * g) * e + (t * e) * h)
+          (m * m) :=
+      ZPoly.congr_add ((s * g) * e) ((qFactor * g + rFactor) * h)
+        ((s * g) * e) ((t * e) * h) (m * m)
+        (ZPoly.congr_refl ((s * g) * e) (m * m)) hdivH
+    exact ZPoly.congr_trans _ _ _ (m * m)
+      (by simpa [hfirstExact] using ZPoly.congr_refl (g * c + rFactor * h) (m * m))
+      (ZPoly.congr_trans _ _ _ (m * m) hstep
+        (by
+          simpa [quadraticHenselStep_factor_first_order_bezout_exact g h s t e] using
+            ZPoly.congr_refl ((s * g) * e + (t * e) * h) (m * m)))
+  have hbezE :
+      ZPoly.congr ((s * g + t * h) * e) (1 * e) (m * m) :=
+    congr_mul_right_zero_mod_square m (s * g + t * h) 1 e hbez he
+  have honeE : (1 : ZPoly) * e = e := by
+    rw [DensePoly.mul_comm_poly (1 : ZPoly) e]
+    exact DensePoly.mul_one_right_poly e
+  have hOneE : ZPoly.congr ((1 : ZPoly) * e) e (m * m) := by
+    rw [honeE]
+    exact ZPoly.congr_refl e (m * m)
+  have hfirst :
+      ZPoly.congr (g * c + rFactor * h) e (m * m) :=
+    ZPoly.congr_trans _ _ _ (m * m) hfirstToBez
+      (ZPoly.congr_trans _ _ _ (m * m) hbezE hOneE)
+  have hexpandedToError :
+      ZPoly.congr ((g + rFactor) * (h + c)) (g * h + e) (m * m) := by
+    have hexpand :
+        (g + rFactor) * (h + c) =
+          g * h + (g * c + rFactor * h) + rFactor * c :=
+      quadraticHenselStep_factor_update_expand_exact g h rFactor c
+    rw [hexpand]
+    have hsum :
+        ZPoly.congr (g * h + (g * c + rFactor * h) + rFactor * c)
+          (g * h + e + 0) (m * m) :=
+      ZPoly.congr_add (g * h + (g * c + rFactor * h)) (rFactor * c)
+        (g * h + e) 0 (m * m)
+        (ZPoly.congr_add (g * h) (g * c + rFactor * h) (g * h) e
+          (m * m) (ZPoly.congr_refl (g * h) (m * m)) hfirst)
+        hcross
+    have hzero : g * h + e + (0 : ZPoly) = g * h + e := by
+      apply DensePoly.ext_coeff
+      intro n
+      rw [DensePoly.coeff_add, DensePoly.coeff_zero]
+      · omega
+      · rfl
+    exact ZPoly.congr_trans _ _ _ (m * m) hsum
+      (by simpa [hzero] using ZPoly.congr_refl (g * h + e + (0 : ZPoly)) (m * m))
+  have herror : g * h + e = f :=
+    quadraticHenselStep_factor_error_add_exact f g h e heq
+  exact ZPoly.congr_trans _ _ _ (m * m) hprodExpanded
+    (by simpa [herror] using hexpandedToError)
 
 private theorem quadraticHenselStep_bezout_error_congr_zero
     (m : Nat)
