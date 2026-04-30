@@ -221,6 +221,125 @@ private theorem scale_congr_of_congr_mod_base
   change (Int.ofNat (p ^ k) * Int.ofNat p) * w = Int.ofNat (p ^ k * p) * w
   rfl
 
+private theorem liftScaledCoeff_product_dvd_next
+    (p k : Nat) [ZMod64.Bounds p]
+    (r hCorrection : FpPoly p) (_hk : 1 ≤ k) (i j : Nat) :
+    ((p ^ (k + 1) : Nat) : Int) ∣
+      (LinearLiftResult.liftScaledIncrement p k r).coeff i *
+        (LinearLiftResult.liftScaledIncrement p k hCorrection).coeff j := by
+  rcases Nat.exists_eq_add_of_le _hk with ⟨k0, rfl⟩
+  rw [LinearLiftResult.coeff_liftScaledIncrement,
+    LinearLiftResult.coeff_liftScaledIncrement]
+  refine ⟨Int.ofNat (p ^ k0 * (r.coeff i).toNat * (hCorrection.coeff j).toNat), ?_⟩
+  have hpow_exp : (1 + k0) + (1 + k0) = (1 + k0 + 1) + k0 := by
+    omega
+  have hpow : p ^ (1 + k0) * p ^ (1 + k0) = p ^ (1 + k0 + 1) * p ^ k0 := by
+    rw [← Nat.pow_add, ← Nat.pow_add]
+    rw [hpow_exp]
+  calc
+    Int.ofNat (p ^ (1 + k0)) * Int.ofNat (r.coeff i).toNat *
+        (Int.ofNat (p ^ (1 + k0)) * Int.ofNat (hCorrection.coeff j).toNat)
+        =
+          Int.ofNat (p ^ (1 + k0) * p ^ (1 + k0)) *
+            (Int.ofNat (r.coeff i).toNat * Int.ofNat (hCorrection.coeff j).toNat) := by
+          grind
+    _ =
+          Int.ofNat (p ^ (1 + k0 + 1) * p ^ k0) *
+            (Int.ofNat (r.coeff i).toNat * Int.ofNat (hCorrection.coeff j).toNat) := by
+          rw [hpow]
+    _ =
+          Int.ofNat (p ^ (1 + k0 + 1)) *
+            Int.ofNat (p ^ k0 * (r.coeff i).toNat * (hCorrection.coeff j).toNat) := by
+          grind
+
+private theorem mulCoeffStep_liftScaled_dvd_next
+    (p k : Nat) [ZMod64.Bounds p]
+    (r hCorrection : FpPoly p) (_hk : 1 ≤ k)
+    (n i : Nat) (acc : Int) (j : Nat)
+    (hacc : ((p ^ (k + 1) : Nat) : Int) ∣ acc) :
+    ((p ^ (k + 1) : Nat) : Int) ∣
+      DensePoly.mulCoeffStep
+        (LinearLiftResult.liftScaledIncrement p k r)
+        (LinearLiftResult.liftScaledIncrement p k hCorrection)
+        n i acc j := by
+  by_cases hij : i + j = n
+  · rcases hacc with ⟨a, ha⟩
+    rcases liftScaledCoeff_product_dvd_next p k r hCorrection _hk i j with ⟨c, hc⟩
+    refine ⟨a + c, ?_⟩
+    calc
+      DensePoly.mulCoeffStep
+          (LinearLiftResult.liftScaledIncrement p k r)
+          (LinearLiftResult.liftScaledIncrement p k hCorrection)
+          n i acc j
+          = acc +
+              (LinearLiftResult.liftScaledIncrement p k r).coeff i *
+                (LinearLiftResult.liftScaledIncrement p k hCorrection).coeff j := by
+            simp [DensePoly.mulCoeffStep, hij]
+      _ = ((p ^ (k + 1) : Nat) : Int) * a +
+            ((p ^ (k + 1) : Nat) : Int) * c := by rw [ha, hc]
+      _ = ((p ^ (k + 1) : Nat) : Int) * (a + c) := by grind
+  · simpa [DensePoly.mulCoeffStep, hij] using hacc
+
+private theorem foldl_mulCoeffStep_liftScaled_dvd_next
+    (p k : Nat) [ZMod64.Bounds p]
+    (r hCorrection : FpPoly p) (_hk : 1 ≤ k)
+    (n i : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((p ^ (k + 1) : Nat) : Int) ∣ acc) :
+    ((p ^ (k + 1) : Nat) : Int) ∣
+      xs.foldl
+        (DensePoly.mulCoeffStep
+          (LinearLiftResult.liftScaledIncrement p k r)
+          (LinearLiftResult.liftScaledIncrement p k hCorrection)
+          n i)
+        acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons j xs ih =>
+      simpa using
+        ih (DensePoly.mulCoeffStep
+          (LinearLiftResult.liftScaledIncrement p k r)
+          (LinearLiftResult.liftScaledIncrement p k hCorrection)
+          n i acc j)
+          (mulCoeffStep_liftScaled_dvd_next p k r hCorrection _hk n i acc j hacc)
+
+private theorem foldl_mulCoeffSum_liftScaled_dvd_next
+    (p k : Nat) [ZMod64.Bounds p]
+    (r hCorrection : FpPoly p) (_hk : 1 ≤ k)
+    (n : Nat) (xs : List Nat) (acc : Int)
+    (hacc : ((p ^ (k + 1) : Nat) : Int) ∣ acc) :
+    ((p ^ (k + 1) : Nat) : Int) ∣
+      xs.foldl
+        (fun acc i =>
+          (List.range (LinearLiftResult.liftScaledIncrement p k hCorrection).size).foldl
+            (DensePoly.mulCoeffStep
+              (LinearLiftResult.liftScaledIncrement p k r)
+              (LinearLiftResult.liftScaledIncrement p k hCorrection)
+              n i)
+            acc)
+        acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons i xs ih =>
+      have hinner :
+          ((p ^ (k + 1) : Nat) : Int) ∣
+            (List.range (LinearLiftResult.liftScaledIncrement p k hCorrection).size).foldl
+              (DensePoly.mulCoeffStep
+                (LinearLiftResult.liftScaledIncrement p k r)
+                (LinearLiftResult.liftScaledIncrement p k hCorrection)
+                n i)
+              acc :=
+        foldl_mulCoeffStep_liftScaled_dvd_next p k r hCorrection _hk n i
+          (List.range (LinearLiftResult.liftScaledIncrement p k hCorrection).size) acc hacc
+      simpa using ih
+        ((List.range (LinearLiftResult.liftScaledIncrement p k hCorrection).size).foldl
+          (DensePoly.mulCoeffStep
+            (LinearLiftResult.liftScaledIncrement p k r)
+            (LinearLiftResult.liftScaledIncrement p k hCorrection)
+            n i)
+          acc) hinner
+
 private theorem linearHenselStep_product_expansion_cross_congr
     (p k : Nat) [ZMod64.Bounds p]
     (r hCorrection : FpPoly p)
@@ -230,7 +349,13 @@ private theorem linearHenselStep_product_expansion_cross_congr
         LinearLiftResult.liftScaledIncrement p k hCorrection)
       0
       (p ^ (k + 1)) := by
-  sorry
+  intro i
+  rw [DensePoly.coeff_mul, DensePoly.coeff_zero]
+  apply Int.emod_eq_zero_of_dvd
+  unfold DensePoly.mulCoeffSum
+  simpa using
+    foldl_mulCoeffSum_liftScaled_dvd_next p k r hCorrection _hk i
+      (List.range (LinearLiftResult.liftScaledIncrement p k r).size) 0 ⟨0, by simp⟩
 
 private theorem linearHenselStep_product_expansion_identity_congr_core
     (p k : Nat) [ZMod64.Bounds p]
