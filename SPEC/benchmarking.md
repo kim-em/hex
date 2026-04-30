@@ -480,3 +480,17 @@ explicitly forbidden:
   (rungs too close to the per-spawn floor, even when some survive
   the filter) is miscalibration, not a finding, and the registration
   must be re-tuned before the library advances through Phase 4.
+- **Verdict-fitting: rewriting the algorithm, fixture, or declaration
+  so an inconclusive verdict converges.** The declared complexity is
+  the contract, derived from the algorithm a priori; the verdict only
+  checks it. Rewriting the implementation under test, rescaling
+  `degree := f(n)`, or raising `verdictWarmupFraction` until the
+  harness reports "consistent" is not a fix — it is laundering the
+  verdict. Inconclusive means raise the schedule or file a
+  finding-issue against the implementation, never re-declare.
+
+Every `setup_benchmark` registration must carry an adjacent comment
+deriving its `n => …` from the algorithm: which step dominates, and
+how the prep fixture's parameter maps onto that step's input size.
+Changes to a declaration require a commit message re-deriving the
+model independently of harness output.
