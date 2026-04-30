@@ -1,4 +1,5 @@
 import HexPoly.Dense
+import Init.Data.Array.Lemmas
 
 /-!
 Executable arithmetic operations for dense array-backed polynomials.
@@ -139,6 +140,164 @@ def mul [Add R] [Mul R] (p q : DensePoly R) : DensePoly R :=
 
 instance [Add R] [Mul R] : Mul (DensePoly R) where
   mul := mul
+
+/-- One inner schoolbook multiplication step, projected to coefficient `n`. -/
+def mulCoeffStep [Add R] [Mul R] (p q : DensePoly R) (n i : Nat) (acc : R) (j : Nat) : R :=
+  if i + j = n then acc + p.coeff i * q.coeff j else acc
+
+/-- The schoolbook coefficient fold matching the executable multiplication loop order. -/
+def mulCoeffSum [Add R] [Mul R] (p q : DensePoly R) (n : Nat) : R :=
+  (List.range p.size).foldl
+    (fun acc i => (List.range q.size).foldl (mulCoeffStep p q n i) acc)
+    (Zero.zero : R)
+
+omit [DecidableEq R] in
+private theorem array_getD_set!_schoolbook [Add R] [Mul R]
+    (acc : Array R) (n k : Nat) (term : R) (hk : k < acc.size) :
+    (acc.set! k (acc[k]?.getD (Zero.zero : R) + term)).getD n (Zero.zero : R) =
+      if k = n then acc.getD n (Zero.zero : R) + term else acc.getD n (Zero.zero : R) := by
+  by_cases hkn : k = n
+  · subst n
+    simp [Array.getD, hk]
+  ·
+    by_cases hn : n < acc.size
+    · unfold Array.getD
+      simp [Array.set!_eq_setIfInBounds, hk, hn, hkn]
+    · unfold Array.getD
+      simp [Array.set!_eq_setIfInBounds, hk, hn, hkn]
+
+private theorem mul_inner_array_coeff_fold [Add R] [Mul R]
+    (p q : DensePoly R) (n i : Nat) (xs : List Nat) (acc : Array R)
+    (hbound : ∀ j, j ∈ xs → i + j < acc.size) :
+    (xs.foldl
+        (fun acc j =>
+          let k := i + j
+          acc.set! k ((acc[k]?).getD (Zero.zero : R) + p.coeff i * q.coeff j))
+        acc).getD n (Zero.zero : R) =
+      xs.foldl (mulCoeffStep p q n i) (acc.getD n (Zero.zero : R)) := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      have hj : i + j < acc.size := hbound j (by simp)
+      rw [ih]
+      · rw [array_getD_set!_schoolbook (R := R) acc n (i + j) (p.coeff i * q.coeff j) hj]
+        unfold mulCoeffStep
+        by_cases h : i + j = n
+        · simp [h]
+        · simp [h]
+      · intro j' hj'
+        simpa [Array.size_setIfInBounds] using hbound j' (by simp [hj'])
+
+private theorem mul_inner_array_size [Add R] [Mul R]
+    (p q : DensePoly R) (i : Nat) (xs : List Nat) (acc : Array R) :
+    (xs.foldl
+        (fun acc j =>
+          let k := i + j
+          acc.set! k ((acc[k]?).getD (Zero.zero : R) + p.coeff i * q.coeff j))
+        acc).size = acc.size := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih]
+      simp [Array.size_setIfInBounds]
+
+private theorem mul_array_coeff_fold [Add R] [Mul R]
+    (p q : DensePoly R) (n : Nat) (xs : List Nat) (acc : Array R) (size : Nat)
+    (hacc : acc.size = size)
+    (hbound : ∀ i, i ∈ xs → ∀ j, j < q.size → i + j < size) :
+    (xs.foldl
+        (fun acc i =>
+          (List.range q.size).foldl
+            (fun acc j =>
+              let k := i + j
+              acc.set! k ((acc[k]?).getD (Zero.zero : R) + p.coeff i * q.coeff j))
+            acc)
+        acc).getD n (Zero.zero : R) =
+      xs.foldl (fun coeff i => (List.range q.size).foldl (mulCoeffStep p q n i) coeff)
+        (acc.getD n (Zero.zero : R)) := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hinner :
+          ((List.range q.size).foldl
+              (fun acc j =>
+                let k := i + j
+                acc.set! k ((acc[k]?).getD (Zero.zero : R) + p.coeff i * q.coeff j))
+              acc).getD n (Zero.zero : R) =
+            (List.range q.size).foldl (mulCoeffStep p q n i)
+              (acc.getD n (Zero.zero : R)) := by
+        apply mul_inner_array_coeff_fold
+        intro j hj
+        have hjlt : j < q.size := by simpa using List.mem_range.mp hj
+        simpa [hacc] using hbound i (by simp) j hjlt
+      rw [ih]
+      · rw [hinner]
+      · rw [mul_inner_array_size]
+        exact hacc
+      · intro i' hi' j hj
+        exact hbound i' (by simp [hi']) j hj
+
+private theorem size_eq_zero_of_isZero_true (p : DensePoly R) (h : p.isZero = true) :
+    p.size = 0 := by
+  have hsize : p.coeffs.size = 0 := by
+    simpa [isZero, Array.isEmpty_iff_size_eq_zero] using h
+  simpa [size] using hsize
+
+private theorem size_pos_of_isZero_false (p : DensePoly R) (h : p.isZero = false) :
+    0 < p.size := by
+  have hsize : p.coeffs.size ≠ 0 := by
+    simpa [isZero, Array.isEmpty_iff_size_eq_zero] using h
+  simpa [size, Nat.pos_iff_ne_zero] using hsize
+
+omit [Zero R] [DecidableEq R] in
+private theorem list_foldl_ignore (xs : List Nat) (init : R) :
+    xs.foldl (fun acc _ => acc) init = init := by
+  induction xs generalizing init with
+  | nil =>
+      rfl
+  | cons _ xs ih =>
+      simpa using ih init
+
+theorem coeff_mul [Add R] [Mul R] (p q : DensePoly R) (n : Nat) :
+    (p * q).coeff n = mulCoeffSum p q n := by
+  change (mul p q).coeff n = mulCoeffSum p q n
+  unfold mul
+  by_cases hzero : p.isZero || q.isZero
+  · rw [if_pos hzero]
+    by_cases hp : p.isZero
+    · have hpsize : p.size = 0 := size_eq_zero_of_isZero_true p (by simpa using hp)
+      rw [show (0 : DensePoly R).coeff n = (Zero.zero : R) by
+        exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)]
+      simp [mulCoeffSum, hpsize]
+    · have hq : q.isZero = true := by
+        cases hq' : q.isZero <;> simp [hp, hq'] at hzero ⊢
+      have hqsize : q.size = 0 := size_eq_zero_of_isZero_true q hq
+      rw [show (0 : DensePoly R).coeff n = (Zero.zero : R) by
+        exact coeff_eq_zero_of_size_le (0 : DensePoly R) (by simp)]
+      simp [mulCoeffSum, hqsize, list_foldl_ignore]
+  · rw [if_neg hzero]
+    rw [coeff_ofCoeffs]
+    have hp_not : p.isZero = false := by
+      cases hp : p.isZero <;> cases hq : q.isZero <;> simp [hp, hq] at hzero ⊢
+    have hq_not : q.isZero = false := by
+      cases hp : p.isZero <;> cases hq : q.isZero <;> simp [hp, hq] at hzero ⊢
+    have hp_pos : 0 < p.size := size_pos_of_isZero_false p hp_not
+    have hq_pos : 0 < q.size := size_pos_of_isZero_false q hq_not
+    let size := p.size + q.size - 1
+    have hfold :=
+      mul_array_coeff_fold p q n (List.range p.size)
+        (Array.replicate size (Zero.zero : R)) size (by simp)
+        (by
+          intro i hi j hj
+          have hi' : i < p.size := by simpa using List.mem_range.mp hi
+          omega)
+    simpa [mulCoeffSum, size, Array.getD] using hfold
 
 /-- Evaluate a polynomial using Horner's method. -/
 def eval [Add R] [Mul R] (p : DensePoly R) (x : R) : R :=
