@@ -397,6 +397,28 @@ private theorem detProduct_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Na
           (List.finRange n) i c (fun r => M[r][perm[r]]) 1
           (List.mem_finRange i) (List.nodup_finRange n)
 
+private def finTranspose {n : Nat} (i j : Fin n) (r : Fin n) : Fin n :=
+  if r = i then j else if r = j then i else r
+
+private def transposePermutationValues {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) : Vector (Fin n) n :=
+  Vector.ofFn fun r => perm[finTranspose i j r]
+
+private theorem detTerm_rowSwap_transposeValues {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
+    detTerm (rowSwap M i j) perm =
+      -detTerm M (transposePermutationValues perm i j) := by
+  sorry
+
+private theorem permutationVectors_transposeValues_neg_sum {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) :
+    (permutationVectors n).foldl
+        (fun acc perm => acc + -detTerm M (transposePermutationValues perm i j)) 0 =
+      -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+  sorry
+
 /-- The permutation-vector enumeration contributes `1` on the identity
 matrix: all non-identity terms vanish and the identity vector appears once. -/
 private theorem permutationVectors_identity_sum {R : Type u} [Lean.Grind.CommRing R]
@@ -411,7 +433,16 @@ private theorem permutationVectors_rowSwap_sum {R : Type u} [Lean.Grind.CommRing
     (permutationVectors n).foldl
         (fun acc perm => acc + detTerm (rowSwap M i j) perm) 0 =
       -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
-  sorry
+  calc
+    (permutationVectors n).foldl
+        (fun acc perm => acc + detTerm (rowSwap M i j) perm) 0 =
+      (permutationVectors n).foldl
+        (fun acc perm => acc + -detTerm M (transposePermutationValues perm i j)) 0 := by
+        apply foldl_det_sum_congr
+        intro perm _hmem
+        exact detTerm_rowSwap_transposeValues M i j h perm
+    _ = -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
+        exact permutationVectors_transposeValues_neg_sum M i j h
 
 /-- Scaling one matrix row scales each Leibniz term by the same scalar. -/
 private theorem detTerm_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
