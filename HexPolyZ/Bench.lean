@@ -14,9 +14,9 @@ Scientific registrations:
 * `runCoprimeModPWitness`: finite-prefix Bezout witness checking, `O(n^2)`.
 * `runContent`: integer coefficient content, `O(n)`.
 * `runPrimitivePartChecksum`: integer primitive part, `O(n)`.
-* `runBinom`: central-binomial multiplicative formula, `O(n log^2 n)` under
-  compiled `Nat` arithmetic. The timed loop performs `O(n)` arithmetic steps,
-  and the central-binomial accumulator grows linearly in bit width.
+* `runBinom`: central-binomial multiplicative formula, `O(n^2)` under
+  compiled `Nat` arithmetic. The timed loop performs `O(n)` arithmetic steps
+  over an accumulator whose bit width grows linearly in `n`.
 * `runFloorSqrtChecksum`: batched floor-square-root computation, `O(n log n)`.
 * `runCeilSqrtChecksum`: batched ceiling-square-root computation, `O(n log n)`.
 * `runCoeffNormSq`: squared coefficient-vector norm, `O(n)`.
@@ -251,18 +251,17 @@ setup_benchmark runPrimitivePartChecksum n => n
 /-
 `ZPoly.binom (2*n) n` folds across `min n n = n` multiplicative terms.
 For this central-binomial fixture the accumulator reaches linear bit width.
-Over the committed parameter range, compiled `Nat` multiplication and exact
-division by the small `n - i` and `i + 1` factors track the bit-growth cost
-rather than pure operation count, so the scientific declaration includes two
-logarithmic growth factors.
+Each compiled `Nat` multiply/divide step therefore scales with the accumulator
+limb count, so the scientific declaration models bit-cost growth rather than
+only counting loop iterations.
 -/
-setup_benchmark runBinom n => n * Nat.log2 (n + 1) * Nat.log2 (n + 1)
+setup_benchmark runBinom n => n * n
   where {
-    paramFloor := 32
-    paramCeiling := 512
-    paramSchedule := .custom #[32, 64, 128, 256, 512]
-    maxSecondsPerCall := 3.0
-    targetInnerNanos := 200000000
+    paramFloor := 16384
+    paramCeiling := 131072
+    paramSchedule := .custom #[16384, 32768, 65536, 131072]
+    maxSecondsPerCall := 10.0
+    targetInnerNanos := 300000000
     signalFloorMultiplier := 1.0
   }
 
