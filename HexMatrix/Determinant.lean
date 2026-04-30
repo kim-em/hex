@@ -590,9 +590,69 @@ private theorem detProduct_rowScale {R : Type u} [Lean.Grind.CommRing R] {n : Na
 private def finTranspose {n : Nat} (i j : Fin n) (r : Fin n) : Fin n :=
   if r = i then j else if r = j then i else r
 
+private theorem finTranspose_left {n : Nat} (i j : Fin n) :
+    finTranspose i j i = j := by
+  simp [finTranspose]
+
+private theorem finTranspose_right {n : Nat} (i j : Fin n) :
+    finTranspose i j j = i := by
+  by_cases h : j = i
+  · subst j
+    simp [finTranspose]
+  · simp [finTranspose, h]
+
+private theorem finTranspose_of_ne {n : Nat} (i j r : Fin n)
+    (hi : r ≠ i) (hj : r ≠ j) :
+    finTranspose i j r = r := by
+  simp [finTranspose, hi, hj]
+
+private theorem finTranspose_involutive {n : Nat} (i j r : Fin n) :
+    finTranspose i j (finTranspose i j r) = r := by
+  by_cases hi : r = i
+  · subst r
+    rw [finTranspose_left, finTranspose_right]
+  · by_cases hj : r = j
+    · subst r
+      rw [finTranspose_right, finTranspose_left]
+    · rw [finTranspose_of_ne i j r hi hj]
+      exact finTranspose_of_ne i j r hi hj
+
+private theorem finTranspose_injective {n : Nat} (i j : Fin n) :
+    Function.Injective (finTranspose i j) := by
+  intro a b h
+  have h' := congrArg (finTranspose i j) h
+  simpa [finTranspose_involutive] using h'
+
+private theorem finTranspose_ne_iff {n : Nat} (i j a b : Fin n) :
+    finTranspose i j a ≠ finTranspose i j b ↔ a ≠ b := by
+  constructor
+  · intro h hab
+    exact h (hab ▸ rfl)
+  · intro h hab
+    exact h (finTranspose_injective i j hab)
+
 private def transposePermutationValues {n : Nat}
     (perm : Vector (Fin n) n) (i j : Fin n) : Vector (Fin n) n :=
   Vector.ofFn fun r => perm[finTranspose i j r]
+
+private theorem transposePermutationValues_get {n : Nat}
+    (perm : Vector (Fin n) n) (i j r : Fin n) :
+    (transposePermutationValues perm i j)[r] = perm[finTranspose i j r] := by
+  simp [transposePermutationValues]
+
+private theorem transposePermutationValues_involutive {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) :
+    transposePermutationValues (transposePermutationValues perm i j) i j = perm := by
+  apply Vector.ext
+  intro r hr
+  simp [transposePermutationValues, finTranspose_involutive]
+
+private theorem detSign_transposePermutationValues_involutive {R : Type u}
+    [Lean.Grind.Ring R] {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n) :
+    detSign (R := R) (transposePermutationValues (transposePermutationValues perm i j) i j) =
+      detSign (R := R) perm := by
+  rw [transposePermutationValues_involutive]
 
 private theorem detTerm_rowSwap_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
