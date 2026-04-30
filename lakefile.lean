@@ -151,5 +151,8 @@ lean_exe hexlll_bench where
 lean_exe hexhensel_bench where
   root := `HexHensel.Bench
 
+lean_exe hexberlekamp_bench where
+  root := `HexBerlekamp.Bench
+
 @[default_target]
 lean_lib HexManual where

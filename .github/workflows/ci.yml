@@ -51,3 +51,6 @@ jobs:
       - run: |
           lake exe hexhensel_bench list
           lake exe hexhensel_bench verify
+      - run: |
+          lake exe hexberlekamp_bench list
+          lake exe hexberlekamp_bench verify
