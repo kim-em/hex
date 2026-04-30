@@ -1127,6 +1127,62 @@ private theorem detSign_transposePermutationValues_involutive {R : Type u}
       detSign (R := R) perm := by
   rw [transposePermutationValues_involutive]
 
+private theorem inversionCount_transposePermutationValues_parity {n : Nat}
+    (perm : Vector (Fin n) n) (i j : Fin n)
+    (hnodup : perm.toList.Nodup) (h : i ≠ j) :
+    inversionCount (transposePermutationValues perm i j).toList % 2 =
+      (inversionCount perm.toList + 1) % 2 := by
+  have hval : i.val ≠ j.val := by
+    intro hv
+    exact h (Fin.ext hv)
+  cases Nat.lt_or_gt_of_ne hval with
+  | inl hij =>
+      have hnodup_split :
+          (perm.toList.take i.val ++ perm[i] ::
+              (perm.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+                perm[j] :: perm.toList.drop (j.val + 1)).Nodup := by
+        rw [← vector_toList_split_two perm hij]
+        exact hnodup
+      have hpar :
+          inversionCount
+              (perm.toList.take i.val ++ perm[j] ::
+                (perm.toList.drop (i.val + 1)).take (j.val - i.val - 1) ++
+                  perm[i] :: perm.toList.drop (j.val + 1)) %
+              2 =
+            (inversionCount perm.toList + 1) % 2 := by
+        have hswap :=
+          inversionCount_swap_separated_parity
+            (perm.toList.take i.val)
+            ((perm.toList.drop (i.val + 1)).take (j.val - i.val - 1))
+            (perm.toList.drop (j.val + 1)) perm[i] perm[j] hnodup_split
+        rw [← vector_toList_split_two perm hij] at hswap
+        exact hswap
+      rw [transposePermutationValues_toList_of_lt perm hij]
+      exact hpar
+  | inr hji =>
+      have hnodup_split :
+          (perm.toList.take j.val ++ perm[j] ::
+              (perm.toList.drop (j.val + 1)).take (i.val - j.val - 1) ++
+                perm[i] :: perm.toList.drop (i.val + 1)).Nodup := by
+        rw [← vector_toList_split_two perm hji]
+        exact hnodup
+      have hpar :
+          inversionCount
+              (perm.toList.take j.val ++ perm[i] ::
+                (perm.toList.drop (j.val + 1)).take (i.val - j.val - 1) ++
+                  perm[j] :: perm.toList.drop (i.val + 1)) %
+              2 =
+            (inversionCount perm.toList + 1) % 2 := by
+        have hswap :=
+          inversionCount_swap_separated_parity
+            (perm.toList.take j.val)
+            ((perm.toList.drop (j.val + 1)).take (i.val - j.val - 1))
+            (perm.toList.drop (i.val + 1)) perm[j] perm[i] hnodup_split
+        rw [← vector_toList_split_two perm hji] at hswap
+        exact hswap
+      rw [transposePermutationValues_toList_of_gt perm hji]
+      exact hpar
+
 private theorem detProduct_rowSwap_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
     (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
@@ -1136,18 +1192,33 @@ private theorem detProduct_rowSwap_transposeValues {R : Type u}
 
 private theorem detSign_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
-    (perm : Vector (Fin n) n) (i j : Fin n) (h : i ≠ j) :
+    (perm : Vector (Fin n) n) (i j : Fin n)
+    (hnodup : perm.toList.Nodup) (h : i ≠ j) :
     detSign (R := R) perm = -detSign (R := R) (transposePermutationValues perm i j) := by
-  sorry
+  unfold detSign
+  have hpar :=
+    inversionCount_transposePermutationValues_parity perm i j hnodup h
+  by_cases hp : inversionCount perm.toList % 2 = 0
+  · have ht : inversionCount (transposePermutationValues perm i j).toList % 2 ≠ 0 := by
+      omega
+    simp [hp, ht]
+    grind
+  · have hpone : inversionCount perm.toList % 2 = 1 := by
+      have hlt : inversionCount perm.toList % 2 < 2 := Nat.mod_lt _ (by decide)
+      omega
+    have ht : inversionCount (transposePermutationValues perm i j).toList % 2 = 0 := by
+      omega
+    simp [hp, ht]
 
 private theorem detTerm_rowSwap_transposeValues {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat}
-    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j) (perm : Vector (Fin n) n) :
+    (M : Matrix R n n) (i j : Fin n) (h : i ≠ j)
+    (perm : Vector (Fin n) n) (hnodup : perm.toList.Nodup) :
     detTerm (rowSwap M i j) perm =
       -detTerm M (transposePermutationValues perm i j) := by
   unfold detTerm
   rw [detProduct_rowSwap_transposeValues M i j h perm]
-  rw [detSign_transposeValues (R := R) perm i j h]
+  rw [detSign_transposeValues (R := R) perm i j hnodup h]
   grind
 
 private theorem permutationVectors_transposeValues_neg_sum {R : Type u}
@@ -1186,8 +1257,8 @@ private theorem permutationVectors_rowSwap_sum {R : Type u} [Lean.Grind.CommRing
       (permutationVectors n).foldl
         (fun acc perm => acc + -detTerm M (transposePermutationValues perm i j)) 0 := by
         apply foldl_det_sum_congr
-        intro perm _hmem
-        exact detTerm_rowSwap_transposeValues M i j h perm
+        intro perm hmem
+        exact detTerm_rowSwap_transposeValues M i j h perm (permutationVectors_nodup hmem)
     _ = -((permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0) := by
         exact permutationVectors_transposeValues_neg_sum M i j h
 
