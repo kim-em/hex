@@ -288,9 +288,93 @@ def primitivePart (p : DensePoly Int) : DensePoly Int :=
     ofCoeffs <|
       p.toArray.toList.map (fun coeff => coeff / c) |>.toArray
 
+private theorem foldl_gcd_dvd_acc (xs : List Nat) (acc : Nat) :
+    xs.foldl (fun g x => Nat.gcd g x) acc ∣ acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      exact Nat.dvd_trans (ih (Nat.gcd acc x)) (Nat.gcd_dvd_left acc x)
+
+private theorem foldl_gcd_dvd_of_mem {xs : List Nat} {x acc : Nat}
+    (hx : x ∈ xs) :
+    xs.foldl (fun g x => Nat.gcd g x) acc ∣ x := by
+  induction xs generalizing acc with
+  | nil =>
+      cases hx
+  | cons y ys ih =>
+      simp at hx
+      cases hx with
+      | inl hxy =>
+          subst hxy
+          exact Nat.dvd_trans (foldl_gcd_dvd_acc ys (Nat.gcd acc x))
+            (Nat.gcd_dvd_right acc x)
+      | inr hy =>
+          exact ih (acc := Nat.gcd acc y) hy
+
+private theorem contentNat_dvd_coeff (p : DensePoly Int) (n : Nat) :
+    (contentNat p : Int) ∣ p.coeff n := by
+  by_cases hn : n < p.size
+  · rw [Int.ofNat_dvd_left]
+    unfold contentNat coeff toArray
+    have hmem : p.coeffs[n].natAbs ∈ p.coeffs.toList.map Int.natAbs := by
+      apply List.mem_map.mpr
+      refine ⟨p.coeffs[n], ?_, rfl⟩
+      rw [List.mem_iff_getElem]
+      exact ⟨n, by simpa [size] using hn, by simp [Array.getElem_toList]; rfl⟩
+    have hfold := foldl_gcd_dvd_of_mem (acc := 0) hmem
+    have hcoeff : (p.coeffs.getD n (Zero.zero : Int)).natAbs = p.coeffs[n].natAbs := by
+      change (p.coeffs.getD n (0 : Int)).natAbs = p.coeffs[n].natAbs
+      rw [Array.getElem_eq_getD (0 : Int)]
+    rw [hcoeff]
+    simpa only [List.foldl_map] using hfold
+  · have hnle : p.size ≤ n := Nat.le_of_not_gt hn
+    rw [coeff_eq_zero_of_size_le p hnle]
+    exact ⟨0, by rw [Int.mul_zero]; rfl⟩
+
+private theorem list_getD_map_ediv_zero (c : Int) (coeffs : List Int) (n : Nat) :
+    (coeffs.map fun coeff => coeff / c).getD n (Zero.zero : Int) =
+      coeffs.getD n (Zero.zero : Int) / c := by
+  induction coeffs generalizing n with
+  | nil =>
+      exact (Int.zero_ediv c).symm
+  | cons coeff coeffs ih =>
+      cases n with
+      | zero =>
+          simp
+      | succ n =>
+          simpa using ih n
+
 theorem content_mul_primitivePart (p : DensePoly Int) :
     scale (content p) (primitivePart p) = p := by
-  sorry
+  apply ext_coeff
+  intro n
+  calc
+    (scale (content p) (primitivePart p)).coeff n =
+        content p * (primitivePart p).coeff n := by
+          exact coeff_scale (content p) (primitivePart p) n (Int.mul_zero _)
+    _ = p.coeff n := by
+      by_cases hc : contentNat p = 0
+      · have hdiv := contentNat_dvd_coeff p n
+        rw [hc] at hdiv
+        rcases hdiv with ⟨k, hk⟩
+        have hpzero : p.coeff n = 0 := by
+          simpa using hk
+        simp [content, primitivePart, hc, hpzero]
+      · have hpart :
+            (primitivePart p).coeff n = p.coeff n / content p := by
+          unfold primitivePart content
+          rw [if_neg hc]
+          rw [coeff_ofCoeffs_list]
+          rw [list_getD_map_ediv_zero]
+          unfold coeff toArray Array.getD
+          by_cases hn : n < p.coeffs.size
+          · simp [hn]
+          · simp [hn]
+        have hmul : content p * (p.coeff n / content p) = p.coeff n := by
+          unfold content
+          exact Int.mul_ediv_cancel' (contentNat_dvd_coeff p n)
+        rw [hpart, hmul]
 
 /-- Construct a polynomial with prescribed residues modulo coprime factors. -/
 def polyCRT {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Mul S]
