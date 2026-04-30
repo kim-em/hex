@@ -437,11 +437,17 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
     (p q m : DensePoly S) : Prop :=
   m ∣ (p - q)
 
+private theorem mod_sub_self_eq_mul_neg_div {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    (p m : DensePoly S) :
+    p % m - p = m * (0 - p / m) := by
+  sorry
+
 private theorem congr_mod_core {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
     (p m : DensePoly S) :
     m ∣ (p % m - p) := by
-  sorry
+  exact ⟨0 - p / m, mod_sub_self_eq_mul_neg_div p m⟩
 
 /-- Reduction modulo the modulus is congruent to the original polynomial over a lawful
 coefficient ring. -/
@@ -450,11 +456,34 @@ theorem congr_mod {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
     Congr (p % m) p m := by
   exact congr_mod_core p m
 
+private theorem eq_add_mul_of_sub_eq_mul {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    {p q m r : DensePoly S} :
+    p - q = m * r -> p = q + m * r := by
+  intro hsub
+  apply ext_coeff
+  intro n
+  have hcoeff := congrArg (fun x : DensePoly S => x.coeff n) hsub
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  change (p - q).coeff n = (m * r).coeff n at hcoeff
+  rw [coeff_sub p q n hzero_sub] at hcoeff
+  rw [coeff_add q (m * r) n hzero_add]
+  grind
+
+private theorem mod_add_mul_self {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
+    (q m r : DensePoly S) :
+    (q + m * r) % m = q % m := by
+  sorry
+
 private theorem mod_eq_mod_of_dvd_sub {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     {p q m : DensePoly S} :
     m ∣ (p - q) -> p % m = q % m := by
-  sorry
+  rintro ⟨r, hmul⟩
+  rw [eq_add_mul_of_sub_eq_mul hmul]
+  exact mod_add_mul_self q m r
 
 /-- Congruent polynomials have the same canonical remainder once the divisor law package
 supplies the executable `%` invariants. -/
