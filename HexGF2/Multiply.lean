@@ -2688,6 +2688,157 @@ private theorem coeffWords_monomial_mulWords_source
     foldl_xorClmulAt_monomial_left_prefix_after_source xs
       (m := xs.size) (k := k) (source := source) (by omega) (by omega) hsource
 
+private def clmulCoeffAt (idx : Nat) (x y : UInt64) (n : Nat) : Bool :=
+  if n / 64 = idx then
+    (((clmul x y).2 >>> (n % 64).toUInt64) &&& 1) != 0
+  else if n / 64 = idx + 1 then
+    (((clmul x y).1 >>> (n % 64).toUInt64) &&& 1) != 0
+  else
+    false
+
+private def xorBoolList (bits : List Bool) : Bool :=
+  bits.foldl (fun acc bit => acc != bit) false
+
+private theorem Bool.bne_assoc (a b c : Bool) :
+    ((a != b) != c) = (a != (b != c)) := by
+  cases a <;> cases b <;> cases c <;> rfl
+
+private theorem foldl_bne_start (bits : List Bool) (acc : Bool) :
+    bits.foldl (fun acc bit => acc != bit) acc =
+      (acc != xorBoolList bits) := by
+  unfold xorBoolList
+  induction bits generalizing acc with
+  | nil =>
+      cases acc <;> rfl
+  | cons bit bits ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc != bit), ih (false != bit)]
+      generalize htail : List.foldl (fun acc bit => acc != bit) false bits = tail
+      cases acc <;> cases bit <;> cases tail <;> rfl
+
+private theorem xorBoolList_cons (bit : Bool) (bits : List Bool) :
+    xorBoolList (bit :: bits) = (bit != xorBoolList bits) := by
+  unfold xorBoolList
+  simp only [List.foldl_cons]
+  rw [foldl_bne_start]
+  cases bit <;> rfl
+
+private theorem xorBoolList_append (xs ys : List Bool) :
+    xorBoolList (xs ++ ys) = (xorBoolList xs != xorBoolList ys) := by
+  unfold xorBoolList
+  rw [List.foldl_append, foldl_bne_start]
+  simp [xorBoolList]
+
+private theorem coeffWords_xorClmulAt_contrib
+    (acc : Array UInt64) {idx n : Nat} (x y : UInt64)
+    (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size) :
+    coeffWords (xorClmulAt acc idx x y) n =
+      (coeffWords acc n != clmulCoeffAt idx x y n) := by
+  unfold clmulCoeffAt
+  by_cases hLow : n / 64 = idx
+  · rw [coeffWords_xorClmulAt_low acc x y hidx hLow]
+    simp [hLow]
+  · by_cases hHigh : n / 64 = idx + 1
+    · rw [coeffWords_xorClmulAt_high acc x y hidx hidxNext hHigh]
+      simp [hHigh]
+    · rw [coeffWords_xorClmulAt_ne acc x y hLow hHigh]
+      simp [hLow, hHigh]
+
+private theorem foldl_xorClmulAt_coeff_contrib
+    (js : List Nat) (acc : Array UInt64) (idx : Nat) (x : UInt64)
+    (ys : Array UInt64) (n : Nat)
+    (hbound : ∀ j ∈ js, idx + j + 1 < acc.size) :
+    coeffWords
+        (js.foldl (fun acc j => xorClmulAt acc (idx + j) x ys[j]!) acc)
+        n =
+      (coeffWords acc n !=
+        xorBoolList (js.map (fun j => clmulCoeffAt (idx + j) x ys[j]! n))) := by
+  induction js generalizing acc with
+  | nil =>
+      simp [xorBoolList]
+  | cons j js ih =>
+      simp only [List.foldl_cons, List.map_cons]
+      have hidx : idx + j < acc.size := by
+        have h := hbound j (by simp)
+        omega
+      have hidxNext : idx + j + 1 < acc.size := hbound j (by simp)
+      rw [ih]
+      · rw [coeffWords_xorClmulAt_contrib acc x ys[j]! hidx hidxNext]
+        rw [xorBoolList_cons, Bool.bne_assoc]
+      · intro j' hj'
+        have h := hbound j' (by simp [hj'])
+        simpa [xorClmulAt_size] using h
+
+private theorem foldl_mulWords_coeff_contrib
+    (is : List Nat) (acc : Array UInt64) (xs ys : Array UInt64) (n : Nat)
+    (hbound : ∀ i ∈ is, ∀ j ∈ List.range ys.size, i + j + 1 < acc.size) :
+    coeffWords
+        (is.foldl
+          (fun acc i =>
+            let x := xs[i]!
+            (List.range ys.size).foldl
+              (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+              acc)
+          acc)
+        n =
+      (coeffWords acc n !=
+        xorBoolList
+          (List.flatMap
+            (fun i =>
+              (List.range ys.size).map
+                (fun j => clmulCoeffAt (i + j) xs[i]! ys[j]! n))
+            is)) := by
+  induction is generalizing acc with
+  | nil =>
+      simp [xorBoolList]
+  | cons i is ih =>
+      simp only [List.foldl_cons, List.flatMap_cons]
+      rw [ih]
+      · have hinner := foldl_xorClmulAt_coeff_contrib
+          (List.range ys.size) acc i xs[i]! ys n
+          (by
+            intro j hj
+            exact hbound i (by simp) j hj)
+        rw [hinner]
+        rw [xorBoolList_append, Bool.bne_assoc]
+      · intro i' hi' j hj
+        have h := hbound i' (by simp [hi']) j hj
+        simpa [foldl_xorClmulAt_size] using h
+
+private theorem coeffWords_mulWords_contrib (xs ys : Array UInt64) (n : Nat) :
+    coeffWords (mulWords xs ys) n =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            (List.range ys.size).map
+              (fun j => clmulCoeffAt (i + j) xs[i]! ys[j]! n))
+          (List.range xs.size)) := by
+  unfold mulWords
+  by_cases hxs : xs.isEmpty
+  · have hxsize : xs.size = 0 := by
+      simpa [Array.isEmpty] using hxs
+    simp [hxs, hxsize, coeffWords_empty, xorBoolList]
+  · by_cases hys : ys.isEmpty
+    · have hysize : ys.size = 0 := by
+        simpa [Array.isEmpty] using hys
+      have hflat :
+          List.flatMap (fun _ : Nat => ([] : List Bool)) (List.range xs.size) = [] := by
+        generalize hlist : List.range xs.size = is
+        induction is with
+        | nil => rfl
+        | cons i is ih =>
+            simp [List.flatMap_cons]
+      simp [hxs, hys, hysize, coeffWords_empty, xorBoolList, hflat]
+    · simp [hxs, hys]
+      rw [foldl_mulWords_coeff_contrib]
+      · rw [coeffWords_replicate_zero]
+        simp
+      · intro i hi j hj
+        have hi' : i < xs.size := List.mem_range.mp hi
+        have hj' : j < ys.size := List.mem_range.mp hj
+        simp
+        omega
+
 /-- Coefficients of the raw packed product are symmetric in the two input word
 arrays. This is the local bridge from word-level `clmul_comm` to polynomial
 multiplication commutativity. -/
