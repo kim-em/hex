@@ -809,6 +809,144 @@ private theorem fold_add_congr
         intro j hj
         exact hterm j (by simp [hj])) (acc + term₂ i)
 
+private theorem fold_add_zero_terms_acc
+    (xs : List Nat) (term : Nat → ZMod64 p)
+    (hterm : ∀ i, i ∈ xs → term i = 0) (acc : ZMod64 p) :
+    xs.foldl (fun acc i => acc + term i) acc = acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [hterm i (by simp)]
+      rw [zmod_add_zero]
+      exact ih (by
+        intro j hj
+        exact hterm j (by simp [hj])) acc
+
+private theorem fold_add_zero_terms
+    (xs : List Nat) (term : Nat → ZMod64 p)
+    (hterm : ∀ i, i ∈ xs → term i = 0) :
+    xs.foldl (fun acc i => acc + term i) 0 = 0 := by
+  exact fold_add_zero_terms_acc xs term hterm 0
+
+private theorem fold_add_single_range
+    (n t : Nat) (a : ZMod64 p) (ht : t < n + 1) :
+    (List.range (n + 1)).foldl
+        (fun acc i => acc + if i = t then a else 0) 0 = a := by
+  induction n with
+  | zero =>
+      have ht0 : t = 0 := by omega
+      simp [ht0]
+      exact zmod_zero_add a
+  | succ n ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      by_cases hlast : t = n + 1
+      · subst t
+        have hzero :
+            (List.range (n + 1)).foldl
+                (fun acc i => acc + if i = n + 1 then a else 0) 0 = 0 := by
+          apply fold_add_zero_terms
+          intro i hi
+          have hi' : i < n + 1 := List.mem_range.mp hi
+          have hne : i ≠ n + 1 := by omega
+          rw [if_neg hne]
+        rw [hzero]
+        rw [if_pos rfl]
+        exact zmod_zero_add a
+      · have ht' : t < n + 1 := by omega
+        rw [ih ht']
+        have hne : n + 1 ≠ t := by omega
+        rw [if_neg hne]
+        exact zmod_add_zero a
+
+private theorem fold_add_single_range_zero
+    (n t : Nat) (a : ZMod64 p) (ht : ¬ t < n + 1) :
+    (List.range (n + 1)).foldl
+        (fun acc i => acc + if i = t then a else 0) 0 = 0 := by
+  apply fold_add_zero_terms
+  intro i hi
+  have hi' : i < n + 1 := List.mem_range.mp hi
+  have hit : i ≠ t := by omega
+  simp [hit]
+
+theorem coeff_mul_shift_scale_one
+    (f : FpPoly p) (c : ZMod64 p) (i n : Nat) :
+    (f * DensePoly.shift i (DensePoly.scale c (1 : FpPoly p))).coeff n =
+      if i ≤ n then f.coeff (n - i) * c else 0 := by
+  rw [coeff_mul, mulCoeffSum_eq_degree_bound f
+    (DensePoly.shift i (DensePoly.scale c (1 : FpPoly p))) n]
+  by_cases hin : i ≤ n
+  · calc
+      (List.range (n + 1)).foldl
+          (fun acc j =>
+            acc + mulCoeffTerm f
+              (DensePoly.shift i (DensePoly.scale c (1 : FpPoly p))) n j) 0
+          =
+        (List.range (n + 1)).foldl
+          (fun acc j => acc + if j = n - i then f.coeff (n - i) * c else 0) 0 := by
+            apply fold_add_congr
+            intro j hj
+            have hjn : j < n + 1 := List.mem_range.mp hj
+            unfold mulCoeffTerm
+            by_cases hnj : n < j
+            · have hne : j ≠ n - i := by omega
+              rw [if_pos hnj, if_neg hne]
+            · simp [hnj]
+              have hzero : c * (0 : ZMod64 p) = 0 := by grind
+              rw [DensePoly.coeff_shift_scale i c (1 : FpPoly p) (n - j) hzero]
+              by_cases hlt : n - j < i
+              · have hne : j ≠ n - i := by
+                  intro hji
+                  subst j
+                  have hnot : ¬ n - (n - i) < i := by
+                    rw [Nat.sub_sub_self hin]
+                    omega
+                  exact hnot hlt
+                rw [if_neg hne]
+                simp [hlt]
+                exact zmod_mul_zero (f.coeff j)
+              · by_cases hji : j = n - i
+                · subst j
+                  rw [if_pos rfl]
+                  simp [hlt]
+                  rw [coeff_one]
+                  have hsub : n - (n - i) - i = 0 := by
+                    rw [Nat.sub_sub_self hin]
+                    simp
+                  simp [hsub]
+                  grind
+                · rw [if_neg hji]
+                  simp [hlt]
+                  rw [coeff_one]
+                  have hsub : n - j - i ≠ 0 := by omega
+                  simp [hsub]
+                  exact zmod_mul_zero (f.coeff j)
+      _ = f.coeff (n - i) * c := by
+            exact fold_add_single_range n (n - i) (f.coeff (n - i) * c) (by omega)
+      _ = if i ≤ n then f.coeff (n - i) * c else 0 := by
+            rw [if_pos hin]
+  · have hzero :
+        (List.range (n + 1)).foldl
+            (fun acc j =>
+              acc + mulCoeffTerm f
+                (DensePoly.shift i (DensePoly.scale c (1 : FpPoly p))) n j) 0 = 0 := by
+      apply fold_add_zero_terms
+      intro j hj
+      have hjn : j < n + 1 := List.mem_range.mp hj
+      unfold mulCoeffTerm
+      by_cases hnj : n < j
+      · simp [hnj]
+      · simp [hnj]
+        have hzero : c * (0 : ZMod64 p) = 0 := by grind
+        rw [DensePoly.coeff_shift_scale i c (1 : FpPoly p) (n - j) hzero]
+        have hlt : n - j < i := by omega
+        simp [hlt]
+        exact zmod_mul_zero (f.coeff j)
+    rw [hzero]
+    rw [if_neg hin]
+
 private theorem fold_mulCoeff_assoc_left_expand
     (f g h : FpPoly p) (n : Nat) :
     (List.range (n + 1)).foldl
