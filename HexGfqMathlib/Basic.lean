@@ -1,5 +1,6 @@
 import HexGfq
 import HexGF2Mathlib.Field
+import Mathlib.Algebra.Field.MinimalAxioms
 import Mathlib.FieldTheory.Finite.GaloisField
 
 /-!
@@ -67,6 +68,27 @@ variable {f : Hex.FpPoly p}
 variable {hf : 0 < Hex.FpPoly.degree f}
 variable {hp : Hex.Nat.Prime p}
 variable {hirr : Hex.FpPoly.Irreducible f}
+
+/-- The executable finite-field wrapper carries Mathlib's `Field` structure
+through the field laws already proved for the implementation-facing
+`Lean.Grind.Field` hierarchy. -/
+noncomputable instance field :
+    Field (Hex.GFqField.FiniteField f hf hp hirr) :=
+  Field.ofMinimalAxioms (Hex.GFqField.FiniteField f hf hp hirr)
+    (by intro a b c; exact Lean.Grind.Semiring.add_assoc a b c)
+    (by
+      intro a
+      calc
+        0 + a = a + 0 := Lean.Grind.Semiring.add_comm 0 a
+        _ = a := Lean.Grind.Semiring.add_zero a)
+    (by intro a; exact Lean.Grind.Ring.neg_add_cancel a)
+    (by intro a b c; exact Lean.Grind.Semiring.mul_assoc a b c)
+    (by intro a b; exact Lean.Grind.CommSemiring.mul_comm a b)
+    (by intro a; exact Lean.Grind.Semiring.one_mul a)
+    (by intro a ha; exact Lean.Grind.Field.mul_inv_cancel ha)
+    (Lean.Grind.Field.inv_zero (α := Hex.GFqField.FiniteField f hf hp hirr))
+    (by intro a b c; exact Lean.Grind.Semiring.left_distrib a b c)
+    ⟨0, 1, Hex.GFqField.zero_ne_one f hf hp hirr⟩
 
 /-- Reduced polynomial representatives for the quotient by `f`. -/
 abbrev ReducedRep (f : Hex.FpPoly p) : Type :=
@@ -165,6 +187,17 @@ theorem card_eq_galoisField_card [Fact p.Prime]
     (h : Hex.Conway.SupportedEntry p n) (hn : n ≠ 0) :
     Fintype.card (Hex.GFq p n h) = Nat.card (GaloisField p n) := by
   rw [fintype_card_eq_pow h, GaloisField.card p n hn]
+
+/-- Canonical `GFq` values are ring-equivalent to Mathlib's `GaloisField`
+with the same characteristic and extension degree. -/
+noncomputable def equivGaloisField [Fact p.Prime]
+    (h : Hex.Conway.SupportedEntry p n) (hn : n ≠ 0) :
+    _root_.RingEquiv (Hex.GFq p n h) (GaloisField p n) := by
+  classical
+  haveI : Fintype (GaloisField p n) := Fintype.ofFinite (GaloisField p n)
+  refine FiniteField.ringEquivOfCardEq (K := Hex.GFq p n h) (K' := GaloisField p n) ?_
+  rw [card_eq_galoisField_card (h := h) hn]
+  exact Nat.card_eq_fintype_card (α := GaloisField p n)
 
 end GFq
 
