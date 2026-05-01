@@ -53,6 +53,101 @@ private theorem UInt64.toNat_sub_mod_two_pow (a b : UInt64) {t : Nat}
   simpa [UInt64.toNat_sub] using
     mod_uint64_word_mod_two_pow (2 ^ 64 - b.toNat + a.toNat) t ht
 
+private theorem int_newton_refine_dvd (m y : Int) (hm : m ∣ y - 1) :
+    m * m ∣ y * (2 - y) - 1 := by
+  rcases hm with ⟨q, hq⟩
+  have hy : y = 1 + m * q := by omega
+  subst y
+  refine ⟨-(q * q), ?_⟩
+  grind
+
+private theorem nat_newton_refine_dvd (y k : Nat) (h : y % 2 ^ k = 1) :
+    ((2 ^ k : Nat) : Int) * ((2 ^ k : Nat) : Int) ∣
+      (y : Int) * (2 - (y : Int)) - 1 := by
+  have hy : y = 1 + 2 ^ k * (y / 2 ^ k) := by
+    have hdecomp := Nat.mod_add_div y (2 ^ k)
+    rw [h] at hdecomp
+    omega
+  apply int_newton_refine_dvd
+  refine ⟨((y / 2 ^ k : Nat) : Int), ?_⟩
+  have hyInt := congrArg (fun n : Nat => (n : Int)) hy
+  simp only [Int.natCast_add, Int.ofNat_one, Int.natCast_mul] at hyInt
+  omega
+
+private theorem int_dvd_of_nat_dvd {a b : Nat} (h : a ∣ b) :
+    (a : Int) ∣ (b : Int) := by
+  rcases h with ⟨q, hq⟩
+  refine ⟨(q : Int), ?_⟩
+  rw [← Int.natCast_mul, hq]
+
+/--
+Newton/Hensel refinement over powers of two, phrased with the `2^64 - z + 2`
+wrapping-subtraction shape produced by `UInt64.toNat_sub_mod_two_pow`.
+-/
+private theorem nat_newton_refine_wrapped_dvd (y z k t : Nat)
+    (h : y % 2 ^ k = 1) (hz : z = y % 2 ^ 64)
+    (ht : t ≤ 2 * k) (ht64 : t ≤ 64) :
+    ((2 ^ t : Nat) : Int) ∣
+      (y : Int) * (((2 ^ 64 - z + 2 : Nat) : Int)) - 1 := by
+  let T : Nat := 2 ^ t
+  let W : Nat := 2 ^ 64
+  have hT_dvd_kk_nat : T ∣ (2 ^ k) * (2 ^ k) := by
+    have ht' : t ≤ k + k := by omega
+    rw [← Nat.pow_add]
+    exact Nat.pow_dvd_pow 2 ht'
+  have hT_dvd_kk : (T : Int) ∣ (((2 ^ k) * (2 ^ k) : Nat) : Int) :=
+    int_dvd_of_nat_dvd hT_dvd_kk_nat
+  have hstd_big := nat_newton_refine_dvd y k h
+  have hstd : (T : Int) ∣ (y : Int) * (2 - (y : Int)) - 1 := by
+    rcases hT_dvd_kk with ⟨a, ha⟩
+    rcases hstd_big with ⟨b, hb⟩
+    refine ⟨a * b, ?_⟩
+    simp only [T, Int.natCast_mul] at ha ⊢
+    rw [hb, ha]
+    grind
+  have hT_dvd_W_nat : T ∣ W := by
+    exact Nat.pow_dvd_pow 2 ht64
+  have hT_dvd_W : (T : Int) ∣ (W : Int) := int_dvd_of_nat_dvd hT_dvd_W_nat
+  have hdecomp : z + W * (y / W) = y := by
+    have h0 := Nat.mod_add_div y W
+    rw [← hz] at h0
+    exact h0
+  have hWbase : (W : Int) ∣ (W : Int) + (y : Int) - (z : Int) := by
+    refine ⟨1 + ((y / W : Nat) : Int), ?_⟩
+    have hdecompInt := congrArg (fun n : Nat => (n : Int)) hdecomp
+    simp only [Int.natCast_add, Int.natCast_mul] at hdecompInt
+    simp only [W] at hdecompInt ⊢
+    omega
+  have hbase : (T : Int) ∣ (W : Int) + (y : Int) - (z : Int) := by
+    rcases hT_dvd_W with ⟨a, ha⟩
+    rcases hWbase with ⟨b, hb⟩
+    refine ⟨a * b, ?_⟩
+    simp only [T] at ha ⊢
+    rw [hb, ha]
+    grind
+  have hwrapDiff :
+      (((2 ^ 64 - z + 2 : Nat) : Int) - (2 - (y : Int))) =
+        (W : Int) + (y : Int) - (z : Int) := by
+    have hzle : z ≤ W := by
+      rw [hz]
+      exact Nat.le_of_lt (Nat.mod_lt y (Nat.two_pow_pos 64))
+    simp only [W]
+    omega
+  have hdelta : (T : Int) ∣
+      (y : Int) * ((((2 ^ 64 - z + 2 : Nat) : Int) - (2 - (y : Int)))) := by
+    rcases hbase with ⟨a, ha⟩
+    refine ⟨(y : Int) * a, ?_⟩
+    rw [hwrapDiff, ha]
+    grind
+  have hsum : (T : Int) ∣
+      ((y : Int) * ((((2 ^ 64 - z + 2 : Nat) : Int) - (2 - (y : Int)))) +
+        ((y : Int) * (2 - (y : Int)) - 1)) :=
+    Int.dvd_add hdelta hstd
+  rcases hsum with ⟨q, hq⟩
+  refine ⟨q, ?_⟩
+  rw [← hq]
+  grind
+
 /--
 Starting from the odd-modulus seed `x = p`, five refinement steps lift the
 inverse from mod `2^3` to mod `2^96 ≥ 2^64`.
