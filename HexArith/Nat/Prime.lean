@@ -188,10 +188,62 @@ private theorem add_pow_chooseSum (n a b : Nat) :
         _ = chooseSum (n + 1) a b (n + 1 + 1) :=
             (chooseSum_succ_row n a b (n + 1) (by omega)).symm
 
+private theorem chooseTerm_dvd_of_middle {p a b k : Nat}
+    (hchoose : ∀ k, 0 < k → k < p → p ∣ choose p k)
+    (hk0 : 0 < k) (hkp : k < p) : p ∣ chooseTerm p a b k := by
+  unfold chooseTerm
+  simpa [Nat.mul_assoc] using
+    Nat.dvd_mul_right_of_dvd (hchoose k hk0 hkp) (a ^ (p - k) * b ^ k)
+
+private theorem chooseTerm_mod_eq_zero_of_middle {p a b k : Nat}
+    (hchoose : ∀ k, 0 < k → k < p → p ∣ choose p k)
+    (hk0 : 0 < k) (hkp : k < p) : chooseTerm p a b k % p = 0 := by
+  exact Nat.mod_eq_zero_of_dvd (chooseTerm_dvd_of_middle hchoose hk0 hkp)
+
+private theorem chooseSum_prefix_mod {p a b m : Nat}
+    (hchoose : ∀ k, 0 < k → k < p → p ∣ choose p k)
+    (hm0 : 0 < m) (hmp : m ≤ p) : chooseSum p a b m % p = a ^ p % p := by
+  induction m with
+  | zero => omega
+  | succ m ih =>
+      cases m with
+      | zero =>
+          simp [chooseSum, chooseTerm]
+      | succ m =>
+          have hprev : chooseSum p a b (m + 1) % p = a ^ p % p := by
+            exact ih (by omega) (by omega)
+          have hterm :
+              chooseTerm p a b (m + 1) % p = 0 :=
+            chooseTerm_mod_eq_zero_of_middle hchoose (by omega) (by omega)
+          calc
+            chooseSum p a b (m + 1 + 1) % p
+                = (chooseSum p a b (m + 1) + chooseTerm p a b (m + 1)) % p := by
+                    rfl
+            _ = (chooseSum p a b (m + 1) % p
+                  + chooseTerm p a b (m + 1) % p) % p := Nat.add_mod _ _ _
+            _ = a ^ p % p := by
+                  rw [hprev, hterm, Nat.add_zero, Nat.mod_mod]
+
 private theorem add_pow_prime_mod_of_choose_dvd {p : Nat} (hp : Prime p) (a b : Nat)
     (hchoose : ∀ k, 0 < k → k < p → p ∣ choose p k) :
     (a + b) ^ p % p = (a ^ p + b ^ p) % p := by
-  sorry
+  have hp_pos : 0 < p := by
+    have htwo := hp.1
+    omega
+  have hprefix : chooseSum p a b p % p = a ^ p % p :=
+    chooseSum_prefix_mod hchoose hp_pos (Nat.le_refl p)
+  have hlast : chooseTerm p a b p = b ^ p := by
+    simp [chooseTerm, choose_self]
+  calc
+    (a + b) ^ p % p = chooseSum p a b (p + 1) % p := by
+      rw [add_pow_chooseSum]
+    _ = (chooseSum p a b p + chooseTerm p a b p) % p := by
+      rfl
+    _ = (chooseSum p a b p % p + chooseTerm p a b p % p) % p := Nat.add_mod _ _ _
+    _ = (a ^ p % p + b ^ p % p) % p := by
+      rw [hprefix, hlast]
+    _ = (a ^ p + b ^ p) % p := by
+      rw [← Nat.add_mod]
 
 private theorem pow_prime_mod_from_add_pow {p : Nat} (hp : Prime p) (a : Nat)
     (hadd : ∀ a b, (a + b) ^ p % p = (a ^ p + b ^ p) % p) :
