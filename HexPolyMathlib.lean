@@ -1,5 +1,6 @@
 import HexPolyMathlib.Basic
 import HexPolyMathlib.Euclid
+import HexPolyMathlib.Conformance
 
 /-!
 The `HexPolyMathlib` library bridges the executable `HexPoly` core to
