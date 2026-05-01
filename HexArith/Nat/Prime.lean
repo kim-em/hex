@@ -75,9 +75,26 @@ private theorem not_dvd_of_pos_lt {p k : Nat} (hk : 0 < k) (hk' : k < p) :
     simpa [Nat.mul_comm] using Nat.le_mul_of_pos_left p hc_pos
   omega
 
+private theorem choose_one_right (n : Nat) : choose n 1 = n := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      simp [choose]
+      rw [ih]
+      omega
+
 private theorem choose_succ_mul_eq (n k : Nat) :
     (k + 1) * choose (n + 1) (k + 1) = (n + 1) * choose n k := by
-  sorry
+  induction n generalizing k with
+  | zero =>
+      cases k <;> simp [choose]
+  | succ n ih =>
+      cases k with
+      | zero =>
+          simp [choose, choose_one_right]
+          omega
+      | succ k =>
+          grind [choose]
 
 private theorem choose_prime_dvd_from_mul_identity {p k : Nat} (hp : Prime p)
     (hk : 0 < k) (hk' : k < p) : p ∣ choose p k := by
@@ -102,7 +119,19 @@ private theorem add_pow_prime_mod_of_choose_dvd {p : Nat} (hp : Prime p) (a b : 
 private theorem pow_prime_mod_from_add_pow {p : Nat} (hp : Prime p) (a : Nat)
     (hadd : ∀ a b, (a + b) ^ p % p = (a ^ p + b ^ p) % p) :
     a ^ p % p = a % p := by
-  sorry
+  have hp_pos : 0 < p := by
+    have htwo := hp.1
+    omega
+  induction a with
+  | zero => simp [Nat.zero_pow hp_pos]
+  | succ a ih =>
+      have h := hadd a 1
+      simp [Nat.one_pow] at h
+      calc
+        (a + 1) ^ p % p = (a ^ p + 1) % p := h
+        _ = (a ^ p % p + 1) % p := (Nat.mod_add_mod (a ^ p) p 1).symm
+        _ = (a % p + 1) % p := by rw [ih]
+        _ = (a + 1) % p := Nat.mod_add_mod a p 1
 
 /--
 Every nontrivial binomial coefficient in the `p`th row of Pascal's triangle is
