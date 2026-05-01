@@ -218,6 +218,33 @@ private theorem nat_right_distrib_mod (x y z m : Nat) :
       rw [Nat.add_mod]
       rw [Nat.mul_mod x z m, Nat.mul_mod y z m]
 
+private theorem nat_neg_add_cancel_mod (x m : Nat) (hx : x < m) :
+    ((m - x) % m + x) % m = 0 := by
+  by_cases hzero : x = 0
+  · simp [hzero]
+  · have hpos : 0 < x := Nat.pos_of_ne_zero hzero
+    have hlt : m - x < m := by omega
+    have hsum : m - x + x = m := Nat.sub_add_cancel (Nat.le_of_lt hx)
+    rw [Nat.mod_eq_of_lt hlt, hsum, Nat.mod_self]
+
+private theorem nat_neg_neg_mod (x m : Nat) (hx : x < m) :
+    (m - (m - x) % m) % m = x := by
+  by_cases hzero : x = 0
+  · simp [hzero]
+  · have hpos : 0 < x := Nat.pos_of_ne_zero hzero
+    have hlt : m - x < m := by omega
+    have hsub : m - (m - x) = x := by omega
+    rw [Nat.mod_eq_of_lt hlt, hsub, Nat.mod_eq_of_lt hx]
+
+private theorem nat_mul_comm_mod (x y m : Nat) :
+    (x * y) % m = (y * x) % m := by
+  rw [Nat.mul_comm]
+
+private theorem neg_neg (a : ZMod64 p) : ZMod64.neg (ZMod64.neg a) = a := by
+  apply ext_toNat
+  rw [toNat_neg, toNat_neg]
+  exact nat_neg_neg_mod a.toNat p a.isLt
+
 instance : Lean.Grind.Semiring (ZMod64 p) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
@@ -308,29 +335,55 @@ instance : Lean.Grind.Semiring (ZMod64 p) := by
     rw [toNat_natCast]
     simp [Nat.mul_mod]
 
-instance : Lean.Grind.Ring (ZMod64 p) := by
-  refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
-  · intro a
-    ext
-    sorry
-  · intro a b
-    ext
-    sorry
-  · intro i a
-    ext
-    sorry
-  · intro n a
-    sorry
-  · intro n
-    sorry
-  · intro i
-    sorry
+instance : Lean.Grind.Ring (ZMod64 p) where
+  neg_add_cancel := by
+    intro a
+    apply ext_toNat
+    change (ZMod64.add (ZMod64.neg a) a).toNat = (ZMod64.zero : ZMod64 p).toNat
+    rw [toNat_add, toNat_neg, toNat_zero]
+    simpa [Nat.mod_mod] using nat_neg_add_cancel_mod a.toNat p a.isLt
+  sub_eq_add_neg := by
+    intro a b
+    apply ext_toNat
+    change (ZMod64.sub a b).toNat = (ZMod64.add a (ZMod64.neg b)).toNat
+    rw [toNat_sub, toNat_add, toNat_neg]
+    simp
+  neg_zsmul := by
+    intro i a
+    cases i with
+    | ofNat n =>
+        cases n with
+        | zero =>
+            apply ext_toNat
+            change (ZMod64.nsmul 0 a).toNat = (ZMod64.neg (ZMod64.nsmul 0 a)).toNat
+            rw [toNat_nsmul, toNat_neg, toNat_nsmul]
+            simp
+        | succ n =>
+            rfl
+    | negSucc n =>
+        exact (neg_neg (ZMod64.nsmul (n + 1) a)).symm
+  intCast_neg := by
+    intro i
+    cases i with
+    | ofNat n =>
+        cases n with
+        | zero =>
+            apply ext_toNat
+            change (ZMod64.natCast p 0).toNat = (ZMod64.neg (ZMod64.natCast p 0)).toNat
+            rw [toNat_natCast, toNat_neg, toNat_natCast]
+            simp
+        | succ n =>
+            rfl
+    | negSucc n =>
+        exact (neg_neg (ZMod64.natCast p (n + 1))).symm
 
 instance : Lean.Grind.CommRing (ZMod64 p) := by
   refine Lean.Grind.CommRing.mk ?_
   intro a b
-  ext
-  sorry
+  apply ext_toNat
+  change (ZMod64.mul a b).toNat = (ZMod64.mul b a).toNat
+  rw [toNat_mul, toNat_mul]
+  exact nat_mul_comm_mod a.toNat b.toNat p
 
 instance : Lean.Grind.IsCharP (ZMod64 p) p where
   ofNat_ext_iff {x y} := natCast_eq_natCast_iff (p := p) x y
