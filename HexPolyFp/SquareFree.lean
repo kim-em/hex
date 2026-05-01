@@ -955,11 +955,28 @@ private theorem squareFreeAuxRev_reconstruction_invariant
             simpa [g, c, loop, contribution, hrepeated, hcontribution_not_one, hloop_repeated]
               using hcalc
 
-private theorem squareFreeAuxRev_pairwise_coprime
+private def squareFreeFactorCoprimeRel :
+    SquareFreeFactor p → SquareFreeFactor p → Prop :=
+  fun a b => DensePoly.gcd a.factor b.factor = 1
+
+private theorem squareFreeAuxRev_pairwise_coprime_of_acc
     (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
+    accRev.reverse.Pairwise squareFreeFactorCoprimeRel →
+    (∀ a ∈ accRev.reverse,
+      ∀ b ∈ (squareFreeAuxRev f multiplicity fuel []).reverse,
+        squareFreeFactorCoprimeRel a b) →
     (squareFreeAuxRev f multiplicity fuel accRev).reverse.Pairwise
-      (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
+      squareFreeFactorCoprimeRel := by
   sorry
+
+private theorem squareFreeAuxRev_pairwise_coprime_nil
+    (f : FpPoly p) (multiplicity fuel : Nat) :
+    (squareFreeAuxRev f multiplicity fuel []).reverse.Pairwise
+      squareFreeFactorCoprimeRel := by
+  apply squareFreeAuxRev_pairwise_coprime_of_acc
+  · simp
+  · intro a ha
+    simp at ha
 
 private def yunFactorsStepsSquareFree (c w : FpPoly p) : Nat → Prop
   | 0 => True
@@ -1130,7 +1147,8 @@ theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   unfold squareFreeDecomposition squareFreeAux
-  exact squareFreeAuxRev_pairwise_coprime (normalizeMonic f).2 1 ((normalizeMonic f).2.size + 1) []
+  exact squareFreeAuxRev_pairwise_coprime_nil
+    (normalizeMonic f).2 1 ((normalizeMonic f).2.size + 1)
 
 theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
