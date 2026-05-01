@@ -504,6 +504,18 @@ private theorem powLinear_coeffFold_prime_coeff_expansion (g : FpPoly p) (m n : 
   powLinear_coeffFold_coeff_expansion g m p n
 
 /--
+Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
+This is the dense-polynomial convolution fact needed by the formal
+`p`-th-root reconstruction: only exponent tuples with all mass on one
+input coefficient survive modulo `p`.
+-/
+private theorem powLinear_prime_coeff
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (n : Nat) :
+    (powLinear g p).coeff n =
+      if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
+  sorry
+
+/--
 Prime-characteristic cancellation for the recursive coefficient expansion of
 `(coeffFold g m)^p`: all mixed `p`-tuples vanish, leaving only diagonal
 choices from the bounded coefficient fold.
@@ -516,7 +528,19 @@ private theorem coeffFoldPowerCoeff_prime_coeff
       else
         0 := by
   rw [← powLinear_coeffFold_prime_coeff_expansion (p := p) g m n]
-  sorry
+  rw [powLinear_prime_coeff hp, coeffFold_coeff]
+  by_cases hn : n % p = 0
+  · simp [hn]
+    by_cases hlt : n / p < m
+    · simp [hlt]
+    · simp [hlt]
+      cases p with
+      | zero =>
+          exact False.elim (Nat.not_lt_zero 0 (ZMod64.Bounds.pPos (p := 0)))
+      | succ p =>
+          rw [Lean.Grind.Semiring.pow_succ]
+          grind
+  · simp [hn]
 
 private theorem coeffFoldPowerCoeff_prime_coeff_of_mod_ne_zero
     (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) (hn : n % p ≠ 0) :
@@ -545,18 +569,6 @@ private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
       (powLinear f p).coeff n + (powLinear g p).coeff n := by
-  sorry
-
-/--
-Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
-This is the dense-polynomial convolution fact needed by the formal
-`p`-th-root reconstruction: only exponent tuples with all mass on one
-input coefficient survive modulo `p`.
--/
-private theorem powLinear_prime_coeff
-    (hp : Hex.Nat.Prime p) (g : FpPoly p) (n : Nat) :
-    (powLinear g p).coeff n =
-      if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
   sorry
 
 /--
