@@ -55,6 +55,39 @@ private def pow (f : FpPoly p) (n : Nat) : FpPoly p :=
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
   factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1
 
+private theorem weightedProduct_nil :
+    weightedProduct ([] : List (SquareFreeFactor p)) = 1 := by
+  rfl
+
+private theorem weightedProduct_foldl_eq_mul
+    (acc : FpPoly p) (factors : List (SquareFreeFactor p)) :
+    factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) acc =
+      acc * weightedProduct factors := by
+  induction factors generalizing acc with
+  | nil =>
+      rw [weightedProduct_nil]
+      exact (DensePoly.mul_one_right_poly acc).symm
+  | cons sf factors ih =>
+      unfold weightedProduct
+      simp only [List.foldl_cons]
+      rw [ih (acc * pow sf.factor sf.multiplicity)]
+      rw [ih ((1 : FpPoly p) * pow sf.factor sf.multiplicity)]
+      have hone :
+          (1 : FpPoly p) * pow sf.factor sf.multiplicity =
+            pow sf.factor sf.multiplicity := by
+        exact one_mul (pow sf.factor sf.multiplicity)
+      rw [hone]
+      exact DensePoly.mul_assoc_poly acc (pow sf.factor sf.multiplicity) (weightedProduct factors)
+
+private theorem weightedProduct_cons
+    (sf : SquareFreeFactor p) (factors : List (SquareFreeFactor p)) :
+    weightedProduct (sf :: factors) =
+      pow sf.factor sf.multiplicity * weightedProduct factors := by
+  unfold weightedProduct
+  simp only [List.foldl_cons]
+  rw [weightedProduct_foldl_eq_mul]
+  exact congrArg (fun x => x * weightedProduct factors) (one_mul (pow sf.factor sf.multiplicity))
+
 /--
 Extract the formal `p`-th root by keeping exactly the coefficients whose
 degrees are multiples of `p`.
