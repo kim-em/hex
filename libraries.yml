@@ -130,7 +130,7 @@ libraries:
   HexGF2Mathlib:
     deps: [HexGF2, HexPolyFp, HexGfqField]
     mathlib: true
-    done_through: 2
+    done_through: 3
   HexGfqMathlib:
     deps: [HexGfq, HexGF2Mathlib]
     mathlib: true

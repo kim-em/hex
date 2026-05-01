@@ -1,4 +1,5 @@
 import HexGF2Mathlib.Basic
+import HexGF2Mathlib.Conformance
 import HexGF2Mathlib.Field
 
 /-!
