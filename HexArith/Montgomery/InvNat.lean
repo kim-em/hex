@@ -26,6 +26,33 @@ private theorem montPosInvStep_mod_6_to_12 (p x : UInt64)
   unfold montPosInvStep
   bv_decide (config := { timeout := 30 })
 
+private theorem two_pow_dvd_uint64_word {t : Nat} (ht : t ≤ 64) :
+    2 ^ t ∣ UInt64.word := by
+  refine ⟨2 ^ (64 - t), ?_⟩
+  calc
+    UInt64.word = 2 ^ 64 := rfl
+    _ = 2 ^ (t + (64 - t)) := by rw [Nat.add_sub_of_le ht]
+    _ = 2 ^ t * 2 ^ (64 - t) := by rw [Nat.pow_add]
+
+private theorem mod_uint64_word_mod_two_pow (n t : Nat) (ht : t ≤ 64) :
+    n % UInt64.word % 2 ^ t = n % 2 ^ t := by
+  exact Nat.mod_mod_of_dvd n (two_pow_dvd_uint64_word ht)
+
+/-- Multiplication wrap at `2^64` is invisible when reducing modulo fewer bits. -/
+private theorem UInt64.toNat_mul_mod_two_pow (a b : UInt64) {t : Nat}
+    (ht : t ≤ 64) :
+    (a * b).toNat % 2 ^ t = (a.toNat * b.toNat) % 2 ^ t := by
+  simpa [UInt64.toNat_mul] using
+    mod_uint64_word_mod_two_pow (a.toNat * b.toNat) t ht
+
+/-- Subtraction wrap at `2^64` is invisible when reducing modulo fewer bits. -/
+private theorem UInt64.toNat_sub_mod_two_pow (a b : UInt64) {t : Nat}
+    (ht : t ≤ 64) :
+    (a - b).toNat % 2 ^ t =
+      (2 ^ 64 - b.toNat + a.toNat) % 2 ^ t := by
+  simpa [UInt64.toNat_sub] using
+    mod_uint64_word_mod_two_pow (2 ^ 64 - b.toNat + a.toNat) t ht
+
 /--
 Starting from the odd-modulus seed `x = p`, five refinement steps lift the
 inverse from mod `2^3` to mod `2^96 ≥ 2^64`.
@@ -40,12 +67,6 @@ def montPosInv (p : UInt64) : UInt64 :=
 /-- The user-facing Montgomery inverse is the negated positive inverse. -/
 def montInv (p : UInt64) : UInt64 :=
   0 - montPosInv p
-
-/-- One Newton step doubles the number of correct bits in the inverse. -/
-theorem newton_step (hp_odd : p % 2 = 1) (k : Nat)
-    (hxk : p * x % 2 ^ k = 1) :
-    p * (x * (2 - p * x)) % 2 ^ (2 * k) = 1 := by
-  sorry
 
 /-- The positive Montgomery inverse satisfies `p * x ≡ 1 (mod 2^64)`. -/
 theorem montPosInv_spec (p : UInt64) (hp_odd : p.toNat % 2 = 1) :
