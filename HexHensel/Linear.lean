@@ -1177,6 +1177,229 @@ theorem linearHenselStep_spec
   simpa using
     linearHenselStep_reduced_factor_congr p k f g h s t hk hprod hbez hmonic
 
+private theorem coeff_last_eq_leadingCoeff (f : ZPoly) (hpos : 0 < f.size) :
+    f.coeff (f.size - 1) = f.leadingCoeff := by
+  cases f with
+  | mk coeffs normalized =>
+      have hcoeffs : 0 < coeffs.size := by simpa [DensePoly.size] using hpos
+      have hidx : coeffs.size - 1 < coeffs.size := Nat.sub_one_lt (Nat.ne_of_gt hcoeffs)
+      change coeffs.getD (coeffs.size - 1) 0 = coeffs.back?.getD 0
+      rw [Array.back?_eq_getElem?]
+      rw [Array.getElem?_eq_getElem hidx]
+      exact (Array.getElem_eq_getD 0).symm
+
+private theorem monic_size_pos (f : ZPoly) (hmonic : DensePoly.Monic f) :
+    0 < f.size := by
+  by_cases hpos : 0 < f.size
+  · exact hpos
+  · have hsize : f.size = 0 := Nat.eq_zero_of_not_pos hpos
+    have hlead : f.leadingCoeff = 0 := by
+      cases f with
+      | mk coeffs normalized =>
+          simp [DensePoly.leadingCoeff, DensePoly.size] at hsize ⊢
+          simp [hsize]
+    have hlead_one : f.leadingCoeff = 1 := by
+      simpa [DensePoly.Monic] using hmonic
+    rw [hlead] at hlead_one
+    exact False.elim (Int.zero_ne_one hlead_one)
+
+private theorem degree?_eq_some_of_coeff_eq_one_and_high_coeff_zero
+    (f : ZPoly) (n : Nat)
+    (hone : f.coeff n = 1)
+    (hhigh : ∀ i, n < i → f.coeff i = 0) :
+    f.degree? = some n := by
+  have hn_lt_size : n < f.size := by
+    by_cases hn : n < f.size
+    · exact hn
+    · have hcoeff := DensePoly.coeff_eq_zero_of_size_le f (Nat.le_of_not_gt hn)
+      rw [hone] at hcoeff
+      exact False.elim (Int.one_ne_zero hcoeff)
+  have hsize_le : f.size ≤ n + 1 := by
+    by_cases hle : f.size ≤ n + 1
+    · exact hle
+    · have hlast_zero : f.coeff (f.size - 1) = 0 := by
+        apply hhigh
+        omega
+      have hlast_ne : f.coeff (f.size - 1) ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size f (by omega)
+      exact False.elim (hlast_ne hlast_zero)
+  have hsize : f.size = n + 1 := by omega
+  unfold DensePoly.degree?
+  simp [hsize]
+
+private theorem monic_of_coeff_eq_one_and_high_coeff_zero
+    (f : ZPoly) (n : Nat)
+    (hone : f.coeff n = 1)
+    (hhigh : ∀ i, n < i → f.coeff i = 0) :
+    DensePoly.Monic f := by
+  have hdeg := degree?_eq_some_of_coeff_eq_one_and_high_coeff_zero f n hone hhigh
+  have hsize : f.size = n + 1 := by
+    unfold DensePoly.degree? at hdeg
+    by_cases hzero : f.size = 0
+    · simp [hzero] at hdeg
+    · simp [hzero] at hdeg
+      omega
+  unfold DensePoly.Monic
+  have hlast := coeff_last_eq_leadingCoeff f (by omega)
+  rw [hsize] at hlast
+  have hidx : n + 1 - 1 = n := by omega
+  rw [hidx] at hlast
+  rw [← hlast]
+  exact hone
+
+private theorem degree?_eq_some_size_sub_one_of_monic
+    (f : ZPoly) (hmonic : DensePoly.Monic f) :
+    f.degree? = some (f.size - 1) := by
+  unfold DensePoly.degree?
+  have hpos := monic_size_pos f hmonic
+  simp [Nat.ne_of_gt hpos]
+
+private theorem degree?_getD_eq_size_sub_one_of_monic
+    (f : ZPoly) (hmonic : DensePoly.Monic f) :
+    f.degree?.getD 0 = f.size - 1 := by
+  rw [degree?_eq_some_size_sub_one_of_monic f hmonic]
+  rfl
+
+private theorem coeff_last_eq_one_of_monic
+    (f : ZPoly) (hmonic : DensePoly.Monic f) :
+    f.coeff (f.size - 1) = 1 := by
+  rw [coeff_last_eq_leadingCoeff f (monic_size_pos f hmonic)]
+  simpa [DensePoly.Monic] using hmonic
+
+private theorem size_le_of_degree?_getD_lt
+    (f : ZPoly) {n : Nat}
+    (hdeg : f.degree?.getD 0 < n) :
+    f.size ≤ n := by
+  unfold DensePoly.degree? at hdeg
+  by_cases hzero : f.size = 0
+  · omega
+  · simp [hzero] at hdeg
+    omega
+
+private theorem add_low_degree_degree?_eq
+    (g a : ZPoly)
+    (hmonic : DensePoly.Monic g)
+    (hdeg : a.degree?.getD 0 < g.degree?.getD 0) :
+    (g + a).degree? = g.degree? := by
+  let n := g.size - 1
+  have hgpos := monic_size_pos g hmonic
+  have hgdeg : g.degree?.getD 0 = n := by
+    simpa [n] using degree?_getD_eq_size_sub_one_of_monic g hmonic
+  have hasize : a.size ≤ n := by
+    apply size_le_of_degree?_getD_lt a
+    simpa [hgdeg] using hdeg
+  have hone : (g + a).coeff n = 1 := by
+    rw [DensePoly.coeff_add g a n (by rfl)]
+    have ha : a.coeff n = 0 := DensePoly.coeff_eq_zero_of_size_le a hasize
+    have hg : g.coeff n = 1 := by
+      simpa [n] using coeff_last_eq_one_of_monic g hmonic
+    rw [hg, ha]
+    omega
+  have hhigh : ∀ i, n < i → (g + a).coeff i = 0 := by
+    intro i hi
+    rw [DensePoly.coeff_add g a i (by rfl)]
+    have hgzero : g.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le g (by omega)
+    have hazero : a.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le a (by omega)
+    rw [hgzero, hazero]
+    rfl
+  calc
+    (g + a).degree? = some n :=
+      degree?_eq_some_of_coeff_eq_one_and_high_coeff_zero (g + a) n hone hhigh
+    _ = g.degree? := by
+      rw [degree?_eq_some_size_sub_one_of_monic g hmonic]
+
+private theorem add_low_degree_monic
+    (g a : ZPoly)
+    (hmonic : DensePoly.Monic g)
+    (hdeg : a.degree?.getD 0 < g.degree?.getD 0) :
+    DensePoly.Monic (g + a) := by
+  let n := g.size - 1
+  have hgdeg : g.degree?.getD 0 = n := by
+    simpa [n] using degree?_getD_eq_size_sub_one_of_monic g hmonic
+  have hasize : a.size ≤ n := by
+    apply size_le_of_degree?_getD_lt a
+    simpa [hgdeg] using hdeg
+  have hone : (g + a).coeff n = 1 := by
+    rw [DensePoly.coeff_add g a n (by rfl)]
+    have ha : a.coeff n = 0 := DensePoly.coeff_eq_zero_of_size_le a hasize
+    have hg : g.coeff n = 1 := by
+      simpa [n] using coeff_last_eq_one_of_monic g hmonic
+    rw [hg, ha]
+    omega
+  have hhigh : ∀ i, n < i → (g + a).coeff i = 0 := by
+    intro i hi
+    rw [DensePoly.coeff_add g a i (by rfl)]
+    have hgzero : g.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le g (by omega)
+    have hazero : a.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le a (by omega)
+    rw [hgzero, hazero]
+    rfl
+  exact monic_of_coeff_eq_one_and_high_coeff_zero (g + a) n hone hhigh
+
+private theorem one_lt_pow_succ_of_one_lt (p k : Nat) (hp : 1 < p) :
+    1 < p ^ (k + 1) := by
+  induction k with
+  | zero =>
+      simpa using hp
+  | succ k ih =>
+      rw [Nat.add_succ, Nat.pow_succ]
+      exact Nat.lt_of_lt_of_le ih
+        (Nat.le_mul_of_pos_right (p ^ (k + 1)) (Nat.zero_lt_of_lt hp))
+
+private theorem reduceModPow_degree?_eq_of_monic
+    (p k : Nat) (f : ZPoly)
+    (hp : 1 < p)
+    (hmonic : DensePoly.Monic f) :
+    (ZPoly.reduceModPow f p (k + 1)).degree? = f.degree? := by
+  let n := f.size - 1
+  have hmodpos : 0 < p ^ (k + 1) := Nat.pow_pos (by omega)
+  have hmodgt : 1 < p ^ (k + 1) := one_lt_pow_succ_of_one_lt p k hp
+  have hone : (ZPoly.reduceModPow f p (k + 1)).coeff n = 1 := by
+    rw [ZPoly.coeff_reduceModPow_eq_emod_of_pos _ _ _ _ hmodpos]
+    have hf : f.coeff n = 1 := by
+      simpa [n] using coeff_last_eq_one_of_monic f hmonic
+    rw [hf]
+    exact Int.emod_eq_of_lt (by decide) (by
+      change Int.ofNat 1 < Int.ofNat (p ^ (k + 1))
+      exact Int.ofNat_lt.mpr hmodgt)
+  have hhigh : ∀ i, n < i → (ZPoly.reduceModPow f p (k + 1)).coeff i = 0 := by
+    intro i hi
+    apply ZPoly.coeff_reduceModPow_eq_zero_of_emod
+    have hfzero : f.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le f (by omega)
+    rw [hfzero]
+    simp
+  calc
+    (ZPoly.reduceModPow f p (k + 1)).degree? =
+        some n :=
+      degree?_eq_some_of_coeff_eq_one_and_high_coeff_zero
+        (ZPoly.reduceModPow f p (k + 1)) n hone hhigh
+    _ = f.degree? := by
+      rw [degree?_eq_some_size_sub_one_of_monic f hmonic]
+
+private theorem reduceModPow_monic_of_monic
+    (p k : Nat) (f : ZPoly)
+    (hp : 1 < p)
+    (hmonic : DensePoly.Monic f) :
+    DensePoly.Monic (ZPoly.reduceModPow f p (k + 1)) := by
+  let n := f.size - 1
+  have hmodpos : 0 < p ^ (k + 1) := Nat.pow_pos (by omega)
+  have hmodgt : 1 < p ^ (k + 1) := one_lt_pow_succ_of_one_lt p k hp
+  have hone : (ZPoly.reduceModPow f p (k + 1)).coeff n = 1 := by
+    rw [ZPoly.coeff_reduceModPow_eq_emod_of_pos _ _ _ _ hmodpos]
+    have hf : f.coeff n = 1 := by
+      simpa [n] using coeff_last_eq_one_of_monic f hmonic
+    rw [hf]
+    exact Int.emod_eq_of_lt (by decide) (by
+      change Int.ofNat 1 < Int.ofNat (p ^ (k + 1))
+      exact Int.ofNat_lt.mpr hmodgt)
+  have hhigh : ∀ i, n < i → (ZPoly.reduceModPow f p (k + 1)).coeff i = 0 := by
+    intro i hi
+    apply ZPoly.coeff_reduceModPow_eq_zero_of_emod
+    have hfzero : f.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le f (by omega)
+    rw [hfzero]
+    simp
+  exact monic_of_coeff_eq_one_and_high_coeff_zero
+    (ZPoly.reduceModPow f p (k + 1)) n hone hhigh
+
 /-- The linear step preserves monicity of the lifted `g` factor. -/
 theorem linearHenselStep_monic
     (p k : Nat) [ZMod64.Bounds p]
@@ -1190,7 +1413,16 @@ theorem linearHenselStep_monic
       let qr := DensePoly.divMod (t * eMod) gMod
       (LinearLiftResult.liftScaledIncrement p k qr.2).degree?.getD 0 < g.degree?.getD 0) :
     DensePoly.Monic (linearHenselStep p k f g h s t).g := by
-  sorry
+  unfold linearHenselStep
+  let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+  let gMod := ZPoly.modP p g
+  let eMod := ZPoly.modP p e
+  let qr := DensePoly.divMod (t * eMod) gMod
+  let g' := g + LinearLiftResult.liftScaledIncrement p k qr.2
+  have hgRaw : DensePoly.Monic g' := by
+    exact add_low_degree_monic g (LinearLiftResult.liftScaledIncrement p k qr.2)
+      hmonic (by simpa [e, gMod, eMod, qr] using hgCorrectionDegree)
+  simpa [e, gMod, eMod, qr, g'] using reduceModPow_monic_of_monic p k g' hp hgRaw
 
 /-- The linear step preserves the degree of the monic `g` factor. -/
 theorem linearHenselStep_g_degree?_eq
@@ -1205,7 +1437,22 @@ theorem linearHenselStep_g_degree?_eq
       let qr := DensePoly.divMod (t * eMod) gMod
       (LinearLiftResult.liftScaledIncrement p k qr.2).degree?.getD 0 < g.degree?.getD 0) :
     (linearHenselStep p k f g h s t).g.degree? = g.degree? := by
-  sorry
+  unfold linearHenselStep
+  let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+  let gMod := ZPoly.modP p g
+  let eMod := ZPoly.modP p e
+  let qr := DensePoly.divMod (t * eMod) gMod
+  let g' := g + LinearLiftResult.liftScaledIncrement p k qr.2
+  have hgRawMonic : DensePoly.Monic g' := by
+    exact add_low_degree_monic g (LinearLiftResult.liftScaledIncrement p k qr.2)
+      hmonic (by simpa [e, gMod, eMod, qr] using hgCorrectionDegree)
+  have hgRawDegree : g'.degree? = g.degree? := by
+    exact add_low_degree_degree?_eq g (LinearLiftResult.liftScaledIncrement p k qr.2)
+      hmonic (by simpa [e, gMod, eMod, qr] using hgCorrectionDegree)
+  calc
+    (ZPoly.reduceModPow g' p (k + 1)).degree? = g'.degree? :=
+      reduceModPow_degree?_eq_of_monic p k g' hp hgRawMonic
+    _ = g.degree? := hgRawDegree
 
 /-- The linear step keeps the degree of `h` unchanged under the expected invariant. -/
 theorem linearHenselStep_h_degree?_eq
