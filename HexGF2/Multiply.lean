@@ -3402,6 +3402,43 @@ private def rightAssocFixedTripleContribs
   (List.range slotBound).map
     (fun slot => clmulCoeffAt (i + slot) x (clmulWordAt (j + k) y z slot) n)
 
+private theorem clmulCoeffAt_assoc_twoWord_low
+    (x y z : UInt64) (bit : Nat) :
+    ((((clmul (clmul x y).2 z).2 >>> bit.toUInt64) &&& 1) != 0) =
+      ((((clmul x (clmul y z).2).2 >>> bit.toUInt64) &&& 1) != 0) := by
+  sorry
+
+private theorem clmulCoeffAt_assoc_twoWord_middle
+    (x y z : UInt64) (bit : Nat) :
+    (((((clmul (clmul x y).2 z).1 >>> bit.toUInt64) &&& 1) != 0) !=
+        ((((clmul (clmul x y).1 z).2 >>> bit.toUInt64) &&& 1) != 0)) =
+      (((((clmul x (clmul y z).2).1 >>> bit.toUInt64) &&& 1) != 0) !=
+        ((((clmul x (clmul y z).1).2 >>> bit.toUInt64) &&& 1) != 0)) := by
+  sorry
+
+private theorem clmulCoeffAt_assoc_twoWord_high
+    (x y z : UInt64) (bit : Nat) :
+    ((((clmul (clmul x y).1 z).1 >>> bit.toUInt64) &&& 1) != 0) =
+      ((((clmul x (clmul y z).1).1 >>> bit.toUInt64) &&& 1) != 0) := by
+  sorry
+
+private theorem clmulCoeffAt_assoc_twoWord
+    (base n : Nat) (x y z : UInt64) :
+    (clmulCoeffAt base (clmul x y).2 z n !=
+      clmulCoeffAt (base + 1) (clmul x y).1 z n) =
+    (clmulCoeffAt base x (clmul y z).2 n !=
+      clmulCoeffAt (base + 1) x (clmul y z).1 n) := by
+  unfold clmulCoeffAt
+  by_cases h0 : n / 64 = base
+  · have hbase02 : base ≠ base + 1 + 1 := by omega
+    simp [h0, hbase02, clmulCoeffAt_assoc_twoWord_low]
+  · by_cases h1 : n / 64 = base + 1
+    · simp [h1, clmulCoeffAt_assoc_twoWord_middle]
+    · by_cases h2 : n / 64 = base + 1 + 1
+      · have hbase20 : base + 1 + 1 ≠ base := by omega
+        simp [h2, hbase20, clmulCoeffAt_assoc_twoWord_high]
+      · simp [h0, h1, h2]
+
 /-- The raw product has enough intermediate slots to contain every source
 word-pair contribution selected by the source ranges. -/
 private theorem mulWords_size_source_pair
