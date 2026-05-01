@@ -209,6 +209,8 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
     ∀ (p q : DensePoly R) (hq : Monic q), divModMonic p q hq = divMod p q
   mod_self_eq_zero :
     ∀ p : DensePoly R, p % p = 0
+  mod_eq_zero_of_dvd :
+    ∀ p q : DensePoly R, q ∣ p → p % q = 0
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
 
@@ -326,6 +328,11 @@ theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R] [DivModLaws R]
     (p q : DensePoly R) :
     (p / q) * q + (p % q) = p := by
   simpa [DensePoly.div, DensePoly.mod] using divMod_spec p q
+
+theorem mod_eq_zero_of_dvd [One R] [Add R] [Sub R] [Mul R] [Div R] [DivModLaws R]
+    (p q : DensePoly R) :
+    q ∣ p → p % q = 0 := by
+  exact DivModLaws.mod_eq_zero_of_dvd p q
 
 theorem modByMonic_eq_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
     [DivModLaws R]
