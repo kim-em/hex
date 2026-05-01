@@ -2729,6 +2729,90 @@ private theorem xorBoolList_append (xs ys : List Bool) :
   rw [List.foldl_append, foldl_bne_start]
   simp [xorBoolList]
 
+private theorem Bool.bne_medial (a b c d : Bool) :
+    ((a != b) != (c != d)) = ((a != c) != (b != d)) := by
+  cases a <;> cases b <;> cases c <;> cases d <;> rfl
+
+private theorem List.flatMap_const_nil {α β : Type} (xs : List α) :
+    xs.flatMap (fun _ => ([] : List β)) = [] := by
+  induction xs with
+  | nil => rfl
+  | cons _ xs ih => simp [ih]
+
+private theorem List.flatMap_empty_input {α β : Type} (f : α → List β) :
+    ([] : List α).flatMap f = [] := by
+  rfl
+
+private theorem List.flatMap_singleton {α β : Type} (xs : List α) (f : α → β) :
+    xs.flatMap (fun x => [f x]) = xs.map f := by
+  induction xs with
+  | nil => rfl
+  | cons _ xs ih => simp [ih]
+
+private theorem List.flatMap_congr_left {α β : Type} {xs : List α} {f g : α → List β}
+    (h : ∀ x, x ∈ xs → f x = g x) :
+    xs.flatMap f = xs.flatMap g := by
+  induction xs with
+  | nil =>
+      rfl
+  | cons x xs ih =>
+      simp only [List.flatMap_cons]
+      rw [h x (by simp)]
+      rw [ih]
+      intro y hy
+      exact h y (by simp [hy])
+
+private theorem xorBoolList_flatMap_append {α : Type}
+    (xs : List α) (left right : α → List Bool) :
+    xorBoolList (xs.flatMap fun x => left x ++ right x) =
+      (xorBoolList (xs.flatMap left) != xorBoolList (xs.flatMap right)) := by
+  induction xs with
+  | nil =>
+      simp [xorBoolList]
+  | cons x xs ih =>
+      simp only [List.flatMap_cons]
+      rw [xorBoolList_append, xorBoolList_append, xorBoolList_append, ih]
+      rw [xorBoolList_append]
+      generalize xorBoolList (left x) = a
+      generalize xorBoolList (List.flatMap left xs) = b
+      generalize xorBoolList (right x) = c
+      generalize xorBoolList (List.flatMap right xs) = d
+      cases a <;> cases b <;> cases c <;> cases d <;> rfl
+
+private theorem xorBoolList_wordPairs_swap
+    (m n : Nat) (term : Nat → Nat → Bool) :
+    xorBoolList
+        (List.flatMap
+          (fun i => (List.range n).map (fun j => term i j))
+          (List.range m)) =
+      xorBoolList
+        (List.flatMap
+          (fun j => (List.range m).map (fun i => term i j))
+          (List.range n)) := by
+  induction m with
+  | zero =>
+      simp [xorBoolList, List.flatMap_const_nil]
+  | succ m ih =>
+      rw [List.range_succ, List.flatMap_append]
+      simp only [List.flatMap_cons]
+      rw [xorBoolList_append, ih]
+      rw [List.flatMap_empty_input]
+      simp only [List.append_nil]
+      have hcols :
+          xorBoolList
+              (List.flatMap
+                (fun j => (List.range m ++ [m]).map (fun i => term i j))
+                (List.range n)) =
+            (xorBoolList
+                (List.flatMap
+                  (fun j => (List.range m).map (fun i => term i j))
+                  (List.range n)) !=
+              xorBoolList ((List.range n).map (fun j => term m j))) := by
+        simp only [List.map_append, List.map_cons, List.map_nil]
+        rw [xorBoolList_flatMap_append]
+        rw [List.flatMap_singleton]
+      rw [hcols]
+
 private theorem coeffWords_xorClmulAt_contrib
     (acc : Array UInt64) {idx n : Nat} (x y : UInt64)
     (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size) :
@@ -2839,12 +2923,25 @@ private theorem coeffWords_mulWords_contrib (xs ys : Array UInt64) (n : Nat) :
         simp
         omega
 
+private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
+    clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
+  unfold clmulCoeffAt
+  rw [Nat.add_comm i j, clmul_comm x y]
+
 /-- Coefficients of the raw packed product are symmetric in the two input word
 arrays. This is the local bridge from word-level `clmul_comm` to polynomial
 multiplication commutativity. -/
 private theorem coeffWords_mulWords_comm (xs ys : Array UInt64) (n : Nat) :
     coeffWords (mulWords xs ys) n = coeffWords (mulWords ys xs) n := by
-  sorry
+  rw [coeffWords_mulWords_contrib xs ys n, coeffWords_mulWords_contrib ys xs n]
+  rw [xorBoolList_wordPairs_swap xs.size ys.size
+    (fun i j => clmulCoeffAt (i + j) xs[i]! ys[j]! n)]
+  congr 1
+  apply List.flatMap_congr_left
+  intro j hj
+  apply List.map_congr_left
+  intro i hi
+  exact clmulCoeffAt_comm i j xs[i]! ys[j]! n
 
 /-- Multiplication in `F_2[x]` via carry-less word products and XOR
 accumulation. -/
