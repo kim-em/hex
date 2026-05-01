@@ -487,11 +487,55 @@ private theorem squareFreeAuxRevContribution_pthRoot_correct_pow
       pow (pthRoot f) (multiplicity * p) := by
   sorry
 
+private theorem derivative_coeff_pred_of_pos_lt
+    (f : FpPoly p) {n : Nat} (hn0 : 0 < n) (hn : n < f.size) :
+    (DensePoly.derivative f).coeff (n - 1) =
+      ((n : Nat) : ZMod64 p) * f.coeff n := by
+  unfold DensePoly.derivative
+  rw [DensePoly.coeff_ofCoeffs_list]
+  have hpred : n - 1 < f.size - 1 := by omega
+  have hget :
+      (((List.range (f.size - 1)).map
+          (fun i => (((i + 1 : Nat) : ZMod64 p) * f.coeff (i + 1)))).getD
+        (n - 1) (0 : ZMod64 p)) =
+          (((n - 1 + 1 : Nat) : ZMod64 p) * f.coeff (n - 1 + 1)) := by
+    simp [List.getD, hpred]
+  have hsucc : n - 1 + 1 = n := by omega
+  simpa [hsucc] using hget
+
+private theorem zmod64_natCast_ne_zero_of_mod_ne_zero
+    (n : Nat) (hn : n % p ≠ 0) :
+    ((n : Nat) : ZMod64 p) ≠ 0 := by
+  intro hzero
+  apply hn
+  have hnat := congrArg ZMod64.toNat hzero
+  simpa using hnat
+
 private theorem derivative_zero_coeff_non_pmultiple
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (n : Nat)
     (hdf : (DensePoly.derivative f).isZero = true) (hn : n % p ≠ 0) :
     f.coeff n = 0 := by
-  sorry
+  by_cases hsize : f.size ≤ n
+  · exact DensePoly.coeff_eq_zero_of_size_le f hsize
+  · have hnlt : n < f.size := Nat.lt_of_not_ge hsize
+    have hn0 : 0 < n := by
+      cases n with
+      | zero =>
+          simp at hn
+      | succ n =>
+          exact Nat.succ_pos n
+    have hderiv_zero_poly : DensePoly.derivative f = 0 :=
+      eq_zero_of_isZero_true (DensePoly.derivative f) hdf
+    have hderiv_coeff : (DensePoly.derivative f).coeff (n - 1) = 0 := by
+      rw [hderiv_zero_poly]
+      exact DensePoly.coeff_zero (R := ZMod64 p) (n - 1)
+    have hmul :
+        ((n : Nat) : ZMod64 p) * f.coeff n = 0 := by
+      rw [← derivative_coeff_pred_of_pos_lt f hn0 hnlt]
+      exact hderiv_coeff
+    rcases ZMod64.eq_zero_or_eq_zero_of_mul_eq_zero hp hmul with hnzero | hcoeff
+    · exact False.elim (zmod64_natCast_ne_zero_of_mod_ne_zero n hn hnzero)
+    · exact hcoeff
 
 private theorem pthRoot_frobenius_of_derivative_zero
     (hp : Hex.Nat.Prime p) (f : FpPoly p)
