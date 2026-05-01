@@ -503,6 +503,44 @@ private theorem powLinear_coeffFold_prime_coeff_expansion (g : FpPoly p) (m n : 
     (powLinear (coeffFold g m) p).coeff n = coeffFoldPowerCoeff g m p n :=
   powLinear_coeffFold_coeff_expansion g m p n
 
+/--
+Prime-characteristic cancellation for the recursive coefficient expansion of
+`(coeffFold g m)^p`: all mixed `p`-tuples vanish, leaving only diagonal
+choices from the bounded coefficient fold.
+-/
+private theorem coeffFoldPowerCoeff_prime_coeff
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) :
+    coeffFoldPowerCoeff g m p n =
+      if n % p = 0 then
+        if n / p < m then (g.coeff (n / p)) ^ p else 0
+      else
+        0 := by
+  rw [← powLinear_coeffFold_prime_coeff_expansion (p := p) g m n]
+  sorry
+
+private theorem coeffFoldPowerCoeff_prime_coeff_of_mod_ne_zero
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) (hn : n % p ≠ 0) :
+    coeffFoldPowerCoeff g m p n = 0 := by
+  rw [coeffFoldPowerCoeff_prime_coeff hp g m n]
+  simp [hn]
+
+private theorem coeffFoldPowerCoeff_prime_coeff_of_mod_eq_zero
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) (hn : n % p = 0) :
+    coeffFoldPowerCoeff g m p n =
+      if n / p < m then (g.coeff (n / p)) ^ p else 0 := by
+  rw [coeffFoldPowerCoeff_prime_coeff hp g m n]
+  simp [hn]
+
+private theorem powLinear_coeffFold_prime_coeff
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) :
+    (powLinear (coeffFold g m) p).coeff n =
+      if n % p = 0 then
+        if n / p < m then (g.coeff (n / p)) ^ p else 0
+      else
+        0 := by
+  rw [powLinear_coeffFold_prime_coeff_expansion]
+  exact coeffFoldPowerCoeff_prime_coeff hp g m n
+
 private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
