@@ -176,6 +176,45 @@ private theorem powLinear_powLinear_mul (f : FpPoly p) (m n : Nat) :
       rw [powLinear, ih]
       simpa [Nat.succ_mul] using (powLinear_add f (m * n) n).symm
 
+private theorem powLinear_mul_base (f g : FpPoly p) (n : Nat) :
+    powLinear (f * g) n = powLinear f n * powLinear g n := by
+  induction n with
+  | zero =>
+      simp [powLinear]
+  | succ n ih =>
+      rw [powLinear, ih, powLinear, powLinear]
+      calc
+        (powLinear f n * powLinear g n) * (f * g) =
+            powLinear f n * (powLinear g n * (f * g)) := by
+              exact DensePoly.mul_assoc_poly
+                (powLinear f n) (powLinear g n) (f * g)
+        _ = powLinear f n * ((powLinear g n * f) * g) := by
+              exact congrArg (fun x => powLinear f n * x)
+                (DensePoly.mul_assoc_poly (powLinear g n) f g).symm
+        _ = powLinear f n * ((f * powLinear g n) * g) := by
+              rw [mul_comm (powLinear g n) f]
+        _ = powLinear f n * (f * (powLinear g n * g)) := by
+              exact congrArg (fun x => powLinear f n * x)
+                (DensePoly.mul_assoc_poly f (powLinear g n) g)
+        _ = (powLinear f n * f) * (powLinear g n * g) := by
+              exact (DensePoly.mul_assoc_poly
+                (powLinear f n) f (powLinear g n * g)).symm
+
+private theorem pow_add_exp (f : FpPoly p) (m n : Nat) :
+    pow f (m + n) = pow f m * pow f n := by
+  rw [pow_eq_powLinear, pow_eq_powLinear, pow_eq_powLinear]
+  exact powLinear_add f m n
+
+private theorem pow_mul_base (f g : FpPoly p) (n : Nat) :
+    pow (f * g) n = pow f n * pow g n := by
+  rw [pow_eq_powLinear, pow_eq_powLinear, pow_eq_powLinear]
+  exact powLinear_mul_base f g n
+
+private theorem pow_pow_mul' (f : FpPoly p) (m n : Nat) :
+    pow (pow f n) m = pow f (m * n) := by
+  rw [pow_eq_powLinear, pow_eq_powLinear, pow_eq_powLinear]
+  exact powLinear_powLinear_mul f m n
+
 private theorem zmod64_add_pow_prime
     (hp : Hex.Nat.Prime p) (a b : ZMod64 p) :
     (a + b) ^ p = a ^ p + b ^ p := by
