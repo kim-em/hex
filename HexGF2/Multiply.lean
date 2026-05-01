@@ -3395,6 +3395,17 @@ private theorem coeffWords_mulWords_right_assoc_sourceTriples
   exact xorBoolList_flatMap_congr_xor
     (fun i _hi => rightAssocSourceTripleContribs_slot xs ys zs i n)
 
+/-- The source-triple XOR expansions of the two raw associated products
+contribute the same coefficient.  Proving this requires the fixed source-word
+triple bridge: summing over the intermediate word slot in `(xs[i] * ys[j]) *
+zs[k]` matches summing over the intermediate word slot in `xs[i] * (ys[j] *
+zs[k])`. -/
+private theorem xorBoolList_assoc_sourceTripleContribs
+    (xs ys zs : Array UInt64) (n : Nat) :
+    xorBoolList (leftAssocSourceTripleContribs xs ys zs n) =
+      xorBoolList (rightAssocSourceTripleContribs xs ys zs n) := by
+  sorry
+
 private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
     clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
   unfold clmulCoeffAt
@@ -3447,6 +3458,17 @@ private theorem coeffWords_mulWords_ofWords_right
   change coeffWords (mulWords xs (normalizeWords (mulWords ys zs))) n =
     coeffWords (mulWords xs (mulWords ys zs)) n
   exact coeffWords_mulWords_normalize_right xs (mulWords ys zs) n
+
+/-- Raw packed multiplication is coefficientwise associative.  This is the
+source-triple frontier: the two source-triple expansions above reduce raw
+associativity to a fixed-triple word contribution identity. -/
+private theorem coeffWords_mulWords_assoc
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords (mulWords xs ys) zs) n =
+      coeffWords (mulWords xs (mulWords ys zs)) n := by
+  rw [coeffWords_mulWords_left_assoc_sourceTriples,
+    coeffWords_mulWords_right_assoc_sourceTriples]
+  exact xorBoolList_assoc_sourceTripleContribs xs ys zs n
 
 /-- Multiplication in `F_2[x]` via carry-less word products and XOR
 accumulation. -/
@@ -3533,7 +3555,14 @@ theorem right_distrib (p q r : GF2Poly) :
 /-- Packed `GF(2)` polynomial multiplication is associative. -/
 theorem mul_assoc (p q r : GF2Poly) :
     (p * q) * r = p * (q * r) := by
-  sorry
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mul]
+  change
+    coeffWords (mulWords (ofWords (mulWords p.words q.words)).words r.words) n =
+      coeffWords (mulWords p.words (ofWords (mulWords q.words r.words)).words) n
+  rw [coeffWords_mulWords_ofWords_left, coeffWords_mulWords_ofWords_right]
+  exact coeffWords_mulWords_assoc p.words q.words r.words n
 
 private theorem coeff_shiftLeft_lt (p : GF2Poly) {k n : Nat} (hn : n < k) :
     (p.shiftLeft k).coeff n = false := by
