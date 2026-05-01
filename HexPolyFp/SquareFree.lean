@@ -362,6 +362,30 @@ private theorem yunFactors_reconstruction_invariant
             simpa [y, z, hz] using hmul
 
 /--
+Product contribution of `squareFreeAuxRev` before it is multiplied into the
+caller-provided reverse accumulator.
+-/
+private def squareFreeAuxRevContribution (f : FpPoly p) (multiplicity : Nat) :
+    Nat → FpPoly p
+  | 0 => 1
+  | fuel + 1 =>
+      if f.isZero then
+        1
+      else
+        let df := DensePoly.derivative f
+        if df.isZero then
+          squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel
+        else
+          let g := DensePoly.gcd f df
+          let c := f / g
+          let contribution := yunFactorsContribution c g multiplicity fuel
+          if isOne contribution.2 then
+            contribution.1
+          else
+            contribution.1 *
+              squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel
+
+/--
 Tail-recursive square-free decomposition over `F_p[x]`, accumulating factors
 in reverse output order. A derivative-zero branch descends through the formal
 `p`-th root and scales multiplicities by `p`.
@@ -394,6 +418,77 @@ descends through the formal `p`-th root and scales multiplicities by `p`.
 private def squareFreeAux (f : FpPoly p) (multiplicity : Nat)
     (fuel : Nat) : List (SquareFreeFactor p) :=
   (squareFreeAuxRev f multiplicity fuel []).reverse
+
+private theorem squareFreeAuxRev_reconstruction_invariant
+    (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
+    weightedProduct (squareFreeAuxRev f multiplicity fuel accRev).reverse =
+      weightedProduct accRev.reverse *
+        squareFreeAuxRevContribution f multiplicity fuel := by
+  induction fuel generalizing f multiplicity accRev with
+  | zero =>
+      simp [squareFreeAuxRev, squareFreeAuxRevContribution]
+  | succ fuel ih =>
+      simp only [squareFreeAuxRev, squareFreeAuxRevContribution]
+      by_cases hzero : f.isZero
+      · simp [hzero]
+      · simp [hzero]
+        by_cases hdf : (DensePoly.derivative f).isZero
+        · simpa [hdf] using ih (pthRoot f) (multiplicity * p) accRev
+        · simp [hdf]
+          let g := DensePoly.gcd f (DensePoly.derivative f)
+          let c := f / g
+          let loop := yunFactors c g multiplicity fuel accRev
+          let contribution := yunFactorsContribution c g multiplicity fuel
+          have hloop := yunFactors_reconstruction_invariant c g multiplicity fuel accRev
+          have hloop_repeated : loop.2 = contribution.2 := by
+            simpa [loop, contribution] using hloop.1
+          have hloop_product :
+              weightedProduct loop.1.reverse =
+                weightedProduct accRev.reverse * contribution.1 := by
+            simpa [loop, contribution] using hloop.2
+          by_cases hrepeated : isOne loop.2
+          · have hcontribution_one : isOne contribution.2 := by
+              simpa [hloop_repeated] using hrepeated
+            simpa [g, c, loop, contribution, hrepeated, hcontribution_one] using hloop_product
+          · have hcontribution_not_one : isOne contribution.2 = false := by
+              cases hc : isOne contribution.2
+              · exact rfl
+              · exfalso
+                apply hrepeated
+                simpa [hloop_repeated] using hc
+            have hrec :
+                weightedProduct (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel loop.1).reverse =
+                  weightedProduct loop.1.reverse *
+                    squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel := by
+              exact ih (pthRoot loop.2) (multiplicity * p) loop.1
+            have hrec_contribution :
+                squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel =
+                  squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel := by
+              rw [hloop_repeated]
+            have hcalc :
+                weightedProduct (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel loop.1).reverse =
+                  weightedProduct accRev.reverse *
+                    (contribution.1 *
+                      squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel) := by
+              calc
+                weightedProduct (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel loop.1).reverse
+                    = weightedProduct loop.1.reverse *
+                        squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel := hrec
+                _ = (weightedProduct accRev.reverse * contribution.1) *
+                        squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel := by
+                      rw [hloop_product]
+                _ = weightedProduct accRev.reverse *
+                        (contribution.1 *
+                          squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel) := by
+                      exact DensePoly.mul_assoc_poly
+                        (weightedProduct accRev.reverse) contribution.1
+                        (squareFreeAuxRevContribution (pthRoot loop.2) (multiplicity * p) fuel)
+                _ = weightedProduct accRev.reverse *
+                        (contribution.1 *
+                          squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel) := by
+                      rw [hrec_contribution]
+            simpa [g, c, loop, contribution, hrepeated, hcontribution_not_one, hloop_repeated]
+              using hcalc
 
 private theorem squareFreeAuxRev_pairwise_coprime
     (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
@@ -492,6 +587,11 @@ private theorem squareFreeAuxRev_factors_squareFree
           · simpa [loop, c, g, hrepeated] using
               ih (pthRoot loop.2) (multiplicity * p) loop.1 hloop
 
+private theorem squareFreeAuxRevContribution_correct
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) :
+    squareFreeAuxRevContribution f 1 (f.size + 1) = f := by
+  sorry
+
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
@@ -507,7 +607,11 @@ def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDe
 private theorem squareFreeAux_weightedProduct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     weightedProduct (squareFreeAux f 1 (f.size + 1)) = f := by
-  sorry
+  unfold squareFreeAux
+  have hinvariant := squareFreeAuxRev_reconstruction_invariant f 1 (f.size + 1) []
+  rw [hinvariant]
+  simp [weightedProduct_nil]
+  exact squareFreeAuxRevContribution_correct hp f
 
 theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
