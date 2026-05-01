@@ -36,22 +36,28 @@ def mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p :=
   { p_odd := hp
     p' := montInv p
     p'_eq := by
-      sorry
+      have hp_nat : p.toNat % 2 = 1 := by
+        have h := congrArg UInt64.toNat hp
+        simpa [UInt64.toNat_mod, UInt64.toNat_ofNat, UInt64.size] using h
+      have hspec := montInv_spec p hp_nat
+      simpa [UInt64.word, Nat.mul_comm] using hspec
     r2 := r2OfModulus p
     r2_eq := by
       sorry }
 
 /-- View the odd-modulus assumption as a Nat-level parity fact. -/
 theorem p_odd_nat (ctx : MontCtx p) : p.toNat % 2 = 1 := by
-  sorry
+  have h := congrArg UInt64.toNat ctx.p_odd
+  simpa [UInt64.toNat_mod, UInt64.toNat_ofNat, UInt64.size] using h
 
 /-- An odd `UInt64` modulus is positive at the Nat level. -/
 theorem p_pos (ctx : MontCtx p) : 0 < p.toNat := by
-  sorry
+  have hodd := ctx.p_odd_nat
+  omega
 
 /-- Every `UInt64` modulus is below the Montgomery radix `R = 2^64`. -/
-theorem p_lt_R (ctx : MontCtx p) : p.toNat < UInt64.word := by
-  sorry
+theorem p_lt_R (_ctx : MontCtx p) : p.toNat < UInt64.word := by
+  simpa [UInt64.word, UInt64.size] using UInt64.toNat_lt_size p
 
 /-- Convert a standard residue into Montgomery form. -/
 def toMont (ctx : MontCtx p) (a : UInt64) : UInt64 :=
