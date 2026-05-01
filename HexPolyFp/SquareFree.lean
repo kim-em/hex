@@ -219,6 +219,17 @@ private theorem pthRoot_coeff_of_lt
   rw [DensePoly.coeff_ofCoeffs]
   simp [Array.getD, hi]
 
+/--
+Coefficient form of the prime-field Frobenius law for the formal `p`-th root:
+the `p`th power restores coefficients in degrees divisible by `p` and has zero
+coefficients elsewhere.
+-/
+private theorem pthRoot_pow_prime_coeff
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (n : Nat) :
+    (pow (pthRoot f) p).coeff n =
+      if n % p = 0 then f.coeff n else 0 := by
+  sorry
+
 private theorem scale_one_poly (c : ZMod64 p) :
     DensePoly.scale c (1 : FpPoly p) = DensePoly.C c := by
   apply DensePoly.ext_coeff
@@ -546,10 +557,15 @@ private theorem derivative_zero_coeff_non_pmultiple
 
 private theorem pthRoot_frobenius_of_derivative_zero
     (hp : Hex.Nat.Prime p) (f : FpPoly p)
-    (hzero : f.isZero = false)
+    (_hzero : f.isZero = false)
     (hdf : (DensePoly.derivative f).isZero = true) :
     pow (pthRoot f) p = f := by
-  sorry
+  apply DensePoly.ext_coeff
+  intro n
+  rw [pthRoot_pow_prime_coeff hp f n]
+  by_cases hn : n % p = 0
+  · simp [hn]
+  · simp [hn, derivative_zero_coeff_non_pmultiple hp f n hdf hn]
 
 private theorem pow_pow_mul
     (f : FpPoly p) (m n : Nat) (_hm : 0 < m) :
