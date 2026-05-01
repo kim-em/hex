@@ -167,6 +167,13 @@ private theorem zmod64_fold_add_pow_prime
   simpa [ZMod64.pow_prime hp (0 : ZMod64 p)] using
     zmod64_fold_add_pow_prime_acc (p := p) hp xs (0 : ZMod64 p)
 
+private theorem zmod64_index_fold_add_pow_prime
+    (hp : Hex.Nat.Prime p) (xs : List Nat) (term : Nat → ZMod64 p) :
+    (xs.foldl (fun acc i => acc + term i) 0) ^ p =
+      xs.foldl (fun acc i => acc + term i ^ p) 0 := by
+  simpa [List.foldl_map] using
+    zmod64_fold_add_pow_prime (p := p) hp (xs.map term)
+
 /-- Multiply the factors in a square-free decomposition with their multiplicities. -/
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
   factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1
@@ -297,6 +304,34 @@ private theorem coeffTerm_coeff (g : FpPoly p) (i n : Nat) :
     · have hsub : n - i ≠ 0 := by omega
       simp [hni, hsub]
       exact hzero
+
+private theorem coeff_foldl_coeffTerm_coeff
+    (g : FpPoly p) (xs : List Nat) (acc : FpPoly p) (n : Nat) :
+    (xs.foldl (fun acc i => acc + coeffTerm g i) acc).coeff n =
+      xs.foldl (fun acc i => acc + (coeffTerm g i).coeff n) (acc.coeff n) := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc + coeffTerm g i)]
+      rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
+
+private theorem coeffFold_coeff_index_fold (g : FpPoly p) (m n : Nat) :
+    (coeffFold g m).coeff n =
+      (List.range m).foldl (fun acc i => acc + (coeffTerm g i).coeff n) 0 := by
+  unfold coeffFold
+  simpa [DensePoly.coeff_zero] using
+    coeff_foldl_coeffTerm_coeff (p := p) g (List.range m) (0 : FpPoly p) n
+
+private theorem coeffFold_coeff_index_fold_pow_prime
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) :
+    ((coeffFold g m).coeff n) ^ p =
+      (List.range m).foldl
+        (fun acc i => acc + (coeffTerm g i).coeff n ^ p) 0 := by
+  rw [coeffFold_coeff_index_fold]
+  exact zmod64_index_fold_add_pow_prime
+    (p := p) hp (List.range m) (fun i => (coeffTerm g i).coeff n)
 
 private theorem powLinear_coeffTerm_coeff (g : FpPoly p) (i k n : Nat) :
     (powLinear (coeffTerm g i) k).coeff n =
