@@ -12,6 +12,20 @@ resulting modular-inverse properties.
 private def montPosInvStep (p x : UInt64) : UInt64 :=
   x * (2 - p * x)
 
+/-- The executable wrapping Newton step lifts a 3-bit inverse to 6 bits. -/
+private theorem montPosInvStep_mod_3_to_6 (p x : UInt64)
+    (hx : p * x % 8 = 1) :
+    p * montPosInvStep p x % 64 = 1 := by
+  unfold montPosInvStep
+  bv_decide (config := { timeout := 30 })
+
+/-- The executable wrapping Newton step lifts a 6-bit inverse to 12 bits. -/
+private theorem montPosInvStep_mod_6_to_12 (p x : UInt64)
+    (hx : p * x % 64 = 1) :
+    p * montPosInvStep p x % 4096 = 1 := by
+  unfold montPosInvStep
+  bv_decide (config := { timeout := 30 })
+
 /--
 Starting from the odd-modulus seed `x = p`, five refinement steps lift the
 inverse from mod `2^3` to mod `2^96 ≥ 2^64`.
