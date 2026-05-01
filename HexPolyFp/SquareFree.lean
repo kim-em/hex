@@ -398,6 +398,76 @@ private theorem coeffFold_size_eq (g : FpPoly p) :
     coeffFold g g.size = g := by
   exact coeffFold_eq_of_size_le g g.size (Nat.le_refl g.size)
 
+/--
+Coefficient expansion for a power of a bounded coefficient fold.
+
+The successor case is the finite schoolbook convolution of the already
+expanded `k` choices with one more bounded coefficient choice from `g`.
+-/
+private def coeffFoldPowerCoeff (g : FpPoly p) (m : Nat) : Nat → Nat → ZMod64 p
+  | 0, n => if n = 0 then 1 else 0
+  | k + 1, n =>
+      (List.range (powLinear (coeffFold g m) k).size).foldl
+        (fun acc i =>
+          acc + coeffFoldPowerCoeff g m k i *
+            (if n < i then 0 else if n - i < m then g.coeff (n - i) else 0))
+        0
+
+private theorem powLinear_coeffFold_coeff_expansion (g : FpPoly p) (m k n : Nat) :
+    (powLinear (coeffFold g m) k).coeff n = coeffFoldPowerCoeff g m k n := by
+  induction k generalizing n with
+  | zero =>
+      simp [powLinear, coeffFoldPowerCoeff]
+      change (DensePoly.C (1 : ZMod64 p)).coeff n = if n = 0 then 1 else 0
+      exact DensePoly.coeff_C (1 : ZMod64 p) n
+  | succ k ih =>
+      rw [powLinear, coeff_mul]
+      unfold mulCoeffSum
+      simp only [coeffFoldPowerCoeff]
+      let xs := List.range (powLinear (coeffFold g m) k).size
+      change xs.foldl
+          (fun acc i => acc + mulCoeffTerm (powLinear (coeffFold g m) k) (coeffFold g m) n i)
+          0 =
+        xs.foldl
+          (fun acc i =>
+            acc + coeffFoldPowerCoeff g m k i *
+              (if n < i then 0 else if n - i < m then g.coeff (n - i) else 0))
+          0
+      suffices hfold :
+          ∀ acc,
+            xs.foldl
+                (fun acc i =>
+                  acc + mulCoeffTerm (powLinear (coeffFold g m) k) (coeffFold g m) n i)
+                acc =
+              xs.foldl
+                (fun acc i =>
+                  acc + coeffFoldPowerCoeff g m k i *
+                    (if n < i then 0 else if n - i < m then g.coeff (n - i) else 0))
+                acc by
+        exact hfold 0
+      intro acc
+      induction xs generalizing acc with
+      | nil =>
+          rfl
+      | cons i xs ihxs =>
+          simp only [List.foldl_cons]
+          have hterm :
+              mulCoeffTerm (powLinear (coeffFold g m) k) (coeffFold g m) n i =
+                coeffFoldPowerCoeff g m k i *
+                  (if n < i then 0 else if n - i < m then g.coeff (n - i) else 0) := by
+            unfold mulCoeffTerm
+            rw [ih, coeffFold_coeff]
+            by_cases hni : n < i
+            · simp [hni]
+              grind
+            · simp [hni]
+          rw [hterm]
+          exact ihxs _
+
+private theorem powLinear_coeffFold_prime_coeff_expansion (g : FpPoly p) (m n : Nat) :
+    (powLinear (coeffFold g m) p).coeff n = coeffFoldPowerCoeff g m p n :=
+  powLinear_coeffFold_coeff_expansion g m p n
+
 private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
