@@ -167,9 +167,16 @@ proofs, but that tree is not part of the external contract.
 Suggested companion theorem shape (in `hex-hensel`):
 ```lean
 theorem multifactorLift_spec
-    (hprod : ZPoly.congr (Array.polyProduct factors) f p)
+    (hk : 1 ≤ k)
+    (hp : 1 < p)
+    (hinv : MultifactorLiftInvariant p k f factors.toList)
     : ZPoly.congr (Array.polyProduct (multifactorLift p k f factors)) f (p^k)
 ```
+The invariant is recursive over the sequential split tree. Each nontrivial
+split carries the same start invariant, degree preservation hypothesis, and
+Bezout preservation hypothesis required by `henselLift_spec`; the tail carries
+the invariant for the lifted complementary factor. Product congruence modulo
+`p` alone is not sufficient for multifactor lifting.
 
 Theorems that belong in `hex-hensel-mathlib` are the ones that use
 Mathlib's abstract polynomial/divisibility/coprimality infrastructure
