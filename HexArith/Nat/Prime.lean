@@ -111,6 +111,83 @@ private theorem choose_prime_dvd_from_mul_identity {p k : Nat} (hp : Prime p)
           · exact False.elim (not_dvd_of_pos_lt hk hk' hdiv)
           · exact hdiv
 
+private def chooseTerm (n a b k : Nat) : Nat :=
+  choose n k * a ^ (n - k) * b ^ k
+
+private def chooseSum (n a b : Nat) : Nat -> Nat
+  | 0 => 0
+  | k + 1 => chooseSum n a b k + chooseTerm n a b k
+
+private theorem choose_eq_zero_of_lt {n k : Nat} (h : n < k) : choose n k = 0 := by
+  induction n generalizing k with
+  | zero =>
+      cases k with
+      | zero => omega
+      | succ k => rfl
+  | succ n ih =>
+      cases k with
+      | zero => omega
+      | succ k =>
+          simp [choose]
+          by_cases hk : n < k
+          · simp [ih hk]
+            exact ih (by omega)
+          · exfalso
+            omega
+
+private theorem choose_self (n : Nat) : choose n n = 1 := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      simp [choose, ih, choose_eq_zero_of_lt (by omega : n < n + 1)]
+
+private theorem chooseSum_zero (a b : Nat) : chooseSum 0 a b 1 = 1 := by
+  simp [chooseSum, chooseTerm]
+
+private theorem chooseSum_succ_row (n a b m : Nat) (hm : m ≤ n + 1) :
+    chooseSum (n + 1) a b (m + 1) =
+      a * chooseSum n a b (m + 1) + b * chooseSum n a b m := by
+  induction m with
+  | zero =>
+      simp [chooseSum, chooseTerm, Nat.pow_succ]
+      rw [Nat.mul_comm]
+  | succ m ih =>
+      rw [chooseSum, ih (by omega)]
+      unfold chooseTerm
+      by_cases hlt : m < n
+      · have hpow : a ^ (n - m) = a * a ^ (n - (m + 1)) := by
+          have hsub' : n - m = n - (m + 1) + 1 := by omega
+          rw [hsub', Nat.pow_succ, Nat.mul_comm]
+        simp [chooseSum, chooseTerm, choose_succ_succ, hpow, Nat.pow_succ,
+          Nat.mul_add, Nat.add_mul, Nat.add_assoc]
+        ac_rfl
+      · have hmn : m = n := by omega
+        subst m
+        have hzero : choose n (n + 1) = 0 := choose_eq_zero_of_lt (by omega)
+        simp [chooseSum, chooseTerm, choose_succ_succ, hzero, Nat.pow_succ,
+          Nat.mul_add, Nat.add_assoc]
+        ac_rfl
+
+private theorem add_pow_chooseSum (n a b : Nat) :
+    (a + b) ^ n = chooseSum n a b (n + 1) := by
+  induction n with
+  | zero =>
+      simp [chooseSum, chooseTerm]
+  | succ n ih =>
+      calc
+        (a + b) ^ (n + 1) = (a + b) ^ n * (a + b) := Nat.pow_succ (a + b) n
+        _ = (a + b) ^ n * a + (a + b) ^ n * b := by rw [Nat.mul_add]
+        _ = a * chooseSum n a b (n + 1) + b * chooseSum n a b (n + 1) := by
+            rw [ih]
+            ac_rfl
+        _ = a * chooseSum n a b (n + 1 + 1) + b * chooseSum n a b (n + 1) := by
+            have hzero : choose n (n + 1) = 0 := choose_eq_zero_of_lt (by omega)
+            have htail : chooseSum n a b (n + 1 + 1) = chooseSum n a b (n + 1) := by
+              simp [chooseSum, chooseTerm, hzero]
+            rw [htail]
+        _ = chooseSum (n + 1) a b (n + 1 + 1) :=
+            (chooseSum_succ_row n a b (n + 1) (by omega)).symm
+
 private theorem add_pow_prime_mod_of_choose_dvd {p : Nat} (hp : Prime p) (a b : Nat)
     (hchoose : ∀ k, 0 < k → k < p → p ∣ choose p k) :
     (a + b) ^ p % p = (a ^ p + b ^ p) % p := by
