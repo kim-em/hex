@@ -37,6 +37,38 @@ private def isOne (f : FpPoly p) : Bool :=
         false
   | _ => false
 
+private theorem eq_one_of_isOne_true
+    (f : FpPoly p) (h : isOne f = true) :
+    f = 1 := by
+  unfold isOne at h
+  cases hdeg : f.degree? with
+  | none =>
+      simp [hdeg] at h
+  | some d =>
+      cases d with
+      | zero =>
+        simp [hdeg] at h
+        have hcoeff0 : f.coeff 0 = (1 : ZMod64 p) := h
+        have hsize : f.size = 1 := by
+          unfold DensePoly.degree? at hdeg
+          by_cases hzero : f.size = 0
+          · simp [hzero] at hdeg
+          · simp [hzero] at hdeg
+            omega
+        apply DensePoly.ext_coeff
+        intro n
+        cases n with
+        | zero =>
+            change f.coeff 0 = (DensePoly.C (1 : ZMod64 p)).coeff 0
+            simpa [DensePoly.coeff_C] using hcoeff0
+        | succ n =>
+            have hn : f.size ≤ n + 1 := by omega
+            change f.coeff (n + 1) = (DensePoly.C (1 : ZMod64 p)).coeff (n + 1)
+            rw [DensePoly.coeff_eq_zero_of_size_le f hn]
+            exact (DensePoly.coeff_C (1 : ZMod64 p) (n + 1)).symm
+      | succ d =>
+        simp [hdeg] at h
+
 /-- Polynomial exponentiation uses square-and-multiply on the exponent bits. -/
 private def pow (f : FpPoly p) (n : Nat) : FpPoly p :=
   let rec go (acc base : FpPoly p) (k : Nat) : FpPoly p :=
