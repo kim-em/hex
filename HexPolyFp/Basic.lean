@@ -54,6 +54,9 @@ instance : DecidableEq (ZMod64 p) := by
 These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
 surface; the executable division operations themselves are inherited from `DensePoly`. -/
 instance : DensePoly.DivModLaws (ZMod64 p) where
+  divMod_spec := by
+    intro f g
+    sorry
   divMod_remainder_degree_lt_of_pos_degree := by
     intro f g hdegree
     sorry

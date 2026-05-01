@@ -198,6 +198,10 @@ theorems that use long-division invariants should require this class rather than
 those invariants for arbitrary, potentially unlawful `Div` and `Sub` instances. -/
 class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [Mul R]
     [Div R] : Prop where
+  divMod_spec :
+    ∀ p q : DensePoly R,
+      let qr := divMod p q
+      qr.1 * q + qr.2 = p
   divMod_remainder_degree_lt_of_pos_degree :
     ∀ p q : DensePoly R,
       0 < q.degree?.getD 0 → (divMod p q).2.degree?.getD 0 < q.degree?.getD 0
@@ -208,11 +212,11 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
 
-theorem divMod_spec [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem divMod_spec [One R] [Add R] [Sub R] [Mul R] [Div R] [DivModLaws R]
     (p q : DensePoly R) :
     let qr := divMod p q
     qr.1 * q + qr.2 = p := by
-  sorry
+  exact DivModLaws.divMod_spec p q
 
 theorem gcd_dvd_left [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) :
@@ -300,7 +304,7 @@ theorem mod_degree_lt_of_pos_degree [One R] [Add R] [Sub R] [Mul R] [Div R]
     0 < q.degree?.getD 0 → (p % q).degree?.getD 0 < q.degree?.getD 0 := by
   simpa [DensePoly.mod] using divMod_remainder_degree_lt_of_pos_degree p q
 
-theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem div_mul_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R] [DivModLaws R]
     (p q : DensePoly R) :
     (p / q) * q + (p % q) = p := by
   simpa [DensePoly.div, DensePoly.mod] using divMod_spec p q
@@ -1358,7 +1362,7 @@ def Congr {S : Type _} [Zero S] [DecidableEq S] [Add S] [Sub S] [Mul S]
   m ∣ (p - q)
 
 private theorem mod_sub_self_eq_mul_neg_div {S : Type _}
-    [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (p m : DensePoly S) :
     p % m - p = m * (0 - p / m) := by
   have hdiv : (p / m) * m + (p % m) = p := div_mul_add_mod p m
@@ -1375,7 +1379,7 @@ private theorem mod_sub_self_eq_mul_neg_div {S : Type _}
   grind
 
 private theorem congr_mod_core {S : Type _}
-    [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (p m : DensePoly S) :
     m ∣ (p % m - p) := by
   exact ⟨0 - p / m, mod_sub_self_eq_mul_neg_div p m⟩
@@ -1383,6 +1387,7 @@ private theorem congr_mod_core {S : Type _}
 /-- Reduction modulo the modulus is congruent to the original polynomial over a lawful
 coefficient ring. -/
 theorem congr_mod {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [DivModLaws S]
     (p m : DensePoly S) :
     Congr (p % m) p m := by
   exact congr_mod_core p m
