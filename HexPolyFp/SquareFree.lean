@@ -1019,6 +1019,9 @@ private theorem squareFreeAuxRevContribution_derivative_zero_correct
           exact pthRoot_pow_mul_prime_of_derivative_zero
             hp f multiplicity hmultiplicity hzero hdf
 
+private def squareFreeContributionReachable (f : FpPoly p) : Prop :=
+  f.size = 1 → f = 1
+
 private theorem yunFactorsContribution_reconstruct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
@@ -1038,19 +1041,32 @@ private theorem yunFactorsContribution_reconstruct
 private theorem squareFreeAuxRevContribution_correct_pow_of_nonzero
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel)
-    (hzero : f.isZero = false) :
+    (hzero : f.isZero = false)
+    (hreachable : squareFreeContributionReachable f) :
     squareFreeAuxRevContribution f multiplicity fuel = pow f multiplicity := by
-  cases fuel with
+  induction fuel generalizing f multiplicity with
   | zero =>
       omega
-  | succ fuel =>
+  | succ fuel ih =>
       simp only [squareFreeAuxRevContribution]
       simp [hzero]
       by_cases hdf : (DensePoly.derivative f).isZero
       · simpa [hdf] using
           squareFreeAuxRevContribution_derivative_zero_correct
             hp f multiplicity fuel hmultiplicity hfuel hzero hdf (by
-              sorry)
+              have hmultiplicity_root : 0 < multiplicity * p := by
+                have hp_pos : 0 < p := by
+                  have htwo : 2 ≤ p := Hex.Nat.Prime.two_le hp
+                  omega
+                exact Nat.mul_pos hmultiplicity hp_pos
+              have hroot_fuel : (pthRoot f).size < fuel := by
+                sorry
+              have hroot_zero : (pthRoot f).isZero = false := by
+                sorry
+              have hroot_reachable : squareFreeContributionReachable (pthRoot f) := by
+                sorry
+              exact ih (pthRoot f) (multiplicity * p)
+                hmultiplicity_root hroot_fuel hroot_zero hroot_reachable)
       · have hdf_false : (DensePoly.derivative f).isZero = false := by
           cases h : (DensePoly.derivative f).isZero <;> simp [h] at hdf ⊢
         simp [hdf_false]
@@ -1467,10 +1483,11 @@ private theorem squareFreeAuxRev_factors_squareFree
               ih (pthRoot loop.2) (multiplicity * p) loop.1 hloop
 
 private theorem squareFreeAuxRevContribution_correct
-    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false) :
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false)
+    (hreachable : squareFreeContributionReachable f) :
     squareFreeAuxRevContribution f 1 (f.size + 1) = f := by
   rw [squareFreeAuxRevContribution_correct_pow_of_nonzero hp f 1 (f.size + 1)
-    (by omega) (by omega) hzero]
+    (by omega) (by omega) hzero hreachable]
   exact pow_one f
 
 private theorem squareFreeAux_zero_weightedProduct
@@ -1492,13 +1509,19 @@ def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDe
   { unit, factors }
 
 private theorem squareFreeAux_weightedProduct_nonzero
-    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false) :
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false)
+    (hreachable : squareFreeContributionReachable f) :
     weightedProduct (squareFreeAux f 1 (f.size + 1)) = f := by
   unfold squareFreeAux
   have hinvariant := squareFreeAuxRev_reconstruction_invariant f 1 (f.size + 1) []
   rw [hinvariant]
   simp [weightedProduct_nil]
-  exact squareFreeAuxRevContribution_correct hp f hzero
+  exact squareFreeAuxRevContribution_correct hp f hzero hreachable
+
+private theorem normalizeMonic_squareFreeContributionReachable
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) :
+    squareFreeContributionReachable (normalizeMonic f).2 := by
+  sorry
 
 private theorem normalizeMonic_zero_squareFree_weightedProduct
     (hp : Hex.Nat.Prime p) (f : FpPoly p)
@@ -1531,7 +1554,8 @@ theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
   · exact normalizeMonic_zero_squareFree_weightedProduct hp f hzero
   · have hnonzero : (normalizeMonic f).2.isZero = false := by
       cases h : (normalizeMonic f).2.isZero <;> simp [h] at hzero ⊢
-    rw [squareFreeAux_weightedProduct_nonzero hp (normalizeMonic f).2 hnonzero]
+    rw [squareFreeAux_weightedProduct_nonzero hp (normalizeMonic f).2 hnonzero
+      (normalizeMonic_squareFreeContributionReachable hp f)]
     exact normalizeMonic_reconstruct hp f
 
 theorem squareFree_factors_squareFree (hp : Hex.Nat.Prime p) (f : FpPoly p) :
