@@ -39,6 +39,23 @@ def barrettReduce (ctx : BarrettCtx p) (T : UInt64) : UInt64 :=
   let r := T - q * p
   if r ≥ p then r - p else r
 
+private theorem BarrettCtx.toNat_pinv (ctx : BarrettCtx p) :
+    ctx.pinv.toNat = barrettRadix / p.toNat := by
+  rw [ctx.pinv_eq]
+  have hRpos : 0 < barrettRadix := by
+    simp [barrettRadix, UInt64.word]
+  have hlt : barrettRadix / p.toNat < UInt64.word := by
+    have hdiv_lt : barrettRadix / p.toNat < barrettRadix :=
+      Nat.div_lt_self hRpos ctx.p_gt
+    simpa [barrettRadix] using hdiv_lt
+  simpa [UInt64.toNat_ofNat, UInt64.size, barrettRadix, UInt64.word]
+    using Nat.mod_eq_of_lt hlt
+
+private theorem UInt64.toNat_mul_of_lt_word (a b : UInt64)
+    (h : a.toNat * b.toNat < UInt64.word) :
+    (a * b).toNat = a.toNat * b.toNat := by
+  simpa [UInt64.toNat_mul, UInt64.size, UInt64.word] using Nat.mod_eq_of_lt h
+
 /--
 The executable Barrett reduction agrees with the Nat-level reduction when the
 input word is in the small-product range guaranteed by the context hypotheses.
@@ -47,4 +64,62 @@ theorem toNat_barrettReduce (ctx : BarrettCtx p) (T : UInt64)
     (hT : T.toNat < p.toNat * p.toNat) :
     (barrettReduce ctx T).toNat =
       barrettReduceNat p.toNat ctx.pinv.toNat T.toNat := by
-  sorry
+  have hp0 : 0 < p.toNat := Nat.lt_trans (by decide : 0 < 1) ctx.p_gt
+  have hT_word : T.toNat < barrettRadix := by
+    have hp_word : p.toNat * p.toNat < UInt64.word := by
+      calc
+        p.toNat * p.toNat < 2 ^ 32 * 2 ^ 32 :=
+          Nat.mul_lt_mul'' ctx.p_lt ctx.p_lt
+        _ = UInt64.word := by
+          rw [UInt64.word, ← Nat.pow_add]
+    simpa [barrettRadix] using Nat.lt_trans hT hp_word
+  let q := UInt64.mulHi T ctx.pinv
+  have hpinv : ctx.pinv.toNat = barrettRadix / p.toNat := ctx.toNat_pinv
+  have hq_eq : q.toNat = T.toNat * ctx.pinv.toNat / barrettRadix := by
+    simpa [q, barrettRadix] using UInt64.toNat_mulHi T ctx.pinv
+  have hq_le_div : q.toNat ≤ T.toNat / p.toNat := by
+    rw [hq_eq]
+    exact barrettQuotient_le_div
+      (p := p.toNat) (pinv := ctx.pinv.toNat) (T := T.toNat) ctx.p_gt hpinv
+  have hq_mul_le : q.toNat * p.toNat ≤ T.toNat := by
+    calc
+      q.toNat * p.toNat ≤ (T.toNat / p.toNat) * p.toNat :=
+        Nat.mul_le_mul_right p.toNat hq_le_div
+      _ ≤ T.toNat := Nat.div_mul_le_self T.toNat p.toNat
+  have hq_mul_word : q.toNat * p.toNat < UInt64.word := by
+    exact Nat.lt_of_le_of_lt hq_mul_le (by simpa [barrettRadix] using hT_word)
+  have hqmul_toNat : (q * p).toNat = q.toNat * p.toNat :=
+    UInt64.toNat_mul_of_lt_word q p hq_mul_word
+  let r := T - q * p
+  have hr_toNat : r.toNat = T.toNat - q.toNat * p.toNat := by
+    have hleNat : (q * p).toNat ≤ T.toNat := by
+      simpa [hqmul_toNat] using hq_mul_le
+    have hle : q * p ≤ T := by
+      rw [UInt64.le_iff_toNat_le]
+      exact hleNat
+    simpa [r, hqmul_toNat] using UInt64.toNat_sub_of_le T (q * p) hle
+  dsimp [barrettReduce, barrettReduceNat]
+  change
+    (if r ≥ p then r - p else r).toNat =
+      if T.toNat - (T.toNat * ctx.pinv.toNat / barrettRadix) * p.toNat ≥ p.toNat then
+        T.toNat - (T.toNat * ctx.pinv.toNat / barrettRadix) * p.toNat - p.toNat
+      else
+        T.toNat - (T.toNat * ctx.pinv.toNat / barrettRadix) * p.toNat
+  rw [← hq_eq]
+  by_cases hge : r ≥ p
+  · have hcond : p.toNat ≤ T.toNat - q.toNat * p.toNat := by
+      have hle : p ≤ r := hge
+      rw [UInt64.le_iff_toNat_le] at hle
+      simpa [hr_toNat] using hle
+    have hsub_toNat : (r - p).toNat = r.toNat - p.toNat :=
+      UInt64.toNat_sub_of_le r p hge
+    simp [hge, hcond, hsub_toNat, hr_toNat]
+  · have hnot_ge : ¬ r ≥ p := by
+      exact hge
+    have hcond : ¬ p.toNat ≤ T.toNat - q.toNat * p.toNat := by
+      intro hnat
+      apply hge
+      change p ≤ r
+      rw [UInt64.le_iff_toNat_le]
+      simpa [hr_toNat] using hnat
+    simp [hnot_ge, hcond, hr_toNat]
