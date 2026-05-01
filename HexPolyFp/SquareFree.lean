@@ -256,6 +256,102 @@ private theorem pthRoot_coeff (f : FpPoly p) (i : Nat) :
         (Nat.div_le_iff_le_mul hp).mp hle
       omega)).symm
 
+private theorem zmod64_add_zero_coeff (a : ZMod64 p) :
+    a + 0 = a := by
+  grind
+
+private theorem zmod64_zero_add_coeff (a : ZMod64 p) :
+    0 + a = a := by
+  grind
+
+private theorem zmod64_add_zero_zero_coeff :
+    (0 : ZMod64 p) + 0 = 0 := by
+  grind
+
+/-- The single coefficient contribution `g_i x^i`, represented with dense shifts. -/
+private def coeffTerm (g : FpPoly p) (i : Nat) : FpPoly p :=
+  DensePoly.shift i (DensePoly.scale (g.coeff i) (1 : FpPoly p))
+
+/-- Finite sum of the coefficient contributions of `g` below the bound `m`. -/
+private def coeffFold (g : FpPoly p) (m : Nat) : FpPoly p :=
+  (List.range m).foldl (fun acc i => acc + coeffTerm g i) 0
+
+/-- Project a monomial coefficient contribution back to a dense coefficient. -/
+private theorem coeffTerm_coeff (g : FpPoly p) (i n : Nat) :
+    (coeffTerm g i).coeff n = if n = i then g.coeff i else 0 := by
+  unfold coeffTerm
+  have hzero : g.coeff i * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_shift_scale i (g.coeff i) (1 : FpPoly p) n hzero]
+  by_cases hlt : n < i
+  · simp only [hlt, if_true]
+    have hne : n ≠ i := by omega
+    simp [hne]
+    rfl
+  · simp only [hlt, if_false]
+    change g.coeff i * (DensePoly.C (1 : ZMod64 p)).coeff (n - i) =
+      if n = i then g.coeff i else 0
+    rw [DensePoly.coeff_C]
+    by_cases hni : n = i
+    · simp [hni]
+      grind
+    · have hsub : n - i ≠ 0 := by omega
+      simp [hni, hsub]
+      exact hzero
+
+/-- Coefficient projection for the bounded finite coefficient fold. -/
+private theorem coeffFold_coeff (g : FpPoly p) (m n : Nat) :
+    (coeffFold g m).coeff n = if n < m then g.coeff n else 0 := by
+  induction m with
+  | zero =>
+      unfold coeffFold
+      simp only [List.range_zero, List.foldl_nil]
+      rw [DensePoly.coeff_zero]
+      simp
+      rfl
+  | succ m ih =>
+      unfold coeffFold
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      change ((List.range m).foldl (fun acc i => acc + coeffTerm g i) 0 +
+          coeffTerm g m).coeff n = if n < m + 1 then g.coeff n else 0
+      rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
+      change (coeffFold g m).coeff n + (coeffTerm g m).coeff n =
+        if n < m + 1 then g.coeff n else 0
+      rw [ih, coeffTerm_coeff]
+      by_cases hlt : n < m
+      · rw [if_pos hlt]
+        have hne : n ≠ m := by omega
+        rw [if_neg hne]
+        rw [if_pos (by omega : n < m + 1)]
+        exact zmod64_add_zero_coeff (g.coeff n)
+      · by_cases heq : n = m
+        · rw [if_neg hlt]
+          rw [if_pos heq]
+          rw [if_pos (by omega : n < m + 1)]
+          rw [heq]
+          exact zmod64_zero_add_coeff (g.coeff m)
+        · have hsucc : ¬n < m + 1 := by omega
+          rw [if_neg hlt]
+          rw [if_neg heq]
+          rw [if_neg hsucc]
+          exact zmod64_add_zero_zero_coeff
+
+/-- Any coefficient fold whose bound reaches `g.size` reconstructs `g`. -/
+private theorem coeffFold_eq_of_size_le (g : FpPoly p) (m : Nat) (hm : g.size ≤ m) :
+    coeffFold g m = g := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeffFold_coeff]
+  by_cases hn : n < m
+  · simp [hn]
+  · simp [hn]
+    exact (DensePoly.coeff_eq_zero_of_size_le g (by omega)).symm
+
+/-- Reconstruct a polynomial from exactly its stored coefficient range. -/
+private theorem coeffFold_size_eq (g : FpPoly p) :
+    coeffFold g g.size = g := by
+  exact coeffFold_eq_of_size_le g g.size (Nat.le_refl g.size)
+
 /--
 Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
 This is the dense-polynomial convolution fact needed by the formal
