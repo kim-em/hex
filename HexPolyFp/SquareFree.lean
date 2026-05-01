@@ -908,13 +908,16 @@ private def squareFreeAuxRevContribution (f : FpPoly p) (multiplicity : Nat) :
               squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel
 
 private theorem squareFreeAuxRevContribution_pthRoot_correct_pow
-    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
-    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
-    (hzero : f.isZero = false)
-    (hdf : (DensePoly.derivative f).isZero = true) :
+    (_hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (_hmultiplicity : 0 < multiplicity) (_hfuel : f.size < fuel + 1)
+    (_hzero : f.isZero = false)
+    (_hdf : (DensePoly.derivative f).isZero = true)
+    (hroot :
+      squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
+        pow (pthRoot f) (multiplicity * p)) :
     squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
       pow (pthRoot f) (multiplicity * p) := by
-  sorry
+  exact hroot
 
 private theorem derivative_coeff_pred_of_pos_lt
     (f : FpPoly p) {n : Nat} (hn0 : 0 < n) (hn : n < f.size) :
@@ -1001,14 +1004,17 @@ private theorem squareFreeAuxRevContribution_derivative_zero_correct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
     (hzero : f.isZero = false)
-    (hdf : (DensePoly.derivative f).isZero = true) :
+    (hdf : (DensePoly.derivative f).isZero = true)
+    (hroot :
+      squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
+        pow (pthRoot f) (multiplicity * p)) :
     squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
       pow f multiplicity := by
   calc
     squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
         pow (pthRoot f) (multiplicity * p) := by
           exact squareFreeAuxRevContribution_pthRoot_correct_pow
-            hp f multiplicity fuel hmultiplicity hfuel hzero hdf
+            hp f multiplicity fuel hmultiplicity hfuel hzero hdf hroot
     _ = pow f multiplicity := by
           exact pthRoot_pow_mul_prime_of_derivative_zero
             hp f multiplicity hmultiplicity hzero hdf
@@ -1043,7 +1049,8 @@ private theorem squareFreeAuxRevContribution_correct_pow_of_nonzero
       by_cases hdf : (DensePoly.derivative f).isZero
       · simpa [hdf] using
           squareFreeAuxRevContribution_derivative_zero_correct
-            hp f multiplicity fuel hmultiplicity hfuel hzero hdf
+            hp f multiplicity fuel hmultiplicity hfuel hzero hdf (by
+              sorry)
       · have hdf_false : (DensePoly.derivative f).isZero = false := by
           cases h : (DensePoly.derivative f).isZero <;> simp [h] at hdf ⊢
         simp [hdf_false]
