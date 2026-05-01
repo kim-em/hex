@@ -504,6 +504,11 @@ def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDe
   let factors := squareFreeAux monicPart 1 (monicPart.size + 1)
   { unit, factors }
 
+private theorem squareFreeAux_weightedProduct
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) :
+    weightedProduct (squareFreeAux f 1 (f.size + 1)) = f := by
+  sorry
+
 theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
@@ -513,7 +518,9 @@ theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
 theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     DensePoly.C d.unit * weightedProduct d.factors = f := by
-  sorry
+  dsimp [squareFreeDecomposition]
+  rw [squareFreeAux_weightedProduct hp]
+  exact normalizeMonic_reconstruct hp f
 
 theorem squareFree_factors_squareFree (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
