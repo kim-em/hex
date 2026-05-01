@@ -401,6 +401,18 @@ private theorem squareFreeAuxRev_pairwise_coprime
       (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   sorry
 
+private theorem yunFactors_factors_squareFree_of_derivative_split
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (accRev : List (SquareFreeFactor p))
+    (hdf : (DensePoly.derivative f).isZero ≠ true)
+    (hacc :
+      ∀ sf ∈ accRev.reverse, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1) :
+    ∀ sf ∈
+        (yunFactors (f / DensePoly.gcd f (DensePoly.derivative f))
+          (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel accRev).1.reverse,
+      DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
+  sorry
+
 private theorem squareFreeAuxRev_factors_squareFree
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (accRev : List (SquareFreeFactor p))
@@ -408,7 +420,30 @@ private theorem squareFreeAuxRev_factors_squareFree
       ∀ sf ∈ accRev.reverse, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1) :
     ∀ sf ∈ (squareFreeAuxRev f multiplicity fuel accRev).reverse,
       DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
-  sorry
+  induction fuel generalizing f multiplicity accRev with
+  | zero =>
+      simpa [squareFreeAuxRev] using hacc
+  | succ fuel ih =>
+      simp only [squareFreeAuxRev]
+      by_cases hzero : f.isZero
+      · simpa [hzero] using hacc
+      · simp [hzero]
+        by_cases hdf : (DensePoly.derivative f).isZero
+        · simpa [hdf] using ih (pthRoot f) (multiplicity * p) accRev hacc
+        · simp [hdf]
+          let g := DensePoly.gcd f (DensePoly.derivative f)
+          let c := f / g
+          let loop := yunFactors c g multiplicity fuel accRev
+          have hloop :
+              ∀ sf ∈ loop.1.reverse,
+                DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
+            simpa [loop, c, g] using
+              yunFactors_factors_squareFree_of_derivative_split hp f multiplicity fuel
+                accRev hdf hacc
+          by_cases hrepeated : isOne loop.2
+          · simpa [loop, c, g, hrepeated] using hloop
+          · simpa [loop, c, g, hrepeated] using
+              ih (pthRoot loop.2) (multiplicity * p) loop.1 hloop
 
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
