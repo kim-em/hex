@@ -1458,8 +1458,8 @@ theorem linearHenselStep_g_degree?_eq
 theorem linearHenselStep_h_degree?_eq
     (p k : Nat) [ZMod64.Bounds p]
     (f g h : ZPoly) (s t : FpPoly p)
-    (hp : 1 < p)
-    (hprod : ZPoly.congr (g * h) f (p ^ k))
+    (_hp : 1 < p)
+    (_hprod : ZPoly.congr (g * h) f (p ^ k))
     (hhRawDegree :
       let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
       let gMod := ZPoly.modP p g
@@ -1479,7 +1479,19 @@ theorem linearHenselStep_h_degree?_eq
       let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
       (ZPoly.reduceModPow h' p (k + 1)).degree? = h'.degree?) :
     (linearHenselStep p k f g h s t).h.degree? = h.degree? := by
-  sorry
+  unfold linearHenselStep
+  let e := ZPoly.coeffwiseDiv (f - g * h) (p ^ k)
+  let gMod := ZPoly.modP p g
+  let hMod := ZPoly.modP p h
+  let eMod := ZPoly.modP p e
+  let qr := DensePoly.divMod (t * eMod) gMod
+  let hCorrection := s * eMod + qr.1 * hMod
+  let h' := h + LinearLiftResult.liftScaledIncrement p k hCorrection
+  calc
+    (ZPoly.reduceModPow h' p (k + 1)).degree? = h'.degree? := by
+      simpa [e, gMod, hMod, eMod, qr, hCorrection, h'] using hhReducedDegree
+    _ = h.degree? := by
+      simpa [e, gMod, hMod, eMod, qr, hCorrection, h'] using hhRawDegree
 
 /-- The iterative linear wrapper lifts the factorization to congruence modulo `p^k`. -/
 theorem henselLift_spec
