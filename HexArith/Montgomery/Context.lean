@@ -216,6 +216,159 @@ private theorem twoWordProduct_lt_p_word (ctx : MontCtx p) (a b : UInt64)
     _ < p.toNat * p.toNat := hprod_lt_p2
     _ < p.toNat * UInt64.word := hp2_lt_pword
 
+private theorem cancel_word_mod_of_lt (ctx : MontCtx p) {x y : Nat}
+    (hx : x < p.toNat) (hy : y < p.toNat)
+    (h : x * UInt64.word % p.toNat = y * UInt64.word % p.toNat) :
+    x = y := by
+  have hp_pos := ctx.p_pos
+  have hcop : Nat.Coprime p.toNat UInt64.word := by
+    simpa [UInt64.word] using Nat.coprime_pow_two_of_odd (p := p.toNat) (k := 64)
+      ctx.p_odd_nat
+  have hle_case :
+      ∀ {x y : Nat}, x < p.toNat → y < p.toNat →
+        x * UInt64.word % p.toNat = y * UInt64.word % p.toNat →
+        y ≤ x → x = y := by
+    intro x y hx hy h hxy
+    have hsub_mod : (x * UInt64.word - y * UInt64.word) % p.toNat = 0 :=
+      Nat.sub_mod_eq_zero_of_mod_eq h
+    have hdvd_sub_mul : p.toNat ∣ (x - y) * UInt64.word := by
+      have hsub_mul : (x - y) * UInt64.word = x * UInt64.word - y * UInt64.word := by
+        exact Nat.mul_sub_right_distrib x y UInt64.word
+      rw [hsub_mul]
+      exact Nat.dvd_of_mod_eq_zero hsub_mod
+    have hpdvd_sub : p.toNat ∣ x - y :=
+      hcop.dvd_of_dvd_mul_right hdvd_sub_mul
+    have hsub_lt : x - y < p.toNat := by omega
+    have hsub_zero : x - y = 0 := by
+      rcases hpdvd_sub with ⟨k, hk⟩
+      cases k with
+      | zero =>
+          simpa using hk
+      | succ k =>
+          have hp_le : p.toNat ≤ x - y := by
+            calc
+              p.toNat ≤ p.toNat * (k + 1) := by
+                exact Nat.le_mul_of_pos_right _ (Nat.succ_pos k)
+              _ = x - y := hk.symm
+          omega
+    omega
+  by_cases hxy : y ≤ x
+  · exact hle_case hx hy h hxy
+  · exact (hle_case hy hx h.symm (Nat.le_of_not_ge hxy)).symm
+
+private theorem fromMont_lt (ctx : MontCtx p) (a : UInt64) (ha : a < p) :
+    ctx.fromMont a < p := by
+  rw [UInt64.lt_iff_toNat_lt]
+  have haNat : a.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using ha
+  have hT : a.toNat + 0 * UInt64.word < p.toNat * UInt64.word := by
+    have hword_pos : 0 < UInt64.word := by
+      simp [UInt64.word]
+    calc
+      a.toNat + 0 * UInt64.word = a.toNat := by simp
+      _ ≤ a.toNat * UInt64.word := Nat.le_mul_of_pos_right _ hword_pos
+      _ < p.toNat * UInt64.word := Nat.mul_lt_mul_of_pos_right haNat hword_pos
+  have hpp' : p.toNat * ctx.p'.toNat % UInt64.word = UInt64.word - 1 := by
+    simpa [Nat.mul_comm] using ctx.p'_eq
+  unfold fromMont
+  rw [toNat_redc ctx 0 a hT]
+  exact redcNat_lt ctx.p_pos ctx.p_lt_R hpp' hT
+
+private theorem fromMont_repr (ctx : MontCtx p) (a : UInt64) (ha : a < p) :
+    (ctx.fromMont a).toNat * UInt64.word % p.toNat = a.toNat := by
+  have haNat : a.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using ha
+  have hT : a.toNat + 0 * UInt64.word < p.toNat * UInt64.word := by
+    have hword_pos : 0 < UInt64.word := by
+      simp [UInt64.word]
+    calc
+      a.toNat + 0 * UInt64.word = a.toNat := by simp
+      _ ≤ a.toNat * UInt64.word := Nat.le_mul_of_pos_right _ hword_pos
+      _ < p.toNat * UInt64.word := Nat.mul_lt_mul_of_pos_right haNat hword_pos
+  have hpp' : p.toNat * ctx.p'.toNat % UInt64.word = UInt64.word - 1 := by
+    simpa [Nat.mul_comm] using ctx.p'_eq
+  unfold fromMont
+  rw [toNat_redc ctx 0 a hT]
+  have hredc := redcNat_eq_mod ctx.p_pos ctx.p_lt_R hpp' hT
+  simpa [Nat.mod_eq_of_lt haNat] using hredc
+
+private theorem toMont_eq_mod_word (ctx : MontCtx p) (a : UInt64) (ha : a < p) :
+    (ctx.toMont a).toNat = (a.toNat * UInt64.word) % p.toNat := by
+  have haNat : a.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using ha
+  have hr2Nat : ctx.r2.toNat < p.toNat := by
+    rw [ctx.r2_eq]
+    exact Nat.mod_lt _ ctx.p_pos
+  have hT := twoWordProduct_lt_p_word ctx a ctx.r2 haNat hr2Nat
+  have hpp' : p.toNat * ctx.p'.toNat % UInt64.word = UInt64.word - 1 := by
+    simpa [Nat.mul_comm] using ctx.p'_eq
+  have hraw :
+      (ctx.toMont a).toNat * UInt64.word % p.toNat =
+        (a.toNat * ctx.r2.toNat) % p.toNat := by
+    unfold toMont
+    rw [toNat_redc ctx (UInt64.mulHi a ctx.r2) (a * ctx.r2) hT]
+    have hredc := redcNat_eq_mod ctx.p_pos ctx.p_lt_R hpp' hT
+    calc
+      redcNat p.toNat ctx.p'.toNat
+            ((a * ctx.r2).toNat + (UInt64.mulHi a ctx.r2).toNat * UInt64.word) *
+          UInt64.word % p.toNat
+          = ((a * ctx.r2).toNat + (UInt64.mulHi a ctx.r2).toNat * UInt64.word) %
+              p.toNat := hredc
+      _ = (a.toNat * ctx.r2.toNat) % p.toNat := by
+            rw [Nat.add_comm]
+            rw [UInt64.mulHi_mulLo a ctx.r2]
+  have hto_lt_nat : (ctx.toMont a).toNat < p.toNat := by
+    unfold toMont
+    rw [toNat_redc ctx (UInt64.mulHi a ctx.r2) (a * ctx.r2) hT]
+    exact redcNat_lt ctx.p_pos ctx.p_lt_R hpp' hT
+  apply cancel_word_mod_of_lt ctx
+  · exact hto_lt_nat
+  · exact Nat.mod_lt _ ctx.p_pos
+  calc
+    (ctx.toMont a).toNat * UInt64.word % p.toNat
+        = (a.toNat * ctx.r2.toNat) % p.toNat := hraw
+    _ = (a.toNat * (UInt64.word * UInt64.word % p.toNat)) % p.toNat := by
+          rw [ctx.r2_eq]
+    _ = (a.toNat * (UInt64.word * UInt64.word)) % p.toNat := by
+          rw [Nat.mul_mod_mod]
+    _ = ((a.toNat * UInt64.word) % p.toNat * UInt64.word) % p.toNat := by
+          calc
+            a.toNat * (UInt64.word * UInt64.word) % p.toNat
+                = (a.toNat * UInt64.word) * (UInt64.word % p.toNat) % p.toNat := by
+                  rw [← Nat.mul_assoc]
+                  exact (Nat.mul_mod_mod (a.toNat * UInt64.word) UInt64.word p.toNat).symm
+            _ = (a.toNat * UInt64.word) * UInt64.word % p.toNat := by
+                  exact Nat.mul_mod_mod (a.toNat * UInt64.word) UInt64.word p.toNat
+            _ = ((a.toNat * UInt64.word) % p.toNat * (UInt64.word % p.toNat)) %
+                  p.toNat := by
+                  exact Nat.mul_mod (a.toNat * UInt64.word) UInt64.word p.toNat
+            _ = ((a.toNat * UInt64.word) % p.toNat * UInt64.word) % p.toNat := by
+                  rw [Nat.mul_mod_mod]
+
+private theorem mulMont_repr_word (ctx : MontCtx p) (a b : UInt64)
+    (ha : a < p) (hb : b < p) :
+    (ctx.mulMont a b).toNat * UInt64.word % p.toNat =
+      (a.toNat * b.toNat) % p.toNat := by
+  have haNat : a.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using ha
+  have hbNat : b.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using hb
+  have hT := twoWordProduct_lt_p_word ctx a b haNat hbNat
+  have hpp' : p.toNat * ctx.p'.toNat % UInt64.word = UInt64.word - 1 := by
+    simpa [Nat.mul_comm] using ctx.p'_eq
+  unfold mulMont
+  rw [toNat_redc ctx (UInt64.mulHi a b) (a * b) hT]
+  have hredc := redcNat_eq_mod ctx.p_pos ctx.p_lt_R hpp' hT
+  calc
+    redcNat p.toNat ctx.p'.toNat
+          ((a * b).toNat + (UInt64.mulHi a b).toNat * UInt64.word) *
+        UInt64.word % p.toNat
+        = ((a * b).toNat + (UInt64.mulHi a b).toNat * UInt64.word) % p.toNat :=
+          hredc
+    _ = (a.toNat * b.toNat) % p.toNat := by
+          rw [Nat.add_comm]
+          rw [UInt64.mulHi_mulLo a b]
+
 /-- Montgomery conversion returns a canonical residue. -/
 theorem toMont_lt (ctx : MontCtx p) (a : UInt64) (ha : a < p) :
     ctx.toMont a < p := by
@@ -252,12 +405,80 @@ theorem mulMont_repr (ctx : MontCtx p) (a b : UInt64)
     (ha : a < p) (hb : b < p) :
     (ctx.fromMont (ctx.mulMont a b)).toNat =
       ((ctx.fromMont a).toNat * (ctx.fromMont b).toNat) % p.toNat := by
-  sorry
+  let fa := (ctx.fromMont a).toNat
+  let fb := (ctx.fromMont b).toNat
+  let y := (fa * fb) % p.toNat
+  have hmul_lt : ctx.mulMont a b < p := mulMont_lt ctx a b ha hb
+  have hmulNat_lt : (ctx.mulMont a b).toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using hmul_lt
+  have hfrom_mul_lt : (ctx.fromMont (ctx.mulMont a b)).toNat < p.toNat := by
+    have hlt := fromMont_lt ctx (ctx.mulMont a b) hmul_lt
+    simpa [UInt64.lt_iff_toNat_lt] using hlt
+  have hy_lt : y < p.toNat := Nat.mod_lt _ ctx.p_pos
+  have hfa : fa * UInt64.word % p.toNat = a.toNat := by
+    simpa [fa] using fromMont_repr ctx a ha
+  have hfb : fb * UInt64.word % p.toNat = b.toNat := by
+    simpa [fb] using fromMont_repr ctx b hb
+  have hy_twice :
+      (y * UInt64.word % p.toNat) * UInt64.word % p.toNat =
+        (a.toNat * b.toNat) % p.toNat := by
+    calc
+      (y * UInt64.word % p.toNat) * UInt64.word % p.toNat
+          = (((fa * fb) % p.toNat * UInt64.word) % p.toNat) *
+              UInt64.word % p.toNat := by rfl
+      _ = ((fa * fb * UInt64.word) % p.toNat) * UInt64.word % p.toNat := by
+            exact congrArg (fun z => z * UInt64.word % p.toNat)
+              (Nat.mod_mul_mod (fa * fb) UInt64.word p.toNat)
+      _ = (fa * (fb * UInt64.word) % p.toNat) * UInt64.word % p.toNat := by
+            rw [Nat.mul_assoc]
+      _ = (fa * (fb * UInt64.word % p.toNat) % p.toNat) *
+            UInt64.word % p.toNat := by
+            rw [Nat.mul_mod_mod]
+      _ = (fa * b.toNat % p.toNat) * UInt64.word % p.toNat := by
+            rw [hfb]
+      _ = (b.toNat * (fa * UInt64.word)) % p.toNat := by
+            calc
+              (fa * b.toNat % p.toNat) * UInt64.word % p.toNat
+                  = (fa * b.toNat * UInt64.word) % p.toNat := by
+                    exact Nat.mod_mul_mod (fa * b.toNat) UInt64.word p.toNat
+              _ = (b.toNat * (fa * UInt64.word)) % p.toNat := by
+                    rw [Nat.mul_comm fa b.toNat, Nat.mul_assoc]
+      _ = (b.toNat * (fa * UInt64.word % p.toNat)) % p.toNat := by
+            exact (Nat.mul_mod_mod b.toNat (fa * UInt64.word) p.toNat).symm
+      _ = (b.toNat * a.toNat) % p.toNat := by
+            rw [hfa]
+      _ = (a.toNat * b.toNat) % p.toNat := by
+            rw [Nat.mul_comm]
+  have hyR_eq_mul : y * UInt64.word % p.toNat = (ctx.mulMont a b).toNat := by
+    apply cancel_word_mod_of_lt ctx
+    · exact Nat.mod_lt _ ctx.p_pos
+    · exact hmulNat_lt
+    calc
+      (y * UInt64.word % p.toNat) * UInt64.word % p.toNat
+          = (a.toNat * b.toNat) % p.toNat := hy_twice
+      _ = (ctx.mulMont a b).toNat * UInt64.word % p.toNat :=
+            (mulMont_repr_word ctx a b ha hb).symm
+  apply cancel_word_mod_of_lt ctx hfrom_mul_lt hy_lt
+  calc
+    (ctx.fromMont (ctx.mulMont a b)).toNat * UInt64.word % p.toNat
+        = (ctx.mulMont a b).toNat := fromMont_repr ctx (ctx.mulMont a b) hmul_lt
+    _ = y * UInt64.word % p.toNat := hyR_eq_mul.symm
 
 /-- Converting into Montgomery form and back is the identity on reduced inputs. -/
 theorem fromMont_toMont (ctx : MontCtx p) (a : UInt64) (ha : a < p) :
     ctx.fromMont (ctx.toMont a) = a := by
-  sorry
+  apply UInt64.toNat_inj.mp
+  have haNat : a.toNat < p.toNat := by
+    simpa [UInt64.lt_iff_toNat_lt] using ha
+  have hto_lt : ctx.toMont a < p := toMont_lt ctx a ha
+  have hfrom_lt_nat : (ctx.fromMont (ctx.toMont a)).toNat < p.toNat := by
+    have hlt := fromMont_lt ctx (ctx.toMont a) hto_lt
+    simpa [UInt64.lt_iff_toNat_lt] using hlt
+  apply cancel_word_mod_of_lt ctx hfrom_lt_nat haNat
+  calc
+    (ctx.fromMont (ctx.toMont a)).toNat * UInt64.word % p.toNat
+        = (ctx.toMont a).toNat := fromMont_repr ctx (ctx.toMont a) hto_lt
+    _ = a.toNat * UInt64.word % p.toNat := toMont_eq_mod_word ctx a ha
 
 /-- Montgomery multiplication computes modular multiplication after conversion. -/
 theorem toNat_mulMont (ctx : MontCtx p) (a b : UInt64)
