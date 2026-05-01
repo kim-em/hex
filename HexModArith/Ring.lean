@@ -171,50 +171,142 @@ theorem toNat_inv (a : ZMod64 p) (hcop : Nat.Coprime a.val.toNat p) :
     (a.inv * a).toNat = 1 % p := by
   simpa [ZMod64.toNat_eq_val] using inv_mul_eq_one (p := p) a hcop
 
+private theorem ext_toNat {a b : ZMod64 p} (h : a.toNat = b.toNat) : a = b := by
+  apply ext
+  apply UInt64.toNat_inj.mp
+  simpa [toNat_eq_val] using h
+
+private theorem nat_add_assoc_mod (x y z m : Nat) :
+    (((x % m + y % m) % m + z % m) % m) =
+      (x % m + (y % m + z % m) % m) % m := by
+  calc
+    (((x % m + y % m) % m + z % m) % m) = ((x + y) + z) % m := by
+      rw [← Nat.add_mod x y m, ← Nat.add_mod (x + y) z m]
+    _ = (x + (y + z)) % m := by rw [Nat.add_assoc]
+    _ = (x % m + (y % m + z % m) % m) % m := by
+      rw [← Nat.add_mod y z m, ← Nat.add_mod x (y + z) m]
+
+private theorem nat_mul_assoc_mod (x y z m : Nat) :
+    (((x % m * (y % m)) % m * (z % m)) % m) =
+      (x % m * ((y % m * (z % m)) % m)) % m := by
+  calc
+    (((x % m * (y % m)) % m * (z % m)) % m) = ((x * y) * z) % m := by
+      rw [← Nat.mul_mod x y m, ← Nat.mul_mod (x * y) z m]
+    _ = (x * (y * z)) % m := by rw [Nat.mul_assoc]
+    _ = (x % m * ((y % m * (z % m)) % m)) % m := by
+      rw [← Nat.mul_mod y z m, ← Nat.mul_mod x (y * z) m]
+
+private theorem nat_left_distrib_mod (x y z m : Nat) :
+    (x % m * ((y % m + z % m) % m) % m) =
+      ((x % m * (y % m)) % m + (x % m * (z % m)) % m) % m := by
+  calc
+    (x % m * ((y % m + z % m) % m) % m) = (x * (y + z)) % m := by
+      rw [← Nat.add_mod y z m, ← Nat.mul_mod x (y + z) m]
+    _ = (x * y + x * z) % m := by rw [Nat.left_distrib]
+    _ = ((x % m * (y % m)) % m + (x % m * (z % m)) % m) % m := by
+      rw [Nat.add_mod]
+      rw [Nat.mul_mod x y m, Nat.mul_mod x z m]
+
+private theorem nat_right_distrib_mod (x y z m : Nat) :
+    (((x % m + y % m) % m) * (z % m) % m) =
+      ((x % m * (z % m)) % m + (y % m * (z % m)) % m) % m := by
+  calc
+    (((x % m + y % m) % m) * (z % m) % m) = ((x + y) * z) % m := by
+      rw [← Nat.add_mod x y m, ← Nat.mul_mod (x + y) z m]
+    _ = (x * z + y * z) % m := by rw [Nat.right_distrib]
+    _ = ((x % m * (z % m)) % m + (y % m * (z % m)) % m) % m := by
+      rw [Nat.add_mod]
+      rw [Nat.mul_mod x z m, Nat.mul_mod y z m]
+
 instance : Lean.Grind.Semiring (ZMod64 p) := by
   refine Lean.Grind.Semiring.mk ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    rw [show a + 0 = ZMod64.add a ZMod64.zero from rfl]
+    change (ZMod64.add a ZMod64.zero).toNat = a.toNat
+    rw [toNat_add, toNat_zero, Nat.add_zero]
+    exact Nat.mod_eq_of_lt a.isLt
   · intro a b
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.add a b).toNat = (ZMod64.add b a).toNat
+    rw [toNat_add, toNat_add]
+    simp [Nat.add_comm]
   · intro a b c
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.add (ZMod64.add a b) c).toNat =
+      (ZMod64.add a (ZMod64.add b c)).toNat
+    rw [toNat_add, toNat_add, toNat_add, toNat_add]
+    simpa [toNat_eq_val, Nat.mod_mod] using
+      nat_add_assoc_mod a.toNat b.toNat c.toNat p
   · intro a b c
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul (ZMod64.mul a b) c).toNat =
+      (ZMod64.mul a (ZMod64.mul b c)).toNat
+    rw [toNat_mul, toNat_mul, toNat_mul, toNat_mul]
+    simpa [toNat_eq_val, Nat.mod_mod] using
+      nat_mul_assoc_mod a.toNat b.toNat c.toNat p
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul a ZMod64.one).toNat = a.toNat
+    rw [toNat_mul, toNat_one]
+    simp [Nat.mod_eq_of_lt a.isLt]
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul ZMod64.one a).toNat = a.toNat
+    rw [toNat_mul, toNat_one]
+    simp [Nat.mod_eq_of_lt a.isLt]
   · intro a b c
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul a (ZMod64.add b c)).toNat =
+      (ZMod64.add (ZMod64.mul a b) (ZMod64.mul a c)).toNat
+    rw [toNat_mul, toNat_add, toNat_add, toNat_mul, toNat_mul]
+    simpa [toNat_eq_val, Nat.mod_mod] using
+      nat_left_distrib_mod a.toNat b.toNat c.toNat p
   · intro a b c
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul (ZMod64.add a b) c).toNat =
+      (ZMod64.add (ZMod64.mul a c) (ZMod64.mul b c)).toNat
+    rw [toNat_mul, toNat_add, toNat_add, toNat_mul, toNat_mul]
+    simpa [toNat_eq_val, Nat.mod_mod] using
+      nat_right_distrib_mod a.toNat b.toNat c.toNat p
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul ZMod64.zero a).toNat = (ZMod64.zero : ZMod64 p).toNat
+    rw [toNat_mul, toNat_zero]
+    simp
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.mul a ZMod64.zero).toNat = (ZMod64.zero : ZMod64 p).toNat
+    rw [toNat_mul, toNat_zero]
+    simp
   · intro a
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.pow a 0).toNat = (ZMod64.one : ZMod64 p).toNat
+    rw [toNat_pow, toNat_one]
+    simp
   · intro a n
-    ext
-    sorry
+    apply ext_toNat
+    change (ZMod64.pow a (n + 1)).toNat =
+      (ZMod64.mul (ZMod64.pow a n) a).toNat
+    rw [toNat_pow, toNat_mul, toNat_pow]
+    simp [Nat.pow_succ, Nat.mul_mod]
   · intro n
-    sorry
+    apply ext_toNat
+    change (OfNat.ofNat (n + 1) : ZMod64 p).toNat =
+      (ZMod64.add (OfNat.ofNat n) ZMod64.one).toNat
+    rw [show (OfNat.ofNat (n + 1) : ZMod64 p) = ZMod64.natCast p (n + 1) from rfl]
+    rw [show (OfNat.ofNat n : ZMod64 p) = ZMod64.natCast p n from rfl]
+    rw [toNat_natCast, toNat_add, toNat_natCast, toNat_one]
+    simp [Nat.add_mod]
   · intro n
-    sorry
+    rfl
   · intro n a
-    sorry
+    apply ext_toNat
+    change (ZMod64.nsmul n a).toNat = (ZMod64.mul (↑n : ZMod64 p) a).toNat
+    rw [toNat_nsmul, toNat_mul]
+    rw [show (↑n : ZMod64 p).toNat = (ZMod64.natCast p n).toNat from rfl]
+    rw [toNat_natCast]
+    simp [Nat.mul_mod]
 
 instance : Lean.Grind.Ring (ZMod64 p) := by
   refine Lean.Grind.Ring.mk ?_ ?_ ?_ ?_ ?_ ?_
