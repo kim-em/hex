@@ -1120,29 +1120,6 @@ def LinearLiftStepDegreeInvariant
   (LinearLiftResult.liftScaledIncrement p current qr.2).degree?.getD 0 <
     acc.g.degree?.getD 0
 
-private theorem henselLiftLoop_invariant
-    (p steps current : Nat) [ZMod64.Bounds p]
-    (f : ZPoly) (s t : FpPoly p) (acc : LinearLiftResult)
-    (hp : 1 < p)
-    (hcurrent : 1 ≤ current)
-    (hinv : LinearLiftLoopInvariant p current f s t acc)
-    (hstepDegree :
-      ∀ (n : Nat) (state : LinearLiftResult),
-        current ≤ n →
-        LinearLiftLoopInvariant p n f s t state →
-        LinearLiftStepDegreeInvariant p n f s t state)
-    (hstepBezout :
-      ∀ (n : Nat) (state : LinearLiftResult),
-        current ≤ n →
-        LinearLiftLoopInvariant p n f s t state →
-        let next := linearHenselStep p n f state.g state.h s t
-        ZPoly.congr
-          (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
-          1 p) :
-    LinearLiftLoopInvariant p (current + steps) f s t
-      (henselLiftLoop p steps current f s t acc) := by
-  sorry
-
 /--
 Lift a factorization modulo `p` to a factorization modulo `p^k` by iterating the
 linear Hensel step.
@@ -1492,6 +1469,56 @@ theorem linearHenselStep_h_degree?_eq
       simpa [e, gMod, hMod, eMod, qr, hCorrection, h'] using hhReducedDegree
     _ = h.degree? := by
       simpa [e, gMod, hMod, eMod, qr, hCorrection, h'] using hhRawDegree
+
+private theorem henselLiftLoop_invariant
+    (p steps current : Nat) [ZMod64.Bounds p]
+    (f : ZPoly) (s t : FpPoly p) (acc : LinearLiftResult)
+    (hp : 1 < p)
+    (hcurrent : 1 ≤ current)
+    (hinv : LinearLiftLoopInvariant p current f s t acc)
+    (hstepDegree :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        current ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        LinearLiftStepDegreeInvariant p n f s t state)
+    (hstepBezout :
+      ∀ (n : Nat) (state : LinearLiftResult),
+        current ≤ n →
+        LinearLiftLoopInvariant p n f s t state →
+        let next := linearHenselStep p n f state.g state.h s t
+        ZPoly.congr
+          (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
+          1 p) :
+    LinearLiftLoopInvariant p (current + steps) f s t
+      (henselLiftLoop p steps current f s t acc) := by
+  induction steps generalizing current acc with
+  | zero =>
+      simpa [henselLiftLoop] using hinv
+  | succ steps ih =>
+      let next := linearHenselStep p current f acc.g acc.h s t
+      have hnext :
+          LinearLiftLoopInvariant p (current + 1) f s t next := by
+        rcases hinv with ⟨hprod, hbez, hmonic⟩
+        refine ⟨?_, ?_, ?_⟩
+        · simpa [next] using
+            linearHenselStep_spec p current f acc.g acc.h s t hcurrent hprod hbez hmonic
+        · simpa [next] using hstepBezout current acc (by omega) ⟨hprod, hbez, hmonic⟩
+        · exact
+            linearHenselStep_monic p current f acc.g acc.h s t hp hmonic
+              (by
+                simpa [LinearLiftStepDegreeInvariant] using
+                  hstepDegree current acc (by omega) ⟨hprod, hbez, hmonic⟩)
+      have htail :
+          LinearLiftLoopInvariant p ((current + 1) + steps) f s t
+            (henselLiftLoop p steps (current + 1) f s t next) := by
+        apply ih (current := current + 1) (acc := next)
+        · omega
+        · exact hnext
+        · intro n state hn hstate
+          exact hstepDegree n state (by omega) hstate
+        · intro n state hn hstate
+          exact hstepBezout n state (by omega) hstate
+      simpa [henselLiftLoop, next, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using htail
 
 /-- The iterative linear wrapper lifts the factorization to congruence modulo `p^k`. -/
 theorem henselLift_spec
