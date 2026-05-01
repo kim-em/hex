@@ -468,6 +468,69 @@ instance : Inv (ZMod64 p) where
         % Int.ofNat p)) % p := by
   rw [inv, toNat_ofNat]
 
+private theorem invBezout_mul_mod_eq_one {a p : Nat} (hp : 0 < p)
+    {s t : Int} (hbez : s * Int.ofNat a + t * Int.ofNat p = 1) :
+    (Int.toNat (s % Int.ofNat p) * a) % p = 1 % p := by
+  have hpInt : (Int.ofNat p) ≠ 0 := Int.ofNat_ne_zero.mpr (Nat.ne_of_gt hp)
+  have hs_nonneg : 0 ≤ s % Int.ofNat p := Int.emod_nonneg _ hpInt
+  have hs_cast : Int.ofNat (Int.toNat (s % Int.ofNat p)) = s % Int.ofNat p :=
+    Int.toNat_of_nonneg hs_nonneg
+  have hs_congr :
+      (Int.ofNat (Int.toNat (s % Int.ofNat p)) * Int.ofNat a -
+          s * Int.ofNat a) % Int.ofNat p = 0 := by
+    rw [hs_cast]
+    have hdiv :
+        Int.ofNat p ∣
+          (s % Int.ofNat p * Int.ofNat a - s * Int.ofNat a) := by
+      have hbase : Int.ofNat p ∣ s % Int.ofNat p - s :=
+        Int.dvd_sub_self_of_emod_eq rfl
+      rcases hbase with ⟨k, hk⟩
+      refine ⟨k * Int.ofNat a, ?_⟩
+      rw [← Int.sub_mul, hk, Int.mul_assoc]
+    exact Int.emod_eq_zero_of_dvd hdiv
+  have hbez_congr : (s * Int.ofNat a - 1) % Int.ofNat p = 0 := by
+    have hdiv : Int.ofNat p ∣ s * Int.ofNat a - 1 := by
+      refine ⟨-t, ?_⟩
+      calc
+        s * Int.ofNat a - 1 = -(t * Int.ofNat p) := by omega
+        _ = Int.ofNat p * -t := by
+          rw [Int.mul_comm]
+          exact Int.neg_mul_eq_mul_neg (Int.ofNat p) t
+    exact Int.emod_eq_zero_of_dvd hdiv
+  apply Int.ofNat_inj.mp
+  rw [Int.natCast_emod, Int.natCast_emod]
+  have htarget :
+      (Int.ofNat (Int.toNat (s % Int.ofNat p) * a) - 1) % Int.ofNat p = 0 := by
+    have hdiv₁ : Int.ofNat p ∣
+        Int.ofNat (Int.toNat (s % Int.ofNat p)) * Int.ofNat a -
+          s * Int.ofNat a :=
+      Int.dvd_of_emod_eq_zero hs_congr
+    have hdiv₂ : Int.ofNat p ∣ s * Int.ofNat a - 1 :=
+      Int.dvd_of_emod_eq_zero hbez_congr
+    have hdiv : Int.ofNat p ∣ Int.ofNat (Int.toNat (s % Int.ofNat p) * a) - 1 := by
+      rcases hdiv₁ with ⟨k₁, hk₁⟩
+      rcases hdiv₂ with ⟨k₂, hk₂⟩
+      refine ⟨k₁ + k₂, ?_⟩
+      calc
+        Int.ofNat (Int.toNat (s % Int.ofNat p) * a) - 1 =
+            (Int.ofNat (Int.toNat (s % Int.ofNat p)) * Int.ofNat a -
+                s * Int.ofNat a) +
+              (s * Int.ofNat a - 1) := by
+          rw [show Int.ofNat (Int.toNat (s % Int.ofNat p) * a) =
+              Int.ofNat (Int.toNat (s % Int.ofNat p)) * Int.ofNat a by
+            simp [Int.ofNat_eq_natCast]]
+          omega
+        _ = Int.ofNat p * k₁ + Int.ofNat p * k₂ := by
+          rw [hk₁, hk₂]
+        _ = Int.ofNat p * (k₁ + k₂) := by
+          rw [Int.mul_add]
+    exact Int.emod_eq_zero_of_dvd hdiv
+  have hleft :
+      (Int.ofNat (Int.toNat (s % Int.ofNat p) * a) % Int.ofNat p) =
+        (1 : Int) % Int.ofNat p := by
+    exact Int.emod_eq_emod_iff_emod_sub_eq_zero.mpr htarget
+  simpa using hleft
+
 private theorem nat_mod_mul_pow_square_even (acc base k p : Nat) (heven : k % 2 = 0) :
     (acc * ((base * base) % p) ^ (k / 2)) % p = (acc * base ^ k) % p := by
   have hk : 2 * (k / 2) = k := by
@@ -554,7 +617,25 @@ theorem toNat_pow (a : ZMod64 p) (n : Nat) :
 
 theorem inv_mul_eq_one (a : ZMod64 p) (hcop : Nat.Coprime a.toNat p) :
     (mul (inv a) a).toNat = 1 % p := by
-  sorry
+  rw [toNat_mul, toNat_inv_def]
+  generalize hgcd : HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat p) = triple
+  obtain ⟨g, s, t⟩ := triple
+  have hbez :
+      s * Int.ofNat a.toNat + t * Int.ofNat p = 1 := by
+    have hspec := HexArith.Int.extGcd_bezout (Int.ofNat a.toNat) (Int.ofNat p)
+    have hfst := HexArith.Int.extGcd_fst (Int.ofNat a.toNat) (Int.ofNat p)
+    rw [hgcd] at hspec
+    rw [hgcd] at hfst
+    simp at hfst
+    have hg : g = 1 := by
+      rw [hfst]
+      simpa [Int.gcd_eq_natAbs_gcd_natAbs, hcop]
+    rw [hg] at hspec
+    simp at hspec
+    exact hspec
+  simpa [Nat.mod_mod] using
+    invBezout_mul_mod_eq_one (a := a.toNat) (p := p) (Bounds.pPos (p := p))
+      (s := s) (t := t) hbez
 
 theorem add_lt_modulus (a b : ZMod64 p) : (add a b).toNat < p := by
   exact (add a b).isLt
