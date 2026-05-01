@@ -2845,6 +2845,17 @@ private theorem xorBoolList_flatMap_congr_xor {α : Type}
       intro y hy
       exact h y (by simp [hy])
 
+private theorem xorBoolList_map_xorBoolList {α : Type}
+    (xs : List α) (terms : α → List Bool) :
+    xorBoolList (xs.map (fun x => xorBoolList (terms x))) =
+      xorBoolList (xs.flatMap terms) := by
+  induction xs with
+  | nil =>
+      rfl
+  | cons x xs ih =>
+      simp only [List.map_cons, List.flatMap_cons]
+      rw [xorBoolList_cons, xorBoolList_append, ih]
+
 /-- Reindex a triple XOR from the left-associated word-pair grouping
 `(i,j),k` to the right-associated grouping `i,(j,k)`, keeping the outer
 source word `i` fixed and swapping the two inner finite ranges. -/
@@ -3281,6 +3292,108 @@ private theorem clmulCoeffAt_mulWords_right_contrib
           (List.range ys.size)).map
           (fun word => clmulCoeffAt idx x word n)) := by
   rw [mulWords_getElem!_contrib, clmulCoeffAt_xorWordList_right]
+
+/-- Source-word contribution list for one coefficient of the left-associated
+raw product `(xs * ys) * zs`.  The outer product contributes a word slot and a
+`zs` source word; each such intermediate word is expanded back to the
+`xs`/`ys` source pair contributions that created it. -/
+private def leftAssocSourceTripleContribs
+    (xs ys zs : Array UInt64) (n : Nat) : List Bool :=
+  List.flatMap
+    (fun slot =>
+      List.flatMap
+        (fun k =>
+          (List.flatMap
+            (fun i =>
+              (List.range ys.size).map
+                (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
+            (List.range xs.size)).map
+            (fun word => clmulCoeffAt (slot + k) word zs[k]! n))
+        (List.range zs.size))
+    (List.range (mulWords xs ys).size)
+
+/-- Source-word contribution list for one coefficient of the right-associated
+raw product `xs * (ys * zs)`.  The outer product contributes an `xs` source
+word and an intermediate word slot; each intermediate word is expanded back to
+the `ys`/`zs` source pair contributions that created it. -/
+private def rightAssocSourceTripleContribs
+    (xs ys zs : Array UInt64) (n : Nat) : List Bool :=
+  List.flatMap
+    (fun i =>
+      List.flatMap
+        (fun slot =>
+          (List.flatMap
+            (fun j =>
+              (List.range zs.size).map
+                (fun k => clmulWordAt (j + k) ys[j]! zs[k]! slot))
+            (List.range ys.size)).map
+            (fun word => clmulCoeffAt (i + slot) xs[i]! word n))
+        (List.range (mulWords ys zs).size))
+    (List.range xs.size)
+
+private theorem leftAssocSourceTripleContribs_slot
+    (xs ys zs : Array UInt64) (slot n : Nat) :
+    xorBoolList
+        ((List.range zs.size).map
+          (fun k => clmulCoeffAt (slot + k) (mulWords xs ys)[slot]! zs[k]! n)) =
+      xorBoolList
+        (List.flatMap
+          (fun k =>
+            (List.flatMap
+              (fun i =>
+                (List.range ys.size).map
+                  (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
+              (List.range xs.size)).map
+              (fun word => clmulCoeffAt (slot + k) word zs[k]! n))
+          (List.range zs.size)) := by
+  rw [← xorBoolList_map_xorBoolList]
+  congr 1
+  apply List.map_congr_left
+  intro k _hk
+  exact clmulCoeffAt_mulWords_left_contrib xs ys slot (slot + k) zs[k]! n
+
+private theorem rightAssocSourceTripleContribs_slot
+    (xs ys zs : Array UInt64) (i n : Nat) :
+    xorBoolList
+        ((List.range (mulWords ys zs).size).map
+          (fun slot => clmulCoeffAt (i + slot) xs[i]! (mulWords ys zs)[slot]! n)) =
+      xorBoolList
+        (List.flatMap
+          (fun slot =>
+            (List.flatMap
+              (fun j =>
+                (List.range zs.size).map
+                  (fun k => clmulWordAt (j + k) ys[j]! zs[k]! slot))
+              (List.range ys.size)).map
+              (fun word => clmulCoeffAt (i + slot) xs[i]! word n))
+          (List.range (mulWords ys zs).size)) := by
+  rw [← xorBoolList_map_xorBoolList]
+  congr 1
+  apply List.map_congr_left
+  intro slot _hslot
+  exact clmulCoeffAt_mulWords_right_contrib ys zs slot (i + slot) xs[i]! n
+
+/-- Coefficients of the left-associated raw product expand to the finite XOR
+of the source-word triples contributing to `(xs * ys) * zs`. -/
+private theorem coeffWords_mulWords_left_assoc_sourceTriples
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords (mulWords xs ys) zs) n =
+      xorBoolList (leftAssocSourceTripleContribs xs ys zs n) := by
+  rw [coeffWords_mulWords_contrib]
+  unfold leftAssocSourceTripleContribs
+  exact xorBoolList_flatMap_congr_xor
+    (fun slot _hslot => leftAssocSourceTripleContribs_slot xs ys zs slot n)
+
+/-- Coefficients of the right-associated raw product expand to the finite XOR
+of the source-word triples contributing to `xs * (ys * zs)`. -/
+private theorem coeffWords_mulWords_right_assoc_sourceTriples
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords xs (mulWords ys zs)) n =
+      xorBoolList (rightAssocSourceTripleContribs xs ys zs n) := by
+  rw [coeffWords_mulWords_contrib]
+  unfold rightAssocSourceTripleContribs
+  exact xorBoolList_flatMap_congr_xor
+    (fun i _hi => rightAssocSourceTripleContribs_slot xs ys zs i n)
 
 private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
     clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
