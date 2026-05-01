@@ -3331,6 +3331,89 @@ private def rightAssocSourceTripleContribs
         (List.range (mulWords ys zs).size))
     (List.range xs.size)
 
+/-- Contributions from one fixed source triple `(i,j,k)` to the left-associated
+word product, varying only the intermediate `(xs * ys)` result slot. -/
+private def leftAssocFixedTripleContribs
+    (i j k : Nat) (x y z : UInt64) (n slotBound : Nat) : List Bool :=
+  (List.range slotBound).map
+    (fun slot => clmulCoeffAt (slot + k) (clmulWordAt (i + j) x y slot) z n)
+
+/-- Contributions from one fixed source triple `(i,j,k)` to the right-associated
+word product, varying only the intermediate `(ys * zs)` result slot. -/
+private def rightAssocFixedTripleContribs
+    (i j k : Nat) (x y z : UInt64) (n slotBound : Nat) : List Bool :=
+  (List.range slotBound).map
+    (fun slot => clmulCoeffAt (i + slot) x (clmulWordAt (j + k) y z slot) n)
+
+/-- The raw product has enough intermediate slots to contain every source
+word-pair contribution selected by the source ranges. -/
+private theorem mulWords_size_source_pair
+    {xs ys : Array UInt64} {i j : Nat}
+    (hi : i ∈ List.range xs.size) (hj : j ∈ List.range ys.size) :
+    i + j + 1 < (mulWords xs ys).size := by
+  have hiLt : i < xs.size := List.mem_range.mp hi
+  have hjLt : j < ys.size := List.mem_range.mp hj
+  have hxs : ¬ xs.isEmpty := by
+    intro h
+    have hsize : xs.size = 0 := by
+      simpa [Array.isEmpty] using h
+    omega
+  have hys : ¬ ys.isEmpty := by
+    intro h
+    have hsize : ys.size = 0 := by
+      simpa [Array.isEmpty] using h
+    omega
+  unfold mulWords
+  simp [hxs, hys, foldl_mulWords_size]
+  omega
+
+/-- Fixed source-word associativity for carry-less multiplication after
+expanding only the intermediate packed-word slot. -/
+private theorem xorBoolList_assoc_fixed_sourceTriple
+    (i j k : Nat) (x y z : UInt64) (n leftBound rightBound : Nat)
+    (hleft : i + j + 1 < leftBound) (hright : j + k + 1 < rightBound) :
+    xorBoolList (leftAssocFixedTripleContribs i j k x y z n leftBound) =
+      xorBoolList (rightAssocFixedTripleContribs i j k x y z n rightBound) := by
+  sorry
+
+/-- Regroup the left-associated source expansion by fixed source triples rather
+than by intermediate product slot first. -/
+private theorem leftAssocSourceTripleContribs_by_fixed
+    (xs ys zs : Array UInt64) (n : Nat) :
+    xorBoolList (leftAssocSourceTripleContribs xs ys zs n) =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun j =>
+                List.flatMap
+                  (fun k =>
+                    leftAssocFixedTripleContribs i j k xs[i]! ys[j]! zs[k]! n
+                      (mulWords xs ys).size)
+                  (List.range zs.size))
+              (List.range ys.size))
+          (List.range xs.size)) := by
+  sorry
+
+/-- Regroup the right-associated source expansion by fixed source triples rather
+than by intermediate product slot first. -/
+private theorem rightAssocSourceTripleContribs_by_fixed
+    (xs ys zs : Array UInt64) (n : Nat) :
+    xorBoolList (rightAssocSourceTripleContribs xs ys zs n) =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun j =>
+                List.flatMap
+                  (fun k =>
+                    rightAssocFixedTripleContribs i j k xs[i]! ys[j]! zs[k]! n
+                      (mulWords ys zs).size)
+                  (List.range zs.size))
+              (List.range ys.size))
+          (List.range xs.size)) := by
+  sorry
+
 private theorem leftAssocSourceTripleContribs_slot
     (xs ys zs : Array UInt64) (slot n : Nat) :
     xorBoolList
@@ -3404,7 +3487,17 @@ private theorem xorBoolList_assoc_sourceTripleContribs
     (xs ys zs : Array UInt64) (n : Nat) :
     xorBoolList (leftAssocSourceTripleContribs xs ys zs n) =
       xorBoolList (rightAssocSourceTripleContribs xs ys zs n) := by
-  sorry
+  rw [leftAssocSourceTripleContribs_by_fixed, rightAssocSourceTripleContribs_by_fixed]
+  apply xorBoolList_flatMap_congr_xor
+  intro i hi
+  apply xorBoolList_flatMap_congr_xor
+  intro j hj
+  apply xorBoolList_flatMap_congr_xor
+  intro k hk
+  exact xorBoolList_assoc_fixed_sourceTriple i j k xs[i]! ys[j]! zs[k]! n
+    (mulWords xs ys).size (mulWords ys zs).size
+    (mulWords_size_source_pair hi hj)
+    (mulWords_size_source_pair hj hk)
 
 private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
     clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
