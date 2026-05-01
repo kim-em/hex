@@ -51,6 +51,11 @@ private def pow (f : FpPoly p) (n : Nat) : FpPoly p :=
     exact Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide)
   go 1 f n
 
+private theorem pow_one (f : FpPoly p) :
+    pow f 1 = f := by
+  unfold pow
+  simp [pow.go]
+
 /-- Multiply the factors in a square-free decomposition with their multiplicities. -/
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
   factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1
@@ -385,6 +390,59 @@ private def squareFreeAuxRevContribution (f : FpPoly p) (multiplicity : Nat) :
             contribution.1 *
               squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel
 
+private theorem squareFreeAuxRevContribution_derivative_zero_correct
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true) :
+    squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
+      pow f multiplicity := by
+  sorry
+
+private theorem yunFactorsContribution_reconstruct
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false) :
+    let g := DensePoly.gcd f (DensePoly.derivative f)
+    let c := f / g
+    let contribution := yunFactorsContribution c g multiplicity fuel
+    if isOne contribution.2 then
+      contribution.1 = pow f multiplicity
+    else
+      contribution.1 *
+        squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
+          pow f multiplicity := by
+  sorry
+
+private theorem squareFreeAuxRevContribution_correct_pow_of_nonzero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel)
+    (hzero : f.isZero = false) :
+    squareFreeAuxRevContribution f multiplicity fuel = pow f multiplicity := by
+  cases fuel with
+  | zero =>
+      omega
+  | succ fuel =>
+      simp only [squareFreeAuxRevContribution]
+      simp [hzero]
+      by_cases hdf : (DensePoly.derivative f).isZero
+      · simpa [hdf] using
+          squareFreeAuxRevContribution_derivative_zero_correct
+            hp f multiplicity fuel hmultiplicity hfuel hzero hdf
+      · have hdf_false : (DensePoly.derivative f).isZero = false := by
+          cases h : (DensePoly.derivative f).isZero <;> simp [h] at hdf ⊢
+        simp [hdf_false]
+        let g := DensePoly.gcd f (DensePoly.derivative f)
+        let c := f / g
+        let contribution := yunFactorsContribution c g multiplicity fuel
+        have hrec :=
+          yunFactorsContribution_reconstruct
+            hp f multiplicity fuel hmultiplicity hfuel hzero hdf_false
+        by_cases hrepeated : isOne contribution.2
+        · simpa [g, c, contribution, hrepeated] using hrec
+        · simpa [g, c, contribution, hrepeated] using hrec
+
 /--
 Tail-recursive square-free decomposition over `F_p[x]`, accumulating factors
 in reverse output order. A derivative-zero branch descends through the formal
@@ -588,9 +646,17 @@ private theorem squareFreeAuxRev_factors_squareFree
               ih (pthRoot loop.2) (multiplicity * p) loop.1 hloop
 
 private theorem squareFreeAuxRevContribution_correct
-    (hp : Hex.Nat.Prime p) (f : FpPoly p) :
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false) :
     squareFreeAuxRevContribution f 1 (f.size + 1) = f := by
-  sorry
+  rw [squareFreeAuxRevContribution_correct_pow_of_nonzero hp f 1 (f.size + 1)
+    (by omega) (by omega) hzero]
+  exact pow_one f
+
+private theorem squareFreeAux_zero_weightedProduct
+    (f : FpPoly p) (hzero : f.isZero = true) :
+    weightedProduct (squareFreeAux f 1 (f.size + 1)) = 1 := by
+  unfold squareFreeAux
+  simp [squareFreeAuxRev, hzero, weightedProduct_nil]
 
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
@@ -604,14 +670,24 @@ def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDe
   let factors := squareFreeAux monicPart 1 (monicPart.size + 1)
   { unit, factors }
 
-private theorem squareFreeAux_weightedProduct
-    (hp : Hex.Nat.Prime p) (f : FpPoly p) :
+private theorem squareFreeAux_weightedProduct_nonzero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (hzero : f.isZero = false) :
     weightedProduct (squareFreeAux f 1 (f.size + 1)) = f := by
   unfold squareFreeAux
   have hinvariant := squareFreeAuxRev_reconstruction_invariant f 1 (f.size + 1) []
   rw [hinvariant]
   simp [weightedProduct_nil]
-  exact squareFreeAuxRevContribution_correct hp f
+  exact squareFreeAuxRevContribution_correct hp f hzero
+
+private theorem normalizeMonic_zero_squareFree_weightedProduct
+    (hp : Hex.Nat.Prime p) (f : FpPoly p)
+    (hzero : (normalizeMonic f).2.isZero = true) :
+    DensePoly.C (normalizeMonic f).1 *
+      weightedProduct
+        (squareFreeAux (normalizeMonic f).2 1 ((normalizeMonic f).2.size + 1)) =
+        f := by
+  rw [squareFreeAux_zero_weightedProduct (normalizeMonic f).2 hzero]
+  sorry
 
 theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
@@ -623,8 +699,12 @@ theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     DensePoly.C d.unit * weightedProduct d.factors = f := by
   dsimp [squareFreeDecomposition]
-  rw [squareFreeAux_weightedProduct hp]
-  exact normalizeMonic_reconstruct hp f
+  by_cases hzero : (normalizeMonic f).2.isZero
+  · exact normalizeMonic_zero_squareFree_weightedProduct hp f hzero
+  · have hnonzero : (normalizeMonic f).2.isZero = false := by
+      cases h : (normalizeMonic f).2.isZero <;> simp [h] at hzero ⊢
+    rw [squareFreeAux_weightedProduct_nonzero hp (normalizeMonic f).2 hnonzero]
+    exact normalizeMonic_reconstruct hp f
 
 theorem squareFree_factors_squareFree (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
