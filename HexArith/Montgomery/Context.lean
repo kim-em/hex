@@ -515,6 +515,22 @@ namespace HexArith
 private def bitLength (n : Nat) : Nat :=
   if n = 0 then 0 else n.log2 + 1
 
+private theorem lt_two_pow_bitLength (n : Nat) : n < 2 ^ bitLength n := by
+  unfold bitLength
+  by_cases hn : n = 0
+  · simp [hn]
+  · simpa [hn] using Nat.lt_log2_self (n := n)
+
+private theorem testBit_eq_true_iff_shiftRight_mod_two {n bit : Nat} :
+    n.testBit bit = true ↔ (n >>> bit) % 2 = 1 := by
+  rw [Nat.testBit_eq_decide_div_mod_eq, Nat.shiftRight_eq_div_pow]
+  simp
+
+private theorem testBit_eq_false_iff_shiftRight_mod_two {n bit : Nat} :
+    n.testBit bit = false ↔ (n >>> bit) % 2 = 0 := by
+  rw [Nat.testBit_eq_decide_div_mod_eq, Nat.shiftRight_eq_div_pow]
+  cases Nat.mod_two_eq_zero_or_one (n / 2 ^ bit) <;> simp_all
+
 /-- Tail-recursive exponentiation by repeated squaring in Montgomery form. -/
 private def powMontBitsGo (ctx : MontCtx p) (k : Nat) :
     Nat → Nat → UInt64 → UInt64 → UInt64
@@ -526,7 +542,7 @@ private def powMontBitsGo (ctx : MontCtx p) (k : Nat) :
 
 /-- Exponentiate a Montgomery-form base by repeated squaring. -/
 private def powMont (ctx : MontCtx p) (base : UInt64) (n : Nat) : UInt64 :=
-  powMontBitsGo ctx n (bitLength n) 0 (ctx.toMont 1) base
+  powMontBitsGo ctx n (bitLength n) 0 (ctx.toMont (UInt64.ofNat (1 % p.toNat))) base
 
 /-- Word-sized odd-modulus modular exponentiation via Montgomery arithmetic. -/
 private def powModWordOdd (a n : Nat) (p : UInt64) (hp : p % 2 = 1) : Nat :=
@@ -534,16 +550,310 @@ private def powModWordOdd (a n : Nat) (p : UInt64) (hp : p % 2 = 1) : Nat :=
   let base := ctx.toMont (UInt64.ofNat (a % p.toNat))
   (ctx.fromMont (powMont ctx base n)).toNat
 
+/-- Tail-recursive Nat fallback for modular exponentiation. -/
+private def powModNatGo (n p : Nat) : Nat → Nat → Nat → Nat → Nat
+  | 0, _, acc, _ => acc
+  | remaining + 1, bit, acc, base =>
+      let acc' := if n.testBit bit then (acc * base) % p else acc
+      let base' := (base * base) % p
+      powModNatGo n p remaining (bit + 1) acc' base'
+
 /-- Nat-level fallback modular exponentiation by repeated squaring. -/
 private def powModNat (a n p : Nat) : Nat :=
-  let rec go (remaining bit acc base : Nat) : Nat :=
-    match remaining with
-    | 0 => acc
-    | remaining' + 1 =>
-        let acc' := if n.testBit bit then (acc * base) % p else acc
-        let base' := (base * base) % p
-        go remaining' (bit + 1) acc' base'
-  go (bitLength n) 0 (1 % p) (a % p)
+  powModNatGo n p (bitLength n) 0 (1 % p) (a % p)
+
+private theorem pow_sq (base q : Nat) :
+    base ^ (2 * q) = (base * base) ^ q := by
+  induction q with
+  | zero => simp
+  | succ q ih =>
+      rw [Nat.mul_succ, Nat.pow_add, ih]
+      simp [Nat.pow_succ, Nat.mul_comm, Nat.mul_assoc]
+
+private theorem pow_sq_succ (base q : Nat) :
+    base ^ (2 * q + 1) = base * (base * base) ^ q := by
+  rw [Nat.pow_succ, pow_sq]
+  simp [Nat.mul_comm]
+
+private theorem powModNatGo_eq (a n p remaining bit acc base : Nat) (hp : 0 < p)
+    (hbound : n >>> bit < 2 ^ remaining)
+    (hacc : acc < p)
+    (hinv : acc * base ^ (n >>> bit) % p = a ^ n % p) :
+    powModNatGo n p remaining bit acc base = a ^ n % p := by
+  induction remaining generalizing bit acc base with
+  | zero =>
+      have hshift : n >>> bit = 0 := by
+        simpa using hbound
+      have hacc_mod : acc % p = acc := Nat.mod_eq_of_lt hacc
+      calc
+        powModNatGo n p 0 bit acc base = acc := rfl
+        _ = acc % p := hacc_mod.symm
+        _ = a ^ n % p := by simpa [hshift] using hinv
+  | succ remaining ih =>
+      let q := n >>> bit
+      have hq_decomp : q = 2 * (q / 2) + (q % 2) := by
+        rw [Nat.add_comm]
+        exact (Nat.mod_add_div q 2).symm
+      have htail_bound : n >>> (bit + 1) < 2 ^ remaining := by
+        have hq_lt : q < 2 ^ (remaining + 1) := hbound
+        have hq_div_lt : q / 2 < 2 ^ remaining := by
+          have htwo_pow_succ : 2 ^ (remaining + 1) = 2 * 2 ^ remaining := by
+            rw [Nat.pow_succ, Nat.mul_comm]
+          rw [htwo_pow_succ] at hq_lt
+          exact Nat.div_lt_of_lt_mul hq_lt
+        simpa [q, Nat.shiftRight_succ, Nat.add_comm] using hq_div_lt
+      unfold powModNatGo
+      by_cases hbit : n.testBit bit = true
+      · have hq_mod : q % 2 = 1 :=
+          testBit_eq_true_iff_shiftRight_mod_two.mp hbit
+        have hq_eq : q = 2 * (n >>> (bit + 1)) + 1 := by
+          calc
+            q = 2 * (q / 2) + q % 2 := hq_decomp
+            _ = 2 * (q / 2) + 1 := by rw [hq_mod]
+            _ = 2 * (n >>> (bit + 1)) + 1 := by
+                  simp [q, Nat.shiftRight_succ, Nat.add_comm]
+        have hacc' : (acc * base) % p < p := Nat.mod_lt _ hp
+        have hinv' :
+            ((acc * base) % p) * ((base * base) % p) ^ (n >>> (bit + 1)) % p =
+              a ^ n % p := by
+          calc
+            ((acc * base) % p) * ((base * base) % p) ^ (n >>> (bit + 1)) % p
+                = (acc * base * (base * base) ^ (n >>> (bit + 1))) % p := by
+                  simpa [Nat.pow_mod, Nat.mul_assoc] using
+                    (Nat.mul_mod (acc * base) ((base * base) ^ (n >>> (bit + 1))) p).symm
+            _ = acc * (base * (base * base) ^ (n >>> (bit + 1))) % p := by
+                  rw [Nat.mul_assoc]
+            _ = acc * base ^ (n >>> bit) % p := by
+                  change acc * (base * (base * base) ^ (n >>> (bit + 1))) % p =
+                    acc * base ^ q % p
+                  rw [hq_eq, pow_sq_succ]
+            _ = a ^ n % p := hinv
+        simpa [hbit] using ih (bit + 1) ((acc * base) % p) ((base * base) % p)
+          htail_bound hacc' hinv'
+      · have hbit_false : n.testBit bit = false := by
+          cases h : n.testBit bit <;> simp_all
+        have hq_mod : q % 2 = 0 :=
+          testBit_eq_false_iff_shiftRight_mod_two.mp hbit_false
+        have hq_eq : q = 2 * (n >>> (bit + 1)) := by
+          calc
+            q = 2 * (q / 2) + q % 2 := hq_decomp
+            _ = 2 * (q / 2) := by rw [hq_mod, Nat.add_zero]
+            _ = 2 * (n >>> (bit + 1)) := by
+                  simp [q, Nat.shiftRight_succ]
+        have hinv' :
+            acc * ((base * base) % p) ^ (n >>> (bit + 1)) % p =
+              a ^ n % p := by
+          calc
+            acc * ((base * base) % p) ^ (n >>> (bit + 1)) % p
+                = acc * (base * base) ^ (n >>> (bit + 1)) % p := by
+                  simpa [Nat.pow_mod, Nat.mul_mod_mod] using
+                    (Nat.mul_mod_mod acc ((base * base) ^ (n >>> (bit + 1))) p)
+            _ = acc * base ^ (n >>> bit) % p := by
+                  change acc * (base * base) ^ (n >>> (bit + 1)) % p =
+                    acc * base ^ q % p
+                  rw [hq_eq, pow_sq]
+            _ = a ^ n % p := hinv
+        simpa [hbit] using ih (bit + 1) acc ((base * base) % p)
+          htail_bound hacc hinv'
+
+private theorem powModNat_eq (a n p : Nat) (hp : 0 < p) :
+    powModNat a n p = a ^ n % p := by
+  unfold powModNat
+  apply powModNatGo_eq a n p (bitLength n) 0 (1 % p) (a % p) hp
+  · simpa using lt_two_pow_bitLength n
+  · exact Nat.mod_lt _ hp
+  · calc
+      1 % p * (a % p) ^ (n >>> 0) % p
+          = 1 * (a % p) ^ n % p := by
+            simp
+      _ = a ^ n % p := by
+            simp [Nat.pow_mod]
+
+private theorem UInt64.toNat_ofNat_mod_lt_word {x p : Nat}
+    (hp : 0 < p)
+    (hpw : p < UInt64.word) :
+    (UInt64.ofNat (x % p)).toNat = x % p := by
+  have hlt : x % p < UInt64.size := by
+    exact Nat.lt_trans (Nat.mod_lt _ hp) (by
+      simpa [UInt64.word] using hpw)
+  simpa [UInt64.toNat_ofNat, UInt64.size] using Nat.mod_eq_of_lt hlt
+
+private theorem powMontBitsGo_eq (ctx : MontCtx p) (a n remaining bit : Nat)
+    (acc base : UInt64)
+    (hbound : n >>> bit < 2 ^ remaining)
+    (hacc : acc < p)
+    (hbase : base < p)
+    (hinv :
+      ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat ^ (n >>> bit)) %
+          p.toNat = a ^ n % p.toNat) :
+    (ctx.fromMont (powMontBitsGo ctx n remaining bit acc base)).toNat =
+      a ^ n % p.toNat := by
+  induction remaining generalizing bit acc base with
+  | zero =>
+      have hshift : n >>> bit = 0 := by
+        simpa using hbound
+      have hfrom_lt : (ctx.fromMont acc).toNat < p.toNat := by
+        have hlt := MontCtx.fromMont_lt ctx acc hacc
+        simpa [UInt64.lt_iff_toNat_lt] using hlt
+      calc
+        (ctx.fromMont (powMontBitsGo ctx n 0 bit acc base)).toNat =
+            (ctx.fromMont acc).toNat := rfl
+        _ = (ctx.fromMont acc).toNat % p.toNat := (Nat.mod_eq_of_lt hfrom_lt).symm
+        _ = a ^ n % p.toNat := by simpa [hshift] using hinv
+  | succ remaining ih =>
+      let q := n >>> bit
+      have hq_decomp : q = 2 * (q / 2) + (q % 2) := by
+        rw [Nat.add_comm]
+        exact (Nat.mod_add_div q 2).symm
+      have htail_bound : n >>> (bit + 1) < 2 ^ remaining := by
+        have hq_lt : q < 2 ^ (remaining + 1) := hbound
+        have hq_div_lt : q / 2 < 2 ^ remaining := by
+          have htwo_pow_succ : 2 ^ (remaining + 1) = 2 * 2 ^ remaining := by
+            rw [Nat.pow_succ, Nat.mul_comm]
+          rw [htwo_pow_succ] at hq_lt
+          exact Nat.div_lt_of_lt_mul hq_lt
+        simpa [q, Nat.shiftRight_succ, Nat.add_comm] using hq_div_lt
+      have hbase' : ctx.mulMont base base < p :=
+        MontCtx.mulMont_lt ctx base base hbase hbase
+      unfold powMontBitsGo
+      by_cases hbit : n.testBit bit = true
+      · have hq_mod : q % 2 = 1 :=
+          testBit_eq_true_iff_shiftRight_mod_two.mp hbit
+        have hq_eq : q = 2 * (n >>> (bit + 1)) + 1 := by
+          calc
+            q = 2 * (q / 2) + q % 2 := hq_decomp
+            _ = 2 * (q / 2) + 1 := by rw [hq_mod]
+            _ = 2 * (n >>> (bit + 1)) + 1 := by
+                  simp [q, Nat.shiftRight_succ, Nat.add_comm]
+        have hacc' : ctx.mulMont acc base < p :=
+          MontCtx.mulMont_lt ctx acc base hacc hbase
+        have hmul_acc :
+            (ctx.fromMont (ctx.mulMont acc base)).toNat =
+              ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat) % p.toNat :=
+          MontCtx.mulMont_repr ctx acc base hacc hbase
+        have hmul_base :
+            (ctx.fromMont (ctx.mulMont base base)).toNat =
+              ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) % p.toNat :=
+          MontCtx.mulMont_repr ctx base base hbase hbase
+        have hinv' :
+            ((ctx.fromMont (ctx.mulMont acc base)).toNat *
+                (ctx.fromMont (ctx.mulMont base base)).toNat ^ (n >>> (bit + 1))) %
+              p.toNat = a ^ n % p.toNat := by
+          calc
+            ((ctx.fromMont (ctx.mulMont acc base)).toNat *
+                (ctx.fromMont (ctx.mulMont base base)).toNat ^ (n >>> (bit + 1))) %
+              p.toNat
+                = (((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat) %
+                    p.toNat *
+                    (((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) %
+                      p.toNat) ^ (n >>> (bit + 1))) % p.toNat := by
+                  rw [hmul_acc, hmul_base]
+            _ = ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat *
+                    ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                      (n >>> (bit + 1))) % p.toNat := by
+                  simpa [Nat.pow_mod, Nat.mul_assoc] using
+                    (Nat.mul_mod
+                      ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat)
+                      (((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                        (n >>> (bit + 1))) p.toNat).symm
+            _ = ((ctx.fromMont acc).toNat *
+                    ((ctx.fromMont base).toNat *
+                      ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                        (n >>> (bit + 1)))) % p.toNat := by
+                  rw [Nat.mul_assoc]
+            _ = ((ctx.fromMont acc).toNat *
+                    (ctx.fromMont base).toNat ^ (n >>> bit)) % p.toNat := by
+                  change ((ctx.fromMont acc).toNat *
+                    ((ctx.fromMont base).toNat *
+                      ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                        (n >>> (bit + 1)))) % p.toNat =
+                    ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat ^ q) % p.toNat
+                  rw [hq_eq, pow_sq_succ]
+            _ = a ^ n % p.toNat := hinv
+        simpa [hbit] using ih (bit + 1) (ctx.mulMont acc base) (ctx.mulMont base base)
+          htail_bound hacc' hbase' hinv'
+      · have hbit_false : n.testBit bit = false := by
+          cases h : n.testBit bit <;> simp_all
+        have hq_mod : q % 2 = 0 :=
+          testBit_eq_false_iff_shiftRight_mod_two.mp hbit_false
+        have hq_eq : q = 2 * (n >>> (bit + 1)) := by
+          calc
+            q = 2 * (q / 2) + q % 2 := hq_decomp
+            _ = 2 * (q / 2) := by rw [hq_mod, Nat.add_zero]
+            _ = 2 * (n >>> (bit + 1)) := by
+                  simp [q, Nat.shiftRight_succ]
+        have hmul_base :
+            (ctx.fromMont (ctx.mulMont base base)).toNat =
+              ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) % p.toNat :=
+          MontCtx.mulMont_repr ctx base base hbase hbase
+        have hinv' :
+            ((ctx.fromMont acc).toNat *
+                (ctx.fromMont (ctx.mulMont base base)).toNat ^ (n >>> (bit + 1))) %
+              p.toNat = a ^ n % p.toNat := by
+          calc
+            ((ctx.fromMont acc).toNat *
+                (ctx.fromMont (ctx.mulMont base base)).toNat ^ (n >>> (bit + 1))) %
+              p.toNat
+                = ((ctx.fromMont acc).toNat *
+                    ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                      (n >>> (bit + 1))) % p.toNat := by
+                  rw [hmul_base]
+                  simpa [Nat.pow_mod, Nat.mul_mod_mod] using
+                    (Nat.mul_mod_mod (ctx.fromMont acc).toNat
+                      (((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                        (n >>> (bit + 1))) p.toNat)
+            _ = ((ctx.fromMont acc).toNat *
+                    (ctx.fromMont base).toNat ^ (n >>> bit)) % p.toNat := by
+                  change ((ctx.fromMont acc).toNat *
+                    ((ctx.fromMont base).toNat * (ctx.fromMont base).toNat) ^
+                      (n >>> (bit + 1))) % p.toNat =
+                    ((ctx.fromMont acc).toNat * (ctx.fromMont base).toNat ^ q) % p.toNat
+                  rw [hq_eq, pow_sq]
+            _ = a ^ n % p.toNat := hinv
+        simpa [hbit] using ih (bit + 1) acc (ctx.mulMont base base)
+          htail_bound hacc hbase' hinv'
+
+private theorem powModWordOdd_eq (a n : Nat) (p : UInt64) (hp : p % 2 = 1) :
+    powModWordOdd a n p hp = a ^ n % p.toNat := by
+  let ctx := MontCtx.mk p hp
+  let acc0 := ctx.toMont (UInt64.ofNat (1 % p.toNat))
+  let base0 := ctx.toMont (UInt64.ofNat (a % p.toNat))
+  have hp_pos : 0 < p.toNat := ctx.p_pos
+  have hp_lt_word : p.toNat < UInt64.word := ctx.p_lt_R
+  have hacc_arg_nat : (UInt64.ofNat (1 % p.toNat)).toNat = 1 % p.toNat :=
+    UInt64.toNat_ofNat_mod_lt_word (x := 1) hp_pos hp_lt_word
+  have hbase_arg_nat : (UInt64.ofNat (a % p.toNat)).toNat = a % p.toNat :=
+    UInt64.toNat_ofNat_mod_lt_word (x := a) hp_pos hp_lt_word
+  have hacc_arg_lt : UInt64.ofNat (1 % p.toNat) < p := by
+    rw [UInt64.lt_iff_toNat_lt, hacc_arg_nat]
+    exact Nat.mod_lt _ hp_pos
+  have hbase_arg_lt : UInt64.ofNat (a % p.toNat) < p := by
+    rw [UInt64.lt_iff_toNat_lt, hbase_arg_nat]
+    exact Nat.mod_lt _ hp_pos
+  have hacc0 : acc0 < p := MontCtx.toMont_lt ctx _ hacc_arg_lt
+  have hbase0 : base0 < p := MontCtx.toMont_lt ctx _ hbase_arg_lt
+  have hfrom_acc0 :
+      (ctx.fromMont acc0).toNat = 1 % p.toNat := by
+    rw [show acc0 = ctx.toMont (UInt64.ofNat (1 % p.toNat)) by rfl,
+      MontCtx.fromMont_toMont ctx _ hacc_arg_lt, hacc_arg_nat]
+  have hfrom_base0 :
+      (ctx.fromMont base0).toNat = a % p.toNat := by
+    rw [show base0 = ctx.toMont (UInt64.ofNat (a % p.toNat)) by rfl,
+      MontCtx.fromMont_toMont ctx _ hbase_arg_lt, hbase_arg_nat]
+  unfold powModWordOdd powMont
+  change (ctx.fromMont (powMontBitsGo ctx n (bitLength n) 0 acc0 base0)).toNat =
+    a ^ n % p.toNat
+  apply powMontBitsGo_eq ctx a n (bitLength n) 0 acc0 base0
+  · simpa using lt_two_pow_bitLength n
+  · exact hacc0
+  · exact hbase0
+  · rw [hfrom_acc0, hfrom_base0]
+    calc
+      1 % p.toNat * (a % p.toNat) ^ (n >>> 0) % p.toNat
+          = 1 * (a % p.toNat) ^ n % p.toNat := by
+            simp
+      _ = a ^ n % p.toNat := by
+            simp [Nat.pow_mod]
 
 /--
 Modular exponentiation by repeated squaring, using Montgomery arithmetic for
@@ -565,6 +875,23 @@ def powMod (a n p : Nat) : Nat :=
 /-- `powMod` agrees with ordinary modular exponentiation. -/
 theorem powMod_eq (a n p : Nat) (hp : p > 0) :
     powMod a n p = a ^ n % p := by
-  sorry
+  unfold powMod
+  split
+  · omega
+  · rename_i hp0
+    by_cases hfit_lt : p < UInt64.size
+    · have hfit : (UInt64.ofNat p).toNat = p := by
+        simpa [UInt64.toNat_ofNat, UInt64.size] using
+          Nat.mod_eq_of_lt hfit_lt
+      by_cases hodd : UInt64.ofNat p % 2 = 1
+      · simp [hfit, hodd, powModWordOdd_eq a n (UInt64.ofNat p) hodd]
+      · simp [hfit_lt, hodd, powModNat_eq a n p hp]
+    · have hfit : ¬ (UInt64.ofNat p).toNat = p := by
+        intro h
+        have hmodlt : p % UInt64.size < UInt64.size := Nat.mod_lt _ (by decide)
+        have hpmod : p % UInt64.size = p := by
+          simpa [UInt64.toNat_ofNat] using h
+        exact hfit_lt (by simpa [hpmod] using hmodlt)
+      simp [hfit_lt, powModNat_eq a n p hp]
 
 end HexArith
