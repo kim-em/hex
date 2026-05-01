@@ -2813,6 +2813,57 @@ private theorem xorBoolList_wordPairs_swap
         rw [List.flatMap_singleton]
       rw [hcols]
 
+/-- XOR a list of machine words as the word-level analogue of `xorBoolList`. -/
+private def xorWordList : List UInt64 → UInt64
+  | [] => 0
+  | word :: words => word ^^^ xorWordList words
+
+/-- The raw word contribution of a single `clmul x y` placed at word offset
+`idx`, projected to result word slot `slot`. -/
+private def clmulWordAt (idx : Nat) (x y : UInt64) (slot : Nat) : UInt64 :=
+  if slot = idx then
+    (clmul x y).2
+  else if slot = idx + 1 then
+    (clmul x y).1
+  else
+    0
+
+private theorem clmulCoeffAt_zero_left (idx : Nat) (y : UInt64) (n : Nat) :
+    clmulCoeffAt idx 0 y n = false := by
+  unfold clmulCoeffAt
+  rw [clmul_zero_left]
+  by_cases hLow : n / 64 = idx
+  · simp [hLow]
+  · by_cases hHigh : n / 64 = idx + 1 <;> simp [hLow, hHigh]
+
+private theorem clmulCoeffAt_xor_left
+    (idx : Nat) (x y z : UInt64) (n : Nat) :
+    clmulCoeffAt idx (x ^^^ y) z n =
+      (clmulCoeffAt idx x z n != clmulCoeffAt idx y z n) := by
+  unfold clmulCoeffAt
+  by_cases hLow : n / 64 = idx
+  · simp [hLow]
+    rw [clmul_xor_left_snd_bit]
+  · by_cases hHigh : n / 64 = idx + 1
+    · simp [hHigh]
+      rw [clmul_xor_left_fst_bit]
+    · simp [hLow, hHigh]
+
+private theorem clmulCoeffAt_xorWordList_left
+    (words : List UInt64) (idx : Nat) (z : UInt64) (n : Nat) :
+    clmulCoeffAt idx (xorWordList words) z n =
+      xorBoolList (words.map (fun word => clmulCoeffAt idx word z n)) := by
+  induction words with
+  | nil =>
+      change clmulCoeffAt idx 0 z n = false
+      exact clmulCoeffAt_zero_left idx z n
+  | cons word words ih =>
+      rw [xorWordList, clmulCoeffAt_xor_left]
+      change (clmulCoeffAt idx word z n != clmulCoeffAt idx (xorWordList words) z n) =
+        xorBoolList (clmulCoeffAt idx word z n ::
+          words.map (fun word => clmulCoeffAt idx word z n))
+      rw [xorBoolList_cons, ih]
+
 private theorem coeffWords_xorClmulAt_contrib
     (acc : Array UInt64) {idx n : Nat} (x y : UInt64)
     (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size) :
@@ -2922,6 +2973,33 @@ private theorem coeffWords_mulWords_contrib (xs ys : Array UInt64) (n : Nat) :
         have hj' : j < ys.size := List.mem_range.mp hj
         simp
         omega
+
+/-- A raw product word is the XOR of all source word-pair contributions whose
+low or high `clmul` word lands in that result slot. -/
+private theorem mulWords_getElem!_contrib
+    (xs ys : Array UInt64) (slot : Nat) :
+    (mulWords xs ys)[slot]! =
+      xorWordList
+        (List.flatMap
+          (fun i =>
+            (List.range ys.size).map
+              (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
+          (List.range xs.size)) := by
+  sorry
+
+/-- Expand a later `clmul` coefficient whose left input is an intermediate raw
+product word into source word-pair contributions. -/
+private theorem clmulCoeffAt_mulWords_left_contrib
+    (xs ys : Array UInt64) (slot idx : Nat) (z : UInt64) (n : Nat) :
+    clmulCoeffAt idx (mulWords xs ys)[slot]! z n =
+      xorBoolList
+        ((List.flatMap
+          (fun i =>
+            (List.range ys.size).map
+              (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
+          (List.range xs.size)).map
+          (fun word => clmulCoeffAt idx word z n)) := by
+  rw [mulWords_getElem!_contrib, clmulCoeffAt_xorWordList_left]
 
 private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
     clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
