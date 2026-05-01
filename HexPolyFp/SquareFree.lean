@@ -1369,15 +1369,19 @@ private theorem yunFactorsContribution_tail_repeated_descent
   · simp [yunFactorsContribution, hc, hz]
   · simp [yunFactorsContribution, hc, hz]
 
-private theorem yunFactorsContribution_loop_state_product_invariant
-    (hp : Hex.Nat.Prime p) (c w : FpPoly p) (multiplicity fuel : Nat)
-    (hmultiplicity : 0 < multiplicity) :
-    let contribution := yunFactorsContribution c w multiplicity fuel
-    (isOne contribution.2 = true → contribution.1 = pow (c * w) multiplicity) ∧
+private theorem yunFactorsContribution_initial_state_product_invariant
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (_hfuel : f.size < fuel + 1)
+    (_hzero : f.isZero = false)
+    (_hdf : (DensePoly.derivative f).isZero = false) :
+    let g := DensePoly.gcd f (DensePoly.derivative f)
+    let c := f / g
+    let contribution := yunFactorsContribution c g multiplicity fuel
+    (isOne contribution.2 = true → contribution.1 = pow f multiplicity) ∧
       (isOne contribution.2 = false →
         contribution.1 *
           squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
-            pow (c * w) multiplicity) := by
+            pow f multiplicity) := by
   have hterminal_surface :
       ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
         isOne c = true →
@@ -1430,6 +1434,10 @@ private theorem yunFactorsContribution_loop_state_product_invariant
                 (multiplicity * p) fuel :=
     fun c w multiplicity fuel hc =>
       yunFactorsContribution_tail_repeated_descent c w multiplicity fuel hc
+  let g := DensePoly.gcd f (DensePoly.derivative f)
+  let c := f / g
+  have hcg : c * g = f := by
+    simpa [c, g] using div_gcd_mul_reconstruct f (DensePoly.derivative f)
   sorry
 
 private theorem yunFactorsContribution_reconstruct_core
@@ -1446,20 +1454,9 @@ private theorem yunFactorsContribution_reconstruct_core
           squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
             pow f multiplicity) := by
   dsimp
-  let g := DensePoly.gcd f (DensePoly.derivative f)
-  let c := f / g
-  have hloop :=
-    yunFactorsContribution_loop_state_product_invariant
-      hp c g multiplicity fuel hmultiplicity
-  have hcg : c * g = f := by
-    simpa [c, g] using div_gcd_mul_reconstruct f (DensePoly.derivative f)
-  constructor
-  · intro hrepeated
-    have hdone := hloop.1 hrepeated
-    simpa [c, g, hcg] using hdone
-  · intro hrepeated
-    have htail := hloop.2 hrepeated
-    simpa [c, g, hcg] using htail
+  exact
+    yunFactorsContribution_initial_state_product_invariant
+      hp f multiplicity fuel hmultiplicity _hfuel _hzero _hdf
 
 private theorem yunFactorsContribution_reconstruct_done
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
