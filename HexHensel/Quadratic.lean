@@ -645,6 +645,284 @@ private theorem divModMonicModSquare_zero_mod_base
     (reduceModSquare_zero_mod_base m p hp)
     hqr
 
+private theorem monic_size_pos (q : ZPoly) (hmonic : DensePoly.Monic q) :
+    0 < q.size := by
+  by_cases hpos : 0 < q.size
+  · exact hpos
+  · have hsize : q.size = 0 := Nat.eq_zero_of_not_pos hpos
+    have hlead : q.leadingCoeff = 0 := by
+      cases q with
+      | mk coeffs normalized =>
+          simp [DensePoly.leadingCoeff, DensePoly.size] at hsize ⊢
+          simp [hsize]
+    have hlead_one : q.leadingCoeff = 1 := by
+      simpa [DensePoly.Monic] using hmonic
+    rw [hlead] at hlead_one
+    exact False.elim (Int.zero_ne_one hlead_one)
+
+private theorem degree?_eq_some_size_sub_one
+    (f : ZPoly) (d : Nat) (hdeg : f.degree? = some d) :
+    f.size = d + 1 := by
+  unfold DensePoly.degree? at hdeg
+  by_cases hzero : f.size = 0
+  · simp [hzero] at hdeg
+  · simp [hzero] at hdeg
+    omega
+
+private theorem size_le_of_coeff_zero_from
+    (f : ZPoly) (n : Nat)
+    (hzero : ∀ i, n ≤ i → f.coeff i = 0) :
+    f.size ≤ n := by
+  by_cases hle : f.size ≤ n
+  · exact hle
+  · have hlast_zero : f.coeff (f.size - 1) = 0 := hzero (f.size - 1) (by omega)
+    have hlast_ne : f.coeff (f.size - 1) ≠ 0 :=
+      DensePoly.coeff_last_ne_zero_of_pos_size f (by omega)
+    exact False.elim (hlast_ne hlast_zero)
+
+private def diagonalCoeffTerm (p q : ZPoly) (n i : Nat) : Int :=
+  if n < i then 0 else p.coeff i * q.coeff (n - i)
+
+private theorem fold_mulCoeffStep_eq_bounded_diagonal_int
+    (p q : ZPoly) (n i m : Nat) (acc : Int) :
+    (List.range m).foldl (DensePoly.mulCoeffStep p q n i) acc =
+      acc + (if n < i then 0
+        else if n - i < m then p.coeff i * q.coeff (n - i) else 0) := by
+  induction m generalizing acc with
+  | zero =>
+      simp
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      unfold DensePoly.mulCoeffStep
+      by_cases hlt : n < i
+      · have hne : i + m ≠ n := by omega
+        simp [hlt, hne]
+      · by_cases hm : n - i < m
+        · have hne : i + m ≠ n := by omega
+          simp [hlt, hm, hne]
+          grind
+        · by_cases heq : i + m = n
+          · have hsub : n - i = m := by omega
+            simp [hlt, heq, hsub]
+          · have hm' : ¬ n - i < m + 1 := by omega
+            simp [hlt, hm, hm', heq]
+
+private theorem fold_mulCoeffStep_eq_diagonal_int
+    (p q : ZPoly) (n i : Nat) (acc : Int) :
+    (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc =
+      acc + diagonalCoeffTerm p q n i := by
+  rw [fold_mulCoeffStep_eq_bounded_diagonal_int]
+  unfold diagonalCoeffTerm
+  by_cases hlt : n < i
+  · simp [hlt]
+  · by_cases hbound : n - i < q.size
+    · simp [hlt, hbound]
+    · have hcoeff : q.coeff (n - i) = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le q (Nat.le_of_not_gt hbound)
+      simp [hlt, hbound, hcoeff]
+
+private theorem fold_mulCoeff_outer_eq_diagonal_int
+    (p q : ZPoly) (n : Nat) (xs : List Nat) (acc : Int) :
+    xs.foldl (fun coeff i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) coeff) acc =
+      xs.foldl (fun coeff i => coeff + diagonalCoeffTerm p q n i) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [fold_mulCoeffStep_eq_diagonal_int]
+      exact ih (acc + diagonalCoeffTerm p q n i)
+
+private theorem mulCoeffSum_eq_diagonal_int (p q : ZPoly) (n : Nat) :
+    DensePoly.mulCoeffSum p q n =
+      (List.range p.size).foldl (fun acc i => acc + diagonalCoeffTerm p q n i) 0 := by
+  unfold DensePoly.mulCoeffSum
+  exact fold_mulCoeff_outer_eq_diagonal_int p q n (List.range p.size) 0
+
+private theorem fold_diagonal_monomial_left
+    (k : Nat) (c : Int) (q : ZPoly) (n m : Nat) :
+    (List.range m).foldl
+        (fun acc i => acc + diagonalCoeffTerm (DensePoly.monomial k c) q n i) 0 =
+      if k < m then diagonalCoeffTerm (DensePoly.monomial k c) q n k else 0 := by
+  induction m with
+  | zero =>
+      simp
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      by_cases hk : k < m
+      · have hmk : m ≠ k := by omega
+        have hks : k < m + 1 := by omega
+        have hterm : diagonalCoeffTerm (DensePoly.monomial k c) q n m = 0 := by
+          unfold diagonalCoeffTerm
+          by_cases hnm : n < m
+          · simp [hnm]
+          ·
+            rw [DensePoly.coeff_monomial]
+            simp [hnm, hmk]
+            change (0 : Int) * q.coeff (n - m) = 0
+            rw [Int.zero_mul]
+        simp [hk, hks, hterm]
+      · by_cases hmk : m = k
+        · subst m
+          have hkk : k < k + 1 := by omega
+          simp [hkk]
+        · have hks : ¬ k < m + 1 := by omega
+          have hterm : diagonalCoeffTerm (DensePoly.monomial k c) q n m = 0 := by
+            unfold diagonalCoeffTerm
+            by_cases hnm : n < m
+            · simp [hnm]
+            ·
+              rw [DensePoly.coeff_monomial]
+              simp [hnm, hmk]
+              change (0 : Int) * q.coeff (n - m) = 0
+              rw [Int.zero_mul]
+          simp [hk, hks, hterm]
+
+private theorem coeff_monomial_mul
+    (k : Nat) (c : Int) (q : ZPoly) (n : Nat) :
+    ((DensePoly.monomial k c : ZPoly) * q).coeff n =
+      if n < k then 0 else c * q.coeff (n - k) := by
+  rw [DensePoly.coeff_mul, mulCoeffSum_eq_diagonal_int]
+  rw [fold_diagonal_monomial_left]
+  by_cases hk : k < (DensePoly.monomial k c : ZPoly).size
+  · simp [hk, diagonalCoeffTerm, DensePoly.coeff_monomial]
+  · have hcoeff : (DensePoly.monomial k c : ZPoly).coeff k = 0 :=
+      DensePoly.coeff_eq_zero_of_size_le (DensePoly.monomial k c : ZPoly)
+        (Nat.le_of_not_gt hk)
+    rw [DensePoly.coeff_monomial] at hcoeff
+    have hc : c = 0 := by simpa using hcoeff
+    subst c
+    simp [diagonalCoeffTerm]
+    intro hsize _hn
+    have hzero_size : (DensePoly.monomial k (0 : Int) : ZPoly).size = 0 := by
+      unfold DensePoly.monomial
+      have hz : (0 : Int) = Zero.zero := rfl
+      simp [hz]
+    omega
+
+private theorem coeff_mulModSquare_monomial_high
+    (m k : Nat) (c : Int) (q : ZPoly) (n : Nat)
+    (hhigh : q.size ≤ n - k) :
+    (mulModSquare (DensePoly.monomial k c) q m).coeff n = 0 := by
+  unfold mulModSquare QuadraticLiftResult.reduceModSquare
+  apply ZPoly.coeff_reduceModPow_eq_zero_of_emod
+  rw [coeff_monomial_mul]
+  by_cases hnk : n < k
+  · simp [hnk]
+  · have hq : q.coeff (n - k) = 0 := DensePoly.coeff_eq_zero_of_size_le q hhigh
+    simp [hnk, hq]
+
+private theorem coeff_mulModSquare_monomial_leading
+    (m k qd : Nat) (c : Int) (q : ZPoly)
+    (hm : 0 < m)
+    (hmonic : DensePoly.Monic q)
+    (hqsize : q.size = qd + 1) :
+    (mulModSquare (DensePoly.monomial k c) q m).coeff (k + qd) =
+      c % Int.ofNat (m ^ 2) := by
+  unfold mulModSquare QuadraticLiftResult.reduceModSquare
+  rw [ZPoly.coeff_reduceModPow_eq_emod_of_pos]
+  rw [coeff_monomial_mul]
+  have hnot : ¬ k + qd < k := by omega
+  have hsub : k + qd - k = qd := by omega
+  have hqpos : 0 < q.size := by omega
+  have hqcoeff : q.coeff qd = 1 := by
+    have hlast := coeff_last_eq_leadingCoeff q hqpos
+    rw [hqsize] at hlast
+    have hidx : qd + 1 - 1 = qd := by omega
+    rw [hidx] at hlast
+    rw [hlast]
+    exact hmonic
+  simp [hnot, hsub, hqcoeff]
+  exact Nat.pow_pos hm
+
+private theorem coeff_subModSquare_cancel_leading
+    (m : Nat) (rem q : ZPoly) (rd qd : Nat)
+    (hm : 0 < m)
+    (hremSize : rem.size = rd + 1)
+    (hqSize : q.size = qd + 1)
+    (hmonic : DensePoly.Monic q)
+    (hqd_le : qd ≤ rd) :
+    (subModSquare rem
+        (mulModSquare
+          (DensePoly.monomial (rd - qd) (reduceCoeffModSquare rem.leadingCoeff m)) q m) m).coeff rd = 0 := by
+  unfold subModSquare QuadraticLiftResult.reduceModSquare
+  apply ZPoly.coeff_reduceModPow_eq_zero_of_emod
+  rw [DensePoly.coeff_sub]
+  · have hremLead : rem.coeff rd = rem.leadingCoeff := by
+      have hpos : 0 < rem.size := by omega
+      have hlast := coeff_last_eq_leadingCoeff rem hpos
+      rw [hremSize] at hlast
+      have hidx : rd + 1 - 1 = rd := by omega
+      simpa [hidx] using hlast
+    have hmul :
+        (mulModSquare
+          (DensePoly.monomial (rd - qd) (reduceCoeffModSquare rem.leadingCoeff m)) q m).coeff rd =
+          (reduceCoeffModSquare rem.leadingCoeff m : Int) % Int.ofNat (m ^ 2) := by
+      have hsum : rd - qd + qd = rd := by omega
+      simpa [hsum] using
+        coeff_mulModSquare_monomial_leading
+          m (rd - qd) qd (reduceCoeffModSquare rem.leadingCoeff m) q hm hmonic hqSize
+    rw [hremLead, hmul]
+    unfold reduceCoeffModSquare canonicalMod quadraticModulus
+    have hpow : m ^ 2 = m * m := by rw [Nat.pow_two]
+    rw [hpow]
+    have hnat :
+        Int.ofNat (Int.toNat (rem.leadingCoeff % Int.ofNat (m * m))) =
+          rem.leadingCoeff % Int.ofNat (m * m) := by
+      have hpos : 0 < m * m := Nat.mul_pos hm hm
+      exact Int.toNat_of_nonneg
+        (Int.emod_nonneg _ (Int.ofNat_ne_zero.mpr (Nat.ne_of_gt hpos)))
+    rw [hnat]
+    have hemidem :
+        rem.leadingCoeff % Int.ofNat (m * m) % Int.ofNat (m * m) =
+          rem.leadingCoeff % Int.ofNat (m * m) := by
+      rw [Int.emod_emod]
+    rw [hemidem]
+    exact Int.emod_eq_emod_iff_emod_sub_eq_zero.mp hemidem.symm
+  · rfl
+
+private theorem divModMonicModSquare_step_remainder_size_le
+    (m : Nat) (q rem : ZPoly) (rd qd fuel : Nat)
+    (hm : 0 < m)
+    (hremDeg : rem.degree? = some rd)
+    (hqDeg : q.degree? = some qd)
+    (hnotLt : ¬ rd < qd)
+    (hmonic : DensePoly.Monic q)
+    (hfuel : rem.size ≤ fuel + 1) :
+    (subModSquare rem
+        (mulModSquare
+          (DensePoly.monomial (rd - qd) (reduceCoeffModSquare rem.leadingCoeff m)) q m) m).size ≤ fuel := by
+  have hremSize : rem.size = rd + 1 :=
+    degree?_eq_some_size_sub_one rem rd hremDeg
+  have hqSize : q.size = qd + 1 :=
+    degree?_eq_some_size_sub_one q qd hqDeg
+  have hrd_le_fuel : rd ≤ fuel := by omega
+  apply Nat.le_trans ?_ hrd_le_fuel
+  apply size_le_of_coeff_zero_from
+  intro i hi
+  by_cases hir : i = rd
+  · subst i
+    exact coeff_subModSquare_cancel_leading m rem q rd qd hm hremSize hqSize hmonic
+      (by omega)
+  · have hgt : rd < i := by omega
+    unfold subModSquare QuadraticLiftResult.reduceModSquare
+    apply ZPoly.coeff_reduceModPow_eq_zero_of_emod
+    rw [DensePoly.coeff_sub]
+    · have hremCoeff : rem.coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le rem (by omega)
+      have hmulCoeff :
+          (mulModSquare
+            (DensePoly.monomial (rd - qd) (reduceCoeffModSquare rem.leadingCoeff m)) q m).coeff i = 0 := by
+        apply coeff_mulModSquare_monomial_high
+        omega
+      rw [hremCoeff, hmulCoeff]
+      simp
+    · rfl
+
 private theorem divModMonicModSquareAux_remainder_coeff_eq_zero_of_monic
     (m : Nat)
     (q : ZPoly)
@@ -655,7 +933,65 @@ private theorem divModMonicModSquareAux_remainder_coeff_eq_zero_of_monic
     (_hfuel : rem.size ≤ fuel)
     (_hqr : (qOut, rOut) = divModMonicModSquareAux m q fuel quot rem) :
     ∀ i, q.size - 1 ≤ i → rOut.coeff i = 0 := by
-  sorry
+  induction fuel generalizing quot rem qOut rOut with
+  | zero =>
+      simp [divModMonicModSquareAux] at _hqr
+      rcases _hqr with ⟨hqOut, hrOut⟩
+      subst qOut
+      subst rOut
+      intro i _hi
+      exact DensePoly.coeff_eq_zero_of_size_le rem (by omega)
+  | succ fuel ih =>
+      cases hq : q.isZero with
+      | true =>
+          have hqpos : 0 < q.size := monic_size_pos q _hmonic
+          have hqsize0 : q.size = 0 := by
+            simp [DensePoly.isZero] at hq
+            simpa [DensePoly.size] using hq
+          omega
+      | false =>
+          cases hremDeg : rem.degree? with
+          | none =>
+              simp [divModMonicModSquareAux, hq, hremDeg] at _hqr
+              rcases _hqr with ⟨hqOut, hrOut⟩
+              subst qOut
+              subst rOut
+              intro i _hi
+              unfold DensePoly.degree? at hremDeg
+              by_cases hzero : rem.size = 0
+              · exact DensePoly.coeff_eq_zero_of_size_le rem (by omega)
+              · simp [hzero] at hremDeg
+          | some rd =>
+              cases hqDeg : q.degree? with
+              | none =>
+                  have hqpos : 0 < q.size := monic_size_pos q _hmonic
+                  unfold DensePoly.degree? at hqDeg
+                  by_cases hzero : q.size = 0
+                  · omega
+                  · simp [hzero] at hqDeg
+              | some qd =>
+                  by_cases hlt : rd < qd
+                  · simp [divModMonicModSquareAux, hq, hremDeg, hqDeg, hlt] at _hqr
+                    rcases _hqr with ⟨hqOut, hrOut⟩
+                    subst qOut
+                    subst rOut
+                    intro i hi
+                    have hremSize : rem.size = rd + 1 :=
+                      degree?_eq_some_size_sub_one rem rd hremDeg
+                    have hqSize : q.size = qd + 1 :=
+                      degree?_eq_some_size_sub_one q qd hqDeg
+                    exact DensePoly.coeff_eq_zero_of_size_le rem (by omega)
+                  · simp [divModMonicModSquareAux, hq, hremDeg, hqDeg, hlt] at _hqr
+                    let k := rd - qd
+                    let coeff := reduceCoeffModSquare rem.leadingCoeff m
+                    let term := DensePoly.monomial k coeff
+                    have hnextFuel :
+                        (subModSquare rem (mulModSquare term q m) m).size ≤ fuel := by
+                      exact divModMonicModSquare_step_remainder_size_le
+                        m q rem rd qd fuel (by omega) hremDeg hqDeg hlt _hmonic _hfuel
+                    exact ih (addModSquare quot term m)
+                      (subModSquare rem (mulModSquare term q m) m)
+                      qOut rOut hnextFuel _hqr
 
 private theorem quadraticHenselStep_bezout_error_definition_congr
     (m : Nat) (s t g' h' b : ZPoly) (hm : 0 < m)
