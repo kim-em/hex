@@ -74,6 +74,38 @@ def MultifactorLiftInvariant
             1 p) ∧
         MultifactorLiftInvariant p k lifted.h rest
 
+private theorem one_mul_zpoly (g : ZPoly) :
+    (1 : ZPoly) * g = g := by
+  rw [DensePoly.mul_comm_poly (S := Int), DensePoly.mul_one_right_poly]
+
+private theorem polyProduct_singleton (g : ZPoly) :
+    Array.polyProduct #[g] = g := by
+  simpa [Array.polyProduct] using one_mul_zpoly g
+
+private theorem list_foldl_mul_eq_mul_foldl_one (g : ZPoly) (xs : List ZPoly) :
+    xs.foldl (fun acc factor => acc * factor) g =
+      g * xs.foldl (fun acc factor => acc * factor) 1 := by
+  induction xs generalizing g with
+  | nil =>
+      simpa using (DensePoly.mul_one_right_poly (S := Int) g).symm
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      rw [one_mul_zpoly]
+      calc
+        xs.foldl (fun acc factor => acc * factor) (g * x) =
+            (g * x) * xs.foldl (fun acc factor => acc * factor) 1 := ih (g * x)
+        _ = g * (x * xs.foldl (fun acc factor => acc * factor) 1) := by
+            rw [DensePoly.mul_assoc_poly (S := Int)]
+        _ = g * xs.foldl (fun acc factor => acc * factor) x := by
+            rw [ih x]
+
+private theorem polyProduct_singleton_append (g : ZPoly) (rest : Array ZPoly) :
+    Array.polyProduct (#[g] ++ rest) = g * Array.polyProduct rest := by
+  cases rest with
+  | mk xs =>
+      simpa [Array.polyProduct, one_mul_zpoly] using
+        list_foldl_mul_eq_mul_foldl_one g xs
+
 private theorem multifactorLiftList_spec
     (p k : Nat) [ZMod64.Bounds p]
     (f : ZPoly) (factors : List ZPoly)
@@ -81,7 +113,50 @@ private theorem multifactorLiftList_spec
     (hp : 1 < p)
     (hinv : MultifactorLiftInvariant p k f factors) :
     ZPoly.congr (Array.polyProduct (multifactorLiftList p k f factors)) f (p ^ k) := by
-  sorry
+  induction factors generalizing f with
+  | nil =>
+      simpa [multifactorLiftList, Array.polyProduct, MultifactorLiftInvariant] using hinv
+  | cons g rest ih =>
+      cases rest with
+      | nil =>
+          have hpow : 0 < p ^ k := Nat.pow_pos (Nat.zero_lt_of_lt hp)
+          simpa [multifactorLiftList, polyProduct_singleton] using
+            ZPoly.congr_reduceModPow f p k hpow
+      | cons h tail =>
+          let restFactors := (h :: tail).toArray
+          let splitProduct := Array.polyProduct restFactors
+          let xgcd := DensePoly.xgcd (ZPoly.modP p g) (ZPoly.modP p splitProduct)
+          let lifted := henselLift p k f g splitProduct xgcd.left xgcd.right
+          rcases hinv with ⟨hstart, hstepDegree, hstepBezout, htail⟩
+          have htailCongr :
+              ZPoly.congr
+                (Array.polyProduct (multifactorLiftList p k lifted.h (h :: tail)))
+                lifted.h
+                (p ^ k) := by
+            exact ih lifted.h htail
+          have hsplit :
+              ZPoly.congr (lifted.g * lifted.h) f (p ^ k) := by
+            simpa [lifted, splitProduct, restFactors, xgcd] using
+              henselLift_spec p k f g splitProduct xgcd.left xgcd.right
+                hk hp hstart hstepDegree hstepBezout
+          have hprod :
+              ZPoly.congr
+                (lifted.g *
+                  Array.polyProduct (multifactorLiftList p k lifted.h (h :: tail)))
+                (lifted.g * lifted.h)
+                (p ^ k) := by
+            exact ZPoly.congr_mul _ _ _ _ (p ^ k)
+              (ZPoly.congr_refl lifted.g (p ^ k))
+              htailCongr
+          have hcombined :
+              ZPoly.congr
+                (lifted.g *
+                  Array.polyProduct (multifactorLiftList p k lifted.h (h :: tail)))
+                f
+                (p ^ k) :=
+            ZPoly.congr_trans _ _ _ (p ^ k) hprod hsplit
+          simpa [multifactorLiftList, restFactors, splitProduct, xgcd, lifted,
+            polyProduct_singleton_append] using hcombined
 
 /--
 The product of the lifted factors is congruent to `f` modulo `p^k`, provided
