@@ -144,6 +144,29 @@ private theorem powLinear_powLinear_mul (f : FpPoly p) (m n : Nat) :
       rw [powLinear, ih]
       simpa [Nat.succ_mul] using (powLinear_add f (m * n) n).symm
 
+private theorem zmod64_add_pow_prime
+    (hp : Hex.Nat.Prime p) (a b : ZMod64 p) :
+    (a + b) ^ p = a ^ p + b ^ p := by
+  rw [ZMod64.pow_prime hp (a + b), ZMod64.pow_prime hp a, ZMod64.pow_prime hp b]
+
+private theorem zmod64_fold_add_pow_prime_acc
+    (hp : Hex.Nat.Prime p) (xs : List (ZMod64 p)) (acc : ZMod64 p) :
+    (xs.foldl (fun acc x => acc + x) acc) ^ p =
+      (xs.map fun x => x ^ p).foldl (fun acc x => acc + x) (acc ^ p) := by
+  induction xs generalizing acc with
+  | nil =>
+      rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons, List.map_cons]
+      rw [ih (acc + x), zmod64_add_pow_prime hp acc x]
+
+private theorem zmod64_fold_add_pow_prime
+    (hp : Hex.Nat.Prime p) (xs : List (ZMod64 p)) :
+    (xs.foldl (fun acc x => acc + x) 0) ^ p =
+      (xs.map fun x => x ^ p).foldl (fun acc x => acc + x) 0 := by
+  simpa [ZMod64.pow_prime hp (0 : ZMod64 p)] using
+    zmod64_fold_add_pow_prime_acc (p := p) hp xs (0 : ZMod64 p)
+
 /-- Multiply the factors in a square-free decomposition with their multiplicities. -/
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
   factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1
