@@ -504,18 +504,6 @@ private theorem powLinear_coeffFold_prime_coeff_expansion (g : FpPoly p) (m n : 
   powLinear_coeffFold_coeff_expansion g m p n
 
 /--
-Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
-This is the dense-polynomial convolution fact needed by the formal
-`p`-th-root reconstruction: only exponent tuples with all mass on one
-input coefficient survive modulo `p`.
--/
-private theorem powLinear_prime_coeff
-    (hp : Hex.Nat.Prime p) (g : FpPoly p) (n : Nat) :
-    (powLinear g p).coeff n =
-      if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
-  sorry
-
-/--
 Prime-characteristic cancellation for the recursive coefficient expansion of
 `(coeffFold g m)^p`: all mixed `p`-tuples vanish, leaving only diagonal
 choices from the bounded coefficient fold.
@@ -599,6 +587,41 @@ private theorem powLinear_add_prime_coeff
             exact zmod64_add_zero_zero_coeff.symm
     _ = (powLinear f p).coeff n + (powLinear g p).coeff n := by
           rw [hf_eq, hg_eq]
+
+/--
+Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
+This is the dense-polynomial convolution fact needed by the formal
+`p`-th-root reconstruction: only exponent tuples with all mass on one
+input coefficient survive modulo `p`.
+-/
+private theorem powLinear_prime_coeff
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (n : Nat) :
+    (powLinear g p).coeff n =
+      if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
+  calc
+    (powLinear g p).coeff n =
+        (powLinear (coeffFold g g.size) p).coeff n := by
+          rw [coeffFold_size_eq g]
+    _ =
+        if n % p = 0 then
+          if n / p < g.size then (g.coeff (n / p)) ^ p else 0
+        else
+          0 := by
+            exact powLinear_coeffFold_prime_coeff hp g g.size n
+    _ = if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
+          by_cases hn : n % p = 0
+          · rw [if_pos hn]
+            by_cases hsize : n / p < g.size
+            · rw [if_pos hsize]
+              rw [if_pos hn]
+            · rw [if_neg hsize]
+              have hcoeff : g.coeff (n / p) = 0 :=
+                DensePoly.coeff_eq_zero_of_size_le g (by omega)
+              rw [hcoeff]
+              rw [if_pos hn]
+              exact (ZMod64.pow_prime hp (0 : ZMod64 p)).symm
+          · rw [if_neg hn]
+            rw [if_neg hn]
 
 /--
 Coefficient form of the prime-field Frobenius law for the formal `p`-th root:
