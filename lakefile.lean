@@ -142,6 +142,9 @@ lean_exe hexgf2mathlib_bench where
 lean_exe hexpolymathlib_bench where
   root := `HexPolyMathlib.Bench
 
+lean_exe hexmatrixmathlib_bench where
+  root := `HexMatrixMathlib.Bench
+
 lean_exe hexpolyfp_bench where
   root := `HexPolyFp.Bench
 
