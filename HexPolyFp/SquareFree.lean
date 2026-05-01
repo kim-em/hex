@@ -56,6 +56,94 @@ private theorem pow_one (f : FpPoly p) :
   unfold pow
   simp [pow.go]
 
+private def powLinear (f : FpPoly p) : Nat → FpPoly p
+  | 0 => 1
+  | n + 1 => powLinear f n * f
+
+private theorem powLinear_add (f : FpPoly p) (m n : Nat) :
+    powLinear f (m + n) = powLinear f m * powLinear f n := by
+  induction n with
+  | zero =>
+      simp [powLinear]
+  | succ n ih =>
+      rw [Nat.add_succ, powLinear, ih, powLinear]
+      exact DensePoly.mul_assoc_poly (powLinear f m) (powLinear f n) f
+
+private theorem powLinear_double (f : FpPoly p) (n : Nat) :
+    powLinear f (2 * n) = powLinear (f * f) n := by
+  induction n with
+  | zero =>
+      rfl
+  | succ n ih =>
+      have htwo : 2 * (n + 1) = 2 * n + 2 := by omega
+      rw [htwo]
+      change powLinear f ((2 * n + 1) + 1) =
+        powLinear (f * f) n * (f * f)
+      rw [powLinear, powLinear, ih]
+      exact DensePoly.mul_assoc_poly (powLinear (f * f) n) f f
+
+private theorem powLinear_double_add_one (f : FpPoly p) (n : Nat) :
+    powLinear f (2 * n + 1) = f * powLinear (f * f) n := by
+  rw [powLinear, powLinear_double]
+  exact mul_comm (powLinear (f * f) n) f
+
+private theorem pow_go_eq_mul_powLinear (acc base : FpPoly p) (k : Nat) :
+    pow.go acc base k = acc * powLinear base k := by
+  induction k using Nat.strongRecOn generalizing acc base with
+  | ind k ih =>
+      rw [pow.go.eq_def]
+      by_cases hk : k = 0
+      · simp [hk, powLinear]
+      · rw [dif_neg hk]
+        have hlt : k / 2 < k :=
+          Nat.div_lt_self (Nat.pos_of_ne_zero hk) (by decide : 1 < 2)
+        cases Nat.mod_two_eq_zero_or_one k with
+        | inl hmod0 =>
+            have hk_eq : k = 2 * (k / 2) := by
+              have h := Nat.mod_add_div k 2
+              omega
+            have hnot : ¬k % 2 = 1 := by omega
+            have hdiv : 2 * (k / 2) / 2 = k / 2 :=
+              Nat.mul_div_right (k / 2) (by decide : 0 < 2)
+            rw [if_neg hnot]
+            calc
+              pow.go acc (base * base) (k / 2)
+                  = acc * powLinear (base * base) (k / 2) := by
+                    exact ih (k / 2) hlt acc (base * base)
+              _ = acc * powLinear base k := by
+                    rw [hk_eq, hdiv, powLinear_double]
+        | inr hmod1 =>
+            have hk_eq : k = 2 * (k / 2) + 1 := by
+              have h := Nat.mod_add_div k 2
+              omega
+            rw [if_pos hmod1]
+            calc
+              pow.go (acc * base) (base * base) (k / 2)
+                  = (acc * base) * powLinear (base * base) (k / 2) := by
+                    exact ih (k / 2) hlt (acc * base) (base * base)
+              _ = acc * (base * powLinear (base * base) (k / 2)) := by
+                    exact DensePoly.mul_assoc_poly acc base
+                      (powLinear (base * base) (k / 2))
+              _ = acc * powLinear base (2 * (k / 2) + 1) := by
+                    rw [powLinear_double_add_one]
+              _ = acc * powLinear base k := by
+                    rw [← hk_eq]
+
+private theorem pow_eq_powLinear (f : FpPoly p) (n : Nat) :
+    pow f n = powLinear f n := by
+  unfold pow
+  rw [pow_go_eq_mul_powLinear]
+  exact one_mul (powLinear f n)
+
+private theorem powLinear_powLinear_mul (f : FpPoly p) (m n : Nat) :
+    powLinear (powLinear f n) m = powLinear f (m * n) := by
+  induction m with
+  | zero =>
+      simp [powLinear]
+  | succ m ih =>
+      rw [powLinear, ih]
+      simpa [Nat.succ_mul] using (powLinear_add f (m * n) n).symm
+
 /-- Multiply the factors in a square-free decomposition with their multiplicities. -/
 def weightedProduct (factors : List (SquareFreeFactor p)) : FpPoly p :=
   factors.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1
@@ -415,7 +503,8 @@ private theorem pthRoot_frobenius_of_derivative_zero
 private theorem pow_pow_mul
     (f : FpPoly p) (m n : Nat) (_hm : 0 < m) :
     pow (pow f n) m = pow f (m * n) := by
-  sorry
+  rw [pow_eq_powLinear, pow_eq_powLinear, pow_eq_powLinear]
+  exact powLinear_powLinear_mul f m n
 
 private theorem pthRoot_pow_mul_prime_of_derivative_zero
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity : Nat)
