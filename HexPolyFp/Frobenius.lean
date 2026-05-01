@@ -49,6 +49,7 @@ def frobeniusXPowMod (f : FpPoly p) (hmonic : DensePoly.Monic f) (k : Nat) :
   powModMonic X f hmonic (p ^ k)
 
 @[simp] theorem frobeniusXPowMod_zero
+    [ZMod64.PrimeModulus p]
     (f : FpPoly p) (hmonic : DensePoly.Monic f) :
     frobeniusXPowMod f hmonic 0 = modByMonic f X hmonic := by
   simp [frobeniusXPowMod, powModMonic, powModMonicAux, modByMonic,

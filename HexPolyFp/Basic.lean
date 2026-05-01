@@ -1,4 +1,4 @@
-import HexModArith.Ring
+import HexModArith.Prime
 import HexPoly.Euclid
 import Init.Data.List.Lemmas
 import Init.Data.List.Perm
@@ -49,11 +49,24 @@ instance : DecidableEq (ZMod64 p) := by
       apply h
       exact congrArg ZMod64.val hab)
 
+/-- Typeclass wrapper for the prime-modulus assumption needed by field-style polynomial
+division laws over `ZMod64 p`. -/
+class PrimeModulus (p : Nat) : Prop where
+  prime : Hex.Nat.Prime p
+
+/-- Build the prime-modulus typeclass witness from an explicit project-local primality proof. -/
+@[reducible]
+def primeModulusOfPrime (hp : Hex.Nat.Prime p) : PrimeModulus p :=
+  ⟨hp⟩
+
 /-- The `F_p[x]` division law obligations used by quotient constructions.
 
 These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
-surface; the executable division operations themselves are inherited from `DensePoly`. -/
-instance : DensePoly.DivModLaws (ZMod64 p) where
+surface; the executable division operations themselves are inherited from `DensePoly`.
+
+Plain `[Bounds p]` is not enough here: for composite moduli, nonunit leading coefficients
+can make field-style long division fail the reconstruction law. -/
+instance [PrimeModulus p] : DensePoly.DivModLaws (ZMod64 p) where
   divMod_spec := by
     intro f g
     sorry
