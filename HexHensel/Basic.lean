@@ -71,6 +71,21 @@ def reduceModPow (f : ZPoly) (p k : Nat) : ZPoly :=
     simp [hi, hcoeff, intModNat]
     rfl
 
+theorem coeff_reduceModPow_eq_zero_of_emod
+    (f : ZPoly) (p k i : Nat)
+    (hzero : f.coeff i % Int.ofNat (p ^ k) = 0) :
+    (reduceModPow f p k).coeff i = 0 := by
+  rw [coeff_reduceModPow]
+  unfold intModNat
+  rw [hzero]
+  rfl
+
+theorem coeff_reduceModPow_eq_emod_of_pos
+    (f : ZPoly) (p k i : Nat) (hpk : 0 < p ^ k) :
+    (reduceModPow f p k).coeff i = f.coeff i % Int.ofNat (p ^ k) := by
+  rw [coeff_reduceModPow]
+  exact intModNat_eq_emod (f.coeff i) hpk
+
 /-- Coefficientwise reduction modulo `p^k` is congruent to the original polynomial. -/
 theorem congr_reduceModPow (f : ZPoly) (p k : Nat) (hpk : 0 < p ^ k) :
     congr (reduceModPow f p k) f (p ^ k) := by
