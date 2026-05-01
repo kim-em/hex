@@ -1577,11 +1577,67 @@ private theorem squareFreeAuxRev_reverse_append
                       (squareFreeAuxRev (pthRoot loopNil.2) (multiplicity * p) fuel loopNil.1).reverse := by
                       rw [hrec_nil])
 
+private theorem yunFactors_pairwise_coprime_nil
+    (c w : FpPoly p) (multiplicity fuel : Nat) :
+    (yunFactors c w multiplicity fuel []).1.reverse.Pairwise
+      squareFreeFactorCoprimeRel := by
+  sorry
+
+private theorem yunFactors_squareFreeAuxRev_tail_cross_coprime
+    (c w : FpPoly p) (multiplicity fuel : Nat) :
+    let loop := yunFactors c w multiplicity fuel []
+    ∀ a ∈ loop.1.reverse,
+      ∀ b ∈ (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel []).reverse,
+        squareFreeFactorCoprimeRel a b := by
+  sorry
+
 private theorem squareFreeAuxRev_pairwise_coprime_nil_core
     (f : FpPoly p) (multiplicity fuel : Nat) :
     (squareFreeAuxRev f multiplicity fuel []).reverse.Pairwise
       squareFreeFactorCoprimeRel := by
-  sorry
+  induction fuel generalizing f multiplicity with
+  | zero =>
+      simp [squareFreeAuxRev]
+  | succ fuel ih =>
+      simp only [squareFreeAuxRev]
+      by_cases hzero : f.isZero
+      · simp [hzero]
+      · simp [hzero]
+        by_cases hdf : (DensePoly.derivative f).isZero
+        · simpa [hdf] using ih (pthRoot f) (multiplicity * p)
+        · simp [hdf]
+          let g := DensePoly.gcd f (DensePoly.derivative f)
+          let c := f / g
+          let loop := yunFactors c g multiplicity fuel []
+          by_cases hrepeated : isOne loop.2
+          · simpa [g, c, loop, hrepeated] using
+              yunFactors_pairwise_coprime_nil c g multiplicity fuel
+          · have hloop :
+                loop.1.reverse.Pairwise squareFreeFactorCoprimeRel := by
+              simpa [loop] using yunFactors_pairwise_coprime_nil c g multiplicity fuel
+            have htail :
+                (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel []).reverse.Pairwise
+                  squareFreeFactorCoprimeRel :=
+              ih (pthRoot loop.2) (multiplicity * p)
+            have hcross :
+                ∀ a ∈ loop.1.reverse,
+                  ∀ b ∈
+                      (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel []).reverse,
+                    squareFreeFactorCoprimeRel a b := by
+              simpa [loop] using
+                yunFactors_squareFreeAuxRev_tail_cross_coprime c g multiplicity fuel
+            have hcombined :
+                (loop.1.reverse ++
+                    (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel []).reverse).Pairwise
+                  squareFreeFactorCoprimeRel := by
+              exact pairwise_append_of_cross
+                squareFreeFactorCoprimeRel hloop htail hcross
+            have hrev :
+                (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel loop.1).reverse =
+                  loop.1.reverse ++
+                    (squareFreeAuxRev (pthRoot loop.2) (multiplicity * p) fuel []).reverse := by
+              exact squareFreeAuxRev_reverse_append (pthRoot loop.2) (multiplicity * p) fuel loop.1
+            simpa [g, c, loop, hrepeated, hrev] using hcombined
 
 private theorem squareFreeAuxRev_pairwise_coprime_core
     (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
