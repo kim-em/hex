@@ -2813,6 +2813,65 @@ private theorem xorBoolList_wordPairs_swap
         rw [List.flatMap_singleton]
       rw [hcols]
 
+private theorem xorBoolList_flatMap_congr_xor {α : Type}
+    {xs : List α} {left right : α → List Bool}
+    (h : ∀ x, x ∈ xs → xorBoolList (left x) = xorBoolList (right x)) :
+    xorBoolList (xs.flatMap left) = xorBoolList (xs.flatMap right) := by
+  induction xs with
+  | nil =>
+      rfl
+  | cons x xs ih =>
+      simp only [List.flatMap_cons]
+      rw [xorBoolList_append, xorBoolList_append]
+      rw [h x (by simp), ih]
+      intro y hy
+      exact h y (by simp [hy])
+
+/-- Reindex a triple XOR from the left-associated word-pair grouping
+`(i,j),k` to the right-associated grouping `i,(j,k)`, keeping the outer
+source word `i` fixed and swapping the two inner finite ranges. -/
+private theorem xorBoolList_wordTriples_assoc
+    (m n o : Nat) (term : Nat → Nat → Nat → Bool) :
+    xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun j => (List.range o).map (fun k => term i j k))
+              (List.range n))
+          (List.range m)) =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun k => (List.range n).map (fun j => term i j k))
+              (List.range o))
+          (List.range m)) := by
+  apply xorBoolList_flatMap_congr_xor
+  intro i _hi
+  exact xorBoolList_wordPairs_swap n o (fun j k => term i j k)
+
+/-- Array-specialized triple reindexing theorem for raw multiplication
+associativity proof terms.  Later coefficient bridges instantiate `term` with
+the source-word contribution predicate built from `xs[i]!`, `ys[j]!`, and
+`zs[k]!`. -/
+private theorem xorBoolList_sourceTriples_assoc
+    (xs ys zs : Array UInt64) (term : Nat → Nat → Nat → Bool) :
+    xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun j => (List.range zs.size).map (fun k => term i j k))
+              (List.range ys.size))
+          (List.range xs.size)) =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun k => (List.range ys.size).map (fun j => term i j k))
+              (List.range zs.size))
+          (List.range xs.size)) := by
+  exact xorBoolList_wordTriples_assoc xs.size ys.size zs.size term
+
 /-- XOR a list of machine words as the word-level analogue of `xorBoolList`. -/
 private def xorWordList : List UInt64 → UInt64
   | [] => 0
