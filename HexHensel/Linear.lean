@@ -1545,7 +1545,20 @@ theorem henselLift_spec
           1 p) :
     let r := henselLift p k f g h s t
     ZPoly.congr (r.g * r.h) f (p ^ k) := by
-  sorry
+  cases k with
+  | zero =>
+      omega
+  | succ k' =>
+      let start : LinearLiftResult :=
+        { g := ZPoly.reduceModPow g p 1
+          h := ZPoly.reduceModPow h p 1 }
+      have hloop :
+          LinearLiftLoopInvariant p (1 + k') f s t
+            (henselLiftLoop p k' 1 f s t start) := by
+        simpa [start] using
+          henselLiftLoop_invariant p k' 1 f s t start hp (by omega) (by simpa [start] using hstart)
+            hstepDegree hstepBezout
+      simpa [henselLift, start, Nat.add_comm] using hloop.1
 
 /-- The iterative linear wrapper preserves monicity of the lifted `g` factor. -/
 theorem henselLift_monic
@@ -1571,7 +1584,20 @@ theorem henselLift_monic
           (FpPoly.liftToZ (s * ZPoly.modP p next.g + t * ZPoly.modP p next.h))
           1 p) :
     DensePoly.Monic (henselLift p k f g h s t).g := by
-  sorry
+  cases k with
+  | zero =>
+      omega
+  | succ k' =>
+      let start : LinearLiftResult :=
+        { g := ZPoly.reduceModPow g p 1
+          h := ZPoly.reduceModPow h p 1 }
+      have hloop :
+          LinearLiftLoopInvariant p (1 + k') f s t
+            (henselLiftLoop p k' 1 f s t start) := by
+        simpa [start] using
+          henselLiftLoop_invariant p k' 1 f s t start hp (by omega) (by simpa [start] using hstart)
+            hstepDegree hstepBezout
+      simpa [henselLift, start] using hloop.2.2
 
 end ZPoly
 end Hex
