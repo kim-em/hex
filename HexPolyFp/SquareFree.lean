@@ -298,6 +298,52 @@ private theorem coeffTerm_coeff (g : FpPoly p) (i n : Nat) :
       simp [hni, hsub]
       exact hzero
 
+private theorem powLinear_coeffTerm_coeff (g : FpPoly p) (i k n : Nat) :
+    (powLinear (coeffTerm g i) k).coeff n =
+      if n = k * i then (g.coeff i) ^ k else 0 := by
+  induction k generalizing n with
+  | zero =>
+      simp [powLinear]
+      change (DensePoly.C (1 : ZMod64 p)).coeff n =
+        if n = 0 then (g.coeff i) ^ 0 else 0
+      rw [DensePoly.coeff_C]
+      by_cases hn : n = 0
+      · simp [hn, Lean.Grind.Semiring.pow_zero (g.coeff i)]
+      · simp [hn]
+        change (0 : ZMod64 p) = (0 : ZMod64 p)
+        rfl
+  | succ k ih =>
+      rw [powLinear]
+      change (powLinear (coeffTerm g i) k *
+          DensePoly.shift i (DensePoly.scale (g.coeff i) (1 : FpPoly p))).coeff n =
+        if n = (k + 1) * i then (g.coeff i) ^ (k + 1) else 0
+      rw [coeff_mul_shift_scale_one]
+      by_cases hin : i ≤ n
+      · rw [if_pos hin, ih]
+        by_cases hprev : n - i = k * i
+        · have hn : n = (k + 1) * i := by
+            calc
+              n = n - i + i := (Nat.sub_add_cancel hin).symm
+              _ = k * i + i := by rw [hprev]
+              _ = (k + 1) * i := by rw [Nat.succ_mul]
+          rw [if_pos hprev, if_pos hn]
+          exact (Lean.Grind.Semiring.pow_succ (g.coeff i) k).symm
+        · have hn : n ≠ (k + 1) * i := by
+            intro hn
+            apply hprev
+            calc
+              n - i = (k + 1) * i - i := by rw [hn]
+              _ = k * i := by rw [Nat.succ_mul]; omega
+          rw [if_neg hprev, if_neg hn]
+          grind
+      · have hn : n ≠ (k + 1) * i := by
+          intro hn
+          have hki : i ≤ (k + 1) * i := by
+            rw [Nat.succ_mul]
+            omega
+          omega
+        rw [if_neg hin, if_neg hn]
+
 /-- Coefficient projection for the bounded finite coefficient fold. -/
 private theorem coeffFold_coeff (g : FpPoly p) (m n : Nat) :
     (coeffFold g m).coeff n = if n < m then g.coeff n else 0 := by
