@@ -83,6 +83,24 @@ private theorem clmul_xor_left_fst_bit (x y z : UInt64) (i : Nat) :
   rw [clmul_xor_left]
   exact UInt64.bit_xor_bne (clmul x z).1 (clmul y z).1 i
 
+private theorem clmul_xor_right_snd_bit (x y z : UInt64) (i : Nat) :
+    ((((clmul x (y ^^^ z)).2 >>> i.toUInt64) &&& 1) != 0) =
+      (((((clmul x y).2 >>> i.toUInt64) &&& 1) != 0) !=
+        ((((clmul x z).2 >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [clmul_comm x (y ^^^ z)]
+  rw [clmul_xor_left]
+  rw [clmul_comm y x, clmul_comm z x]
+  exact UInt64.bit_xor_bne (clmul x y).2 (clmul x z).2 i
+
+private theorem clmul_xor_right_fst_bit (x y z : UInt64) (i : Nat) :
+    ((((clmul x (y ^^^ z)).1 >>> i.toUInt64) &&& 1) != 0) =
+      (((((clmul x y).1 >>> i.toUInt64) &&& 1) != 0) !=
+        ((((clmul x z).1 >>> i.toUInt64) &&& 1) != 0)) := by
+  rw [clmul_comm x (y ^^^ z)]
+  rw [clmul_xor_left]
+  rw [clmul_comm y x, clmul_comm z x]
+  exact UInt64.bit_xor_bne (clmul x y).1 (clmul x z).1 i
+
 private theorem coeffWords_xorClmulAt_low (acc : Array UInt64) {idx n : Nat}
     (x y : UInt64) (hidx : idx < acc.size) (hn : n / 64 = idx) :
     coeffWords (xorClmulAt acc idx x y) n =
@@ -3037,6 +3055,27 @@ private theorem clmulCoeffAt_xor_left
       rw [clmul_xor_left_fst_bit]
     · simp [hLow, hHigh]
 
+private theorem clmulCoeffAt_zero_right (idx : Nat) (x : UInt64) (n : Nat) :
+    clmulCoeffAt idx x 0 n = false := by
+  unfold clmulCoeffAt
+  rw [clmul_zero_right]
+  by_cases hLow : n / 64 = idx
+  · simp [hLow]
+  · by_cases hHigh : n / 64 = idx + 1 <;> simp [hLow, hHigh]
+
+private theorem clmulCoeffAt_xor_right
+    (idx : Nat) (x y z : UInt64) (n : Nat) :
+    clmulCoeffAt idx x (y ^^^ z) n =
+      (clmulCoeffAt idx x y n != clmulCoeffAt idx x z n) := by
+  unfold clmulCoeffAt
+  by_cases hLow : n / 64 = idx
+  · simp [hLow]
+    rw [clmul_xor_right_snd_bit]
+  · by_cases hHigh : n / 64 = idx + 1
+    · simp [hHigh]
+      rw [clmul_xor_right_fst_bit]
+    · simp [hLow, hHigh]
+
 private theorem clmulCoeffAt_xorWordList_left
     (words : List UInt64) (idx : Nat) (z : UInt64) (n : Nat) :
     clmulCoeffAt idx (xorWordList words) z n =
@@ -3050,6 +3089,21 @@ private theorem clmulCoeffAt_xorWordList_left
       change (clmulCoeffAt idx word z n != clmulCoeffAt idx (xorWordList words) z n) =
         xorBoolList (clmulCoeffAt idx word z n ::
           words.map (fun word => clmulCoeffAt idx word z n))
+      rw [xorBoolList_cons, ih]
+
+private theorem clmulCoeffAt_xorWordList_right
+    (words : List UInt64) (idx : Nat) (x : UInt64) (n : Nat) :
+    clmulCoeffAt idx x (xorWordList words) n =
+      xorBoolList (words.map (fun word => clmulCoeffAt idx x word n)) := by
+  induction words with
+  | nil =>
+      change clmulCoeffAt idx x 0 n = false
+      exact clmulCoeffAt_zero_right idx x n
+  | cons word words ih =>
+      rw [xorWordList, clmulCoeffAt_xor_right]
+      change (clmulCoeffAt idx x word n != clmulCoeffAt idx x (xorWordList words) n) =
+        xorBoolList (clmulCoeffAt idx x word n ::
+          words.map (fun word => clmulCoeffAt idx x word n))
       rw [xorBoolList_cons, ih]
 
 private theorem coeffWords_xorClmulAt_contrib
@@ -3213,6 +3267,20 @@ private theorem clmulCoeffAt_mulWords_left_contrib
           (List.range xs.size)).map
           (fun word => clmulCoeffAt idx word z n)) := by
   rw [mulWords_getElem!_contrib, clmulCoeffAt_xorWordList_left]
+
+/-- Expand a later `clmul` coefficient whose right input is an intermediate raw
+product word into source word-pair contributions. -/
+private theorem clmulCoeffAt_mulWords_right_contrib
+    (ys zs : Array UInt64) (slot idx : Nat) (x : UInt64) (n : Nat) :
+    clmulCoeffAt idx x (mulWords ys zs)[slot]! n =
+      xorBoolList
+        ((List.flatMap
+          (fun j =>
+            (List.range zs.size).map
+              (fun k => clmulWordAt (j + k) ys[j]! zs[k]! slot))
+          (List.range ys.size)).map
+          (fun word => clmulCoeffAt idx x word n)) := by
+  rw [mulWords_getElem!_contrib, clmulCoeffAt_xorWordList_right]
 
 private theorem clmulCoeffAt_comm (i j : Nat) (x y : UInt64) (n : Nat) :
     clmulCoeffAt (i + j) x y n = clmulCoeffAt (j + i) y x n := by
