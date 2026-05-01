@@ -1408,6 +1408,47 @@ private theorem yunFactorsContribution_tail_repeated_descent
   · simp [yunFactorsContribution, hc, hz]
   · simp [yunFactorsContribution, hc, hz]
 
+private theorem yunFactorsContribution_step_preserves_target
+    (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p)
+    (hc : isOne c = false)
+    (htarget_one :
+      isOne (c / DensePoly.gcd c w) = true →
+        (yunFactorsContribution
+          (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+          (multiplicity + 1) fuel).1 = target)
+    (htarget_factor :
+      isOne (c / DensePoly.gcd c w) = false →
+        pow (c / DensePoly.gcd c w) multiplicity *
+          (yunFactorsContribution
+            (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+            (multiplicity + 1) fuel).1 = target) :
+    let tail :=
+      yunFactorsContribution
+        (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+        (multiplicity + 1) fuel
+    let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
+    contribution.1 = target ∧
+      contribution.2 = tail.2 ∧
+        (c / DensePoly.gcd c w) * DensePoly.gcd c w = c ∧
+          (w / DensePoly.gcd c w) * DensePoly.gcd c w = w := by
+  dsimp
+  have hsplit := yunFactorsContribution_step_split c w
+  by_cases hz : isOne (c / DensePoly.gcd c w) = true
+  · have hstep :=
+      yunFactorsContribution_step_of_not_isOne_of_isOne_z
+        c w multiplicity fuel hc hz
+    rw [hstep]
+    exact ⟨htarget_one hz, rfl, hsplit.1, hsplit.2⟩
+  · have hz_false : isOne (c / DensePoly.gcd c w) = false := by
+      cases h : isOne (c / DensePoly.gcd c w)
+      · rfl
+      · exact False.elim (hz h)
+    have hstep :=
+      yunFactorsContribution_step_of_not_isOne_of_not_isOne_z
+        c w multiplicity fuel hc hz_false
+    rw [hstep]
+    exact ⟨htarget_factor hz_false, rfl, hsplit.1, hsplit.2⟩
+
 private theorem yunFactorsContribution_initial_state_product_invariant
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (_hfuel : f.size < fuel + 1)
