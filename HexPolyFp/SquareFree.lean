@@ -1102,7 +1102,28 @@ private def squareFreeFactorCoprimeRel :
     SquareFreeFactor p → SquareFreeFactor p → Prop :=
   fun a b => DensePoly.gcd a.factor b.factor = 1
 
-private theorem squareFreeAuxRev_pairwise_coprime_of_acc
+private theorem pairwise_append_of_cross
+    {α : Type} (r : α → α → Prop) {xs ys : List α} :
+    xs.Pairwise r →
+    ys.Pairwise r →
+    (∀ x ∈ xs, ∀ y ∈ ys, r x y) →
+    (xs ++ ys).Pairwise r := by
+  induction xs with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      intro hxs hys hcross
+      simp only [List.pairwise_cons] at hxs ⊢
+      constructor
+      · intro z hz
+        rcases List.mem_append.mp hz with hmem | hmem
+        · exact hxs.1 z hmem
+        · exact hcross x (by simp) z hmem
+      · apply ih hxs.2 hys
+        intro a ha b hb
+        exact hcross a (by simp [ha]) b hb
+
+private theorem squareFreeAuxRev_pairwise_coprime_core
     (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
     accRev.reverse.Pairwise squareFreeFactorCoprimeRel →
     (∀ a ∈ accRev.reverse,
@@ -1111,6 +1132,16 @@ private theorem squareFreeAuxRev_pairwise_coprime_of_acc
     (squareFreeAuxRev f multiplicity fuel accRev).reverse.Pairwise
       squareFreeFactorCoprimeRel := by
   sorry
+
+private theorem squareFreeAuxRev_pairwise_coprime_of_acc
+    (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
+    accRev.reverse.Pairwise squareFreeFactorCoprimeRel →
+    (∀ a ∈ accRev.reverse,
+      ∀ b ∈ (squareFreeAuxRev f multiplicity fuel []).reverse,
+        squareFreeFactorCoprimeRel a b) →
+    (squareFreeAuxRev f multiplicity fuel accRev).reverse.Pairwise
+      squareFreeFactorCoprimeRel := by
+  exact squareFreeAuxRev_pairwise_coprime_core f multiplicity fuel accRev
 
 private theorem squareFreeAuxRev_pairwise_coprime_nil
     (f : FpPoly p) (multiplicity fuel : Nat) :
