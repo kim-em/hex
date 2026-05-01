@@ -687,7 +687,13 @@ private theorem normalizeMonic_zero_squareFree_weightedProduct
         (squareFreeAux (normalizeMonic f).2 1 ((normalizeMonic f).2.size + 1)) =
         f := by
   rw [squareFreeAux_zero_weightedProduct (normalizeMonic f).2 hzero]
-  sorry
+  have hmonic_zero : (normalizeMonic f).2 = 0 :=
+    eq_zero_of_isZero_true (normalizeMonic f).2 hzero
+  have hreconstruct := normalizeMonic_reconstruct hp f
+  rw [hmonic_zero] at hreconstruct
+  simp at hreconstruct
+  rw [← hreconstruct]
+  rfl
 
 theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
