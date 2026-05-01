@@ -996,6 +996,158 @@ private theorem derivative_zero_coeff_non_pmultiple
     · exact False.elim (zmod64_natCast_ne_zero_of_mod_ne_zero n hn hnzero)
     · exact hcoeff
 
+private theorem size_pos_of_isZero_false
+    (f : FpPoly p) (hzero : f.isZero = false) :
+    0 < f.size := by
+  simpa [DensePoly.isZero, DensePoly.size, Array.isEmpty_iff_size_eq_zero,
+    Nat.pos_iff_ne_zero] using hzero
+
+private theorem size_eq_zero_of_isZero_true
+    (f : FpPoly p) (hzero : f.isZero = true) :
+    f.size = 0 := by
+  simpa [DensePoly.isZero, DensePoly.size, Array.isEmpty_iff_size_eq_zero] using hzero
+
+private theorem pthRoot_one
+    (hp : Hex.Nat.Prime p) :
+    pthRoot (1 : FpPoly p) = 1 := by
+  apply DensePoly.ext_coeff
+  intro i
+  rw [pthRoot_coeff]
+  cases i with
+  | zero =>
+      simp
+  | succ i =>
+      have hp_pos : 0 < p := by
+        have htwo : 2 ≤ p := Hex.Nat.Prime.two_le hp
+        omega
+      have hne : (i + 1) * p ≠ 0 := by
+        exact Nat.mul_ne_zero (Nat.succ_ne_zero i) (Nat.ne_of_gt hp_pos)
+      change (DensePoly.C (1 : ZMod64 p)).coeff ((i + 1) * p) =
+        (DensePoly.C (1 : ZMod64 p)).coeff (i + 1)
+      rw [DensePoly.coeff_C, DensePoly.coeff_C]
+      simp [hne]
+
+private theorem pow_one_base (n : Nat) :
+    pow (1 : FpPoly p) n = 1 := by
+  rw [pow_eq_powLinear]
+  induction n with
+  | zero =>
+      rfl
+  | succ n ih =>
+      rw [powLinear, ih]
+      exact mul_one (1 : FpPoly p)
+
+private theorem squareFreeAuxRevContribution_one
+    (hp : Hex.Nat.Prime p) (multiplicity fuel : Nat) :
+    squareFreeAuxRevContribution (1 : FpPoly p) multiplicity fuel = 1 := by
+  induction fuel generalizing multiplicity with
+  | zero =>
+      rfl
+  | succ fuel ih =>
+      simp only [squareFreeAuxRevContribution]
+      have hone_ne : (1 : FpPoly p).isZero = false := by
+        have hcoeffs :
+            (1 : FpPoly p).coeffs = #[(1 : ZMod64 p)] :=
+          DensePoly.coeffs_C_of_ne_zero (zmod64_one_ne_zero_of_prime hp)
+        simp [DensePoly.isZero, hcoeffs]
+      have hdf_one : (DensePoly.derivative (1 : FpPoly p)).isZero = true := by
+        have hcoeffs :
+            (1 : FpPoly p).coeffs = #[(1 : ZMod64 p)] :=
+          DensePoly.coeffs_C_of_ne_zero (zmod64_one_ne_zero_of_prime hp)
+        have hsize : (1 : FpPoly p).size = 1 := by
+          simpa [DensePoly.size] using congrArg Array.size hcoeffs
+        unfold DensePoly.derivative
+        simp [hsize, DensePoly.isZero, DensePoly.ofCoeffs, DensePoly.trimTrailingZeros]
+        rfl
+      simp [hone_ne]
+      rw [hdf_one]
+      rw [pthRoot_one hp]
+      exact ih (multiplicity * p)
+
+private theorem squareFreeAuxRevContribution_pthRoot_constant_correct
+    (hp : Hex.Nat.Prime p) (multiplicity fuel : Nat) :
+    squareFreeAuxRevContribution (pthRoot (1 : FpPoly p)) multiplicity fuel =
+      pow (pthRoot (1 : FpPoly p)) multiplicity := by
+  rw [pthRoot_one hp, squareFreeAuxRevContribution_one hp, pow_one_base]
+
+private theorem derivative_zero_top_degree_mod_eq_zero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true) :
+    (f.size - 1) % p = 0 := by
+  by_cases hmod : (f.size - 1) % p = 0
+  · exact hmod
+  ·
+    have hpos : 0 < f.size := size_pos_of_isZero_false f hzero
+    have hcoeff_zero :=
+      derivative_zero_coeff_non_pmultiple hp f (f.size - 1) hdf hmod
+    have hcoeff_ne := DensePoly.coeff_last_ne_zero_of_pos_size f hpos
+    exact False.elim (hcoeff_ne hcoeff_zero)
+
+private theorem pthRoot_nonzero_of_derivative_zero_nonconstant
+    (hp : Hex.Nat.Prime p) (f : FpPoly p)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true)
+    (hsize : 1 < f.size) :
+    (pthRoot f).isZero = false := by
+  by_cases hroot_false : (pthRoot f).isZero = false
+  · exact hroot_false
+  ·
+    have hroot_true : (pthRoot f).isZero = true := by
+      cases h : (pthRoot f).isZero <;> simp [h] at hroot_false ⊢
+    have hroot_size : (pthRoot f).size = 0 :=
+      size_eq_zero_of_isZero_true (pthRoot f) hroot_true
+    let i := (f.size - 1) / p
+    have hcoeff_root_zero :
+        (pthRoot f).coeff i = 0 := by
+      exact DensePoly.coeff_eq_zero_of_size_le (pthRoot f) (by
+        rw [hroot_size]
+        exact Nat.zero_le i)
+    have hcoeff_f_zero : f.coeff (f.size - 1) = 0 := by
+      have hmod := derivative_zero_top_degree_mod_eq_zero hp f hzero hdf
+      have hmul : i * p = f.size - 1 := by
+        have h := Nat.mod_add_div (f.size - 1) p
+        rw [hmod, Nat.zero_add] at h
+        simpa [i, Nat.mul_comm] using h
+      rw [pthRoot_coeff] at hcoeff_root_zero
+      simpa [hmul] using hcoeff_root_zero
+    have hpos : 0 < f.size := by omega
+    exact False.elim (DensePoly.coeff_last_ne_zero_of_pos_size f hpos hcoeff_f_zero)
+
+private theorem pthRoot_fuel_decrease_of_derivative_zero_nonconstant
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) {fuel : Nat}
+    (hfuel : f.size < fuel + 1)
+    (hsize : 1 < f.size) :
+    (pthRoot f).size < fuel := by
+  by_cases hlt : (pthRoot f).size < fuel
+  · exact hlt
+  ·
+    have hf_le : f.size ≤ fuel := by omega
+    have hfuel_pos : 0 < fuel := by omega
+    let i := (pthRoot f).size - 1
+    have hi_lt : i < (pthRoot f).size := by omega
+    have hroot_coeff_ne :
+        (pthRoot f).coeff i ≠ 0 :=
+      DensePoly.coeff_last_ne_zero_of_pos_size (pthRoot f) (by omega)
+    have hroot_coeff_zero :
+        (pthRoot f).coeff i = 0 := by
+      rw [pthRoot_coeff]
+      exact DensePoly.coeff_eq_zero_of_size_le f (by
+        have hp_two : 2 ≤ p := Hex.Nat.Prime.two_le hp
+        have hige : fuel - 1 ≤ i := by omega
+        have hi : i * p ≥ fuel := by
+          dsimp [i]
+          have hfuel_ge_two : 2 ≤ fuel := by omega
+          calc
+            fuel = (fuel - 1) + 1 := by omega
+            _ ≤ (fuel - 1) + (fuel - 1) := by omega
+            _ = 2 * (fuel - 1) := by omega
+            _ ≤ p * i := by
+              exact Nat.mul_le_mul hp_two hige
+            _ = i * p := Nat.mul_comm p i
+        omega)
+    exact False.elim (hroot_coeff_ne hroot_coeff_zero)
+
 private theorem pthRoot_frobenius_of_derivative_zero
     (hp : Hex.Nat.Prime p) (f : FpPoly p)
     (_hzero : f.isZero = false)
@@ -1049,6 +1201,50 @@ private theorem squareFreeAuxRevContribution_derivative_zero_correct
 private def squareFreeContributionReachable (f : FpPoly p) : Prop :=
   f.size = 1 → f = 1
 
+private theorem pthRoot_reachable_of_derivative_zero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true)
+    (hreachable : squareFreeContributionReachable f) :
+    squareFreeContributionReachable (pthRoot f) := by
+  intro hroot_size
+  have hf_size_one : f.size = 1 := by
+    by_cases hf : f.size = 1
+    · exact hf
+    ·
+      have hf_gt : 1 < f.size := by
+        have hpos := size_pos_of_isZero_false f hzero
+        omega
+      have htop_mod := derivative_zero_top_degree_mod_eq_zero hp f hzero hdf
+      let i := (f.size - 1) / p
+      have hi_pos : 0 < i := by
+        have hdiv : i * p = f.size - 1 := by
+          have h := Nat.mod_add_div (f.size - 1) p
+          rw [htop_mod, Nat.zero_add] at h
+          simpa [i, Nat.mul_comm] using h
+        by_cases hi : i = 0
+        · rw [hi] at hdiv
+          simp at hdiv
+          omega
+        · exact Nat.pos_of_ne_zero hi
+      have hi_ge : 1 ≤ i := Nat.succ_le_of_lt hi_pos
+      have hroot_zero :
+          (pthRoot f).coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le (pthRoot f) (by
+          rw [hroot_size]
+          exact hi_ge)
+      have hf_zero : f.coeff (f.size - 1) = 0 := by
+        have hmul : i * p = f.size - 1 := by
+          have h := Nat.mod_add_div (f.size - 1) p
+          rw [htop_mod, Nat.zero_add] at h
+          simpa [i, Nat.mul_comm] using h
+        rw [pthRoot_coeff] at hroot_zero
+        simpa [hmul] using hroot_zero
+      exact False.elim (DensePoly.coeff_last_ne_zero_of_pos_size f (by omega) hf_zero)
+  have hf_one : f = 1 := hreachable hf_size_one
+  rw [hf_one]
+  exact pthRoot_one hp
+
 private theorem yunFactorsContribution_reconstruct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
@@ -1086,14 +1282,25 @@ private theorem squareFreeAuxRevContribution_correct_pow_of_nonzero
                   have htwo : 2 ≤ p := Hex.Nat.Prime.two_le hp
                   omega
                 exact Nat.mul_pos hmultiplicity hp_pos
-              have hroot_fuel : (pthRoot f).size < fuel := by
-                sorry
-              have hroot_zero : (pthRoot f).isZero = false := by
-                sorry
-              have hroot_reachable : squareFreeContributionReachable (pthRoot f) := by
-                sorry
-              exact ih (pthRoot f) (multiplicity * p)
-                hmultiplicity_root hroot_fuel hroot_zero hroot_reachable)
+              by_cases hconstant : f.size = 1
+              · have hf_one : f = 1 := hreachable hconstant
+                subst f
+                exact squareFreeAuxRevContribution_pthRoot_constant_correct
+                  hp (multiplicity * p) fuel
+              · have hnonconstant : 1 < f.size := by
+                  have hpos := size_pos_of_isZero_false f hzero
+                  omega
+                have hroot_fuel : (pthRoot f).size < fuel :=
+                  pthRoot_fuel_decrease_of_derivative_zero_nonconstant
+                    hp f hfuel hnonconstant
+                have hroot_zero : (pthRoot f).isZero = false :=
+                  pthRoot_nonzero_of_derivative_zero_nonconstant
+                    hp f hzero hdf hnonconstant
+                have hroot_reachable : squareFreeContributionReachable (pthRoot f) :=
+                  pthRoot_reachable_of_derivative_zero
+                    hp f hzero hdf hreachable
+                exact ih (pthRoot f) (multiplicity * p)
+                  hmultiplicity_root hroot_fuel hroot_zero hroot_reachable)
       · have hdf_false : (DensePoly.derivative f).isZero = false := by
           cases h : (DensePoly.derivative f).isZero <;> simp [h] at hdf ⊢
         simp [hdf_false]
