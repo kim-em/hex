@@ -2856,6 +2856,63 @@ private theorem xorBoolList_map_xorBoolList {α : Type}
       simp only [List.map_cons, List.flatMap_cons]
       rw [xorBoolList_cons, xorBoolList_append, ih]
 
+private theorem xorBoolList_flatMap_ranges_swap_list
+    (m n : Nat) (term : Nat → Nat → List Bool) :
+    xorBoolList
+        (List.flatMap
+          (fun i => (List.range n).flatMap (fun j => term i j))
+          (List.range m)) =
+      xorBoolList
+        (List.flatMap
+          (fun j => (List.range m).flatMap (fun i => term i j))
+          (List.range n)) := by
+  calc
+    xorBoolList
+        (List.flatMap
+          (fun i => (List.range n).flatMap (fun j => term i j))
+          (List.range m))
+        = xorBoolList
+            ((List.range m).map
+              (fun i => xorBoolList
+                ((List.range n).flatMap (fun j => term i j)))) := by
+            rw [xorBoolList_map_xorBoolList]
+    _ = xorBoolList
+            ((List.range m).map
+              (fun i => xorBoolList
+                ((List.range n).map (fun j => xorBoolList (term i j))))) := by
+            congr 1
+            apply List.map_congr_left
+            intro i _hi
+            rw [xorBoolList_map_xorBoolList]
+    _ = xorBoolList
+            (List.flatMap
+              (fun i => (List.range n).map (fun j => xorBoolList (term i j)))
+              (List.range m)) := by
+            rw [xorBoolList_map_xorBoolList]
+    _ = xorBoolList
+            (List.flatMap
+              (fun j => (List.range m).map (fun i => xorBoolList (term i j)))
+              (List.range n)) := by
+            exact xorBoolList_wordPairs_swap m n (fun i j => xorBoolList (term i j))
+    _ = xorBoolList
+            ((List.range n).map
+              (fun j => xorBoolList
+                ((List.range m).map (fun i => xorBoolList (term i j))))) := by
+            rw [xorBoolList_map_xorBoolList]
+    _ = xorBoolList
+            ((List.range n).map
+              (fun j => xorBoolList
+                ((List.range m).flatMap (fun i => term i j)))) := by
+            congr 1
+            apply List.map_congr_left
+            intro j _hj
+            rw [xorBoolList_map_xorBoolList]
+    _ = xorBoolList
+        (List.flatMap
+          (fun j => (List.range m).flatMap (fun i => term i j))
+          (List.range n)) := by
+            rw [xorBoolList_map_xorBoolList]
+
 /-- Reindex a triple XOR from the left-associated word-pair grouping
 `(i,j),k` to the right-associated grouping `i,(j,k)`, keeping the outer
 source word `i` fixed and swapping the two inner finite ranges. -/
@@ -3393,7 +3450,144 @@ private theorem leftAssocSourceTripleContribs_by_fixed
                   (List.range zs.size))
               (List.range ys.size))
           (List.range xs.size)) := by
-  sorry
+  unfold leftAssocSourceTripleContribs leftAssocFixedTripleContribs
+  simp only [List.map_flatMap, List.map_map]
+  calc
+    xorBoolList
+        (List.flatMap
+          (fun slot =>
+            List.flatMap
+              (fun k =>
+                List.flatMap
+                  (fun i =>
+                    (List.range ys.size).map
+                      (fun j =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range xs.size))
+              (List.range zs.size))
+          (List.range (mulWords xs ys).size))
+        =
+      xorBoolList
+        (List.flatMap
+          (fun k =>
+            List.flatMap
+              (fun slot =>
+                List.flatMap
+                  (fun i =>
+                    (List.range ys.size).map
+                      (fun j =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range xs.size))
+              (List.range (mulWords xs ys).size))
+          (List.range zs.size)) := by
+          exact xorBoolList_flatMap_ranges_swap_list
+            (mulWords xs ys).size zs.size
+            (fun slot k =>
+              List.flatMap
+                (fun i =>
+                  (List.range ys.size).map
+                    (fun j =>
+                      clmulCoeffAt (slot + k)
+                        (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                (List.range xs.size))
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun k =>
+            List.flatMap
+              (fun i =>
+                List.flatMap
+                  (fun slot =>
+                    (List.range ys.size).map
+                      (fun j =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range (mulWords xs ys).size))
+              (List.range xs.size))
+          (List.range zs.size)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro k _hk
+          exact xorBoolList_flatMap_ranges_swap_list
+            (mulWords xs ys).size xs.size
+            (fun slot i =>
+              (List.range ys.size).map
+                (fun j =>
+                  clmulCoeffAt (slot + k)
+                    (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun k =>
+            List.flatMap
+              (fun i =>
+                List.flatMap
+                  (fun j =>
+                    (List.range (mulWords xs ys).size).map
+                      (fun slot =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range ys.size))
+              (List.range xs.size))
+          (List.range zs.size)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro k _hk
+          apply xorBoolList_flatMap_congr_xor
+          intro i _hi
+          simpa [List.flatMap_singleton] using
+            xorBoolList_flatMap_ranges_swap_list
+              (mulWords xs ys).size ys.size
+              (fun slot j =>
+                [clmulCoeffAt (slot + k)
+                  (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n])
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun k =>
+                List.flatMap
+                  (fun j =>
+                    (List.range (mulWords xs ys).size).map
+                      (fun slot =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range ys.size))
+              (List.range zs.size))
+          (List.range xs.size)) := by
+          exact xorBoolList_flatMap_ranges_swap_list zs.size xs.size
+            (fun k i =>
+              List.flatMap
+                (fun j =>
+                  (List.range (mulWords xs ys).size).map
+                    (fun slot =>
+                      clmulCoeffAt (slot + k)
+                        (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                (List.range ys.size))
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun i =>
+            List.flatMap
+              (fun j =>
+                List.flatMap
+                  (fun k =>
+                    (List.range (mulWords xs ys).size).map
+                      (fun slot =>
+                        clmulCoeffAt (slot + k)
+                          (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
+                  (List.range zs.size))
+              (List.range ys.size))
+          (List.range xs.size)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro i _hi
+          exact xorBoolList_flatMap_ranges_swap_list zs.size ys.size
+            (fun k j =>
+              (List.range (mulWords xs ys).size).map
+                (fun slot =>
+                  clmulCoeffAt (slot + k)
+                    (clmulWordAt (i + j) xs[i]! ys[j]! slot) zs[k]! n))
 
 /-- Regroup the right-associated source expansion by fixed source triples rather
 than by intermediate product slot first. -/
@@ -3412,7 +3606,61 @@ private theorem rightAssocSourceTripleContribs_by_fixed
                   (List.range zs.size))
               (List.range ys.size))
           (List.range xs.size)) := by
-  sorry
+  unfold rightAssocSourceTripleContribs rightAssocFixedTripleContribs
+  simp only [List.map_flatMap, List.map_map]
+  apply xorBoolList_flatMap_congr_xor
+  intro i _hi
+  calc
+    xorBoolList
+        (List.flatMap
+          (fun slot =>
+            List.flatMap
+              (fun j =>
+                (List.range zs.size).map
+                  (fun k =>
+                    clmulCoeffAt (i + slot) xs[i]!
+                      (clmulWordAt (j + k) ys[j]! zs[k]! slot) n))
+              (List.range ys.size))
+          (List.range (mulWords ys zs).size))
+        =
+      xorBoolList
+        (List.flatMap
+          (fun j =>
+            List.flatMap
+              (fun slot =>
+                (List.range zs.size).map
+                  (fun k =>
+                    clmulCoeffAt (i + slot) xs[i]!
+                      (clmulWordAt (j + k) ys[j]! zs[k]! slot) n))
+              (List.range (mulWords ys zs).size))
+          (List.range ys.size)) := by
+          exact xorBoolList_flatMap_ranges_swap_list
+            (mulWords ys zs).size ys.size
+            (fun slot j =>
+              (List.range zs.size).map
+                (fun k =>
+                  clmulCoeffAt (i + slot) xs[i]!
+                    (clmulWordAt (j + k) ys[j]! zs[k]! slot) n))
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun j =>
+            List.flatMap
+              (fun k =>
+                (List.range (mulWords ys zs).size).map
+                  (fun slot =>
+                    clmulCoeffAt (i + slot) xs[i]!
+                      (clmulWordAt (j + k) ys[j]! zs[k]! slot) n))
+              (List.range zs.size))
+          (List.range ys.size)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro j _hj
+          simpa [List.flatMap_singleton] using
+            xorBoolList_flatMap_ranges_swap_list
+              (mulWords ys zs).size zs.size
+              (fun slot k =>
+                [clmulCoeffAt (i + slot) xs[i]!
+                  (clmulWordAt (j + k) ys[j]! zs[k]! slot) n])
 
 private theorem leftAssocSourceTripleContribs_slot
     (xs ys zs : Array UInt64) (slot n : Nat) :
