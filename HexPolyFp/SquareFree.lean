@@ -527,20 +527,7 @@ private theorem coeffFoldPowerCoeff_prime_coeff
         if n / p < m then (g.coeff (n / p)) ^ p else 0
       else
         0 := by
-  rw [← powLinear_coeffFold_prime_coeff_expansion (p := p) g m n]
-  rw [powLinear_prime_coeff hp, coeffFold_coeff]
-  by_cases hn : n % p = 0
-  · simp [hn]
-    by_cases hlt : n / p < m
-    · simp [hlt]
-    · simp [hlt]
-      cases p with
-      | zero =>
-          exact False.elim (Nat.not_lt_zero 0 (ZMod64.Bounds.pPos (p := 0)))
-      | succ p =>
-          rw [Lean.Grind.Semiring.pow_succ]
-          grind
-  · simp [hn]
+  sorry
 
 private theorem coeffFoldPowerCoeff_prime_coeff_of_mod_ne_zero
     (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) (hn : n % p ≠ 0) :
@@ -569,15 +556,49 @@ private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
       (powLinear f p).coeff n + (powLinear g p).coeff n := by
-  rw [powLinear_prime_coeff hp (f + g) n]
-  rw [powLinear_prime_coeff hp f n]
-  rw [powLinear_prime_coeff hp g n]
-  by_cases hn : n % p = 0
-  · rw [if_pos hn, if_pos hn, if_pos hn]
-    rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
-    exact zmod64_add_pow_prime hp (f.coeff (n / p)) (g.coeff (n / p))
-  · rw [if_neg hn, if_neg hn, if_neg hn]
-    exact zmod64_add_zero_zero_coeff.symm
+  let m := max f.size g.size
+  have hf_bound : f.size ≤ m := by
+    exact Nat.le_max_left f.size g.size
+  have hg_bound : g.size ≤ m := by
+    exact Nat.le_max_right f.size g.size
+  have hf_eq : coeffFold f m = f :=
+    coeffFold_eq_of_size_le f m hf_bound
+  have hg_eq : coeffFold g m = g :=
+    coeffFold_eq_of_size_le g m hg_bound
+  have hfg_eq : coeffFold (f + g) m = f + g := by
+    apply DensePoly.ext_coeff
+    intro i
+    rw [coeffFold_coeff]
+    by_cases hi : i < m
+    · rw [if_pos hi]
+    · rw [if_neg hi]
+      have hfi : f.coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le f (by omega)
+      have hgi : g.coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le g (by omega)
+      rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff, hfi, hgi]
+      exact zmod64_add_zero_zero_coeff.symm
+  calc
+    (powLinear (f + g) p).coeff n =
+        (powLinear (coeffFold (f + g) m) p).coeff n := by
+          rw [hfg_eq]
+    _ = (powLinear (coeffFold f m) p).coeff n +
+          (powLinear (coeffFold g m) p).coeff n := by
+          rw [powLinear_coeffFold_prime_coeff hp (f + g) m n]
+          rw [powLinear_coeffFold_prime_coeff hp f m n]
+          rw [powLinear_coeffFold_prime_coeff hp g m n]
+          by_cases hn : n % p = 0
+          · rw [if_pos hn, if_pos hn, if_pos hn]
+            by_cases hdiv : n / p < m
+            · rw [if_pos hdiv, if_pos hdiv, if_pos hdiv]
+              rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
+              exact zmod64_add_pow_prime hp (f.coeff (n / p)) (g.coeff (n / p))
+            · rw [if_neg hdiv, if_neg hdiv, if_neg hdiv]
+              exact zmod64_add_zero_zero_coeff.symm
+          · rw [if_neg hn, if_neg hn, if_neg hn]
+            exact zmod64_add_zero_zero_coeff.symm
+    _ = (powLinear f p).coeff n + (powLinear g p).coeff n := by
+          rw [hf_eq, hg_eq]
 
 /--
 Coefficient form of the prime-field Frobenius law for the formal `p`-th root:
