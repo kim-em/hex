@@ -1324,6 +1324,17 @@ private theorem yunFactorsContribution_stop_of_isOne
     yunFactorsContribution c w i (fuel + 1) = (1, w) := by
   simp [yunFactorsContribution, hc]
 
+private theorem yunFactorsContribution_terminal_of_isOne
+    (c w : FpPoly p) (i fuel : Nat)
+    (hc : isOne c = true) :
+    let contribution := yunFactorsContribution c w i (fuel + 1)
+    contribution.1 = 1 ∧ contribution.2 = w ∧ c = 1 := by
+  have hstop := yunFactorsContribution_stop_of_isOne c w i fuel hc
+  have hc_one := eq_one_of_isOne_true c hc
+  dsimp
+  rw [hstop]
+  exact ⟨rfl, rfl, hc_one⟩
+
 private theorem yunFactorsContribution_step_of_not_isOne_of_isOne_z
     (c w : FpPoly p) (i fuel : Nat)
     (hc : isOne c = false)
@@ -1344,6 +1355,19 @@ private theorem yunFactorsContribution_step_of_not_isOne_of_not_isOne_z
         (yunFactorsContribution
           (DensePoly.gcd c w) (w / DensePoly.gcd c w) (i + 1) fuel).2) := by
   simp [yunFactorsContribution, hc, hz]
+
+private theorem yunFactorsContribution_tail_repeated_descent
+    (c w : FpPoly p) (multiplicity fuel : Nat)
+    (hc : isOne c = false) :
+    let y := DensePoly.gcd c w
+    let tail := yunFactorsContribution y (w / y) (multiplicity + 1) fuel
+    let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
+    contribution.2 = tail.2 ∧
+      squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
+        squareFreeAuxRevContribution (pthRoot tail.2) (multiplicity * p) fuel := by
+  by_cases hz : isOne (c / DensePoly.gcd c w)
+  · simp [yunFactorsContribution, hc, hz]
+  · simp [yunFactorsContribution, hc, hz]
 
 private theorem yunFactorsContribution_reconstruct_core
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
