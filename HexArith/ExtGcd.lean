@@ -35,13 +35,57 @@ decreasing_by
   simp_wf
   simpa [natDivMod] using (Nat.mod_lt a (Nat.pos_iff_ne_zero.2 hb))
 
+private theorem int_ofNat_mod_add_div (a b : Nat) :
+    ((a % b : Nat) : Int) + ((a / b : Nat) : Int) * (b : Int) = (a : Int) := by
+  have h := Nat.mod_add_div a b
+  rw [Nat.mul_comm] at h
+  exact_mod_cast h
+
+private theorem extGcd_bezout_step
+    (a b q r : Nat) (s t g : Int)
+    (hqr : ((r : Nat) : Int) + ((q : Nat) : Int) * (b : Int) = (a : Int))
+    (hrec : s * (b : Int) + t * (r : Int) = g) :
+    t * (a : Int) + (s - t * (q : Int)) * (b : Int) = g := by
+  rw [← hqr]
+  calc
+    t * (((r : Nat) : Int) + ((q : Nat) : Int) * (b : Int)) +
+        (s - t * (q : Int)) * (b : Int)
+        = s * (b : Int) + t * (r : Int) := by
+          simp only [Int.mul_add, Int.sub_mul, Int.mul_assoc]
+          omega
+    _ = g := hrec
+
 theorem extGcd_fst (a b : Nat) : (extGcd a b).1 = Nat.gcd a b := by
-  sorry
+  induction b using Nat.strongRecOn generalizing a with
+  | ind b ih =>
+      rw [extGcd]
+      by_cases hb : b = 0
+      · simp [hb]
+      · simp only [hb, ↓reduceDIte, natDivMod]
+        have hrec :
+            (extGcd b (a % b)).1 = Nat.gcd b (a % b) :=
+          ih (a % b) (Nat.mod_lt a (Nat.pos_iff_ne_zero.2 hb)) b
+        have hgcd : Nat.gcd b (a % b) = Nat.gcd a b := by
+          rw [Nat.gcd_comm a b, Nat.gcd_rec b a, Nat.gcd_comm (a % b) b]
+        exact hrec.trans hgcd
 
 theorem extGcd_bezout (a b : Nat) :
     let (g, s, t) := extGcd a b
     s * a + t * b = g := by
-  sorry
+  induction b using Nat.strongRecOn generalizing a with
+  | ind b ih =>
+      rw [extGcd]
+      by_cases hb : b = 0
+      · simp [hb]
+      · simp only [hb, ↓reduceDIte, natDivMod]
+        have hrec :
+            let (g, s, t) := extGcd b (a % b)
+            s * (b : Int) + t * ((a % b : Nat) : Int) = g :=
+          ih (a % b) (Nat.mod_lt a (Nat.pos_iff_ne_zero.2 hb)) b
+        rcases hstep : extGcd b (a % b) with ⟨g, s, t⟩
+        simp [hstep] at hrec
+        exact extGcd_bezout_step a b (a / b) (a % b) s t g
+          (int_ofNat_mod_add_div a b) hrec
 
 end HexArith
 
