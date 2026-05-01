@@ -134,7 +134,7 @@ libraries:
   HexGfqMathlib:
     deps: [HexGfq, HexGF2Mathlib]
     mathlib: true
-    done_through: 2
+    done_through: 3
   HexBerlekampZassenhausMathlib:
     deps: [HexBerlekampZassenhaus, HexPolyZMathlib]
     mathlib: true
