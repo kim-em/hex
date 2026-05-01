@@ -23,9 +23,45 @@ open Polynomial
 variable {p : Nat} [Hex.ZMod64.Bounds p]
 
 /-- Interpret an executable `FpPoly p` as a Mathlib polynomial over `ZMod p`. -/
-def toMathlibPolynomial (f : Hex.FpPoly p) : Polynomial (ZMod p) :=
+def fpPolyToPolynomial (f : Hex.FpPoly p) : Polynomial (ZMod p) :=
   Finset.sum (Finset.range f.size) fun i =>
     Polynomial.monomial i (HexModArithMathlib.ZMod64.toZMod (f.coeff i))
+
+/-- Rebuild an executable `FpPoly p` from a Mathlib polynomial over `ZMod p`. -/
+def polynomialToFpPoly (f : Polynomial (ZMod p)) : Hex.FpPoly p :=
+  Hex.DensePoly.ofCoeffs <|
+    ((List.range (f.natDegree + 1)).map fun i =>
+      HexModArithMathlib.ZMod64.equiv.symm (f.coeff i)).toArray
+
+/--
+The executable finite-field polynomial representation is ring-equivalent to
+Mathlib polynomials over `ZMod p`.
+-/
+def fpPolyEquiv : Hex.FpPoly p ≃+* Polynomial (ZMod p) where
+  toFun := fpPolyToPolynomial
+  invFun := polynomialToFpPoly
+  left_inv := by
+    sorry
+  right_inv := by
+    sorry
+  map_mul' := by
+    sorry
+  map_add' := by
+    sorry
+
+/-- Interpret an executable `FpPoly p` as a Mathlib polynomial over `ZMod p`. -/
+def toMathlibPolynomial (f : Hex.FpPoly p) : Polynomial (ZMod p) :=
+  fpPolyEquiv f
+
+@[simp]
+theorem fpPolyEquiv_apply (f : Hex.FpPoly p) :
+    fpPolyEquiv f = toMathlibPolynomial f := by
+  rfl
+
+@[simp]
+theorem fpPolyEquiv_symm_apply (f : Polynomial (ZMod p)) :
+    fpPolyEquiv.symm f = polynomialToFpPoly f := by
+  rfl
 
 @[simp]
 theorem coeff_toMathlibPolynomial (f : Hex.FpPoly p) (n : Nat) :
@@ -42,6 +78,15 @@ theorem hexPolyMathlib_coeff_bridge
     {R : Type u} [Semiring R] [DecidableEq R] (f : Hex.DensePoly R) (n : Nat) :
     (HexPolyMathlib.toPolynomial f).coeff n = f.coeff n := by
   simp
+
+/--
+The direct finite-field transport is the coefficientwise lift along
+`ZMod64.equiv`, matching the coefficient view supplied by the generic
+dense-polynomial bridge.
+-/
+theorem toMathlibPolynomial_coeff_bridge (f : Hex.FpPoly p) (n : Nat) :
+    (toMathlibPolynomial f).coeff n = HexModArithMathlib.ZMod64.equiv (f.coeff n) :=
+  coeff_toMathlibPolynomial_equiv f n
 
 /-- Monicity of executable finite-field polynomials transfers to Mathlib. -/
 theorem toMathlibPolynomial_monic (f : Hex.FpPoly p) :
@@ -163,10 +208,9 @@ end Rabin
 
 /-- Executable gcd transfers to Mathlib's gcd after coefficient transport. -/
 theorem toMathlibPolynomial_gcd
-    [Field (Hex.ZMod64 p)] [Fact (Nat.Prime p)]
-    (gcdMonoid : GCDMonoid (Polynomial (ZMod p))) (f g : Hex.FpPoly p) :
+    [Fact (Nat.Prime p)] (f g : Hex.FpPoly p) :
     toMathlibPolynomial (Hex.DensePoly.gcd f g) =
-      gcdMonoid.gcd (toMathlibPolynomial f) (toMathlibPolynomial g) := by
+      gcd (toMathlibPolynomial f) (toMathlibPolynomial g) := by
   sorry
 
 /--
@@ -175,8 +219,7 @@ Mathlib coprimality condition between the transported polynomial and its
 formal derivative.
 -/
 theorem toMathlibPolynomial_squareFree_coprime
-    [Field (Hex.ZMod64 p)] [Fact (Nat.Prime p)]
-    (f : Hex.FpPoly p)
+    [Fact (Nat.Prime p)] (f : Hex.FpPoly p)
     (hsquareFree : Hex.DensePoly.gcd f (Hex.DensePoly.derivative f) = 1) :
     IsCoprime (toMathlibPolynomial f) (Polynomial.derivative (toMathlibPolynomial f)) := by
   sorry
