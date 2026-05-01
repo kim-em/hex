@@ -219,6 +219,32 @@ private theorem pthRoot_coeff_of_lt
   rw [DensePoly.coeff_ofCoeffs]
   simp [Array.getD, hi]
 
+private theorem pthRoot_coeff (f : FpPoly p) (i : Nat) :
+    (pthRoot f).coeff i = f.coeff (i * p) := by
+  by_cases hi : i < (f.size + p - 1) / p
+  · exact pthRoot_coeff_of_lt f hi
+  · unfold pthRoot ofCoeffs
+    rw [DensePoly.coeff_ofCoeffs]
+    simp [Array.getD, hi]
+    exact (DensePoly.coeff_eq_zero_of_size_le f (by
+      have hp : 0 < p := ZMod64.Bounds.pPos (p := p)
+      have hle : (f.size + p - 1) / p ≤ i := Nat.le_of_not_gt hi
+      have hraw : f.size + p - 1 ≤ i * p + p - 1 :=
+        (Nat.div_le_iff_le_mul hp).mp hle
+      omega)).symm
+
+/--
+Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
+This is the dense-polynomial convolution fact needed by the formal
+`p`-th-root reconstruction: only exponent tuples with all mass on one
+input coefficient survive modulo `p`.
+-/
+private theorem powLinear_prime_coeff
+    (hp : Hex.Nat.Prime p) (g : FpPoly p) (n : Nat) :
+    (powLinear g p).coeff n =
+      if n % p = 0 then g.coeff (n / p) ^ p else 0 := by
+  sorry
+
 /--
 Coefficient form of the prime-field Frobenius law for the formal `p`-th root:
 the `p`th power restores coefficients in degrees divisible by `p` and has zero
@@ -228,7 +254,14 @@ private theorem pthRoot_pow_prime_coeff
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (n : Nat) :
     (pow (pthRoot f) p).coeff n =
       if n % p = 0 then f.coeff n else 0 := by
-  sorry
+  rw [pow_eq_powLinear, powLinear_prime_coeff hp]
+  by_cases hn : n % p = 0
+  · simp [hn]
+    have hmul : n / p * p = n := by
+      exact (Nat.div_mul_cancel (Nat.dvd_of_mod_eq_zero hn))
+    rw [pthRoot_coeff, hmul]
+    exact ZMod64.pow_prime hp (f.coeff n)
+  · simp [hn]
 
 private theorem scale_one_poly (c : ZMod64 p) :
     DensePoly.scale c (1 : FpPoly p) = DensePoly.C c := by
