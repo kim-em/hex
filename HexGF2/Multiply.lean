@@ -2688,6 +2688,13 @@ private theorem coeffWords_monomial_mulWords_source
     foldl_xorClmulAt_monomial_left_prefix_after_source xs
       (m := xs.size) (k := k) (source := source) (by omega) (by omega) hsource
 
+/-- Coefficients of the raw packed product are symmetric in the two input word
+arrays. This is the local bridge from word-level `clmul_comm` to polynomial
+multiplication commutativity. -/
+private theorem coeffWords_mulWords_comm (xs ys : Array UInt64) (n : Nat) :
+    coeffWords (mulWords xs ys) n = coeffWords (mulWords ys xs) n := by
+  sorry
+
 /-- Multiplication in `F_2[x]` via carry-less word products and XOR
 accumulation. -/
 def mul (p q : GF2Poly) : GF2Poly :=
@@ -2759,7 +2766,10 @@ theorem left_distrib (p r q : GF2Poly) :
 /-- Packed `GF(2)` polynomial multiplication is commutative. -/
 theorem mul_comm (p q : GF2Poly) :
     p * q = q * p := by
-  sorry
+  apply ext_coeff
+  intro n
+  rw [coeff_mul, coeff_mul]
+  exact coeffWords_mulWords_comm p.words q.words n
 
 /-- Right distributivity of packed `GF(2)` polynomial multiplication over
 addition. -/
