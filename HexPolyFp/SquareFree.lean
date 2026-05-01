@@ -569,7 +569,15 @@ private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
       (powLinear f p).coeff n + (powLinear g p).coeff n := by
-  sorry
+  rw [powLinear_prime_coeff hp (f + g) n]
+  rw [powLinear_prime_coeff hp f n]
+  rw [powLinear_prime_coeff hp g n]
+  by_cases hn : n % p = 0
+  · rw [if_pos hn, if_pos hn, if_pos hn]
+    rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
+    exact zmod64_add_pow_prime hp (f.coeff (n / p)) (g.coeff (n / p))
+  · rw [if_neg hn, if_neg hn, if_neg hn]
+    exact zmod64_add_zero_zero_coeff.symm
 
 /--
 Coefficient form of the prime-field Frobenius law for the formal `p`-th root:
