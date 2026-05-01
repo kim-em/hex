@@ -130,6 +130,12 @@ private def squareFreeAux (f : FpPoly p) (multiplicity : Nat)
     (fuel : Nat) : List (SquareFreeFactor p) :=
   (squareFreeAuxRev f multiplicity fuel []).reverse
 
+private theorem squareFreeAuxRev_pairwise_coprime
+    (f : FpPoly p) (multiplicity fuel : Nat) (accRev : List (SquareFreeFactor p)) :
+    (squareFreeAuxRev f multiplicity fuel accRev).reverse.Pairwise
+      (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
+  sorry
+
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
@@ -145,7 +151,8 @@ def squareFreeDecomposition (hp : Hex.Nat.Prime p) (f : FpPoly p) : SquareFreeDe
 theorem squareFree_pairwise_coprime (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     d.factors.Pairwise (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
-  sorry
+  unfold squareFreeDecomposition squareFreeAux
+  exact squareFreeAuxRev_pairwise_coprime (normalizeMonic f).2 1 ((normalizeMonic f).2.size + 1) []
 
 theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
