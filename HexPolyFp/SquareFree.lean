@@ -1457,19 +1457,19 @@ private theorem yunFactorsContribution_initial_state_split
   dsimp
   exact div_gcd_mul_reconstruct f (DensePoly.derivative f)
 
-private theorem yunFactorsContribution_derivative_active_split_algebra
+private theorem yunFactorsContribution_derivative_active_split_algebra_succ
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
-    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 2)
     (hzero : f.isZero = false)
     (hdf : (DensePoly.derivative f).isZero = false) :
     let g := DensePoly.gcd f (DensePoly.derivative f)
     let c := f / g
-    let contribution := yunFactorsContribution c g multiplicity fuel
+    let contribution := yunFactorsContribution c g multiplicity (fuel + 1)
     c * g = f ∧
       (isOne contribution.2 = true → contribution.1 = pow f multiplicity) ∧
         (isOne contribution.2 = false →
           contribution.1 *
-            squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
+            squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) (fuel + 1) =
               pow f multiplicity) := by
   have hterminal_surface :
       ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
@@ -1529,6 +1529,29 @@ private theorem yunFactorsContribution_derivative_active_split_algebra
     simpa [c, g] using yunFactorsContribution_initial_state_split f
   refine ⟨hcg, ?_⟩
   sorry
+
+private theorem yunFactorsContribution_derivative_active_split_algebra
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false) :
+    let g := DensePoly.gcd f (DensePoly.derivative f)
+    let c := f / g
+    let contribution := yunFactorsContribution c g multiplicity fuel
+    c * g = f ∧
+      (isOne contribution.2 = true → contribution.1 = pow f multiplicity) ∧
+        (isOne contribution.2 = false →
+          contribution.1 *
+            squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
+              pow f multiplicity) := by
+  cases fuel with
+  | zero =>
+      have hsize_pos : 0 < f.size := size_pos_of_isZero_false f hzero
+      omega
+  | succ fuel =>
+      exact
+        yunFactorsContribution_derivative_active_split_algebra_succ
+          hp f multiplicity fuel hmultiplicity hfuel hzero hdf
 
 private theorem yunFactorsContribution_initial_state_product_invariant
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
