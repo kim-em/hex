@@ -77,6 +77,9 @@ instance : DensePoly.DivModLaws (ZMod64 p) where
   mod_self_eq_zero := by
     intro f
     sorry
+  mod_eq_zero_of_dvd := by
+    intro f g hdiv
+    sorry
   mod_mod_of_not_pos_degree := by
     intro f g hdegree
     sorry

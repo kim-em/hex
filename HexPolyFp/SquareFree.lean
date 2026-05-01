@@ -1245,6 +1245,22 @@ private theorem pthRoot_reachable_of_derivative_zero
   rw [hf_one]
   exact pthRoot_one hp
 
+private theorem div_gcd_mul_reconstruct (f df : FpPoly p) :
+    (f / DensePoly.gcd f df) * DensePoly.gcd f df = f := by
+  have hspec := DensePoly.div_mul_add_mod f (DensePoly.gcd f df)
+  have hmod :
+      f % DensePoly.gcd f df = 0 :=
+    DensePoly.mod_eq_zero_of_dvd f (DensePoly.gcd f df)
+      (DensePoly.gcd_dvd_left f df)
+  rw [hmod] at hspec
+  rw [add_zero] at hspec
+  exact hspec
+
+private theorem gcd_mul_div_reconstruct (f df : FpPoly p) :
+    DensePoly.gcd f df * (f / DensePoly.gcd f df) = f := by
+  rw [mul_comm]
+  exact div_gcd_mul_reconstruct f df
+
 private theorem yunFactorsContribution_reconstruct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
