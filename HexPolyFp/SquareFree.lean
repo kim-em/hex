@@ -88,6 +88,28 @@ private theorem weightedProduct_cons
   rw [weightedProduct_foldl_eq_mul]
   exact congrArg (fun x => x * weightedProduct factors) (one_mul (pow sf.factor sf.multiplicity))
 
+private theorem weightedProduct_append
+    (left right : List (SquareFreeFactor p)) :
+    weightedProduct (left ++ right) = weightedProduct left * weightedProduct right := by
+  unfold weightedProduct
+  rw [List.foldl_append]
+  simpa [weightedProduct] using
+    weightedProduct_foldl_eq_mul
+      (p := p)
+      (left.foldl (fun acc sf => acc * pow sf.factor sf.multiplicity) 1)
+      right
+
+private theorem weightedProduct_singleton (sf : SquareFreeFactor p) :
+    weightedProduct [sf] = pow sf.factor sf.multiplicity := by
+  rw [weightedProduct_cons, weightedProduct_nil]
+  exact DensePoly.mul_one_right_poly (pow sf.factor sf.multiplicity)
+
+private theorem weightedProduct_reverse_cons
+    (sf : SquareFreeFactor p) (accRev : List (SquareFreeFactor p)) :
+    weightedProduct (sf :: accRev).reverse =
+      weightedProduct accRev.reverse * pow sf.factor sf.multiplicity := by
+  rw [List.reverse_cons, weightedProduct_append, weightedProduct_singleton]
+
 /--
 Extract the formal `p`-th root by keeping exactly the coefficients whose
 degrees are multiples of `p`.
@@ -273,6 +295,71 @@ private def yunFactors
           else
             { factor := z, multiplicity := i } :: accRev
         yunFactors y (w / y) (i + 1) fuel accRev'
+
+/--
+Specification payload for `yunFactors`: the first component is the product
+contributed by factors discovered from `(c, w, i, fuel)`, and the second is
+the repeated part that remains for the `p`-th-root descent.
+-/
+private def yunFactorsContribution
+    (c w : FpPoly p) (i : Nat) : Nat → FpPoly p × FpPoly p
+  | 0 => (1, w)
+  | fuel + 1 =>
+      if isOne c then
+        (1, w)
+      else
+        let y := DensePoly.gcd c w
+        let z := c / y
+        let tail := yunFactorsContribution y (w / y) (i + 1) fuel
+        let contribution :=
+          if isOne z then
+            tail.1
+          else
+            pow z i * tail.1
+        (contribution, tail.2)
+
+private theorem yunFactors_reconstruction_invariant
+    (c w : FpPoly p) (i fuel : Nat) (accRev : List (SquareFreeFactor p)) :
+    let loop := yunFactors c w i fuel accRev
+    let contribution := yunFactorsContribution c w i fuel
+    loop.2 = contribution.2 ∧
+      weightedProduct loop.1.reverse =
+        weightedProduct accRev.reverse * contribution.1 := by
+  induction fuel generalizing c w i accRev with
+  | zero =>
+      simp [yunFactors, yunFactorsContribution]
+  | succ fuel ih =>
+      simp only [yunFactors, yunFactorsContribution]
+      by_cases hc : isOne c
+      · simp [hc]
+      · simp [hc]
+        let y := DensePoly.gcd c w
+        let z := c / y
+        by_cases hz : isOne z
+        · simpa [y, z, hz] using ih y (w / y) (i + 1) accRev
+        · have htail := ih y (w / y) (i + 1) ({ factor := z, multiplicity := i } :: accRev)
+          constructor
+          · simpa [y, z, hz] using htail.1
+          · have hmul :
+                weightedProduct (yunFactors y (w / y) (i + 1) fuel
+                    ({ factor := z, multiplicity := i } :: accRev)).1.reverse =
+                  weightedProduct accRev.reverse *
+                    (pow z i * (yunFactorsContribution y (w / y) (i + 1) fuel).1) := by
+              calc
+                weightedProduct (yunFactors y (w / y) (i + 1) fuel
+                    ({ factor := z, multiplicity := i } :: accRev)).1.reverse
+                    = weightedProduct ({ factor := z, multiplicity := i } :: accRev).reverse *
+                        (yunFactorsContribution y (w / y) (i + 1) fuel).1 := by
+                          simpa [y, z] using htail.2
+                _ = (weightedProduct accRev.reverse * pow z i) *
+                        (yunFactorsContribution y (w / y) (i + 1) fuel).1 := by
+                          rw [weightedProduct_reverse_cons]
+                _ = weightedProduct accRev.reverse *
+                        (pow z i * (yunFactorsContribution y (w / y) (i + 1) fuel).1) := by
+                          exact DensePoly.mul_assoc_poly
+                            (weightedProduct accRev.reverse) (pow z i)
+                            (yunFactorsContribution y (w / y) (i + 1) fuel).1
+            simpa [y, z, hz] using hmul
 
 /--
 Tail-recursive square-free decomposition over `F_p[x]`, accumulating factors
