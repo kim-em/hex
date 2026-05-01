@@ -31,6 +31,129 @@ private def r2OfModulus (p : UInt64) : UInt64 :=
     let rModP := r2Loop p 64 1
     UInt64.ofNat ((rModP.toNat * rModP.toNat) % p.toNat)
 
+/--
+One `doubleMod` step doubles a canonical residue modulo `p`, using the
+branch condition to avoid word overflow.
+-/
+private theorem toNat_doubleMod (p acc : UInt64) (hacc : acc.toNat < p.toNat) :
+    (doubleMod p acc).toNat = (2 * acc.toNat) % p.toNat := by
+  have hp_pos : 0 < p.toNat := by omega
+  have hgap_toNat : (p - acc).toNat = p.toNat - acc.toNat :=
+    UInt64.toNat_sub_of_le p acc (by
+      rw [UInt64.le_iff_toNat_le]
+      exact Nat.le_of_lt hacc)
+  unfold doubleMod
+  by_cases hbranch : p - acc ≤ acc
+  · have hgap_le : p.toNat - acc.toNat ≤ acc.toNat := by
+      simpa [UInt64.le_iff_toNat_le, hgap_toNat] using hbranch
+    have hsub :
+        (acc - (p - acc)).toNat = acc.toNat - (p.toNat - acc.toNat) := by
+      simpa [hgap_toNat] using UInt64.toNat_sub_of_le acc (p - acc) hbranch
+    have htwo_ge : p.toNat ≤ 2 * acc.toNat := by omega
+    have htwo_lt : 2 * acc.toNat < 2 * p.toNat := by omega
+    have hsub_lt : 2 * acc.toNat - p.toNat < p.toNat := by omega
+    have hmod : (2 * acc.toNat) % p.toNat = 2 * acc.toNat - p.toNat := by
+      calc
+        (2 * acc.toNat) % p.toNat
+            = (2 * acc.toNat - p.toNat) % p.toNat :=
+              Nat.mod_eq_sub_mod htwo_ge
+        _ = 2 * acc.toNat - p.toNat := Nat.mod_eq_of_lt hsub_lt
+    simp [hbranch, hsub, hmod]
+    omega
+  · have hgap_gt : acc.toNat < p.toNat - acc.toNat := by
+      have hnot : ¬ (p - acc).toNat ≤ acc.toNat := by
+        intro hle
+        exact hbranch (by
+          rw [UInt64.le_iff_toNat_le]
+          exact hle)
+      omega
+    have htwo_lt_p : 2 * acc.toNat < p.toNat := by omega
+    have htwo_lt_word : 2 * acc.toNat < UInt64.word := by
+      have hp_lt : p.toNat < UInt64.word := by
+        simpa [UInt64.word, UInt64.size] using UInt64.toNat_lt_size p
+      omega
+    have hadd : (acc + acc).toNat = 2 * acc.toNat := by
+      rw [UInt64.toNat_add]
+      rw [Nat.mod_eq_of_lt]
+      · omega
+      · simpa [UInt64.word, Nat.two_mul] using htwo_lt_word
+    have hmod : (2 * acc.toNat) % p.toNat = 2 * acc.toNat :=
+      Nat.mod_eq_of_lt htwo_lt_p
+    simp [hbranch, hadd, hmod]
+
+/-- The `r2Loop` accumulator equals repeated doubling modulo `p`. -/
+private theorem toNat_r2Loop (p : UInt64) :
+    ∀ n acc, acc.toNat < p.toNat →
+      (r2Loop p n acc).toNat = (acc.toNat * 2 ^ n) % p.toNat := by
+  intro n
+  induction n with
+  | zero =>
+      intro acc hacc
+      simp [r2Loop, Nat.mod_eq_of_lt hacc]
+  | succ n ih =>
+      intro acc hacc
+      have hp_pos : 0 < p.toNat := by omega
+      have hstep_eq := toNat_doubleMod p acc hacc
+      have hstep_lt : (doubleMod p acc).toNat < p.toNat := by
+        rw [hstep_eq]
+        exact Nat.mod_lt _ hp_pos
+      calc
+        (r2Loop p (n + 1) acc).toNat
+            = (r2Loop p n (doubleMod p acc)).toNat := by
+              rfl
+        _ = ((doubleMod p acc).toNat * 2 ^ n) % p.toNat := ih _ hstep_lt
+        _ = (((2 * acc.toNat) % p.toNat) * 2 ^ n) % p.toNat := by
+              rw [hstep_eq]
+        _ = (acc.toNat * 2 ^ (n + 1)) % p.toNat := by
+              rw [Nat.mod_mul_mod]
+              congr 1
+              rw [Nat.pow_succ]
+              ac_rfl
+
+/-- The executable `r2OfModulus` computes `R^2 mod p` for positive moduli. -/
+private theorem toNat_r2OfModulus (p : UInt64) (hp_pos : 0 < p.toNat) :
+    (r2OfModulus p).toNat = (UInt64.word * UInt64.word) % p.toNat := by
+  have hp_lt_word : p.toNat < UInt64.word := by
+    simpa [UInt64.word, UInt64.size] using UInt64.toNat_lt_size p
+  by_cases hle_one : p ≤ 1
+  · have hp_le_one : p.toNat ≤ 1 := by
+      have hle_nat : p.toNat ≤ (1 : UInt64).toNat := by
+        simpa [UInt64.le_iff_toNat_le] using hle_one
+      simpa using hle_nat
+    have hp_eq_one : p.toNat = 1 := by omega
+    unfold r2OfModulus
+    simp [hle_one, hp_eq_one, Nat.mod_one]
+  · have hp_gt_one : 1 < p.toNat := by
+      have hnot_nat : ¬ p.toNat ≤ 1 := by
+        intro hle
+        exact hle_one (by
+          rw [UInt64.le_iff_toNat_le]
+          simpa using hle)
+      omega
+    have hloop :
+        (r2Loop p 64 1).toNat = UInt64.word % p.toNat := by
+      have hone_lt : (1 : UInt64).toNat < p.toNat := by
+        simpa using hp_gt_one
+      have h := toNat_r2Loop p 64 1 hone_lt
+      simpa [UInt64.word, Nat.pow_succ, Nat.mul_comm, Nat.mul_left_comm, Nat.mul_assoc]
+        using h
+    have hsquare_lt : ((r2Loop p 64 1).toNat * (r2Loop p 64 1).toNat) % p.toNat <
+        UInt64.word := by
+      exact Nat.lt_trans (Nat.mod_lt _ hp_pos) hp_lt_word
+    unfold r2OfModulus
+    simp [hle_one]
+    rw [Nat.mod_eq_of_lt]
+    · rw [hloop, Nat.mod_mul_mod]
+      calc
+        UInt64.word * (UInt64.word % p.toNat) % p.toNat
+            = (UInt64.word % p.toNat * ((UInt64.word % p.toNat) % p.toNat)) %
+                p.toNat := Nat.mul_mod UInt64.word (UInt64.word % p.toNat) p.toNat
+        _ = (UInt64.word % p.toNat * (UInt64.word % p.toNat)) % p.toNat := by
+              rw [Nat.mod_mod]
+        _ = UInt64.word * UInt64.word % p.toNat := by
+              simp
+    · simpa [UInt64.word] using hsquare_lt
+
 /-- Build the executable Montgomery context for an odd `UInt64` modulus. -/
 def mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p :=
   { p_odd := hp
@@ -43,7 +166,12 @@ def mk (p : UInt64) (hp : p % 2 = 1) : MontCtx p :=
       simpa [UInt64.word, Nat.mul_comm] using hspec
     r2 := r2OfModulus p
     r2_eq := by
-      sorry }
+      have hp_nat : p.toNat % 2 = 1 := by
+        have h := congrArg UInt64.toNat hp
+        simpa [UInt64.toNat_mod, UInt64.toNat_ofNat, UInt64.size] using h
+      have hp_pos : 0 < p.toNat := by
+        omega
+      exact toNat_r2OfModulus p hp_pos }
 
 /-- View the odd-modulus assumption as a Nat-level parity fact. -/
 theorem p_odd_nat (ctx : MontCtx p) : p.toNat % 2 = 1 := by
