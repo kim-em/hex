@@ -541,4 +541,191 @@ theorem clmul_oneHot_left_snd (a : UInt64) {bit : Nat} (hbit : bit < 64) :
   rw [clmul_oneHot_left a hbit]
   by_cases h : bit = 0 <;> simp [h]
 
+private def xorPair (x y : UInt64 × UInt64) : UInt64 × UInt64 :=
+  (x.1 ^^^ y.1, x.2 ^^^ y.2)
+
+private theorem xorPair_zero_left (x : UInt64 × UInt64) :
+    xorPair (0, 0) x = x := by
+  cases x
+  simp [xorPair]
+
+private theorem xorPair_zero_right (x : UInt64 × UInt64) :
+    xorPair x (0, 0) = x := by
+  cases x
+  simp [xorPair]
+
+private theorem xorPair_assoc (x y z : UInt64 × UInt64) :
+    xorPair (xorPair x y) z = xorPair x (xorPair y z) := by
+  cases x
+  cases y
+  cases z
+  simp [xorPair]
+  constructor <;> bv_decide
+
+private theorem clmul_zero_left (x : UInt64) : clmul 0 x = (0, 0) := by
+  rw [clmul, pureClmul_zero_left]
+
+private def wordBitXorStep (w acc : UInt64) (bit : Nat) : UInt64 :=
+  if (((w >>> bit.toUInt64) &&& 1) != 0) then
+    acc ^^^ ((1 : UInt64) <<< bit.toUInt64)
+  else
+    acc
+
+private def wordBitFold (w : UInt64) : UInt64 :=
+  (List.range 64).foldl (wordBitXorStep w) 0
+
+private theorem wordBitFold_eq (w : UInt64) : wordBitFold w = w := by
+  unfold wordBitFold wordBitXorStep
+  simp [List.range, List.range.loop, List.foldl]
+  bv_decide
+
+private def clmulLeftBitFoldStep (w y : UInt64) (acc : UInt64 × UInt64) (bit : Nat) :
+    UInt64 × UInt64 :=
+  if (((w >>> bit.toUInt64) &&& 1) != 0) then
+    xorPair acc (clmul ((1 : UInt64) <<< bit.toUInt64) y)
+  else
+    acc
+
+private def clmulRightBitFoldStep (w y : UInt64) (acc : UInt64 × UInt64) (bit : Nat) :
+    UInt64 × UInt64 :=
+  if (((w >>> bit.toUInt64) &&& 1) != 0) then
+    xorPair acc (clmul y ((1 : UInt64) <<< bit.toUInt64))
+  else
+    acc
+
+private theorem clmulLeftBitFoldStep_eq_right (w y : UInt64) {bit : Nat}
+    (hbit : bit < 64) (acc : UInt64 × UInt64) :
+    clmulLeftBitFoldStep w y acc bit = clmulRightBitFoldStep w y acc bit := by
+  by_cases hset : (((w >>> bit.toUInt64) &&& 1) != 0)
+  · simp [clmulLeftBitFoldStep, clmulRightBitFoldStep, hset]
+    rw [clmul_oneHot_left (a := y) hbit, clmul_oneHot (a := y) hbit]
+  · simp [clmulLeftBitFoldStep, clmulRightBitFoldStep, hset]
+
+private theorem foldl_clmulLeftBitFoldStep_eq_right (bits : List Nat) (w y : UInt64)
+    (hlt : ∀ bit ∈ bits, bit < 64) (acc : UInt64 × UInt64) :
+    bits.foldl (clmulLeftBitFoldStep w y) acc =
+      bits.foldl (clmulRightBitFoldStep w y) acc := by
+  induction bits generalizing acc with
+  | nil =>
+      simp
+  | cons bit bits ih =>
+      have hbit : bit < 64 := hlt bit (by simp)
+      have htail : ∀ bit ∈ bits, bit < 64 := by
+        intro bit hmem
+        exact hlt bit (by simp [hmem])
+      rw [List.foldl_cons, List.foldl_cons]
+      rw [clmulLeftBitFoldStep_eq_right w y hbit acc]
+      exact ih htail _
+
+private theorem foldl_clmulLeftBitFoldStep_acc (bits : List Nat) (w y : UInt64)
+    (acc : UInt64 × UInt64) :
+    bits.foldl (clmulLeftBitFoldStep w y) acc =
+      xorPair acc (bits.foldl (clmulLeftBitFoldStep w y) (0, 0)) := by
+  induction bits generalizing acc with
+  | nil =>
+      simp [xorPair]
+  | cons bit bits ih =>
+      simp only [List.foldl_cons]
+      by_cases hbit : (((w >>> bit.toUInt64) &&& 1) != 0)
+      · simp [clmulLeftBitFoldStep, hbit]
+        rw [ih (xorPair acc (clmul ((1 : UInt64) <<< bit.toUInt64) y))]
+        rw [ih (xorPair (0, 0) (clmul ((1 : UInt64) <<< bit.toUInt64) y))]
+        rw [xorPair_zero_left, xorPair_assoc]
+      · simp [clmulLeftBitFoldStep, hbit]
+        exact ih acc
+
+private theorem clmul_wordBitFold_left_eq_bits_acc (bits : List Nat) (w y seed : UInt64)
+    (hlt : ∀ bit ∈ bits, bit < 64) :
+    clmul (bits.foldl (wordBitXorStep w) seed) y =
+      xorPair (clmul seed y) (bits.foldl (clmulLeftBitFoldStep w y) (0, 0)) := by
+  induction bits generalizing seed with
+  | nil =>
+      simp [xorPair_zero_right]
+  | cons bit bits ih =>
+      have hbitLt : bit < 64 := hlt bit (by simp)
+      have htail : ∀ bit ∈ bits, bit < 64 := by
+        intro bit hmem
+        exact hlt bit (by simp [hmem])
+      simp only [List.foldl_cons]
+      by_cases hset : (((w >>> bit.toUInt64) &&& 1) != 0)
+      · simp [wordBitXorStep, clmulLeftBitFoldStep, hset]
+        rw [ih (seed ^^^ ((1 : UInt64) <<< bit.toUInt64)) htail]
+        rw [foldl_clmulLeftBitFoldStep_acc bits w y
+          (xorPair (0, 0) (clmul ((1 : UInt64) <<< bit.toUInt64) y))]
+        rw [clmul_xor_left]
+        rw [xorPair_zero_left]
+        simpa [xorPair] using
+          xorPair_assoc (clmul seed y) (clmul ((1 : UInt64) <<< bit.toUInt64) y)
+            (bits.foldl (clmulLeftBitFoldStep w y) (0, 0))
+      · simp [wordBitXorStep, clmulLeftBitFoldStep, hset]
+        exact ih seed htail
+
+private theorem clmul_wordBitFold_left_eq_bits (bits : List Nat) (w y : UInt64)
+    (hlt : ∀ bit ∈ bits, bit < 64) :
+    clmul (bits.foldl (wordBitXorStep w) 0) y =
+      bits.foldl (clmulLeftBitFoldStep w y) (0, 0) := by
+  rw [clmul_wordBitFold_left_eq_bits_acc bits w y 0 hlt, clmul_zero_left, xorPair_zero_left]
+
+private theorem clmulAccumulateBit_eq_xorPair_oneHot (acc : UInt64 × UInt64)
+    (y : UInt64) {bit : Nat} (hbit : bit < 64) :
+    clmulAccumulateBit acc y bit =
+      xorPair acc (clmul y ((1 : UInt64) <<< bit.toUInt64)) := by
+  rw [clmul_oneHot (a := y) hbit]
+  by_cases hzero : bit = 0 <;> simp [clmulAccumulateBit, xorPair, hzero]
+
+private def clmulPureRightStep (w y : UInt64) (acc : UInt64 × UInt64) (bit : Nat) :
+    UInt64 × UInt64 :=
+  if (((w >>> bit.toUInt64) &&& 1) != 0) then
+    clmulAccumulateBit acc y bit
+  else
+    acc
+
+private theorem foldl_pureClmul_eq_right_bits (bits : List Nat) (w y : UInt64)
+    (hlt : ∀ bit ∈ bits, bit < 64) (acc : UInt64 × UInt64) :
+    bits.foldl (clmulPureRightStep w y) acc =
+      bits.foldl (clmulRightBitFoldStep w y) acc := by
+  induction bits generalizing acc with
+  | nil =>
+      simp
+  | cons bit bits ih =>
+      have hbit : bit < 64 := hlt bit (by simp)
+      have htail : ∀ bit ∈ bits, bit < 64 := by
+        intro bit hmem
+        exact hlt bit (by simp [hmem])
+      rw [List.foldl_cons, List.foldl_cons]
+      by_cases hset : (((w >>> bit.toUInt64) &&& 1) != 0)
+      · simp [clmulPureRightStep, clmulRightBitFoldStep, hset]
+        rw [clmulAccumulateBit_eq_xorPair_oneHot acc y hbit]
+        exact ih htail _
+      · simp [clmulPureRightStep, clmulRightBitFoldStep, hset]
+        exact ih htail acc
+
+private theorem clmul_eq_right_bits (w y : UInt64) :
+    clmul y w =
+      (List.range 64).foldl (clmulRightBitFoldStep w y) (0, 0) := by
+  rw [clmul, pureClmul]
+  change (List.range 64).foldl (clmulPureRightStep w y) (0, 0) =
+    (List.range 64).foldl (clmulRightBitFoldStep w y) (0, 0)
+  exact foldl_pureClmul_eq_right_bits (List.range 64) w y (by
+    intro bit hmem
+    exact List.mem_range.mp hmem) (0, 0)
+
+/-- Carry-less word multiplication is commutative. This is the reusable
+word-level symmetry needed by packed polynomial multiplication proofs. -/
+theorem clmul_comm (x y : UInt64) :
+    clmul x y = clmul y x := by
+  calc
+    clmul x y = clmul (wordBitFold x) y := by rw [wordBitFold_eq]
+    _ = (List.range 64).foldl (clmulLeftBitFoldStep x y) (0, 0) := by
+      rw [wordBitFold]
+      rw [clmul_wordBitFold_left_eq_bits (List.range 64) x y (by
+        intro bit hmem
+        exact List.mem_range.mp hmem)]
+    _ = (List.range 64).foldl (clmulRightBitFoldStep x y) (0, 0) := by
+      rw [foldl_clmulLeftBitFoldStep_eq_right (List.range 64) x y (by
+        intro bit hmem
+        exact List.mem_range.mp hmem)]
+    _ = clmul y x := by
+      rw [← clmul_eq_right_bits x y]
+
 end Hex
