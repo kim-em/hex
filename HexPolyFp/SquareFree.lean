@@ -399,13 +399,36 @@ private theorem squareFreeAuxRevContribution_pthRoot_correct_pow
       pow (pthRoot f) (multiplicity * p) := by
   sorry
 
+private theorem derivative_zero_coeff_non_pmultiple
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (n : Nat)
+    (hdf : (DensePoly.derivative f).isZero = true) (hn : n % p ≠ 0) :
+    f.coeff n = 0 := by
+  sorry
+
+private theorem pthRoot_frobenius_of_derivative_zero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true) :
+    pow (pthRoot f) p = f := by
+  sorry
+
+private theorem pow_pow_mul
+    (f : FpPoly p) (m n : Nat) (_hm : 0 < m) :
+    pow (pow f n) m = pow f (m * n) := by
+  sorry
+
 private theorem pthRoot_pow_mul_prime_of_derivative_zero
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity : Nat)
     (hmultiplicity : 0 < multiplicity)
     (hzero : f.isZero = false)
     (hdf : (DensePoly.derivative f).isZero = true) :
     pow (pthRoot f) (multiplicity * p) = pow f multiplicity := by
-  sorry
+  calc
+    pow (pthRoot f) (multiplicity * p) =
+        pow (pow (pthRoot f) p) multiplicity := by
+          exact (pow_pow_mul (pthRoot f) multiplicity p hmultiplicity).symm
+    _ = pow f multiplicity := by
+          rw [pthRoot_frobenius_of_derivative_zero hp f hzero hdf]
 
 private theorem squareFreeAuxRevContribution_derivative_zero_correct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
