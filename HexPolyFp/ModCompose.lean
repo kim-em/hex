@@ -14,6 +14,7 @@ namespace FpPoly
 variable {p : Nat} [ZMod64.Bounds p]
 
 private theorem mod_horner_step_eq
+    [ZMod64.PrimeModulus p]
     (acc g modulus : FpPoly p) (c : ZMod64 p) :
     ((acc % modulus) * g + C c) % modulus = (acc * g + C c) % modulus := by
   rw [DensePoly.mod_add_mod ((acc % modulus) * g) (C c) modulus]
@@ -23,12 +24,14 @@ private theorem mod_horner_step_eq
   rw [DensePoly.mod_mod]
 
 private theorem modByMonic_horner_step_eq
+    [ZMod64.PrimeModulus p]
     (acc g modulus : FpPoly p) (c : ZMod64 p) (hmonic : DensePoly.Monic modulus) :
     modByMonic modulus (modByMonic modulus acc hmonic * g + C c) hmonic =
       modByMonic modulus (acc * g + C c) hmonic := by
   simp [modByMonic, DensePoly.modByMonic_eq_mod, mod_horner_step_eq]
 
 private theorem composeModMonic_fold_eq_mod
+    [ZMod64.PrimeModulus p]
     (coeffs : List (ZMod64 p)) (init g modulus : FpPoly p)
     (hmonic : DensePoly.Monic modulus) :
     coeffs.foldl
@@ -82,6 +85,7 @@ Executable modular composition agrees with ordinary dense-polynomial
 composition followed by one reduction modulo the monic modulus.
 -/
 theorem composeModMonic_eq_modByMonic_compose
+    [ZMod64.PrimeModulus p]
     (f g modulus : FpPoly p) (hmonic : DensePoly.Monic modulus) :
     composeModMonic f g modulus hmonic =
       modByMonic modulus (DensePoly.compose f g) hmonic := by
