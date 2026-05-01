@@ -1261,6 +1261,110 @@ private theorem gcd_mul_div_reconstruct (f df : FpPoly p) :
   rw [mul_comm]
   exact div_gcd_mul_reconstruct f df
 
+private theorem div_gcd_right_mul_reconstruct (c w : FpPoly p) :
+    (w / DensePoly.gcd c w) * DensePoly.gcd c w = w := by
+  have hspec := DensePoly.div_mul_add_mod w (DensePoly.gcd c w)
+  have hmod :
+      w % DensePoly.gcd c w = 0 :=
+    DensePoly.mod_eq_zero_of_dvd w (DensePoly.gcd c w)
+      (DensePoly.gcd_dvd_right c w)
+  rw [hmod] at hspec
+  rw [add_zero] at hspec
+  exact hspec
+
+private theorem gcd_mul_div_right_reconstruct (c w : FpPoly p) :
+    DensePoly.gcd c w * (w / DensePoly.gcd c w) = w := by
+  rw [mul_comm]
+  exact div_gcd_right_mul_reconstruct c w
+
+private theorem yunFactorsContribution_step_split
+    (c w : FpPoly p) :
+    let y := DensePoly.gcd c w
+    let z := c / y
+    z * y = c ∧ (w / y) * y = w := by
+  constructor
+  · exact div_gcd_mul_reconstruct c w
+  · exact div_gcd_right_mul_reconstruct c w
+
+private theorem yunFactorsContribution_stop_of_isOne
+    (c w : FpPoly p) (i fuel : Nat)
+    (hc : isOne c = true) :
+    yunFactorsContribution c w i (fuel + 1) = (1, w) := by
+  simp [yunFactorsContribution, hc]
+
+private theorem yunFactorsContribution_step_of_not_isOne_of_isOne_z
+    (c w : FpPoly p) (i fuel : Nat)
+    (hc : isOne c = false)
+    (hz : isOne (c / DensePoly.gcd c w) = true) :
+    yunFactorsContribution c w i (fuel + 1) =
+      yunFactorsContribution
+        (DensePoly.gcd c w) (w / DensePoly.gcd c w) (i + 1) fuel := by
+  simp [yunFactorsContribution, hc, hz]
+
+private theorem yunFactorsContribution_step_of_not_isOne_of_not_isOne_z
+    (c w : FpPoly p) (i fuel : Nat)
+    (hc : isOne c = false)
+    (hz : isOne (c / DensePoly.gcd c w) = false) :
+    yunFactorsContribution c w i (fuel + 1) =
+      (pow (c / DensePoly.gcd c w) i *
+          (yunFactorsContribution
+            (DensePoly.gcd c w) (w / DensePoly.gcd c w) (i + 1) fuel).1,
+        (yunFactorsContribution
+          (DensePoly.gcd c w) (w / DensePoly.gcd c w) (i + 1) fuel).2) := by
+  simp [yunFactorsContribution, hc, hz]
+
+private theorem yunFactorsContribution_reconstruct_core
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false) :
+    let g := DensePoly.gcd f (DensePoly.derivative f)
+    let c := f / g
+    let contribution := yunFactorsContribution c g multiplicity fuel
+    (isOne contribution.2 = true → contribution.1 = pow f multiplicity) ∧
+      (isOne contribution.2 = false →
+        contribution.1 *
+          squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
+            pow f multiplicity) := by
+  sorry
+
+private theorem yunFactorsContribution_reconstruct_done
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false)
+    (hrepeated :
+      isOne (yunFactorsContribution
+        (f / DensePoly.gcd f (DensePoly.derivative f))
+        (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2 = true) :
+    (yunFactorsContribution
+      (f / DensePoly.gcd f (DensePoly.derivative f))
+      (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).1 =
+        pow f multiplicity := by
+  exact (yunFactorsContribution_reconstruct_core
+    hp f multiplicity fuel hmultiplicity hfuel hzero hdf).1 hrepeated
+
+private theorem yunFactorsContribution_reconstruct_tail
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false)
+    (hrepeated :
+      isOne (yunFactorsContribution
+        (f / DensePoly.gcd f (DensePoly.derivative f))
+        (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2 = false) :
+    (yunFactorsContribution
+      (f / DensePoly.gcd f (DensePoly.derivative f))
+      (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).1 *
+        squareFreeAuxRevContribution
+          (pthRoot (yunFactorsContribution
+            (f / DensePoly.gcd f (DensePoly.derivative f))
+            (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2)
+          (multiplicity * p) fuel =
+          pow f multiplicity := by
+  exact (yunFactorsContribution_reconstruct_core
+    hp f multiplicity fuel hmultiplicity hfuel hzero hdf).2 hrepeated
+
 private theorem yunFactorsContribution_reconstruct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
@@ -1275,7 +1379,27 @@ private theorem yunFactorsContribution_reconstruct
       contribution.1 *
         squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel =
           pow f multiplicity := by
-  sorry
+  simp only
+  by_cases hrepeated :
+      isOne (yunFactorsContribution
+        (f / DensePoly.gcd f (DensePoly.derivative f))
+        (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2
+  · simpa [hrepeated] using
+      yunFactorsContribution_reconstruct_done
+        hp f multiplicity fuel hmultiplicity hfuel hzero hdf hrepeated
+  · have hrepeated_false :
+        isOne (yunFactorsContribution
+          (f / DensePoly.gcd f (DensePoly.derivative f))
+          (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2 = false := by
+      cases h :
+          isOne (yunFactorsContribution
+            (f / DensePoly.gcd f (DensePoly.derivative f))
+            (DensePoly.gcd f (DensePoly.derivative f)) multiplicity fuel).2
+      · rfl
+      · exact False.elim (hrepeated h)
+    simpa [hrepeated_false] using
+      yunFactorsContribution_reconstruct_tail
+        hp f multiplicity fuel hmultiplicity hfuel hzero hdf hrepeated_false
 
 private theorem squareFreeAuxRevContribution_correct_pow_of_nonzero
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
