@@ -212,6 +212,13 @@ private def pthRoot (f : FpPoly p) : FpPoly p :=
   ofCoeffs <|
     (List.range rootSize).map (fun i => f.coeff (i * p)) |>.toArray
 
+private theorem pthRoot_coeff_of_lt
+    (f : FpPoly p) {i : Nat} (hi : i < (f.size + p - 1) / p) :
+    (pthRoot f).coeff i = f.coeff (i * p) := by
+  unfold pthRoot ofCoeffs
+  rw [DensePoly.coeff_ofCoeffs]
+  simp [Array.getD, hi]
+
 private theorem scale_one_poly (c : ZMod64 p) :
     DensePoly.scale c (1 : FpPoly p) = DensePoly.C c := by
   apply DensePoly.ext_coeff
