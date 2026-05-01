@@ -2943,6 +2943,39 @@ private theorem coeffWords_mulWords_comm (xs ys : Array UInt64) (n : Nat) :
   intro i hi
   exact clmulCoeffAt_comm i j xs[i]! ys[j]! n
 
+private theorem coeffWords_mulWords_normalize_left
+    (xs ys : Array UInt64) (n : Nat) :
+    coeffWords (mulWords (normalizeWords xs) ys) n =
+      coeffWords (mulWords xs ys) n := by
+  rw [← coeffWords_mulWords_common_left (normalizeWords xs) ys n xs.size
+    (normalizeWords_size_le xs)]
+  rw [← coeffWords_mulWords_common_left xs ys n xs.size (Nat.le_refl xs.size)]
+  simp [normalizeWords_getElem!]
+
+private theorem coeffWords_mulWords_normalize_right
+    (xs ys : Array UInt64) (n : Nat) :
+    coeffWords (mulWords xs (normalizeWords ys)) n =
+      coeffWords (mulWords xs ys) n := by
+  rw [coeffWords_mulWords_comm xs (normalizeWords ys)]
+  rw [coeffWords_mulWords_normalize_left ys xs]
+  rw [coeffWords_mulWords_comm ys xs]
+
+private theorem coeffWords_mulWords_ofWords_left
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords (ofWords (mulWords xs ys)).words zs) n =
+      coeffWords (mulWords (mulWords xs ys) zs) n := by
+  change coeffWords (mulWords (normalizeWords (mulWords xs ys)) zs) n =
+    coeffWords (mulWords (mulWords xs ys) zs) n
+  exact coeffWords_mulWords_normalize_left (mulWords xs ys) zs n
+
+private theorem coeffWords_mulWords_ofWords_right
+    (xs ys zs : Array UInt64) (n : Nat) :
+    coeffWords (mulWords xs (ofWords (mulWords ys zs)).words) n =
+      coeffWords (mulWords xs (mulWords ys zs)) n := by
+  change coeffWords (mulWords xs (normalizeWords (mulWords ys zs))) n =
+    coeffWords (mulWords xs (mulWords ys zs)) n
+  exact coeffWords_mulWords_normalize_right xs (mulWords ys zs) n
+
 /-- Multiplication in `F_2[x]` via carry-less word products and XOR
 accumulation. -/
 def mul (p q : GF2Poly) : GF2Poly :=
