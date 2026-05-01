@@ -19,6 +19,7 @@ jobs:
           - HexGfq
           - HexPolyZ
           - HexMatrix
+          - HexModArithMathlib
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
