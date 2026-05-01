@@ -68,6 +68,125 @@ theorem hensel_degree
       (HexPolyMathlib.toPolynomial g).natDegree := by
   sorry
 
+/--
+Coefficientwise executable congruence modulo `m` transfers to equality after
+mapping the corresponding Mathlib polynomials to `ZMod m`.
+-/
+theorem zpoly_congr_toPolynomial_map_eq
+    (f g : Hex.ZPoly) (m : Nat)
+    (hcongr : Hex.ZPoly.congr f g m) :
+    let φ := Int.castRingHom (ZMod m)
+    (HexPolyMathlib.toPolynomial f).map φ =
+      (HexPolyMathlib.toPolynomial g).map φ := by
+  sorry
+
+/--
+Equality of Mathlib polynomial reductions modulo `m` gives the executable
+coefficientwise congruence used by `Hex.ZPoly`.
+-/
+theorem zpoly_congr_of_toPolynomial_map_eq
+    (f g : Hex.ZPoly) (m : Nat)
+    (hmap :
+      let φ := Int.castRingHom (ZMod m)
+      (HexPolyMathlib.toPolynomial f).map φ =
+        (HexPolyMathlib.toPolynomial g).map φ) :
+    Hex.ZPoly.congr f g m := by
+  sorry
+
+/-- The executable monic predicate transfers to Mathlib's polynomial monic predicate. -/
+theorem toPolynomial_monic_of_dense_monic
+    (f : Hex.ZPoly) (hmonic : Hex.DensePoly.Monic f) :
+    (HexPolyMathlib.toPolynomial f).Monic := by
+  sorry
+
+/--
+The quadratic executable step gives a Mathlib factorization modulo `m*m`.
+This is the Mathlib-facing form of `Hex.ZPoly.quadraticHenselStep_factor_spec`.
+-/
+theorem quadraticHenselStep_factor_correct
+    (m : Nat) (f g h s t : Hex.ZPoly)
+    (hm : 0 < m)
+    (hprod : Hex.ZPoly.congr (g * h) f m)
+    (hbez : Hex.ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : Hex.DensePoly.Monic g) :
+    let r := Hex.ZPoly.quadraticHenselStep m f g h s t
+    let φ := Int.castRingHom (ZMod (m * m))
+    (HexPolyMathlib.toPolynomial r.g).map φ *
+        (HexPolyMathlib.toPolynomial r.h).map φ =
+      (HexPolyMathlib.toPolynomial f).map φ := by
+  sorry
+
+/--
+The quadratic executable step updates Bezout witnesses modulo `m*m`.
+This is the Mathlib-facing form of `Hex.ZPoly.quadraticHenselStep_bezout_spec`.
+-/
+theorem quadraticHenselStep_bezout_correct
+    (m : Nat) (f g h s t : Hex.ZPoly)
+    (hm : 0 < m)
+    (hprod : Hex.ZPoly.congr (g * h) f m)
+    (hbez : Hex.ZPoly.congr (s * g + t * h) 1 m)
+    (hmonic : Hex.DensePoly.Monic g) :
+    let r := Hex.ZPoly.quadraticHenselStep m f g h s t
+    let φ := Int.castRingHom (ZMod (m * m))
+    (HexPolyMathlib.toPolynomial r.s).map φ *
+          (HexPolyMathlib.toPolynomial r.g).map φ +
+        (HexPolyMathlib.toPolynomial r.t).map φ *
+          (HexPolyMathlib.toPolynomial r.h).map φ =
+      (1 : Polynomial (ZMod (m * m))) := by
+  sorry
+
+/-- The quadratic step preserves monicity on the lifted `g` factor in Mathlib form. -/
+theorem quadraticHenselStep_monic
+    (m : Nat) (f g h s t : Hex.ZPoly)
+    (hm : 0 < m)
+    (hmonic : Hex.DensePoly.Monic g) :
+    let r := Hex.ZPoly.quadraticHenselStep m f g h s t
+    (HexPolyMathlib.toPolynomial r.g).Monic := by
+  sorry
+
+/--
+Quadratic lifting is compatible with the Mathlib uniqueness theorem at the
+doubled prime-power precision.
+-/
+theorem quadraticHenselStep_unique_mod_pow_two_mul
+    (f g h s t : Hex.ZPoly) (g' h' : Polynomial ℤ)
+    (p k : Nat) [Fact (Nat.Prime p)] [Hex.ZMod64.Bounds p]
+    (hk : 0 < k)
+    (hprod : Hex.ZPoly.congr (g * h) f (p ^ k))
+    (hbez : Hex.ZPoly.congr (s * g + t * h) 1 (p ^ k))
+    (hmonic : Hex.DensePoly.Monic g)
+    (hg' : g'.Monic)
+    (hdeg :
+      (HexPolyMathlib.toPolynomial
+        (Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t).g).natDegree =
+        g'.natDegree)
+    (hprod' :
+      let φ := Int.castRingHom (ZMod (p ^ (2 * k)))
+      (g'.map φ) * (h'.map φ) =
+        (HexPolyMathlib.toPolynomial f).map φ)
+    (hg1 :
+      let φ := Int.castRingHom (ZMod p)
+      (HexPolyMathlib.toPolynomial
+        (Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t).g).map φ =
+        g'.map φ)
+    (hh1 :
+      let φ := Int.castRingHom (ZMod p)
+      (HexPolyMathlib.toPolynomial
+        (Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t).h).map φ =
+        h'.map φ)
+    (hcop :
+      let φ := Int.castRingHom (ZMod p)
+      IsCoprime
+        ((HexPolyMathlib.toPolynomial
+          (Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t).g).map φ)
+        ((HexPolyMathlib.toPolynomial
+          (Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t).h).map φ)) :
+    let r := Hex.ZPoly.quadraticHenselStep (p ^ k) f g h s t
+    let φ := Int.castRingHom (ZMod (p ^ (2 * k)))
+    (HexPolyMathlib.toPolynomial r.g).map φ = g'.map φ ∧
+      (HexPolyMathlib.toPolynomial r.h).map φ = h'.map φ := by
+  sorry
+
 /-- Coprime monic factorizations with the same reduction modulo `p` are unique modulo `p^k`. -/
 theorem hensel_unique (f g h g' h' : Polynomial ℤ) (p : ℕ) (k : ℕ)
     [Fact (Nat.Prime p)] (hk : 0 < k)
