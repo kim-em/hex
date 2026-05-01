@@ -2828,6 +2828,135 @@ private def clmulWordAt (idx : Nat) (x y : UInt64) (slot : Nat) : UInt64 :=
   else
     0
 
+private theorem UInt64.xor_assoc (a b c : UInt64) :
+    (a ^^^ b) ^^^ c = a ^^^ (b ^^^ c) := by
+  apply UInt64.toNat_inj.mp
+  simp [UInt64.toNat_xor, Nat.xor_assoc]
+
+private theorem UInt64.xor_zero (a : UInt64) :
+    a ^^^ 0 = a := by
+  apply UInt64.toNat_inj.mp
+  simp
+
+private theorem UInt64.zero_xor (a : UInt64) :
+    0 ^^^ a = a := by
+  apply UInt64.toNat_inj.mp
+  simp
+
+private theorem Array.getElem!_setIfInBounds_ne {α : Type} [Inhabited α]
+    (xs : Array α) {i j : Nat} (v : α) (hne : i ≠ j) :
+    (xs.setIfInBounds i v)[j]! = xs[j]! := by
+  rw [Array.getElem!_eq_getD, Array.getElem!_eq_getD]
+  unfold Array.setIfInBounds
+  by_cases hi : i < xs.size
+  · simp [hi]
+    rw [Array.getElem?_set]
+    simp [hne]
+  · simp [hi]
+
+private theorem replicate_zero_getElem! (size slot : Nat) :
+    (Array.replicate size (0 : UInt64))[slot]! = 0 := by
+  rw [Array.getElem!_eq_getD]
+  by_cases hslot : slot < (Array.replicate size (0 : UInt64)).size
+  · have hslot' : slot < size := by
+      simpa using hslot
+    simp [Array.getD, hslot']
+  · have hslot' : size ≤ slot := by
+      simpa using Nat.le_of_not_gt hslot
+    simp [Array.getD, hslot']
+    rfl
+
+private theorem xorWordList_append (xs ys : List UInt64) :
+    xorWordList (xs ++ ys) = xorWordList xs ^^^ xorWordList ys := by
+  induction xs with
+  | nil =>
+      simp [xorWordList]
+  | cons x xs ih =>
+      simp only [List.cons_append, xorWordList]
+      rw [ih, UInt64.xor_assoc]
+
+private theorem xorClmulAt_getElem!_contrib
+    (acc : Array UInt64) {idx slot : Nat} (x y : UInt64)
+    (hidx : idx < acc.size) (hidxNext : idx + 1 < acc.size) :
+    (xorClmulAt acc idx x y)[slot]! =
+      acc[slot]! ^^^ clmulWordAt idx x y slot := by
+  unfold xorClmulAt clmulWordAt
+  by_cases hLow : slot = idx
+  · subst slot
+    simp [hidx]
+  · by_cases hHigh : slot = idx + 1
+    · subst slot
+      simp [hidx, hidxNext]
+    · have hLow' : idx ≠ slot := Ne.symm hLow
+      have hHigh' : idx + 1 ≠ slot := Ne.symm hHigh
+      rcases hprod : clmul x y with ⟨hi, lo⟩
+      simp [hidx, hidxNext, hLow, hHigh,
+        Array.getElem!_setIfInBounds_ne, hLow', hHigh']
+
+private theorem foldl_xorClmulAt_getElem!_contrib
+    (js : List Nat) (acc : Array UInt64) (idx : Nat) (x : UInt64)
+    (ys : Array UInt64) (slot : Nat)
+    (hbound : ∀ j ∈ js, idx + j + 1 < acc.size) :
+    (js.foldl (fun acc j => xorClmulAt acc (idx + j) x ys[j]!) acc)[slot]! =
+      (acc[slot]! ^^^
+        xorWordList (js.map (fun j => clmulWordAt (idx + j) x ys[j]! slot))) := by
+  induction js generalizing acc with
+  | nil =>
+      simp [xorWordList]
+  | cons j js ih =>
+      simp only [List.foldl_cons, List.map_cons]
+      have htail := ih (xorClmulAt acc (idx + j) x ys[j]!)
+        (by
+          intro j' hj'
+          have h := hbound j' (by simp [hj'])
+          simpa [xorClmulAt_size] using h)
+      rw [htail]
+      have hhead := xorClmulAt_getElem!_contrib acc (idx := idx + j)
+        (slot := slot) x ys[j]!
+        (by
+          have h := hbound j (by simp)
+          omega)
+        (hbound j (by simp))
+      rw [hhead, xorWordList, UInt64.xor_assoc]
+
+private theorem foldl_mulWords_getElem!_contrib
+    (is : List Nat) (acc : Array UInt64) (xs ys : Array UInt64) (slot : Nat)
+    (hbound : ∀ i ∈ is, ∀ j ∈ List.range ys.size, i + j + 1 < acc.size) :
+    (is.foldl
+      (fun acc i =>
+        let x := xs[i]!
+        (List.range ys.size).foldl
+          (fun acc j => xorClmulAt acc (i + j) x ys[j]!)
+          acc)
+      acc)[slot]! =
+      (acc[slot]! ^^^
+        xorWordList
+          (List.flatMap
+            (fun i =>
+              (List.range ys.size).map
+                (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
+            is)) := by
+  induction is generalizing acc with
+  | nil =>
+      simp [xorWordList]
+  | cons i is ih =>
+      simp only [List.foldl_cons, List.flatMap_cons]
+      have htail := ih
+        ((List.range ys.size).foldl
+          (fun acc j => xorClmulAt acc (i + j) xs[i]! ys[j]!) acc)
+        (by
+          intro i' hi' j hj
+          have h := hbound i' (by simp [hi']) j hj
+          simpa [foldl_xorClmulAt_size] using h)
+      rw [htail]
+      have hinner := foldl_xorClmulAt_getElem!_contrib
+        (List.range ys.size) acc i xs[i]! ys slot
+        (by
+          intro j hj
+          exact hbound i (by simp) j hj)
+      rw [hinner]
+      rw [xorWordList_append, UInt64.xor_assoc]
+
 private theorem clmulCoeffAt_zero_left (idx : Nat) (y : UInt64) (n : Nat) :
     clmulCoeffAt idx 0 y n = false := by
   unfold clmulCoeffAt
@@ -2985,7 +3114,32 @@ private theorem mulWords_getElem!_contrib
             (List.range ys.size).map
               (fun j => clmulWordAt (i + j) xs[i]! ys[j]! slot))
           (List.range xs.size)) := by
-  sorry
+  unfold mulWords
+  by_cases hxs : xs.isEmpty
+  · have hxsize : xs.size = 0 := by
+      simpa [Array.isEmpty] using hxs
+    simp [hxs, hxsize, xorWordList]
+    rfl
+  · by_cases hys : ys.isEmpty
+    · have hysize : ys.size = 0 := by
+        simpa [Array.isEmpty] using hys
+      have hflat :
+          List.flatMap (fun _ : Nat => ([] : List UInt64)) (List.range xs.size) = [] := by
+        generalize hlist : List.range xs.size = is
+        induction is with
+        | nil => rfl
+        | cons i is ih =>
+            simp [List.flatMap_cons]
+      simp [hxs, hys, hysize, xorWordList, hflat]
+      rfl
+    · simp [hxs, hys]
+      rw [foldl_mulWords_getElem!_contrib]
+      · rw [replicate_zero_getElem!, UInt64.zero_xor]
+      · intro i hi j hj
+        have hi' : i < xs.size := List.mem_range.mp hi
+        have hj' : j < ys.size := List.mem_range.mp hj
+        simp
+        omega
 
 /-- Expand a later `clmul` coefficient whose left input is an intermediate raw
 product word into source word-pair contributions. -/
