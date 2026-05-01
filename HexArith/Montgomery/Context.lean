@@ -485,14 +485,27 @@ theorem toNat_mulMont (ctx : MontCtx p) (a b : UInt64)
     (ha : a < p) (hb : b < p) :
     (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat =
       (a.toNat * b.toNat) % p.toNat := by
-  sorry
+  have hto_a_lt : ctx.toMont a < p := toMont_lt ctx a ha
+  have hto_b_lt : ctx.toMont b < p := toMont_lt ctx b hb
+  calc
+    (ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b))).toNat
+        = ((ctx.fromMont (ctx.toMont a)).toNat *
+            (ctx.fromMont (ctx.toMont b)).toNat) % p.toNat :=
+          mulMont_repr ctx (ctx.toMont a) (ctx.toMont b) hto_a_lt hto_b_lt
+    _ = (a.toNat * b.toNat) % p.toNat := by
+          rw [fromMont_toMont ctx a ha, fromMont_toMont ctx b hb]
 
 /-- User-facing equality form of Montgomery multiplication. -/
 theorem mulMont_eq (ctx : MontCtx p) (a b : UInt64)
     (ha : a < p) (hb : b < p) :
     ctx.fromMont (ctx.mulMont (ctx.toMont a) (ctx.toMont b)) =
       UInt64.ofNat ((a.toNat * b.toNat) % p.toNat) := by
-  sorry
+  apply UInt64.toNat_inj.mp
+  rw [toNat_mulMont ctx a b ha hb]
+  have hmod_lt_word : (a.toNat * b.toNat) % p.toNat < UInt64.size := by
+    exact Nat.lt_trans (Nat.mod_lt _ ctx.p_pos) (by
+      simpa [UInt64.word] using ctx.p_lt_R)
+  simp [Nat.mod_eq_of_lt hmod_lt_word]
 
 end MontCtx
 
