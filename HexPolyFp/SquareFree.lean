@@ -401,6 +401,15 @@ private theorem squareFreeAuxRev_pairwise_coprime
       (fun a b => DensePoly.gcd a.factor b.factor = 1) := by
   sorry
 
+private theorem squareFreeAuxRev_factors_squareFree
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (accRev : List (SquareFreeFactor p))
+    (hacc :
+      ∀ sf ∈ accRev.reverse, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1) :
+    ∀ sf ∈ (squareFreeAuxRev f multiplicity fuel accRev).reverse,
+      DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
+  sorry
+
 /--
 Compute a square-free decomposition by normalizing away the leading scalar and
 running Yun's algorithm on the resulting monic polynomial.
@@ -427,7 +436,10 @@ theorem squareFree_weightedProduct (hp : Hex.Nat.Prime p) (f : FpPoly p) :
 theorem squareFree_factors_squareFree (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     let d := squareFreeDecomposition hp f
     ∀ sf ∈ d.factors, DensePoly.gcd sf.factor (DensePoly.derivative sf.factor) = 1 := by
-  sorry
+  unfold squareFreeDecomposition squareFreeAux
+  apply squareFreeAuxRev_factors_squareFree hp
+  intro sf hsf
+  simp at hsf
 
 end FpPoly
 end Hex
