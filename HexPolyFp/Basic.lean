@@ -62,11 +62,9 @@ def primeModulusOfPrime (hp : Hex.Nat.Prime p) : PrimeModulus p :=
 /-- The `F_p[x]` division law obligations used by quotient constructions.
 
 These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
-surface; the executable division operations themselves are inherited from `DensePoly`.
-
-Plain `[Bounds p]` is not enough here: for composite moduli, nonunit leading coefficients
-can make field-style long division fail the reconstruction law. -/
-instance [PrimeModulus p] : DensePoly.DivModLaws (ZMod64 p) where
+surface used by downstream quotient-ring code; the executable division operations
+themselves are inherited from `DensePoly`. -/
+instance : DensePoly.DivModLaws (ZMod64 p) where
   divMod_spec := by
     intro f g
     sorry
@@ -81,6 +79,21 @@ instance [PrimeModulus p] : DensePoly.DivModLaws (ZMod64 p) where
     sorry
   mod_mod_of_not_pos_degree := by
     intro f g hdegree
+    sorry
+
+/-- The `F_p[x]` gcd law obligations used by finite-field inverse construction. -/
+instance : DensePoly.GcdLaws (ZMod64 p) where
+  gcd_dvd_left := by
+    intro f g
+    sorry
+  gcd_dvd_right := by
+    intro f g
+    sorry
+  dvd_gcd := by
+    intro d f g hdf hdg
+    sorry
+  xgcd_bezout := by
+    intro f g
     sorry
 
 end ZMod64
