@@ -726,6 +726,33 @@ private theorem zmod64_mul_inv_eq_one_of_prime_ne_zero
   apply UInt64.toNat_inj.mp
   simpa [ZMod64.toNat_eq_val] using hinv
 
+private theorem zmod64_one_ne_zero_of_prime
+    (hp : Hex.Nat.Prime p) :
+    (1 : ZMod64 p) ≠ 0 := by
+  intro hone
+  have hnat : (1 : ZMod64 p).toNat = (0 : ZMod64 p).toNat :=
+    congrArg ZMod64.toNat hone
+  change (ZMod64.one : ZMod64 p).toNat = (ZMod64.zero : ZMod64 p).toNat at hnat
+  have hp_gt : 1 < p := by
+    have htwo : 2 ≤ p := Hex.Nat.Prime.two_le hp
+    omega
+  rw [ZMod64.toNat_one, ZMod64.toNat_zero, Nat.mod_eq_of_lt hp_gt] at hnat
+  omega
+
+private theorem zmod64_inv_ne_zero_of_prime_ne_zero
+    (hp : Hex.Nat.Prime p) {a : ZMod64 p} (ha : a ≠ 0) :
+    a⁻¹ ≠ 0 := by
+  intro hinv
+  have hone := zmod64_mul_inv_eq_one_of_prime_ne_zero hp ha
+  rw [hinv] at hone
+  have hzero : a * (0 : ZMod64 p) = 0 := by grind
+  rw [hzero] at hone
+  exact zmod64_one_ne_zero_of_prime hp hone.symm
+
+private theorem zmod64_mul_zero (a : ZMod64 p) :
+    a * 0 = 0 := by
+  grind
+
 private theorem leadingCoeff_ne_zero_of_isZero_false
     (f : FpPoly p) (hzero : f.isZero = false) :
     DensePoly.leadingCoeff f ≠ 0 := by
@@ -1521,7 +1548,75 @@ private theorem squareFreeAux_weightedProduct_nonzero
 private theorem normalizeMonic_squareFreeContributionReachable
     (hp : Hex.Nat.Prime p) (f : FpPoly p) :
     squareFreeContributionReachable (normalizeMonic f).2 := by
-  sorry
+  intro hsize
+  cases hzero : f.isZero
+  · rw [normalizeMonic_nonzero f hzero] at hsize ⊢
+    change DensePoly.scale (DensePoly.leadingCoeff f)⁻¹ f = 1
+    change (DensePoly.scale (DensePoly.leadingCoeff f)⁻¹ f).size = 1 at hsize
+    let unit := DensePoly.leadingCoeff f
+    have hunit_ne : unit ≠ 0 := leadingCoeff_ne_zero_of_isZero_false f hzero
+    have hinv_ne : unit⁻¹ ≠ 0 :=
+      zmod64_inv_ne_zero_of_prime_ne_zero hp hunit_ne
+    have hunit_inv : unit⁻¹ * unit = 1 := by
+      have h := zmod64_mul_inv_eq_one_of_prime_ne_zero hp hunit_ne
+      have hcomm : unit⁻¹ * unit = unit * unit⁻¹ := by grind
+      rw [hcomm]
+      exact h
+    have hscale_size : f.size = 1 := by
+      have hpos : 0 < f.size := by
+        simpa [DensePoly.isZero, DensePoly.size, Array.isEmpty_iff_size_eq_zero,
+          Nat.pos_iff_ne_zero] using hzero
+      by_cases hle : f.size ≤ 1
+      · omega
+      · exfalso
+        have hgt : 1 < f.size := by omega
+        let i := f.size - 1
+        have hi_ge : 1 ≤ i := by omega
+        have hscaled_zero :
+            (DensePoly.scale unit⁻¹ f).coeff i = 0 :=
+          DensePoly.coeff_eq_zero_of_size_le (DensePoly.scale unit⁻¹ f) (by
+            have hs : (DensePoly.scale unit⁻¹ f).size = 1 := by
+              simpa [unit] using hsize
+            omega)
+        have hscaled_coeff :
+            (DensePoly.scale unit⁻¹ f).coeff i = unit⁻¹ * f.coeff i := by
+          exact DensePoly.coeff_scale unit⁻¹ f i (zmod64_mul_zero unit⁻¹)
+        have hlast : f.coeff i ≠ 0 := by
+          simpa [i] using DensePoly.coeff_last_ne_zero_of_pos_size f hpos
+        have hmul : unit⁻¹ * f.coeff i = 0 := by
+          rw [← hscaled_coeff]
+          exact hscaled_zero
+        rcases ZMod64.eq_zero_or_eq_zero_of_mul_eq_zero hp hmul with hinv_zero | hcoeff_zero
+        · exact hinv_ne hinv_zero
+        · exact hlast hcoeff_zero
+    apply DensePoly.ext_coeff
+    intro n
+    cases n with
+    | zero =>
+        have hcoeff :
+            (DensePoly.scale unit⁻¹ f).coeff 0 = unit⁻¹ * f.coeff 0 := by
+          exact DensePoly.coeff_scale unit⁻¹ f 0 (zmod64_mul_zero unit⁻¹)
+        have hlead : unit = f.coeff 0 := by
+          have hlead_last : DensePoly.leadingCoeff f = f.coeff (f.size - 1) := by
+            unfold DensePoly.leadingCoeff DensePoly.coeff
+            rw [Array.back?_eq_getElem?]
+            have hidx : f.coeffs.size - 1 < f.coeffs.size := by
+              simpa [DensePoly.size] using Nat.sub_one_lt_of_lt (by omega : 0 < f.size)
+            simp [Array.getD, DensePoly.size, hidx]
+          simpa [unit, hscale_size] using hlead_last
+        rw [hcoeff, ← hlead, hunit_inv]
+        exact (DensePoly.coeff_C (1 : ZMod64 p) 0).symm
+    | succ n =>
+        have hcoeff_zero :
+            (DensePoly.scale unit⁻¹ f).coeff (n + 1) = 0 :=
+          DensePoly.coeff_eq_zero_of_size_le (DensePoly.scale unit⁻¹ f) (by
+            have hs : (DensePoly.scale unit⁻¹ f).size = 1 := by
+              simpa [unit] using hsize
+            omega)
+        rw [hcoeff_zero]
+        exact (DensePoly.coeff_C (1 : ZMod64 p) (n + 1)).symm
+  · rw [normalizeMonic_zero f hzero] at hsize
+    simp at hsize
 
 private theorem normalizeMonic_zero_squareFree_weightedProduct
     (hp : Hex.Nat.Prime p) (f : FpPoly p)
