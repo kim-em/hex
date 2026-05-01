@@ -212,32 +212,50 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
 
+/-- Law package for the executable dense-polynomial gcd operations.
+
+The generic algorithms are executable for any coefficient type with the required operations,
+but Euclidean gcd correctness is only true for lawful coefficient/division structures. Concrete
+coefficient libraries provide this package once they have proved the algorithmic invariants. -/
+class GcdLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [Mul R]
+    [Div R] : Prop where
+  gcd_dvd_left :
+    ∀ p q : DensePoly R, gcd p q ∣ p
+  gcd_dvd_right :
+    ∀ p q : DensePoly R, gcd p q ∣ q
+  dvd_gcd :
+    ∀ d p q : DensePoly R, d ∣ p → d ∣ q → d ∣ gcd p q
+  xgcd_bezout :
+    ∀ p q : DensePoly R,
+      let r := xgcd p q
+      r.left * p + r.right * q = r.gcd
+
 theorem divMod_spec [One R] [Add R] [Sub R] [Mul R] [Div R] [DivModLaws R]
     (p q : DensePoly R) :
     let qr := divMod p q
     qr.1 * q + qr.2 = p := by
   exact DivModLaws.divMod_spec p q
 
-theorem gcd_dvd_left [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem gcd_dvd_left [One R] [Add R] [Sub R] [Mul R] [Div R] [GcdLaws R]
     (p q : DensePoly R) :
     gcd p q ∣ p := by
-  sorry
+  exact GcdLaws.gcd_dvd_left p q
 
-theorem gcd_dvd_right [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem gcd_dvd_right [One R] [Add R] [Sub R] [Mul R] [Div R] [GcdLaws R]
     (p q : DensePoly R) :
     gcd p q ∣ q := by
-  sorry
+  exact GcdLaws.gcd_dvd_right p q
 
-theorem dvd_gcd [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem dvd_gcd [One R] [Add R] [Sub R] [Mul R] [Div R] [GcdLaws R]
     (d p q : DensePoly R) :
     d ∣ p → d ∣ q → d ∣ gcd p q := by
-  sorry
+  exact GcdLaws.dvd_gcd d p q
 
-theorem xgcd_bezout [One R] [Add R] [Sub R] [Mul R] [Div R]
+theorem xgcd_bezout [One R] [Add R] [Sub R] [Mul R] [Div R] [GcdLaws R]
     (p q : DensePoly R) :
     let r := xgcd p q
     r.left * p + r.right * q = r.gcd := by
-  sorry
+  exact GcdLaws.xgcd_bezout p q
 
 theorem modByMonic_eq_divModMonic [One R] [Add R] [Sub R] [Mul R]
     (p q : DensePoly R) (hq : Monic q) :
