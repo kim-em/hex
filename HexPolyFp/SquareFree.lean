@@ -398,6 +398,12 @@ private theorem coeffFold_size_eq (g : FpPoly p) :
     coeffFold g g.size = g := by
   exact coeffFold_eq_of_size_le g g.size (Nat.le_refl g.size)
 
+private theorem powLinear_add_prime_coeff
+    (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
+    (powLinear (f + g) p).coeff n =
+      (powLinear f p).coeff n + (powLinear g p).coeff n := by
+  sorry
+
 /--
 Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
 This is the dense-polynomial convolution fact needed by the formal
