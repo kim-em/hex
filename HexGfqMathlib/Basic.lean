@@ -3,7 +3,7 @@ import HexGF2Mathlib.Field
 import Mathlib.FieldTheory.Finite.GaloisField
 
 /-!
-Generic Mathlib-side scaffolding for the executable `GFq` model.
+Generic Mathlib-side definitions for the executable `GFq` model.
 
 This module exposes the concrete reduced-representative enumeration used to
 transport `Fintype` support onto generic `Hex.GFqField.FiniteField` values, and
