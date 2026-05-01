@@ -130,7 +130,11 @@ coefficients through the usual quotient/remainder updates.
 -/
 private def pureIntExtGcd.go (old_r r old_s s old_t t : Int) : Nat × Int × Int :=
   match r with
-  | 0 => (old_r.natAbs, old_s, old_t)
+  | 0 =>
+      if old_r < 0 then
+        (old_r.natAbs, -old_s, -old_t)
+      else
+        (old_r.natAbs, old_s, old_t)
   | .ofNat (n + 1) =>
       let q := old_r / Int.ofNat (n + 1)
       pureIntExtGcd.go (Int.ofNat (n + 1)) (old_r % Int.ofNat (n + 1))
@@ -167,14 +171,117 @@ decreasing_by
 def pureIntExtGcd (a b : Int) : Nat × Int × Int :=
   pureIntExtGcd.go a b 1 0 0 1
 
+private theorem pureIntExtGcd_gcd_step (a b : Int) :
+    Int.gcd b (a % b) = Int.gcd a b := by
+  rw [← Int.ediv_mul_add_emod a b]
+  simp [Int.gcd_comm]
+
+private theorem pureIntExtGcd_linear_step
+    (old_r r old_s s old_t t a b q : Int)
+    (hold : old_s * a + old_t * b = old_r)
+    (hr : s * a + t * b = r)
+    (hq : q = old_r / r) :
+    (old_s - q * s) * a + (old_t - q * t) * b = old_r % r := by
+  have hdiv : old_r / r * r + old_r % r = old_r := Int.ediv_mul_add_emod old_r r
+  calc
+    (old_s - q * s) * a + (old_t - q * t) * b =
+        (old_s * a + old_t * b) - q * (s * a + t * b) := by
+          simp only [Int.sub_mul, Int.mul_add, Int.mul_assoc]
+          omega
+    _ = old_r - (old_r / r) * r := by
+          rw [hold, hr, hq]
+    _ = old_r % r := by
+          omega
+
+private theorem pureIntExtGcd_go_spec
+    (old_r r old_s s old_t t a b : Int)
+    (hold : old_s * a + old_t * b = old_r)
+    (hr : s * a + t * b = r) :
+    let (g, u, v) := pureIntExtGcd.go old_r r old_s s old_t t
+    g = Int.gcd old_r r ∧ u * a + v * b = g := by
+  induction hmeasure : r.natAbs using Nat.strongRecOn generalizing old_r r old_s s old_t t with
+  | ind n ih =>
+      cases r with
+      | ofNat m =>
+          cases m with
+          | zero =>
+              by_cases hneg : old_r < 0
+              · have hneg_coeff :
+                    (-old_s) * a + (-old_t) * b = (old_r.natAbs : Int) := by
+                  have hnat : (old_r.natAbs : Int) = -old_r := by
+                    rw [← Int.natAbs_neg old_r]
+                    exact Int.ofNat_natAbs_of_nonneg (by omega)
+                  calc
+                    (-old_s) * a + (-old_t) * b = -(old_s * a + old_t * b) := by
+                      simp only [Int.neg_mul, Int.neg_add]
+                    _ = -old_r := by rw [hold]
+                    _ = (old_r.natAbs : Int) := hnat.symm
+                simp [pureIntExtGcd.go, hneg, hneg_coeff]
+              · have hnonneg : 0 ≤ old_r := by omega
+                have hcoeff : old_s * a + old_t * b = (old_r.natAbs : Int) := by
+                  rw [Int.ofNat_natAbs_of_nonneg hnonneg]
+                  exact hold
+                simp [pureIntExtGcd.go, hneg, hcoeff]
+          | succ m =>
+              simp only [pureIntExtGcd.go]
+              let r' : Int := Int.ofNat (m + 1)
+              let q := old_r / r'
+              have hlt : (old_r % r').natAbs < r'.natAbs := by
+                have hmod_nonneg : 0 ≤ old_r % r' := by
+                  exact Int.emod_nonneg _ (Int.ofNat_ne_zero.mpr (Nat.succ_ne_zero _))
+                have hpos : (0 : Int) < r' := by
+                  exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+                have hmod_lt : old_r % r' < r' := by
+                  exact Int.emod_lt_of_pos _ hpos
+                have hnatAbs_lt : ((old_r % r').natAbs : Int) < r'.natAbs := by
+                  rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg]
+                  simpa [r'] using hmod_lt
+                exact Int.ofNat_lt.mp hnatAbs_lt
+              have hn : r'.natAbs = n := by
+                simpa [r'] using hmeasure
+              have hrec := ih (old_r % r').natAbs (by simpa [hn] using hlt)
+                r' (old_r % r') s (old_s - q * s) t (old_t - q * t)
+                (by simpa [r'] using hr)
+                (pureIntExtGcd_linear_step old_r r' old_s s old_t t a b q
+                  hold (by simpa [r'] using hr) rfl)
+                rfl
+              exact ⟨hrec.1.trans (pureIntExtGcd_gcd_step old_r r'), hrec.2⟩
+      | negSucc m =>
+          simp only [pureIntExtGcd.go]
+          let r' : Int := Int.negSucc m
+          let q := old_r / r'
+          have hlt : (old_r % r').natAbs < r'.natAbs := by
+            have hmod_nonneg : 0 ≤ old_r % r' := by
+              exact Int.emod_nonneg _ (by simp [r'])
+            have hpos : (0 : Int) < Int.ofNat (m + 1) := by
+              exact Int.ofNat_lt.mpr (Nat.succ_pos _)
+            have hmod_lt : old_r % r' < Int.ofNat (m + 1) := by
+              simpa [r', Int.negSucc_eq, Int.emod_neg] using
+                (Int.emod_lt_of_pos old_r hpos)
+            have hnatAbs_lt : ((old_r % r').natAbs : Int) < r'.natAbs := by
+              rw [Int.ofNat_natAbs_of_nonneg hmod_nonneg, Int.natAbs_negSucc]
+              exact hmod_lt
+            exact Int.ofNat_lt.mp hnatAbs_lt
+          have hn : r'.natAbs = n := by
+            simpa [r'] using hmeasure
+          have hrec := ih (old_r % r').natAbs (by simpa [hn] using hlt)
+            r' (old_r % r') s (old_s - q * s) t (old_t - q * t)
+            (by simpa [r'] using hr)
+            (pureIntExtGcd_linear_step old_r r' old_s s old_t t a b q
+              hold (by simpa [r'] using hr) rfl)
+            rfl
+          exact ⟨hrec.1.trans (pureIntExtGcd_gcd_step old_r r'), hrec.2⟩
+
 theorem pureIntExtGcd_fst (a b : Int) :
     (pureIntExtGcd a b).1 = Int.gcd a b := by
-  sorry
+  have hspec := pureIntExtGcd_go_spec a b 1 0 0 1 a b (by omega) (by omega)
+  simpa [pureIntExtGcd] using hspec.1
 
 theorem pureIntExtGcd_bezout (a b : Int) :
     let (g, s, t) := pureIntExtGcd a b
     s * a + t * b = g := by
-  sorry
+  have hspec := pureIntExtGcd_go_spec a b 1 0 0 1 a b (by omega) (by omega)
+  simpa [pureIntExtGcd] using hspec.2
 
 end Hex
 
@@ -194,12 +301,12 @@ def extGcd (a b : @& Int) : Nat × Int × Int :=
   Hex.pureIntExtGcd a b
 
 theorem extGcd_fst (a b : Int) : (extGcd a b).1 = Int.gcd a b := by
-  sorry
+  simpa [extGcd] using Hex.pureIntExtGcd_fst a b
 
 theorem extGcd_bezout (a b : Int) :
     let (g, s, t) := extGcd a b
     s * a + t * b = g := by
-  sorry
+  simpa [extGcd] using Hex.pureIntExtGcd_bezout a b
 
 end Int
 
@@ -212,12 +319,31 @@ def extGcd (a b : UInt64) : UInt64 × Int × Int :=
 
 theorem extGcd_fst (a b : UInt64) :
     (extGcd a b).1.toNat = Nat.gcd a.toNat b.toNat := by
-  sorry
+  rw [extGcd]
+  have hfst := HexArith.Int.extGcd_fst (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  rcases h : HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat) with ⟨g, s, t⟩
+  rw [h] at hfst
+  simp [Int.gcd] at hfst
+  have hbound : Nat.gcd a.toNat b.toNat < 2 ^ 64 := by
+    by_cases ha : a.toNat = 0
+    · simp [ha, UInt64.toNat_lt b]
+    · exact Nat.lt_of_le_of_lt (Nat.gcd_le_left b.toNat (Nat.pos_of_ne_zero ha)) (UInt64.toNat_lt a)
+  simp [hfst, Nat.mod_eq_of_lt hbound]
 
 theorem extGcd_bezout (a b : UInt64) :
     let (g, s, t) := extGcd a b
     s * Int.ofNat a.toNat + t * Int.ofNat b.toNat = Int.ofNat g.toNat := by
-  sorry
+  rw [extGcd]
+  have hfst := HexArith.Int.extGcd_fst (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  have hbez := HexArith.Int.extGcd_bezout (Int.ofNat a.toNat) (Int.ofNat b.toNat)
+  rcases h : HexArith.Int.extGcd (Int.ofNat a.toNat) (Int.ofNat b.toNat) with ⟨g, s, t⟩
+  rw [h] at hfst hbez
+  simp [Int.gcd] at hfst hbez
+  have hbound : Nat.gcd a.toNat b.toNat < 2 ^ 64 := by
+    by_cases ha : a.toNat = 0
+    · simp [ha, UInt64.toNat_lt b]
+    · exact Nat.lt_of_le_of_lt (Nat.gcd_le_left b.toNat (Nat.pos_of_ne_zero ha)) (UInt64.toNat_lt a)
+  simpa [hfst, UInt64.toNat_ofNat, Nat.mod_eq_of_lt hbound] using hbez
 
 end UInt64
 
