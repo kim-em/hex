@@ -390,6 +390,23 @@ private def squareFreeAuxRevContribution (f : FpPoly p) (multiplicity : Nat) :
             contribution.1 *
               squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) fuel
 
+private theorem squareFreeAuxRevContribution_pthRoot_correct_pow
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true) :
+    squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
+      pow (pthRoot f) (multiplicity * p) := by
+  sorry
+
+private theorem pthRoot_pow_mul_prime_of_derivative_zero
+    (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity : Nat)
+    (hmultiplicity : 0 < multiplicity)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = true) :
+    pow (pthRoot f) (multiplicity * p) = pow f multiplicity := by
+  sorry
+
 private theorem squareFreeAuxRevContribution_derivative_zero_correct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 1)
@@ -397,7 +414,14 @@ private theorem squareFreeAuxRevContribution_derivative_zero_correct
     (hdf : (DensePoly.derivative f).isZero = true) :
     squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
       pow f multiplicity := by
-  sorry
+  calc
+    squareFreeAuxRevContribution (pthRoot f) (multiplicity * p) fuel =
+        pow (pthRoot f) (multiplicity * p) := by
+          exact squareFreeAuxRevContribution_pthRoot_correct_pow
+            hp f multiplicity fuel hmultiplicity hfuel hzero hdf
+    _ = pow f multiplicity := by
+          exact pthRoot_pow_mul_prime_of_derivative_zero
+            hp f multiplicity hmultiplicity hzero hdf
 
 private theorem yunFactorsContribution_reconstruct
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
