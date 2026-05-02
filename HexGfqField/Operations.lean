@@ -279,6 +279,18 @@ private theorem C_mul_C_inv_of_ne_zero
   rw [C_mul_eq_scale, scale_C, zmod64_mul_inv_eq_one_of_prime_ne_zero hp hc]
   rfl
 
+private theorem scale_inv_C_eq_one_of_ne_zero
+    (hp : Hex.Nat.Prime p) {c : ZMod64 p} (hc : c ≠ 0) :
+    DensePoly.scale c⁻¹ (DensePoly.C c : FpPoly p) = 1 := by
+  rw [scale_C]
+  have hmul : c⁻¹ * c = 1 := by
+    have hright := zmod64_mul_inv_eq_one_of_prime_ne_zero hp hc
+    have hcomm : c⁻¹ * c = c * c⁻¹ := by grind
+    rw [hcomm]
+    exact hright
+  rw [hmul]
+  rfl
+
 private theorem eq_C_of_degree_eq_zero
     (g : FpPoly p) (hdeg : g.degree? = some 0) :
     g = DensePoly.C (g.coeff 0) := by
@@ -403,7 +415,22 @@ private theorem reduceMod_repr_mul_invPoly_eq_one
     {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
     GFqRing.reduceMod f (GFqRing.repr x.toQuotient * invPoly x.toQuotient) =
       GFqRing.reduceMod f 1 := by
-  sorry
+  let r := DensePoly.xgcd (GFqRing.repr x.toQuotient) f
+  let c : ZMod64 p := r.gcd.coeff 0
+  have hscaled :=
+    reduceMod_repr_mul_invPoly_eq_scaled_gcd (f := f) (hf := hf) x.toQuotient
+  have hdeg : r.gcd.degree? = some 0 := by
+    simpa [r] using xgcd_repr_gcd_degree_eq_zero_of_ne_zero (x := x) hx
+  have hgcd_C : r.gcd = DensePoly.C c := by
+    simpa [c] using eq_C_of_degree_eq_zero r.gcd hdeg
+  have hc : c ≠ 0 := by
+    simpa [r, c] using xgcd_repr_gcd_coeff_zero_ne_zero_of_ne_zero (x := x) hx
+  have hnormalized :
+      GFqRing.reduceMod f (DensePoly.scale c⁻¹ r.gcd) =
+        GFqRing.reduceMod f 1 := by
+    rw [hgcd_C]
+    rw [scale_inv_C_eq_one_of_ne_zero hp hc]
+  exact hscaled.trans (by simpa [r, c] using hnormalized)
 
 /-- Field inversion stays on the quotient-reduction path by reusing the
 polynomial extended-GCD witness, normalized by the gcd's constant unit factor.
