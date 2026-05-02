@@ -26,6 +26,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libgmp-dev
+      - name: Configure Lean shared library path
+        run: |
+          toolchain="$(sed 's|/|--|; s|:|---|' lean-toolchain)"
+          echo "LD_LIBRARY_PATH=$HOME/.elan/toolchains/$toolchain/lib/lean:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
       - name: Build ${{ matrix.target }} conformance checks
         uses: leanprover/lean-action@v1
         with:
