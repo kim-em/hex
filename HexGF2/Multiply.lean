@@ -4284,43 +4284,6 @@ private theorem clmulAssoc_left_low_sourceTriple
     _ = clmulSourceTripleCoeff x y z bit := by
           exact xorBoolList_left_low_sourceTriple_collapse x y z hbit
 
-private theorem clmulAssoc_right_low_sourceTriple
-    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
-    wordBitAt (clmul x (clmul y z).2).2 bit =
-      clmulSourceTripleCoeff x y z bit := by
-  sorry
-
-private theorem xorBoolList_left_middle_sourceTriple_collapse
-    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
-    (xorBoolList
-        (List.flatMap
-          (fun c =>
-            (List.range 64).map
-              (fun p =>
-                ((wordBitAt (clmul x y).2 p && wordBitAt z c) &&
-                  decide (p + c = bit + 64))))
-          (List.range 64)) !=
-      xorBoolList
-        (List.flatMap
-          (fun c =>
-            (List.range 64).map
-              (fun p =>
-                ((wordBitAt (clmul x y).1 p && wordBitAt z c) &&
-                  decide (p + c = bit))))
-          (List.range 64))) =
-      clmulSourceTripleCoeff x y z (bit + 64) := by
-  sorry
-
-private theorem clmulAssoc_left_middle_sourceTriple
-    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
-    (wordBitAt (clmul (clmul x y).2 z).1 bit !=
-        wordBitAt (clmul (clmul x y).1 z).2 bit) =
-      clmulSourceTripleCoeff x y z (bit + 64) := by
-  rw [clmulSourcePairCoeff_high (clmul x y).2 z hbit]
-  rw [clmulSourcePairCoeff_low (clmul x y).1 z hbit]
-  unfold clmulSourcePairCoeff
-  exact xorBoolList_left_middle_sourceTriple_collapse x y z hbit
-
 private theorem clmulSourceTripleCoeff_reverse_outer
     (x y z : UInt64) (total : Nat) :
     clmulSourceTripleCoeff z y x total =
@@ -4414,6 +4377,50 @@ private theorem clmulSourceTripleCoeff_reverse_outer
           intro c _hc
           cases wordBitAt x a <;> cases wordBitAt y b <;> cases wordBitAt z c <;>
             simp [show (c + b + a = total) ↔ (a + b + c = total) by omega]
+
+private theorem clmulAssoc_right_low_sourceTriple
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
+    wordBitAt (clmul x (clmul y z).2).2 bit =
+      clmulSourceTripleCoeff x y z bit := by
+  calc
+    wordBitAt (clmul x (clmul y z).2).2 bit
+        = wordBitAt (clmul (clmul z y).2 x).2 bit := by
+          rw [clmul_comm x (clmul y z).2, clmul_comm y z]
+    _ = clmulSourceTripleCoeff z y x bit := by
+          exact clmulAssoc_left_low_sourceTriple z y x hbit
+    _ = clmulSourceTripleCoeff x y z bit := by
+          exact clmulSourceTripleCoeff_reverse_outer x y z bit
+
+private theorem xorBoolList_left_middle_sourceTriple_collapse
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
+    (xorBoolList
+        (List.flatMap
+          (fun c =>
+            (List.range 64).map
+              (fun p =>
+                ((wordBitAt (clmul x y).2 p && wordBitAt z c) &&
+                  decide (p + c = bit + 64))))
+          (List.range 64)) !=
+      xorBoolList
+        (List.flatMap
+          (fun c =>
+            (List.range 64).map
+              (fun p =>
+                ((wordBitAt (clmul x y).1 p && wordBitAt z c) &&
+                  decide (p + c = bit))))
+          (List.range 64))) =
+      clmulSourceTripleCoeff x y z (bit + 64) := by
+  sorry
+
+private theorem clmulAssoc_left_middle_sourceTriple
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
+    (wordBitAt (clmul (clmul x y).2 z).1 bit !=
+        wordBitAt (clmul (clmul x y).1 z).2 bit) =
+      clmulSourceTripleCoeff x y z (bit + 64) := by
+  rw [clmulSourcePairCoeff_high (clmul x y).2 z hbit]
+  rw [clmulSourcePairCoeff_low (clmul x y).1 z hbit]
+  unfold clmulSourcePairCoeff
+  exact xorBoolList_left_middle_sourceTriple_collapse x y z hbit
 
 private theorem clmulAssoc_right_middle_sourceTriple
     (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
