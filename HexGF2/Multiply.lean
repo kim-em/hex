@@ -4753,7 +4753,14 @@ private theorem clmulAssoc_right_high_sourceTriple
     (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     wordBitAt (clmul x (clmul y z).1).1 bit =
       clmulSourceTripleCoeff x y z (bit + 128) := by
-  sorry
+  calc
+    wordBitAt (clmul x (clmul y z).1).1 bit
+        = wordBitAt (clmul (clmul z y).1 x).1 bit := by
+          rw [clmul_comm x (clmul y z).1, clmul_comm y z]
+    _ = clmulSourceTripleCoeff z y x (bit + 128) := by
+          exact clmulAssoc_left_high_sourceTriple z y x hbit
+    _ = clmulSourceTripleCoeff x y z (bit + 128) := by
+          exact clmulSourceTripleCoeff_reverse_outer x y z (bit + 128)
 
 private theorem clmulCoeffAt_assoc_twoWord_low
     (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
