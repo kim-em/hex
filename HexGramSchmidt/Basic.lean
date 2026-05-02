@@ -59,6 +59,24 @@ private theorem dot_subtractProjection_self_zero (row basisRow : Vector Rat m)
   simp [projectionCoeff, hnorm]
   grind
 
+private theorem foldl_dot_comm_rat (xs : List (Fin m)) (u v : Vector Rat m)
+    (accU accV : Rat) (hacc : accU = accV) :
+    xs.foldl (fun acc i => acc + u[i] * v[i]) accU =
+      xs.foldl (fun acc i => acc + v[i] * u[i]) accV := by
+  induction xs generalizing accU accV with
+  | nil =>
+      simp [hacc]
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      apply ih
+      grind
+
+private theorem dot_comm_rat (u v : Vector Rat m) :
+    Matrix.dot u v = Matrix.dot v u := by
+  simpa [Matrix.dot, Hex.Vector.dotProduct] using
+    foldl_dot_comm_rat (xs := List.finRange m) (u := u) (v := v)
+      (accU := 0) (accV := 0) rfl
+
 private theorem projectionCoeff_subtractProjection_eq_of_dot_zero
     (row otherBasisRow basisRow : Vector Rat m)
     (horth : Matrix.dot otherBasisRow basisRow = 0) :
@@ -73,6 +91,59 @@ private theorem projectionCoeff_subtractProjection_eq_of_dot_zero
 private def reduceAgainstBasis (basisRev : List (Vector Rat m)) (row : Vector Rat m) :
     Vector Rat m :=
   basisRev.foldl subtractProjection row
+
+private theorem dot_reduceAgainstBasis_zero_of_forall_dot_zero
+    (basisRev : List (Vector Rat m)) (row target : Vector Rat m)
+    (horth : ∀ basisRow ∈ basisRev, Matrix.dot basisRow target = 0) :
+    Matrix.dot (reduceAgainstBasis basisRev row) target = Matrix.dot row target := by
+  induction basisRev generalizing row with
+  | nil =>
+      simp [reduceAgainstBasis]
+  | cons basisRow rest ih =>
+      rw [reduceAgainstBasis]
+      simp only [List.foldl_cons]
+      change Matrix.dot (reduceAgainstBasis rest (subtractProjection row basisRow)) target =
+        Matrix.dot row target
+      rw [ih]
+      · rw [dot_subtractProjection, horth basisRow (by simp)]
+        grind
+      · intro laterBasisRow hlater
+        exact horth laterBasisRow (by simp [hlater])
+
+private theorem dot_reduceAgainstBasis_zero_of_dot_zero
+    (basisRev : List (Vector Rat m)) (row target : Vector Rat m)
+    (hrow : Matrix.dot row target = 0)
+    (horth : ∀ basisRow ∈ basisRev, Matrix.dot basisRow target = 0) :
+    Matrix.dot (reduceAgainstBasis basisRev row) target = 0 := by
+  rw [dot_reduceAgainstBasis_zero_of_forall_dot_zero basisRev row target horth, hrow]
+
+private theorem dot_reduceAgainstBasis_of_mem
+    (basisRev : List (Vector Rat m)) (row basisRow : Vector Rat m)
+    (hmem : basisRow ∈ basisRev)
+    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0))
+    (hnorm : Matrix.dot basisRow basisRow ≠ 0) :
+    Matrix.dot (reduceAgainstBasis basisRev row) basisRow = 0 := by
+  induction basisRev generalizing row with
+  | nil =>
+      simp at hmem
+  | cons head rest ih =>
+      rw [reduceAgainstBasis]
+      simp only [List.foldl_cons]
+      by_cases hhead : head = basisRow
+      · subst basisRow
+        apply dot_reduceAgainstBasis_zero_of_dot_zero
+        · exact dot_subtractProjection_self_zero row head hnorm
+        · intro later hlater
+          exact (List.rel_of_pairwise_cons horth hlater).2
+      · have htail : basisRow ∈ rest := by
+          have hneq : basisRow ≠ head := by
+            intro hb
+            exact hhead hb.symm
+          simp [hneq] at hmem
+          exact hmem
+        apply ih
+        · exact htail
+        · exact List.Pairwise.of_cons horth
 
 private theorem projectionCoeff_reduceAgainstBasis_eq_of_forall_dot_zero
     (basisRev : List (Vector Rat m)) (row basisRow : Vector Rat m)
