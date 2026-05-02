@@ -316,10 +316,36 @@ theorem primitiveSquareFreeDecomposition_primitive (f : ZPoly) :
     · simp [primitiveSquareFreeDecomposition, hzero, hderivative]
     · simp [primitiveSquareFreeDecomposition, hzero, hderivative]
 
+private theorem normalizePrimitiveSign_zero :
+    normalizePrimitiveSign (0 : ZPoly) = 0 := by
+  unfold normalizePrimitiveSign
+  split
+  · exact DensePoly.scale_neg_one_zero
+  · rfl
+
+private theorem normalizePrimitiveSign_primitivePart_primitive (f : ZPoly)
+    (h : content (normalizePrimitiveSign (primitivePart f)) ≠ 0) :
+    Primitive (normalizePrimitiveSign (primitivePart f)) := by
+  have hcontent_ne : content f ≠ 0 := by
+    intro hcontent
+    have hpart_zero : primitivePart f = 0 := by
+      simpa [primitivePart] using
+        DensePoly.primitivePart_eq_zero_of_content_eq_zero f (by simpa [content] using hcontent)
+    apply h
+    rw [hpart_zero, normalizePrimitiveSign_zero]
+    simp [content, DensePoly.content_zero]
+  by_cases hlead : DensePoly.leadingCoeff (primitivePart f) < 0
+  · rw [normalizePrimitiveSign, if_pos hlead, Primitive, content,
+      DensePoly.content_scale_neg_one]
+    simpa [Primitive, content] using primitivePart_primitive f hcontent_ne
+  · rw [normalizePrimitiveSign, if_neg hlead]
+    exact primitivePart_primitive f hcontent_ne
+
 theorem ratPolyPrimitivePart_primitive (f : DensePoly Rat)
     (h : content (ratPolyPrimitivePart f) ≠ 0) :
     Primitive (ratPolyPrimitivePart f) := by
-  sorry
+  unfold ratPolyPrimitivePart at h ⊢
+  exact normalizePrimitiveSign_primitivePart_primitive _ h
 
 theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     let d := primitiveSquareFreeDecomposition f
