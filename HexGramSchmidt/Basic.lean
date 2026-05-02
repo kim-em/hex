@@ -25,6 +25,31 @@ private def projectionCoeff (row basisRow : Vector Rat m) : Rat :=
 private def subtractProjection (row basisRow : Vector Rat m) : Vector Rat m :=
   row - projectionCoeff row basisRow • basisRow
 
+private theorem dot_sub_smul_zero_of_dot_zero (row other basis : Vector Rat m) (c : Rat)
+    (hrow : Matrix.dot row basis = 0) (hother : Matrix.dot other basis = 0) :
+    Matrix.dot (row - c • other) basis = 0 := by
+  rw [Matrix.dot_sub_smul_rat, hrow, hother]
+  grind
+
+private theorem dot_subtractProjection (row basisRow target : Vector Rat m) :
+    Matrix.dot (subtractProjection row basisRow) target =
+      Matrix.dot row target - projectionCoeff row basisRow * Matrix.dot basisRow target := by
+  simp [subtractProjection, Matrix.dot_sub_smul_rat]
+
+private theorem dot_subtractProjection_zero_of_dot_zero
+    (row basisRow target : Vector Rat m)
+    (hrow : Matrix.dot row target = 0) (hbasis : Matrix.dot basisRow target = 0) :
+    Matrix.dot (subtractProjection row basisRow) target = 0 := by
+  rw [dot_subtractProjection, hrow, hbasis]
+  grind
+
+private theorem dot_subtractProjection_self_zero (row basisRow : Vector Rat m)
+    (hnorm : Matrix.dot basisRow basisRow ≠ 0) :
+    Matrix.dot (subtractProjection row basisRow) basisRow = 0 := by
+  rw [dot_subtractProjection]
+  simp [projectionCoeff, hnorm]
+  grind
+
 /-- Reduce a row against the previously constructed orthogonal basis rows. -/
 private def reduceAgainstBasis (basisRev : List (Vector Rat m)) (row : Vector Rat m) :
     Vector Rat m :=
