@@ -181,6 +181,49 @@ private theorem toQuotient_ne_zero
   apply hx
   exact GFqField.ext hq
 
+/-- The xgcd gcd witness divides the nonzero field representative. -/
+private theorem xgcd_repr_gcd_dvd_repr
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    (DensePoly.xgcd (GFqRing.repr x) f).gcd ∣ GFqRing.repr x := by
+  simpa [DensePoly.gcd]
+    using DensePoly.gcd_dvd_left (GFqRing.repr x) f
+
+/-- The xgcd gcd witness divides the irreducible modulus. -/
+private theorem xgcd_repr_gcd_dvd_modulus
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f}
+    (x : GFqRing.PolyQuotient f hf) :
+    (DensePoly.xgcd (GFqRing.repr x) f).gcd ∣ f := by
+  simpa [DensePoly.gcd]
+    using DensePoly.gcd_dvd_right (GFqRing.repr x) f
+
+/-- For a nonzero residue class modulo irreducible `f`, the xgcd gcd witness
+is a constant polynomial. -/
+private theorem xgcd_repr_gcd_degree_eq_zero_of_ne_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
+    (DensePoly.xgcd (GFqRing.repr x.toQuotient) f).gcd.degree? = some 0 := by
+  sorry
+
+/-- For a nonzero residue class modulo irreducible `f`, the constant xgcd gcd
+witness has nonzero constant coefficient. -/
+private theorem xgcd_repr_gcd_coeff_zero_ne_zero_of_ne_zero
+    {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
+    {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
+    (DensePoly.xgcd (GFqRing.repr x.toQuotient) f).gcd.coeff 0 ≠ 0 := by
+  let g := (DensePoly.xgcd (GFqRing.repr x.toQuotient) f).gcd
+  have hdeg : g.degree? = some 0 :=
+    xgcd_repr_gcd_degree_eq_zero_of_ne_zero (x := x) hx
+  have hsize : g.size = 1 := by
+    unfold DensePoly.degree? at hdeg
+    by_cases hzero : g.size = 0
+    · simp [hzero] at hdeg
+    · have hpred : g.size - 1 = 0 := by
+        simpa [hzero] using hdeg
+      omega
+  have hpos : 0 < g.size := by omega
+  simpa [g, hsize] using DensePoly.coeff_last_ne_zero_of_pos_size g hpos
+
 /-- For a nonzero residue class modulo an irreducible polynomial, the
 normalized xgcd witness reduces to the multiplicative identity. -/
 private theorem reduceMod_repr_mul_invPoly_eq_one
