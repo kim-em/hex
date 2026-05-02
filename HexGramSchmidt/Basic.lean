@@ -285,6 +285,86 @@ private theorem basisRowsAux_singleton_head (row : Vector Rat m) (rows : List (V
   obtain ⟨suffix, hsuffix⟩ := basisRowsAux_reverse_prefix [row] rows
   simp [hsuffix]
 
+private theorem basisRowsAux_length (basisRev pending : List (Vector Rat m)) :
+    (basisRowsAux basisRev pending).length = basisRev.length + pending.length := by
+  induction pending generalizing basisRev with
+  | nil =>
+      simp [basisRowsAux]
+  | cons row rows ih =>
+      simpa [basisRowsAux, Nat.add_assoc, Nat.add_comm, Nat.add_left_comm] using
+        ih (GramSchmidt.reduceAgainstBasis basisRev row :: basisRev)
+
+private theorem basisRows_length (rows : List (Vector Rat m)) :
+    (basisRows rows).length = rows.length := by
+  simpa [basisRows] using basisRowsAux_length ([] : List (Vector Rat m)) rows
+
+private theorem orthPairwise_reverse (rows : List (Vector Rat m))
+    (horth : rows.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0)) :
+    rows.reverse.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0) := by
+  rw [List.pairwise_iff_getElem] at horth ⊢
+  intro i j hirev hjrev hij
+  simp [List.length_reverse] at hirev hjrev
+  have hji : rows.length - 1 - j < rows.length - 1 - i := by omega
+  have hxj : rows.length - 1 - j < rows.length := by omega
+  have hxi : rows.length - 1 - i < rows.length := by omega
+  have hrel := horth (rows.length - 1 - j) (rows.length - 1 - i) hxj hxi hji
+  rw [List.getElem_reverse, List.getElem_reverse]
+  exact ⟨hrel.2, hrel.1⟩
+
+private theorem basisRowsAux_pairwise
+    (basisRev pending : List (Vector Rat m))
+    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0)) :
+    (basisRowsAux basisRev pending).Pairwise
+      (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0) := by
+  induction pending generalizing basisRev with
+  | nil =>
+      simpa [basisRowsAux] using orthPairwise_reverse basisRev horth
+  | cons row rows ih =>
+      apply ih
+      apply List.Pairwise.cons
+      · intro basisRow hmem
+        constructor
+        · exact dot_reduceAgainstBasis_of_mem basisRev row basisRow hmem horth
+        · rw [dot_comm_rat]
+          exact dot_reduceAgainstBasis_of_mem basisRev row basisRow hmem horth
+      · exact horth
+
+private theorem basisRows_pairwise (rows : List (Vector Rat m)) :
+    (basisRows rows).Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0) := by
+  simpa [basisRows] using
+    basisRowsAux_pairwise ([] : List (Vector Rat m)) rows (by simp)
+
+private theorem basisMatrix_row_eq_basisRows_get!
+    (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
+    (basisMatrix b).row ⟨i, hi⟩ = (basisRows b.toList)[i]! := by
+  simp [basisMatrix, Matrix.row]
+
+private theorem basisRows_get!_dot_eq_zero
+    (b : Matrix Rat n m) (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
+    Matrix.dot (basisRows b.toList)[i]! (basisRows b.toList)[j]! = 0 := by
+  let rows := basisRows b.toList
+  have hlen : rows.length = n := by
+    simp [rows, basisRows_length]
+  have hirows : i < rows.length := by simpa [hlen] using hi
+  have hjrows : j < rows.length := by simpa [hlen] using hj
+  have hpair : rows.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0) := by
+    simpa [rows] using basisRows_pairwise (rows := b.toList)
+  have hget_i : rows.get ⟨i, hirows⟩ = rows[i]! := by
+    simp [hirows]
+  have hget_j : rows.get ⟨j, hjrows⟩ = rows[j]! := by
+    simp [hjrows]
+  by_cases hlt : i < j
+  · have hrel :=
+      (List.pairwise_iff_get.1 hpair) ⟨i, hirows⟩ ⟨j, hjrows⟩ (by simpa using hlt)
+    rw [← hget_i, ← hget_j]
+    exact hrel.1
+  · have hji : j < i := by
+      exact Nat.lt_of_le_of_ne (Nat.le_of_not_gt hlt) (fun h => hij h.symm)
+    have hrel :=
+      (List.pairwise_iff_get.1 hpair) ⟨j, hjrows⟩ ⟨i, hirows⟩ (by simpa using hji)
+    rw [← hget_i, ← hget_j]
+    exact hrel.2
+
 private theorem basisRows_head (b : Matrix Rat n m) (hn : 0 < n) :
     (basisRows b.toList)[0]! = b[0] := by
   have hlen : b.toList.length = n := by simp
@@ -366,7 +446,9 @@ theorem basis_zero (b : Matrix Rat n m) (hn : 0 < n) :
 theorem basis_orthogonal (b : Matrix Rat n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
     Matrix.dot ((basis b).row ⟨i, hi⟩) ((basis b).row ⟨j, hj⟩) = 0 := by
-  sorry
+  rw [basis, GramSchmidt.basisMatrix_row_eq_basisRows_get!,
+    GramSchmidt.basisMatrix_row_eq_basisRows_get!]
+  exact GramSchmidt.basisRows_get!_dot_eq_zero b i j hi hj hij
 
 theorem basis_decomposition (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     b.row ⟨i, hi⟩ =
@@ -416,7 +498,8 @@ theorem basis_zero (b : Matrix Int n m) (hn : 0 < n) :
 theorem basis_orthogonal (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
     Matrix.dot ((basis b).row ⟨i, hi⟩) ((basis b).row ⟨j, hj⟩) = 0 := by
-  sorry
+  simpa [basis, GramSchmidt.Rat.basis] using
+    GramSchmidt.Rat.basis_orthogonal (b := GramSchmidt.castIntMatrix b) i j hi hj hij
 
 theorem basis_decomposition (b : Matrix Int n m) (i : Nat) (hi : i < n) :
     Vector.map (fun x : Int => (x : Rat)) (b.row ⟨i, hi⟩) =
