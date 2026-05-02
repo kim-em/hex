@@ -47,6 +47,36 @@ private def basisMatrix (b : Matrix Rat n m) : Matrix Rat n m :=
   let rows := basisRows b.toList
   Vector.ofFn fun i => rows[i.val]!
 
+private theorem basisRowsAux_reverse_prefix (basisRev pending : List (Vector Rat m)) :
+    ∃ suffix, basisRowsAux basisRev pending = basisRev.reverse ++ suffix := by
+  induction pending generalizing basisRev with
+  | nil =>
+      exact ⟨[], by simp [basisRowsAux]⟩
+  | cons row rows ih =>
+      obtain ⟨suffix, hsuffix⟩ :=
+        ih (GramSchmidt.reduceAgainstBasis basisRev row :: basisRev)
+      refine ⟨GramSchmidt.reduceAgainstBasis basisRev row :: suffix, ?_⟩
+      simp [basisRowsAux, hsuffix, List.reverse_cons, List.append_assoc]
+
+private theorem basisRowsAux_singleton_head (row : Vector Rat m) (rows : List (Vector Rat m)) :
+    (basisRowsAux [row] rows)[0]! = row := by
+  obtain ⟨suffix, hsuffix⟩ := basisRowsAux_reverse_prefix [row] rows
+  simp [hsuffix]
+
+private theorem basisRows_head (b : Matrix Rat n m) (hn : 0 < n) :
+    (basisRows b.toList)[0]! = b[0] := by
+  have hlen : b.toList.length = n := by simp
+  cases hrows : b.toList with
+  | nil =>
+      simp [hrows] at hlen
+      omega
+  | cons row rows =>
+      have hrow : row = b[0] := by
+        have hget := Vector.getElem_toList (xs := b) (i := 0) (h := by simpa [hlen] using hn)
+        simpa [hrows] using hget
+      simpa [basisRows, basisRowsAux, reduceAgainstBasis, hrows, hrow] using
+        basisRowsAux_singleton_head (row := b[0]) (rows := rows)
+
 /-- Gram-Schmidt coefficient matrix for an already-cast rational input. -/
 private def coeffMatrix (rows basis : Matrix Rat n m) : Matrix Rat n n :=
   Matrix.ofFn fun i j =>
@@ -103,7 +133,8 @@ noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n :=
 theorem basis_zero (b : Matrix Int n m) (hn : 0 < n) :
     (basis b).row ⟨0, hn⟩ =
       Vector.map (fun x : Int => (x : Rat)) (b.row ⟨0, hn⟩) := by
-  sorry
+  simpa [basis, GramSchmidt.basisMatrix, GramSchmidt.castIntMatrix, Matrix.row] using
+    GramSchmidt.basisRows_head (b := GramSchmidt.castIntMatrix b) hn
 
 theorem basis_orthogonal (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
@@ -149,7 +180,8 @@ noncomputable def coeffs (b : Matrix Rat n m) : Matrix Rat n n :=
 
 theorem basis_zero (b : Matrix Rat n m) (hn : 0 < n) :
     (basis b).row ⟨0, hn⟩ = b.row ⟨0, hn⟩ := by
-  sorry
+  simpa [basis, GramSchmidt.basisMatrix, Matrix.row] using
+    GramSchmidt.basisRows_head (b := b) hn
 
 theorem basis_orthogonal (b : Matrix Rat n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
