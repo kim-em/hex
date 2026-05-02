@@ -83,6 +83,9 @@ instance : DensePoly.DivModLaws (ZMod64 p) where
   mod_mod_of_not_pos_degree := by
     intro f g hdegree
     sorry
+  mod_eq_mod_of_congr := by
+    intro f g m hcongr
+    sorry
   mod_add_mod := by
     intro f g m
     sorry

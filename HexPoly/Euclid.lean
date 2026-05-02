@@ -213,6 +213,8 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
     ∀ p q : DensePoly R, q ∣ p → p % q = 0
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
+  mod_eq_mod_of_congr :
+    ∀ p q m : DensePoly R, m ∣ (p - q) → p % m = q % m
   mod_add_mod :
     ∀ p q m : DensePoly R, (p + q) % m = ((p % m) + (q % m)) % m
   mod_mul_mod :
@@ -351,20 +353,6 @@ theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
   by_cases hq : 0 < q.degree?.getD 0
   · exact mod_eq_self_of_degree_lt (p % q) q (mod_degree_lt_of_pos_degree p q hq)
   · exact mod_mod_of_not_pos_degree p q hq
-
-/-- Reducing both summands before addition preserves the canonical remainder. -/
-theorem mod_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
-    [DivModLaws R]
-    (p q m : DensePoly R) :
-    (p + q) % m = ((p % m) + (q % m)) % m := by
-  exact DivModLaws.mod_add_mod p q m
-
-/-- Reducing both factors before multiplication preserves the canonical remainder. -/
-theorem mod_mul_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
-    [DivModLaws R]
-    (p q m : DensePoly R) :
-    (p * q) % m = ((p % m) * (q % m)) % m := by
-  exact DivModLaws.mod_mul_mod p q m
 
 end DensePoly
 
@@ -1601,6 +1589,34 @@ private theorem zero_mod_eq_zero {S : Type _}
       change (ofCoeffs #[] : DensePoly S) = 0
       rfl
 
+private theorem mod_eq_mod_of_dvd_sub {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
+    {p q m : DensePoly S} :
+    m ∣ (p - q) -> p % m = q % m := by
+  exact DivModLaws.mod_eq_mod_of_congr p q m
+
+/-- Congruent polynomials have the same canonical remainder once the divisor law package
+supplies the executable `%` invariants. -/
+theorem mod_eq_mod_of_congr {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [DivModLaws S]
+    {p q m : DensePoly S} :
+    Congr p q m -> p % m = q % m := by
+  exact mod_eq_mod_of_dvd_sub
+
+/-- Reducing both summands before addition preserves the canonical remainder. -/
+theorem mod_add_mod {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [DivModLaws S]
+    (p q m : DensePoly S) :
+    (p + q) % m = ((p % m) + (q % m)) % m := by
+  exact DivModLaws.mod_add_mod p q m
+
+/-- Reducing both factors before multiplication preserves the canonical remainder. -/
+theorem mod_mul_mod {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
+    [DivModLaws S]
+    (p q m : DensePoly S) :
+    (p * q) % m = ((p % m) * (q % m)) % m := by
+  exact DivModLaws.mod_mul_mod p q m
+
 private theorem mod_mul_self_left {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (m r : DensePoly S) :
@@ -1614,26 +1630,16 @@ private theorem mod_add_mul_self {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
     (q m r : DensePoly S) :
     (q + m * r) % m = q % m := by
-  rw [mod_add_mod]
-  rw [mod_mul_self_left]
-  rw [add_zero_right]
-  rw [mod_mod]
-
-private theorem mod_eq_mod_of_dvd_sub {S : Type _}
-    [Lean.Grind.CommRing S] [DecidableEq S] [Div S] [DivModLaws S]
-    {p q m : DensePoly S} :
-    m ∣ (p - q) -> p % m = q % m := by
-  rintro ⟨r, hmul⟩
-  rw [eq_add_mul_of_sub_eq_mul hmul]
-  exact mod_add_mul_self q m r
-
-/-- Congruent polynomials have the same canonical remainder once the divisor law package
-supplies the executable `%` invariants. -/
-theorem mod_eq_mod_of_congr {S : Type _} [Lean.Grind.CommRing S] [DecidableEq S] [Div S]
-    [DivModLaws S]
-    {p q m : DensePoly S} :
-    Congr p q m -> p % m = q % m := by
-  exact mod_eq_mod_of_dvd_sub
+  apply mod_eq_mod_of_congr
+  exact ⟨r, by
+    apply ext_coeff
+    intro n
+    have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+    have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+    rw [coeff_sub (q + m * r) q n hzero_sub]
+    rw [coeff_add q (m * r) n hzero_add]
+    rw [coeff_mul]
+    grind⟩
 
 private theorem polyCRT_sub_left_factor {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
