@@ -1449,6 +1449,49 @@ private theorem yunFactorsContribution_step_preserves_target
     rw [hstep]
     exact ⟨htarget_factor hz_false, rfl, hsplit.1, hsplit.2⟩
 
+/--
+One nonterminal Yun step preserves the caller's target contribution and
+keeps the repeated tail aligned with the recursive state.  This packages the
+algebra needed by the successor fuel proof: callers supply the target facts
+for the recursive tail, and the lemma returns the corresponding current-state
+facts plus the two gcd/division reconstruction equalities.
+-/
+private theorem yunFactorsContribution_step_target_combiner
+    (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p)
+    (hc : isOne c = false)
+    (htarget_one :
+      isOne (c / DensePoly.gcd c w) = true →
+        (yunFactorsContribution
+          (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+          (multiplicity + 1) fuel).1 = target)
+    (htarget_factor :
+      isOne (c / DensePoly.gcd c w) = false →
+        pow (c / DensePoly.gcd c w) multiplicity *
+          (yunFactorsContribution
+            (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+            (multiplicity + 1) fuel).1 = target) :
+    let y := DensePoly.gcd c w
+    let tail :=
+      yunFactorsContribution y (w / y) (multiplicity + 1) fuel
+    let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
+    contribution.1 = target ∧
+      contribution.2 = tail.2 ∧
+        squareFreeAuxRevContribution (pthRoot contribution.2)
+            (multiplicity * p) fuel =
+          squareFreeAuxRevContribution (pthRoot tail.2)
+            (multiplicity * p) fuel ∧
+          (c / y) * y = c ∧ (w / y) * y = w := by
+  dsimp
+  have htarget :=
+    yunFactorsContribution_step_preserves_target
+      c w multiplicity fuel target hc htarget_one htarget_factor
+  have hdescent :=
+    yunFactorsContribution_tail_repeated_descent
+      c w multiplicity fuel hc
+  exact
+    ⟨htarget.1, htarget.2.1, hdescent.2,
+      htarget.2.2.1, htarget.2.2.2⟩
+
 private theorem yunFactorsContribution_initial_state_split
     (f : FpPoly p) :
     let g := DensePoly.gcd f (DensePoly.derivative f)
@@ -1478,51 +1521,33 @@ private theorem yunFactorsContribution_derivative_active_split_algebra_succ
           contribution.1 = 1 ∧ contribution.2 = w ∧ c = 1 :=
     fun c w multiplicity fuel hc =>
       yunFactorsContribution_terminal_of_isOne c w multiplicity fuel hc
-  have hsplit_surface :
-      ∀ (c w : FpPoly p),
-        let y := DensePoly.gcd c w
-        let z := c / y
-        z * y = c ∧ (w / y) * y = w :=
-    fun c w => yunFactorsContribution_step_split c w
-  have hstep_one_surface :
-      ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
+  have hstep_target_surface :
+      ∀ (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p),
         isOne c = false →
-          isOne (c / DensePoly.gcd c w) = true →
-            yunFactorsContribution c w multiplicity (fuel + 1) =
-              yunFactorsContribution
+          (isOne (c / DensePoly.gcd c w) = true →
+            (yunFactorsContribution
+              (DensePoly.gcd c w) (w / DensePoly.gcd c w)
+              (multiplicity + 1) fuel).1 = target) →
+          (isOne (c / DensePoly.gcd c w) = false →
+            pow (c / DensePoly.gcd c w) multiplicity *
+              (yunFactorsContribution
                 (DensePoly.gcd c w) (w / DensePoly.gcd c w)
-                (multiplicity + 1) fuel :=
-    fun c w multiplicity fuel hc hz =>
-      yunFactorsContribution_step_of_not_isOne_of_isOne_z
-        c w multiplicity fuel hc hz
-  have hstep_factor_surface :
-      ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
-        isOne c = false →
-          isOne (c / DensePoly.gcd c w) = false →
-            yunFactorsContribution c w multiplicity (fuel + 1) =
-              (pow (c / DensePoly.gcd c w) multiplicity *
-                  (yunFactorsContribution
-                    (DensePoly.gcd c w) (w / DensePoly.gcd c w)
-                    (multiplicity + 1) fuel).1,
-                (yunFactorsContribution
-                  (DensePoly.gcd c w) (w / DensePoly.gcd c w)
-                  (multiplicity + 1) fuel).2) :=
-    fun c w multiplicity fuel hc hz =>
-      yunFactorsContribution_step_of_not_isOne_of_not_isOne_z
-        c w multiplicity fuel hc hz
-  have hdescent_surface :
-      ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
-        isOne c = false →
+                (multiplicity + 1) fuel).1 = target) →
           let y := DensePoly.gcd c w
-          let tail := yunFactorsContribution y (w / y) (multiplicity + 1) fuel
-          let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
-          contribution.2 = tail.2 ∧
+          let tail :=
+            yunFactorsContribution y (w / y) (multiplicity + 1) fuel
+          let contribution :=
+            yunFactorsContribution c w multiplicity (fuel + 1)
+          contribution.1 = target ∧
+            contribution.2 = tail.2 ∧
             squareFreeAuxRevContribution (pthRoot contribution.2)
                 (multiplicity * p) fuel =
               squareFreeAuxRevContribution (pthRoot tail.2)
-                (multiplicity * p) fuel :=
-    fun c w multiplicity fuel hc =>
-      yunFactorsContribution_tail_repeated_descent c w multiplicity fuel hc
+                (multiplicity * p) fuel ∧
+              (c / y) * y = c ∧ (w / y) * y = w :=
+    fun c w multiplicity fuel target hc htarget_one htarget_factor =>
+      yunFactorsContribution_step_target_combiner
+        c w multiplicity fuel target hc htarget_one htarget_factor
   let g := DensePoly.gcd f (DensePoly.derivative f)
   let c := f / g
   have hcg : c * g = f := by
