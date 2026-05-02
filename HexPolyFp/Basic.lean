@@ -59,15 +59,113 @@ class PrimeModulus (p : Nat) : Prop where
 def primeModulusOfPrime (hp : Hex.Nat.Prime p) : PrimeModulus p :=
   ⟨hp⟩
 
+private theorem divMod_spec_core (f g : DensePoly (ZMod64 p)) :
+    let qr := DensePoly.divMod f g
+    qr.1 * g + qr.2 = f := by
+  sorry
+
+private theorem mod_sub_self_eq_mul_neg_div (f m : DensePoly (ZMod64 p)) :
+    f % m - f = m * (0 - (f / m)) := by
+  have hdiv : (f / m) * m + (f % m) = f := by
+    simpa [DensePoly.div, DensePoly.mod] using divMod_spec_core f m
+  calc
+    f % m - f = 0 - (f / m) * m := by
+      apply DensePoly.ext_coeff
+      intro n
+      have hcoeff := congrArg (fun x : DensePoly (ZMod64 p) => x.coeff n) hdiv
+      have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+      have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+      change (((f / m) * m + (f % m)).coeff n = f.coeff n) at hcoeff
+      rw [DensePoly.coeff_add ((f / m) * m) (f % m) n hzero_add] at hcoeff
+      rw [DensePoly.coeff_sub (f % m) f n hzero_sub]
+      rw [DensePoly.coeff_sub 0 ((f / m) * m) n hzero_sub]
+      rw [DensePoly.coeff_zero]
+      grind
+    _ = m * (0 - (f / m)) := by
+      exact (DensePoly.mul_sub_zero_comm m (f / m)).symm
+
+private theorem congr_mod_core (f m : DensePoly (ZMod64 p)) :
+    DensePoly.Congr (f % m) f m := by
+  exact ⟨0 - (f / m), mod_sub_self_eq_mul_neg_div f m⟩
+
+private theorem mod_eq_mod_of_congr_core (f g m : DensePoly (ZMod64 p))
+    (hcongr : DensePoly.Congr f g m) :
+    f % m = g % m := by
+  sorry
+
+private theorem add_sub_add_right (a b c d : DensePoly (ZMod64 p)) :
+    (a + b) - (c + d) = (a - c) + (b - d) := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+  have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_sub (a + b) (c + d) n hzero_sub]
+  rw [DensePoly.coeff_add a b n hzero_add, DensePoly.coeff_add c d n hzero_add]
+  rw [DensePoly.coeff_add (a - c) (b - d) n hzero_add]
+  rw [DensePoly.coeff_sub a c n hzero_sub, DensePoly.coeff_sub b d n hzero_sub]
+  grind
+
+private theorem sub_self_right_add (a b : DensePoly (ZMod64 p)) :
+    (a + b) - a = b := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+  have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_sub (a + b) a n hzero_sub]
+  rw [DensePoly.coeff_add a b n hzero_add]
+  grind
+
+private theorem mul_left_remainder_delta (f g m rf rg : DensePoly (ZMod64 p))
+    (hf : f % m = f + m * rf)
+    (hg : g % m = g + m * rg) :
+    (f % m * (g % m)) - (f * g) = m * (rf * (g % m) + f * rg) := by
+  have hleft :
+      (f + m * rf) * (g % m) =
+        f * (g % m) + (m * rf) * (g % m) :=
+    DensePoly.mul_add_left_poly f (m * rf) (g % m)
+  have hright :
+      f * (g % m) = f * g + f * (m * rg) := by
+    rw [hg]
+    exact DensePoly.mul_add_right_poly f g (m * rg)
+  calc
+    (f % m * (g % m)) - (f * g)
+        = ((f + m * rf) * (g % m)) - (f * g) := by rw [hf]
+    _ = (f * (g % m) + (m * rf) * (g % m)) - (f * g) := by rw [hleft]
+    _ = ((f * g + f * (m * rg)) + (m * rf) * (g % m)) - (f * g) := by
+      rw [hright]
+    _ = (f * g + (f * (m * rg) + (m * rf) * (g % m))) - (f * g) := by
+      exact congrArg (fun x => x - f * g)
+        (DensePoly.add_assoc_poly (f * g) (f * (m * rg)) ((m * rf) * (g % m)))
+    _ = f * (m * rg) + (m * rf) * (g % m) := by
+      rw [sub_self_right_add]
+    _ = m * (f * rg) + (m * rf) * (g % m) := by
+      apply congrArg (fun x => x + (m * rf) * (g % m))
+      calc
+        f * (m * rg) = (f * m) * rg := by
+          exact (DensePoly.mul_assoc_poly f m rg).symm
+        _ = (m * f) * rg := by
+          exact congrArg (fun x => x * rg) (DensePoly.mul_comm_poly f m)
+        _ = m * (f * rg) := by
+          exact DensePoly.mul_assoc_poly m f rg
+    _ = m * (f * rg) + m * (rf * (g % m)) := by
+      exact congrArg (fun x => m * (f * rg) + x)
+        (DensePoly.mul_assoc_poly m rf (g % m))
+    _ = m * (f * rg + rf * (g % m)) := by
+      exact (DensePoly.mul_add_right_poly m (f * rg) (rf * (g % m))).symm
+    _ = m * (rf * (g % m) + f * rg) := by
+      exact congrArg (fun x => m * x)
+        (DensePoly.add_comm_poly (f * rg) (rf * (g % m)))
+
 /-- The `F_p[x]` division law obligations used by quotient constructions.
 
 These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
 surface used by downstream quotient-ring code; the executable division operations
 themselves are inherited from `DensePoly`. -/
-instance : DensePoly.DivModLaws (ZMod64 p) where
+instance instDivModLawsZMod64Fp (p : Nat) [Bounds p] :
+    DensePoly.DivModLaws (ZMod64 p) where
   divMod_spec := by
     intro f g
-    sorry
+    exact divMod_spec_core f g
   divMod_remainder_degree_lt_of_pos_degree := by
     intro f g hdegree
     sorry
@@ -85,13 +183,47 @@ instance : DensePoly.DivModLaws (ZMod64 p) where
     sorry
   mod_eq_mod_of_congr := by
     intro f g m hcongr
-    sorry
+    exact mod_eq_mod_of_congr_core f g m hcongr
   mod_add_mod := by
     intro f g m
-    sorry
+    apply Eq.symm
+    apply mod_eq_mod_of_congr_core
+    rcases congr_mod_core f m with ⟨rf, hf⟩
+    rcases congr_mod_core g m with ⟨rg, hg⟩
+    exact ⟨rf + rg, by
+      calc
+        (f % m + g % m) - (f + g)
+            = (f % m - f) + (g % m - g) := add_sub_add_right (f % m) (g % m) f g
+        _ = m * rf + m * rg := by rw [hf, hg]
+        _ = m * (rf + rg) := by exact (DensePoly.mul_add_right_poly m rf rg).symm⟩
   mod_mul_mod := by
     intro f g m
-    sorry
+    apply Eq.symm
+    apply mod_eq_mod_of_congr_core
+    rcases congr_mod_core f m with ⟨rf, hf⟩
+    rcases congr_mod_core g m with ⟨rg, hg⟩
+    exact ⟨rf * (g % m) + f * rg, by
+      have hf' : f % m = f + m * rf := by
+        apply DensePoly.ext_coeff
+        intro n
+        have hcoeff := congrArg (fun x : DensePoly (ZMod64 p) => x.coeff n) hf
+        have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+        have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+        change (f % m - f).coeff n = (m * rf).coeff n at hcoeff
+        rw [DensePoly.coeff_sub (f % m) f n hzero_sub] at hcoeff
+        rw [DensePoly.coeff_add f (m * rf) n hzero_add]
+        grind
+      have hg' : g % m = g + m * rg := by
+        apply DensePoly.ext_coeff
+        intro n
+        have hcoeff := congrArg (fun x : DensePoly (ZMod64 p) => x.coeff n) hg
+        have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+        have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+        change (g % m - g).coeff n = (m * rg).coeff n at hcoeff
+        rw [DensePoly.coeff_sub (g % m) g n hzero_sub] at hcoeff
+        rw [DensePoly.coeff_add g (m * rg) n hzero_add]
+        grind
+      exact mul_left_remainder_delta f g m rf rg hf' hg'⟩
 
 /-- The `F_p[x]` gcd law obligations used by finite-field inverse construction. -/
 instance : DensePoly.GcdLaws (ZMod64 p) where
