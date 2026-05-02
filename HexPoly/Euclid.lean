@@ -1338,6 +1338,43 @@ private theorem contentNat_dvd_coeff (p : DensePoly Int) (n : Nat) :
     rw [coeff_eq_zero_of_size_le p hnle]
     exact ⟨0, by rw [Int.mul_zero]; rfl⟩
 
+private theorem dvd_foldl_gcd_of_dvd_mem (xs : List Nat) (d acc : Nat)
+    (hacc : d ∣ acc) (hxs : ∀ x, x ∈ xs → d ∣ x) :
+    d ∣ xs.foldl (fun g x => Nat.gcd g x) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simpa using hacc
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      apply ih
+      · exact Nat.dvd_gcd hacc (hxs x (by simp))
+      · intro y hy
+        exact hxs y (by simp [hy])
+
+private theorem dvd_contentNat_of_dvd_coeff (p : DensePoly Int) (d : Nat)
+    (h : ∀ n, (d : Int) ∣ p.coeff n) :
+    d ∣ contentNat p := by
+  unfold contentNat
+  rw [← List.foldl_map]
+  apply dvd_foldl_gcd_of_dvd_mem
+  · exact Nat.dvd_zero d
+  · intro x hx
+    rw [List.mem_map] at hx
+    rcases hx with ⟨coeff, hcoeff, rfl⟩
+    rw [List.mem_iff_getElem] at hcoeff
+    rcases hcoeff with ⟨n, hn, hget⟩
+    have hcoeff_eq : p.coeff n = coeff := by
+      have hnArray : n < p.coeffs.size := by
+        simpa [toArray] using hn
+      have hgetArray : p.coeffs[n] = coeff := by
+        simpa [toArray, Array.getElem_toList] using hget
+      change p.coeffs.getD n (0 : Int) = coeff
+      rw [← Array.getElem_eq_getD (0 : Int)]
+      exact hgetArray
+    have hdiv := h n
+    rw [hcoeff_eq] at hdiv
+    rwa [Int.ofNat_dvd_left] at hdiv
+
 private theorem list_getD_map_ediv_zero (c : Int) (coeffs : List Int) (n : Nat) :
     (coeffs.map fun coeff => coeff / c).getD n (Zero.zero : Int) =
       coeffs.getD n (Zero.zero : Int) / c := by
@@ -1381,6 +1418,45 @@ theorem content_mul_primitivePart (p : DensePoly Int) :
           unfold content
           exact Int.mul_ediv_cancel' (contentNat_dvd_coeff p n)
         rw [hpart, hmul]
+
+/-- The primitive part of a polynomial with nonzero content has content `1`. -/
+theorem primitivePart_primitive (p : DensePoly Int) (h : content p ≠ 0) :
+    content (primitivePart p) = 1 := by
+  unfold content
+  let c := contentNat p
+  let q := primitivePart p
+  let cp := contentNat q
+  have hc : c ≠ 0 := by
+    intro hc0
+    apply h
+    simpa [content, c] using congrArg Int.ofNat hc0
+  have hscale : scale (content p) q = p := by
+    simpa [q] using content_mul_primitivePart p
+  have hmul_dvd_coeff : ∀ n, ((c * cp : Nat) : Int) ∣ p.coeff n := by
+    intro n
+    have hcoeff := congrArg (fun r : DensePoly Int => r.coeff n) hscale
+    change (scale (content p) q).coeff n = p.coeff n at hcoeff
+    rw [coeff_scale (content p) q n (Int.mul_zero _)] at hcoeff
+    have hcp : (cp : Int) ∣ q.coeff n := by
+      simpa [cp, q] using contentNat_dvd_coeff q n
+    rcases hcp with ⟨k, hk⟩
+    refine ⟨k, ?_⟩
+    rw [← hcoeff, hk]
+    simp [content, c, cp]
+    grind
+  have hmul_dvd_c : c * cp ∣ c := by
+    simpa [c, cp] using dvd_contentNat_of_dvd_coeff p (c * cp) hmul_dvd_coeff
+  rcases hmul_dvd_c with ⟨k, hk⟩
+  have hcpos : 0 < c := Nat.pos_of_ne_zero hc
+  have hcp_one : cp = 1 := by
+    have hcancel : cp * k = 1 := by
+      have hk' : c * 1 = c * (cp * k) := by
+        simpa [Nat.mul_assoc] using hk
+      exact Nat.eq_of_mul_eq_mul_left hcpos hk'.symm
+    exact Nat.eq_one_of_mul_eq_one_right hcancel
+  change (cp : Int) = 1
+  rw [hcp_one]
+  rfl
 
 /-- Construct a polynomial with prescribed residues modulo coprime factors. -/
 def polyCRT {S : Type _} [Zero S] [DecidableEq S] [One S] [Add S] [Mul S]
