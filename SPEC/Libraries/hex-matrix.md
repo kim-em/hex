@@ -21,6 +21,7 @@ Dense matrices as `Vector (Vector R m) n`.
   structure IsEchelonForm (M : Matrix R n m) (D : RowEchelonData R n m) : Prop where
     transform_mul : D.transform * M = D.echelon
     transform_inv : ∃ Tinv : Matrix R n n, Tinv * D.transform = 1
+    transform_right_inv : ∃ Tinv : Matrix R n n, D.transform * Tinv = 1
     rank_le_n : D.rank ≤ n
     rank_le_m : D.rank ≤ m
     pivotCols_sorted : ∀ i j, i < j → D.pivotCols[i] < D.pivotCols[j]
@@ -153,7 +154,7 @@ for RREF and pivot sign tracking.
 - `spanCoeffs_sound : E.spanCoeffs v = some c → rowCombination M c = v`
 - `spanCoeffs_complete : (∃ c, rowCombination M c = v) → (E.spanCoeffs v).isSome`
 - `spanContains_iff : E.spanContains v = true ↔ ∃ c, rowCombination M c = v`
-- `transform_mul_inv : ∃ Tinv, D.transform * Tinv = 1` (left inv → right inv for square matrices)
+- `transform_mul_inv : ∃ Tinv, D.transform * Tinv = 1`
 - `freeCols_sorted`, `colPartition`, `colPartition_exclusive` (see column partition above)
 - `pivotCols_injective`, `freeCols_injective` (from `_sorted`)
 - `pivotCols_disjoint_freeCols` (from `colPartition_exclusive`)
