@@ -3878,6 +3878,54 @@ private theorem xorBoolList_sourcePair_index_collapse_low
         · simp [hpab]]
       simp [xorBoolList_range_false, hsum]
 
+private theorem xorBoolList_sourcePair_index_collapse_high
+    (xy zc : Bool) {a b c bit : Nat}
+    (ha : a < 64) (hb : b < 64) (hc : c < 64) (hbit : bit < 64) :
+    xorBoolList
+        ((List.range 64).map
+          (fun p => (((xy && decide (a + b = p + 64)) && zc) &&
+            decide (p + c = bit + 64)))) =
+      ((xy && zc) && decide (a + b + c = bit + 128)) := by
+  cases xy <;> cases zc
+  · simp [xorBoolList_range_false]
+  · simp [xorBoolList_range_false]
+  · simp [xorBoolList_range_false]
+  · by_cases hsum : a + b + c = bit + 128
+    · have hsourceGe : 64 ≤ a + b := by omega
+      have hsource : a + b - 64 < 64 := by omega
+      have hsourceEq : a + b - 64 + 64 = a + b := by omega
+      rw [show
+          (List.range 64).map
+              (fun p => (((true && decide (a + b = p + 64)) && true) &&
+                decide (p + c = bit + 64))) =
+            (List.range 64).map (fun p => true && decide (p = a + b - 64)) by
+        apply List.map_congr_left
+        intro p hp
+        have hpLt : p < 64 := List.mem_range.mp hp
+        by_cases hpab : p = a + b - 64
+        · subst hpab
+          simp [hsourceEq]
+          have hpc : a + b - 64 + c = bit + 64 := by omega
+          simp [hpc]
+        · have hleft : ¬ a + b = p + 64 := by omega
+          have hright : p + c ≠ bit + 64 := by omega
+          simp [hpab, hleft, hright]]
+      simpa [hsum] using xorBoolList_range_single_decide true hsource
+    · rw [show
+          (List.range 64).map
+              (fun p => (((true && decide (a + b = p + 64)) && true) &&
+                decide (p + c = bit + 64))) =
+            (List.range 64).map (fun _ => false) by
+        apply List.map_congr_left
+        intro p _hp
+        by_cases hpab : a + b = p + 64
+        · have hright : p + c ≠ bit + 64 := by
+            intro hpc
+            omega
+          simp [hpab, hright]
+        · simp [hpab]]
+      simp [xorBoolList_range_false, hsum]
+
 private theorem clmulSourcePairCoeff_and_bit_low
     (x y : UInt64) {p : Nat} (hp : p < 64) (zc gate : Bool) :
     ((wordBitAt (clmul x y).2 p && zc) && gate) =
@@ -4280,14 +4328,324 @@ private theorem clmulAssoc_right_middle_sourceTriple
       clmulSourceTripleCoeff x y z (bit + 64) := by
   sorry
 
+private theorem xorBoolList_left_high_sourceTriple_collapse
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
+    xorBoolList
+        (List.flatMap
+          (fun c =>
+            List.flatMap
+              (fun p =>
+                List.flatMap
+                  (fun b =>
+                    List.map
+                      (fun a =>
+                        ((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64)))
+                      (List.range 64))
+                  (List.range 64))
+              (List.range 64))
+          (List.range 64)) =
+      clmulSourceTripleCoeff x y z (bit + 128) := by
+  unfold clmulSourceTripleCoeff
+  calc
+    xorBoolList
+        (List.flatMap
+          (fun c =>
+            List.flatMap
+              (fun p =>
+                List.flatMap
+                  (fun b =>
+                    List.map
+                      (fun a =>
+                        ((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64)))
+                      (List.range 64))
+                  (List.range 64))
+              (List.range 64))
+          (List.range 64))
+        =
+      xorBoolList
+        (List.flatMap
+          (fun c =>
+            List.flatMap
+              (fun b =>
+                List.flatMap
+                  (fun a =>
+                    List.map
+                      (fun p =>
+                        ((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64)))
+                      (List.range 64))
+                  (List.range 64))
+              (List.range 64))
+          (List.range 64)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro c _hc
+          calc
+            xorBoolList
+                (List.flatMap
+                  (fun p =>
+                    List.flatMap
+                      (fun b =>
+                        List.map
+                          (fun a =>
+                            ((((wordBitAt x a && wordBitAt y b) &&
+                                decide (a + b = p + 64)) && wordBitAt z c) &&
+                              decide (p + c = bit + 64)))
+                          (List.range 64))
+                      (List.range 64))
+                  (List.range 64))
+                =
+              xorBoolList
+                (List.flatMap
+                  (fun b =>
+                    List.flatMap
+                      (fun p =>
+                        List.map
+                          (fun a =>
+                            ((((wordBitAt x a && wordBitAt y b) &&
+                                decide (a + b = p + 64)) && wordBitAt z c) &&
+                              decide (p + c = bit + 64)))
+                          (List.range 64))
+                      (List.range 64))
+                  (List.range 64)) := by
+                  exact xorBoolList_flatMap_ranges_swap_list 64 64
+                    (fun p b =>
+                      (List.range 64).map
+                        (fun a =>
+                          ((((wordBitAt x a && wordBitAt y b) &&
+                              decide (a + b = p + 64)) && wordBitAt z c) &&
+                            decide (p + c = bit + 64))))
+            _ =
+              xorBoolList
+                (List.flatMap
+                  (fun b =>
+                    List.flatMap
+                      (fun a =>
+                        List.map
+                          (fun p =>
+                            ((((wordBitAt x a && wordBitAt y b) &&
+                                decide (a + b = p + 64)) && wordBitAt z c) &&
+                              decide (p + c = bit + 64)))
+                          (List.range 64))
+                      (List.range 64))
+                  (List.range 64)) := by
+                  apply xorBoolList_flatMap_congr_xor
+                  intro b _hb
+                  simpa [List.flatMap_singleton] using
+                    xorBoolList_flatMap_ranges_swap_list 64 64
+                      (fun p a =>
+                        [((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64))])
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun c =>
+            (List.range 64).flatMap
+              (fun b =>
+                (List.range 64).map
+                  (fun a =>
+                    ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                      decide (a + b + c = bit + 128)))))
+          (List.range 64)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro c hc
+          apply xorBoolList_flatMap_congr_xor
+          intro b hb
+          calc
+            xorBoolList
+                ((List.range 64).flatMap
+                  (fun a =>
+                    (List.range 64).map
+                      (fun p =>
+                        ((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64)))))
+                =
+              xorBoolList
+                ((List.range 64).map
+                  (fun a =>
+                    xorBoolList
+                      ((List.range 64).map
+                        (fun p =>
+                          ((((wordBitAt x a && wordBitAt y b) &&
+                              decide (a + b = p + 64)) && wordBitAt z c) &&
+                            decide (p + c = bit + 64)))))) := by
+                  rw [xorBoolList_map_xorBoolList]
+            _ =
+              xorBoolList
+                ((List.range 64).map
+                  (fun a =>
+                    ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                      decide (a + b + c = bit + 128)))) := by
+                  apply congrArg xorBoolList
+                  apply List.map_congr_left
+                  intro a ha
+                  simpa [Bool.and_assoc] using
+                    xorBoolList_sourcePair_index_collapse_high
+                      (wordBitAt x a && wordBitAt y b) (wordBitAt z c)
+                      (a := a) (b := b) (c := c)
+                      (List.mem_range.mp ha) (List.mem_range.mp hb)
+                      (List.mem_range.mp hc) hbit
+    _ =
+      xorBoolList
+        (List.flatMap
+          (fun a =>
+            List.flatMap
+              (fun b =>
+                (List.range 64).map
+                  (fun c =>
+                    ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                      decide (a + b + c = bit + 128))))
+              (List.range 64))
+          (List.range 64)) := by
+          calc
+            xorBoolList
+                (List.flatMap
+                  (fun c =>
+                    (List.range 64).flatMap
+                      (fun b =>
+                        (List.range 64).map
+                          (fun a =>
+                            ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                              decide (a + b + c = bit + 128)))))
+                  (List.range 64))
+                =
+              xorBoolList
+                (List.flatMap
+                  (fun b =>
+                    (List.range 64).flatMap
+                      (fun c =>
+                        (List.range 64).map
+                          (fun a =>
+                            ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                              decide (a + b + c = bit + 128)))))
+                  (List.range 64)) := by
+                  exact xorBoolList_flatMap_ranges_swap_list 64 64
+                    (fun c b =>
+                      (List.range 64).map
+                        (fun a =>
+                          ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                            decide (a + b + c = bit + 128))))
+            _ =
+              xorBoolList
+                (List.flatMap
+                  (fun b =>
+                    (List.range 64).flatMap
+                      (fun a =>
+                        (List.range 64).map
+                          (fun c =>
+                            ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                              decide (a + b + c = bit + 128)))))
+                  (List.range 64)) := by
+                  apply xorBoolList_flatMap_congr_xor
+                  intro b _hb
+                  simpa [List.flatMap_singleton] using
+                    xorBoolList_flatMap_ranges_swap_list 64 64
+                      (fun c a =>
+                        [((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                          decide (a + b + c = bit + 128))])
+            _ =
+              xorBoolList
+                (List.flatMap
+                  (fun a =>
+                    (List.range 64).flatMap
+                      (fun b =>
+                        (List.range 64).map
+                          (fun c =>
+                            ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                              decide (a + b + c = bit + 128)))))
+                  (List.range 64)) := by
+                  exact xorBoolList_flatMap_ranges_swap_list 64 64
+                    (fun b a =>
+                      (List.range 64).map
+                        (fun c =>
+                          ((wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                            decide (a + b + c = bit + 128))))
+
 private theorem clmulAssoc_left_high_sourceTriple
-    (x y z : UInt64) (bit : Nat) :
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     wordBitAt (clmul (clmul x y).1 z).1 bit =
       clmulSourceTripleCoeff x y z (bit + 128) := by
-  sorry
+  rw [clmulSourcePairCoeff_high (clmul x y).1 z hbit]
+  unfold clmulSourcePairCoeff
+  calc
+    xorBoolList
+        (List.flatMap
+          (fun c =>
+            (List.range 64).map
+              (fun p =>
+                ((wordBitAt (clmul x y).1 p && wordBitAt z c) &&
+                  decide (p + c = bit + 64))))
+          (List.range 64))
+        =
+    xorBoolList
+        (List.flatMap
+          (fun c =>
+            List.flatMap
+              (fun p =>
+                List.flatMap
+                  (fun b =>
+                    List.map
+                      (fun a =>
+                        ((((wordBitAt x a && wordBitAt y b) &&
+                            decide (a + b = p + 64)) && wordBitAt z c) &&
+                          decide (p + c = bit + 64)))
+                      (List.range 64))
+                  (List.range 64))
+              (List.range 64))
+          (List.range 64)) := by
+          apply xorBoolList_flatMap_congr_xor
+          intro c _hc
+          calc
+            xorBoolList
+                ((List.range 64).map
+                  (fun p =>
+                    ((wordBitAt (clmul x y).1 p && wordBitAt z c) &&
+                      decide (p + c = bit + 64))))
+                =
+              xorBoolList
+                ((List.range 64).map
+                  (fun p =>
+                    xorBoolList
+                      (List.flatMap
+                        (fun b =>
+                          List.map
+                            (fun a =>
+                              ((((wordBitAt x a && wordBitAt y b) &&
+                                  decide (a + b = p + 64)) && wordBitAt z c) &&
+                                decide (p + c = bit + 64)))
+                            (List.range 64))
+                        (List.range 64)))) := by
+                  apply congrArg xorBoolList
+                  apply List.map_congr_left
+                  intro p hp
+                  exact clmulSourcePairCoeff_and_bit_high x y (List.mem_range.mp hp)
+                    (wordBitAt z c) (decide (p + c = bit + 64))
+            _ =
+              xorBoolList
+                (List.flatMap
+                  (fun p =>
+                    List.flatMap
+                      (fun b =>
+                        List.map
+                          (fun a =>
+                            ((((wordBitAt x a && wordBitAt y b) &&
+                                decide (a + b = p + 64)) && wordBitAt z c) &&
+                              decide (p + c = bit + 64)))
+                          (List.range 64))
+                      (List.range 64))
+                  (List.range 64)) := by
+                  rw [xorBoolList_map_xorBoolList]
+    _ = clmulSourceTripleCoeff x y z (bit + 128) := by
+          exact xorBoolList_left_high_sourceTriple_collapse x y z hbit
 
 private theorem clmulAssoc_right_high_sourceTriple
-    (x y z : UInt64) (bit : Nat) :
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     wordBitAt (clmul x (clmul y z).1).1 bit =
       clmulSourceTripleCoeff x y z (bit + 128) := by
   sorry
@@ -4315,12 +4673,13 @@ private theorem clmulCoeffAt_assoc_twoWord_middle
     clmulAssoc_right_middle_sourceTriple]
 
 private theorem clmulCoeffAt_assoc_twoWord_high
-    (x y z : UInt64) (bit : Nat) :
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     ((((clmul (clmul x y).1 z).1 >>> bit.toUInt64) &&& 1) != 0) =
       ((((clmul x (clmul y z).1).1 >>> bit.toUInt64) &&& 1) != 0) := by
   change wordBitAt (clmul (clmul x y).1 z).1 bit =
     wordBitAt (clmul x (clmul y z).1).1 bit
-  rw [clmulAssoc_left_high_sourceTriple, clmulAssoc_right_high_sourceTriple]
+  rw [clmulAssoc_left_high_sourceTriple x y z hbit,
+    clmulAssoc_right_high_sourceTriple x y z hbit]
 
 private theorem clmulCoeffAt_assoc_twoWord
     (base n : Nat) (x y z : UInt64) :
@@ -4336,7 +4695,8 @@ private theorem clmulCoeffAt_assoc_twoWord
     · simp [h1, clmulCoeffAt_assoc_twoWord_middle x y z (Nat.mod_lt n (by decide : 0 < 64))]
     · by_cases h2 : n / 64 = base + 1 + 1
       · have hbase20 : base + 1 + 1 ≠ base := by omega
-        simp [h2, hbase20, clmulCoeffAt_assoc_twoWord_high]
+        simp [h2, hbase20,
+          clmulCoeffAt_assoc_twoWord_high x y z (Nat.mod_lt n (by decide : 0 < 64))]
       · simp [h0, h1, h2]
 
 /-- The raw product has enough intermediate slots to contain every source
