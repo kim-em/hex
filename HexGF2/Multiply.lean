@@ -3501,6 +3501,168 @@ private theorem clmul_rightBitFold_high
             unfold clmulCoeffAt wordBitAt
             simp [hhigh, hmod]
 
+private theorem xorBoolList_range_false (n : Nat) :
+    xorBoolList ((List.range n).map (fun _ => false)) = false := by
+  induction n with
+  | zero =>
+      simp [xorBoolList]
+  | succ n ih =>
+      rw [List.range_succ, List.map_append, xorBoolList_append, ih]
+      simp [xorBoolList]
+
+private theorem xorBoolList_range_single_decide {n source : Nat} (value : Bool)
+    (hsource : source < n) :
+    xorBoolList ((List.range n).map (fun a => value && decide (a = source))) =
+      value := by
+  induction n generalizing source with
+  | zero =>
+      omega
+  | succ n ih =>
+      rw [List.range_succ, List.map_append, xorBoolList_append]
+      by_cases hlast : source = n
+      · have hleft :
+            (List.range n).map (fun a => value && decide (a = source)) =
+              (List.range n).map (fun _ => false) := by
+          apply List.map_congr_left
+          intro a ha
+          have ha_lt : a < n := List.mem_range.mp ha
+          simp [show a ≠ source by omega]
+        rw [hleft, xorBoolList_range_false]
+        simp [xorBoolList, hlast]
+      · have hsource_lt : source < n := by omega
+        rw [ih hsource_lt]
+        simp [xorBoolList, show n ≠ source by omega]
+
+private theorem xorBoolList_wordBitAt_sum_eq
+    (x : UInt64) {b target : Nat} (hle : b ≤ target) (hsource : target - b < 64) :
+    xorBoolList
+        ((List.range 64).map
+          (fun a => wordBitAt x a && decide (a + b = target))) =
+      wordBitAt x (target - b) := by
+  rw [show
+      (List.range 64).map (fun a => wordBitAt x a && decide (a + b = target)) =
+        (List.range 64).map
+          (fun a => wordBitAt x (target - b) && decide (a = target - b)) by
+    apply List.map_congr_left
+    intro a ha
+    have ha_lt : a < 64 := List.mem_range.mp ha
+    by_cases h : a = target - b
+    · subst h
+      simp [show target - b + b = target by omega]
+    · have hsum : a + b ≠ target := by omega
+      simp [h, hsum]]
+  exact xorBoolList_range_single_decide (wordBitAt x (target - b)) hsource
+
+private theorem xorBoolList_wordBitAt_sum_eq_false_of_target_lt
+    (x : UInt64) {b target : Nat} (hlt : target < b) :
+    xorBoolList
+        ((List.range 64).map
+          (fun a => wordBitAt x a && decide (a + b = target))) =
+      false := by
+  rw [show
+      (List.range 64).map (fun a => wordBitAt x a && decide (a + b = target)) =
+        (List.range 64).map (fun _ => false) by
+    apply List.map_congr_left
+    intro a _ha
+    simp [show a + b ≠ target by omega]]
+  exact xorBoolList_range_false 64
+
+private theorem xorBoolList_wordBitAt_sum_eq_false_of_source_ge
+    (x : UInt64) {b target : Nat} (_hle : b ≤ target) (hsource : 64 ≤ target - b) :
+    xorBoolList
+        ((List.range 64).map
+          (fun a => wordBitAt x a && decide (a + b = target))) =
+      false := by
+  rw [show
+      (List.range 64).map (fun a => wordBitAt x a && decide (a + b = target)) =
+        (List.range 64).map (fun _ => false) by
+    apply List.map_congr_left
+    intro a ha
+    have ha_lt : a < 64 := List.mem_range.mp ha
+    simp [show a + b ≠ target by omega]]
+  exact xorBoolList_range_false 64
+
+private theorem clmul_oneHot_source_low
+    (x : UInt64) {b bit : Nat} (hb : b < 64) (hbit : bit < 64) :
+    wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).2 bit =
+      xorBoolList
+        ((List.range 64).map
+          (fun a => wordBitAt x a && decide (a + b = bit))) := by
+  by_cases hbZero : b = 0
+  · subst hbZero
+    rw [clmul_oneHot_snd x hb]
+    exact (xorBoolList_wordBitAt_sum_eq x (b := 0) (target := bit)
+      (by omega) hbit).symm
+  · have hbPos : 0 < b := Nat.pos_of_ne_zero hbZero
+    by_cases hle : b ≤ bit
+    · change ((((clmul x ((1 : UInt64) <<< b.toUInt64)).2 >>>
+          bit.toUInt64) &&& 1) != 0) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit)))
+      rw [clmul_oneHot_low_bit_shifted x hbPos hb hbit hle]
+      change wordBitAt x (bit - b) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit)))
+      exact (xorBoolList_wordBitAt_sum_eq x (b := b) (target := bit) hle (by omega)).symm
+    · have hlt : bit < b := Nat.lt_of_not_ge hle
+      change ((((clmul x ((1 : UInt64) <<< b.toUInt64)).2 >>>
+          bit.toUInt64) &&& 1) != 0) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit)))
+      rw [clmul_oneHot_low_bit_before_shift_false x hbPos hb hlt]
+      exact (xorBoolList_wordBitAt_sum_eq_false_of_target_lt x hlt).symm
+
+private theorem clmul_oneHot_source_high
+    (x : UInt64) {b bit : Nat} (hb : b < 64) (hbit : bit < 64) :
+    wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).1 bit =
+      xorBoolList
+        ((List.range 64).map
+          (fun a => wordBitAt x a && decide (a + b = bit + 64))) := by
+  by_cases hbZero : b = 0
+  · subst hbZero
+    rw [clmul_oneHot_fst x hb]
+    simp only [if_true]
+    have hzero : wordBitAt 0 bit = false := by
+      simp [wordBitAt]
+    rw [hzero]
+    exact (xorBoolList_wordBitAt_sum_eq_false_of_source_ge x
+      (b := 0) (target := bit + 64) (by omega) (by omega)).symm
+  · have hbPos : 0 < b := Nat.pos_of_ne_zero hbZero
+    by_cases hleBit : b ≤ bit
+    · change ((((clmul x ((1 : UInt64) <<< b.toUInt64)).1 >>>
+          bit.toUInt64) &&& 1) != 0) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit + 64)))
+      rw [clmul_oneHot_high_bit_after_carry_false x hb hbit hleBit]
+      exact (xorBoolList_wordBitAt_sum_eq_false_of_source_ge x
+        (b := b) (target := bit + 64) (by omega) (by omega)).symm
+    · have hbitLt : bit < b := Nat.lt_of_not_ge hleBit
+      have hsourceLt : bit + 64 - b < 64 := by omega
+      have hsumGe : 64 ≤ bit + 64 - b + b := by omega
+      have hsumEq : bit + 64 - b + b - 64 = bit := by omega
+      have hleft :
+          wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).1 bit =
+            wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).1
+              (bit + 64 - b + b - 64) := by
+        rw [hsumEq]
+      rw [hleft]
+      change ((((clmul x ((1 : UInt64) <<< b.toUInt64)).1 >>>
+          (bit + 64 - b + b - 64).toUInt64) &&& 1) != 0) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit + 64)))
+      rw [clmul_oneHot_high_bit_carry_word x hbPos hb hsourceLt hsumGe]
+      change wordBitAt x (bit + 64 - b) =
+        xorBoolList
+          ((List.range 64).map
+            (fun a => wordBitAt x a && decide (a + b = bit + 64)))
+      exact (xorBoolList_wordBitAt_sum_eq x
+        (b := b) (target := bit + 64) (by omega) hsourceLt).symm
+
 /-- Source bit-triple contribution for the coefficient of total bit index
 `total` in a three-word carry-less product. -/
 private def clmulSourceTripleCoeff (x y z : UInt64) (total : Nat) : Bool :=
