@@ -189,6 +189,43 @@ private def normalizePrimitiveSign (f : ZPoly) : ZPoly :=
   else
     f
 
+private theorem ratCommonDen_foldl_preserves_dvd (coeffs : List Rat) {d acc : Nat}
+    (hacc : d ∣ acc) :
+    d ∣ coeffs.foldl (fun acc coeff => Nat.lcm acc coeff.den) acc := by
+  induction coeffs generalizing acc with
+  | nil =>
+      exact hacc
+  | cons coeff coeffs ih =>
+      simp only [List.foldl_cons]
+      exact ih (acc := Nat.lcm acc coeff.den)
+        (Nat.dvd_trans hacc (Nat.dvd_lcm_left acc coeff.den))
+
+private theorem ratCommonDen_foldl_dvd_of_mem (coeffs : List Rat) {q : Rat} {acc : Nat}
+    (hq : q ∈ coeffs) :
+    q.den ∣ coeffs.foldl (fun acc coeff => Nat.lcm acc coeff.den) acc := by
+  induction coeffs generalizing acc with
+  | nil =>
+      cases hq
+  | cons coeff coeffs ih =>
+      simp only [List.foldl_cons]
+      simp only [List.mem_cons] at hq
+      cases hq with
+      | inl hhead =>
+          subst hhead
+          exact ratCommonDen_foldl_preserves_dvd coeffs (Nat.dvd_lcm_right acc q.den)
+      | inr htail =>
+          exact ih (acc := Nat.lcm acc coeff.den) htail
+
+private theorem ratCommonDen_dvd_of_mem (coeffs : List Rat) {q : Rat} (hq : q ∈ coeffs) :
+    q.den ∣ ratCommonDen coeffs := by
+  unfold ratCommonDen
+  exact ratCommonDen_foldl_dvd_of_mem coeffs hq
+
+private theorem ratCoeffToIntWithDen_cast (den : Nat) (coeff : Rat)
+    (hden : coeff.den ∣ den) :
+    ((ratCoeffToIntWithDen den coeff : Int) : Rat) = (den : Rat) * coeff := by
+  sorry
+
 /--
 Clear denominators in a rational polynomial and return the primitive integer
 representative of the resulting rational associate.
@@ -199,6 +236,10 @@ def ratPolyPrimitivePart (f : DensePoly Rat) : ZPoly :=
     DensePoly.ofCoeffs <|
       f.toArray.toList.map (fun coeff => ratCoeffToIntWithDen den coeff) |>.toArray
   normalizePrimitiveSign (primitivePart scaled)
+
+private theorem ratPolyPrimitivePart_rational_associate_core (f : DensePoly Rat) :
+    ∃ unit : Rat, f = DensePoly.scale unit (toRatPoly (ratPolyPrimitivePart f)) := by
+  sorry
 
 /--
 Executable primitive square-free decomposition data for integer-polynomial
@@ -482,6 +523,10 @@ theorem ratPolyPrimitivePart_primitive (f : DensePoly Rat)
     Primitive (ratPolyPrimitivePart f) := by
   unfold ratPolyPrimitivePart at h ⊢
   exact normalizePrimitiveSign_primitivePart_primitive _ h
+
+theorem ratPolyPrimitivePart_rational_associate (f : DensePoly Rat) :
+    ∃ unit : Rat, f = DensePoly.scale unit (toRatPoly (ratPolyPrimitivePart f)) := by
+  exact ratPolyPrimitivePart_rational_associate_core f
 
 theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     let d := primitiveSquareFreeDecomposition f
