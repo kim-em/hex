@@ -119,55 +119,6 @@ private theorem entry_ofFn (f : Fin n → Fin m → R) (i : Fin n) (j : Fin m) :
 
 end GramSchmidt
 
-namespace GramSchmidt.Int
-
-/-- The Gram-Schmidt orthogonal basis for an integer matrix, viewed in
-`Rat` after coefficient divisions. -/
-noncomputable def basis (b : Matrix Int n m) : Matrix Rat n m :=
-  GramSchmidt.basisMatrix (GramSchmidt.castIntMatrix b)
-
-/-- The Gram-Schmidt coefficient matrix for an integer input matrix. -/
-noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n :=
-  GramSchmidt.coeffMatrix (GramSchmidt.castIntMatrix b) (basis b)
-
-theorem basis_zero (b : Matrix Int n m) (hn : 0 < n) :
-    (basis b).row ⟨0, hn⟩ =
-      Vector.map (fun x : Int => (x : Rat)) (b.row ⟨0, hn⟩) := by
-  simpa [basis, GramSchmidt.basisMatrix, GramSchmidt.castIntMatrix, Matrix.row] using
-    GramSchmidt.basisRows_head (b := GramSchmidt.castIntMatrix b) hn
-
-theorem basis_orthogonal (b : Matrix Int n m)
-    (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
-    Matrix.dot ((basis b).row ⟨i, hi⟩) ((basis b).row ⟨j, hj⟩) = 0 := by
-  sorry
-
-theorem basis_decomposition (b : Matrix Int n m) (i : Nat) (hi : i < n) :
-    Vector.map (fun x : Int => (x : Rat)) (b.row ⟨i, hi⟩) =
-      (basis b).row ⟨i, hi⟩ +
-        GramSchmidt.prefixCombination (coeffs b) (basis b) i hi := by
-  sorry
-
-theorem coeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
-    GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨i, hi⟩ = 1 := by
-  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn]
-
-theorem coeffs_upper (b : Matrix Int n m)
-    (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
-    GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
-  have hnot_lt : ¬j < i := Nat.not_lt_of_ge (Nat.le_of_lt hij)
-  have hne : (⟨i, hi⟩ : Fin n) ≠ ⟨j, hj⟩ := by
-    intro h
-    exact (Nat.ne_of_lt hij) (congrArg Fin.val h)
-  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn, hnot_lt, hne]
-
-theorem basis_span (b : Matrix Int n m) (i : Nat) (hi : i < n) :
-    ∀ v : Vector Rat m,
-      GramSchmidt.prefixSpan (basis b) i hi v ↔
-        GramSchmidt.prefixSpan (GramSchmidt.castIntMatrix b) i hi v := by
-  sorry
-
-end GramSchmidt.Int
-
 namespace GramSchmidt.Rat
 
 /-- The Gram-Schmidt orthogonal basis for a rational matrix. -/
@@ -214,4 +165,55 @@ theorem basis_span (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
   sorry
 
 end GramSchmidt.Rat
+
+namespace GramSchmidt.Int
+
+/-- The Gram-Schmidt orthogonal basis for an integer matrix, viewed in
+`Rat` after coefficient divisions. -/
+noncomputable def basis (b : Matrix Int n m) : Matrix Rat n m :=
+  GramSchmidt.basisMatrix (GramSchmidt.castIntMatrix b)
+
+/-- The Gram-Schmidt coefficient matrix for an integer input matrix. -/
+noncomputable def coeffs (b : Matrix Int n m) : Matrix Rat n n :=
+  GramSchmidt.coeffMatrix (GramSchmidt.castIntMatrix b) (basis b)
+
+theorem basis_zero (b : Matrix Int n m) (hn : 0 < n) :
+    (basis b).row ⟨0, hn⟩ =
+      Vector.map (fun x : Int => (x : Rat)) (b.row ⟨0, hn⟩) := by
+  simpa [basis, GramSchmidt.basisMatrix, GramSchmidt.castIntMatrix, Matrix.row] using
+    GramSchmidt.basisRows_head (b := GramSchmidt.castIntMatrix b) hn
+
+theorem basis_orthogonal (b : Matrix Int n m)
+    (i j : Nat) (hi : i < n) (hj : j < n) (hij : i ≠ j) :
+    Matrix.dot ((basis b).row ⟨i, hi⟩) ((basis b).row ⟨j, hj⟩) = 0 := by
+  sorry
+
+theorem basis_decomposition (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    Vector.map (fun x : Int => (x : Rat)) (b.row ⟨i, hi⟩) =
+      (basis b).row ⟨i, hi⟩ +
+        GramSchmidt.prefixCombination (coeffs b) (basis b) i hi := by
+  simpa [basis, coeffs, GramSchmidt.castIntMatrix, GramSchmidt.Rat.basis,
+    GramSchmidt.Rat.coeffs, Matrix.row] using
+      GramSchmidt.Rat.basis_decomposition (b := GramSchmidt.castIntMatrix b) i hi
+
+theorem coeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨i, hi⟩ = 1 := by
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn]
+
+theorem coeffs_upper (b : Matrix Int n m)
+    (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
+    GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
+  have hnot_lt : ¬j < i := Nat.not_lt_of_ge (Nat.le_of_lt hij)
+  have hne : (⟨i, hi⟩ : Fin n) ≠ ⟨j, hj⟩ := by
+    intro h
+    exact (Nat.ne_of_lt hij) (congrArg Fin.val h)
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn, hnot_lt, hne]
+
+theorem basis_span (b : Matrix Int n m) (i : Nat) (hi : i < n) :
+    ∀ v : Vector Rat m,
+      GramSchmidt.prefixSpan (basis b) i hi v ↔
+        GramSchmidt.prefixSpan (GramSchmidt.castIntMatrix b) i hi v := by
+  sorry
+
+end GramSchmidt.Int
 end Hex
