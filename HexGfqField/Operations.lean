@@ -197,13 +197,185 @@ private theorem xgcd_repr_gcd_dvd_modulus
   simpa [DensePoly.gcd]
     using DensePoly.gcd_dvd_right (GFqRing.repr x) f
 
+private theorem zmod64_coprime_of_prime_ne_zero
+    (hp : Hex.Nat.Prime p) {a : ZMod64 p} (ha : a ≠ 0) :
+    Nat.Coprime a.toNat p := by
+  rw [Nat.Coprime]
+  have hnot_dvd : ¬ p ∣ a.toNat := by
+    intro hdiv
+    rcases hdiv with ⟨k, hk⟩
+    have ha_pos : 0 < a.toNat := by
+      by_cases hnat : a.toNat = 0
+      · exfalso
+        apply ha
+        apply ZMod64.ext
+        apply UInt64.toNat_inj.mp
+        simpa [ZMod64.toNat_eq_val] using hnat
+      · exact Nat.pos_of_ne_zero hnat
+    have hk_pos : 0 < k := by
+      cases k with
+      | zero =>
+          exfalso
+          have : a.toNat = 0 := by simpa using hk
+          omega
+      | succ k => exact Nat.succ_pos k
+    have hle : p ≤ a.toNat := by
+      rw [hk]
+      simpa [Nat.mul_comm] using Nat.le_mul_of_pos_left p hk_pos
+    exact (Nat.not_le_of_gt a.toNat_lt) hle
+  have hgcd_dvd_p : Nat.gcd a.toNat p ∣ p := Nat.gcd_dvd_right a.toNat p
+  rcases hp.2 (Nat.gcd a.toNat p) hgcd_dvd_p with hgcd | hgcd
+  · exact hgcd
+  · exfalso
+    apply hnot_dvd
+    rcases Nat.gcd_dvd_left a.toNat p with ⟨k, hk⟩
+    rw [hgcd] at hk
+    exact ⟨k, hk⟩
+
+private theorem zmod64_mul_inv_eq_one_of_prime_ne_zero
+    (hp : Hex.Nat.Prime p) {a : ZMod64 p} (ha : a ≠ 0) :
+    a * a⁻¹ = 1 := by
+  have hcop := zmod64_coprime_of_prime_ne_zero hp ha
+  have hinv : (a⁻¹ * a).toNat = (1 : ZMod64 p).toNat := by
+    simpa [ZMod64.toNat_one] using ZMod64.inv_mul_eq_one (p := p) a hcop
+  have hcomm : a * a⁻¹ = a⁻¹ * a := by grind
+  rw [hcomm]
+  apply ZMod64.ext
+  apply UInt64.toNat_inj.mp
+  simpa [ZMod64.toNat_eq_val] using hinv
+
+private theorem scale_one_poly (c : ZMod64 p) :
+    DensePoly.scale c (1 : FpPoly p) = DensePoly.C c := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero : c * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  change c * (DensePoly.C (1 : ZMod64 p)).coeff n = (DensePoly.C c).coeff n
+  rw [DensePoly.coeff_C, DensePoly.coeff_C]
+  cases n with
+  | zero => grind
+  | succ n => exact hzero
+
+private theorem C_mul_eq_scale (c : ZMod64 p) (f : FpPoly p) :
+    DensePoly.C c * f = DensePoly.scale c f := by
+  have hscale := FpPoly.scale_mul_left c (1 : FpPoly p) f
+  rw [FpPoly.one_mul, scale_one_poly] at hscale
+  exact hscale.symm
+
+private theorem scale_C (c d : ZMod64 p) :
+    DensePoly.scale c (DensePoly.C d : FpPoly p) = DensePoly.C (c * d) := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero : c * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  rw [DensePoly.coeff_C, DensePoly.coeff_C]
+  cases n with
+  | zero => rfl
+  | succ n => exact hzero
+
+private theorem C_mul_C_inv_of_ne_zero
+    (hp : Hex.Nat.Prime p) {c : ZMod64 p} (hc : c ≠ 0) :
+    (DensePoly.C c : FpPoly p) * DensePoly.C c⁻¹ = 1 := by
+  rw [C_mul_eq_scale, scale_C, zmod64_mul_inv_eq_one_of_prime_ne_zero hp hc]
+  rfl
+
+private theorem eq_C_of_degree_eq_zero
+    (g : FpPoly p) (hdeg : g.degree? = some 0) :
+    g = DensePoly.C (g.coeff 0) := by
+  have hsize : g.size = 1 := by
+    unfold DensePoly.degree? at hdeg
+    by_cases hzero : g.size = 0
+    · simp [hzero] at hdeg
+    · have hpred : g.size - 1 = 0 := by
+        simpa [hzero] using hdeg
+      omega
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_C]
+  by_cases hn : n = 0
+  · simp [hn]
+  · have hle : g.size ≤ n := by omega
+    rw [DensePoly.coeff_eq_zero_of_size_le g hle]
+    simp [hn]
+
+private theorem coeff_zero_ne_zero_of_degree_eq_zero
+    (g : FpPoly p) (hdeg : g.degree? = some 0) :
+    g.coeff 0 ≠ 0 := by
+  have hsize : g.size = 1 := by
+    unfold DensePoly.degree? at hdeg
+    by_cases hzero : g.size = 0
+    · simp [hzero] at hdeg
+    · have hpred : g.size - 1 = 0 := by
+        simpa [hzero] using hdeg
+      omega
+  simpa [hsize] using DensePoly.coeff_last_ne_zero_of_pos_size g (by omega)
+
+private theorem dvd_trans_poly {a b c : FpPoly p} (hab : a ∣ b) (hbc : b ∣ c) :
+    a ∣ c := by
+  rcases hab with ⟨u, hu⟩
+  rcases hbc with ⟨v, hv⟩
+  refine ⟨u * v, ?_⟩
+  rw [hv, hu]
+  exact DensePoly.mul_assoc_poly a u v
+
+private theorem dvd_left_of_mul_const_right_eq
+    (hp : Hex.Nat.Prime p) {g r f : FpPoly p}
+    (hfg : g * r = f) (hrdeg : r.degree? = some 0) :
+    f ∣ g := by
+  let c := r.coeff 0
+  have hrC : r = DensePoly.C c := eq_C_of_degree_eq_zero r hrdeg
+  have hc : c ≠ 0 := coeff_zero_ne_zero_of_degree_eq_zero r hrdeg
+  refine ⟨DensePoly.C c⁻¹, ?_⟩
+  have hfgC : g * DensePoly.C c = f := by
+    rw [← hfg]
+    rw [hrC]
+  calc
+    g = g * (1 : FpPoly p) := by rw [FpPoly.mul_one]
+    _ = g * (DensePoly.C c * DensePoly.C c⁻¹) := by
+      rw [C_mul_C_inv_of_ne_zero hp hc]
+    _ = (g * DensePoly.C c) * DensePoly.C c⁻¹ := by
+      exact (DensePoly.mul_assoc_poly g (DensePoly.C c) (DensePoly.C c⁻¹)).symm
+    _ = f * DensePoly.C c⁻¹ := by
+      rw [hfgC]
+
 /-- For a nonzero residue class modulo irreducible `f`, the xgcd gcd witness
 is a constant polynomial. -/
 private theorem xgcd_repr_gcd_degree_eq_zero_of_ne_zero
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     {x : FiniteField f hf hp hirr} (hx : x ≠ zero f hf hp hirr) :
     (DensePoly.xgcd (GFqRing.repr x.toQuotient) f).gcd.degree? = some 0 := by
-  sorry
+  let g := (DensePoly.xgcd (GFqRing.repr x.toQuotient) f).gcd
+  have hg_dvd_repr : g ∣ GFqRing.repr x.toQuotient := by
+    simpa [g] using xgcd_repr_gcd_dvd_repr x.toQuotient
+  have hg_dvd_f : g ∣ f := by
+    simpa [g] using xgcd_repr_gcd_dvd_modulus x.toQuotient
+  rcases hg_dvd_f with ⟨r, hfr⟩
+  have hirr_split := hirr.2 g r hfr.symm
+  rcases hirr_split with hg_const | hr_const
+  · exact hg_const
+  · have hf_dvd_g : f ∣ g :=
+      dvd_left_of_mul_const_right_eq hp hfr.symm hr_const
+    have hf_dvd_repr : f ∣ GFqRing.repr x.toQuotient :=
+      dvd_trans_poly hf_dvd_g hg_dvd_repr
+    have hmod_zero : GFqRing.reduceMod f (GFqRing.repr x.toQuotient) = 0 := by
+      simpa [GFqRing.reduceMod, DensePoly.mod_eq_divMod]
+        using DensePoly.mod_eq_zero_of_dvd (GFqRing.repr x.toQuotient) f hf_dvd_repr
+    have hrepr_self :
+        GFqRing.reduceMod f (GFqRing.repr x.toQuotient) = GFqRing.repr x.toQuotient :=
+      GFqRing.reduceMod_eq_self_of_degree_lt f (GFqRing.repr x.toQuotient)
+        (GFqRing.degree_repr_lt_degree x.toQuotient)
+    have hrepr_zero : GFqRing.repr x.toQuotient = 0 := by
+      rw [hrepr_self] at hmod_zero
+      exact hmod_zero
+    have hquot_ne : x.toQuotient ≠ (0 : GFqRing.PolyQuotient f hf) :=
+      toQuotient_ne_zero hx
+    have hrepr_ne_reduce :
+        GFqRing.repr x.toQuotient ≠ GFqRing.reduceMod f 0 := by
+      exact (GFqRing.ne_zero_iff_repr_ne_zero x.toQuotient).1 (by
+        simpa [GFqRing.zero] using hquot_ne)
+    have hrepr_ne : GFqRing.repr x.toQuotient ≠ 0 := by
+      simpa [GFqRing.reduceMod_zero f hf] using hrepr_ne_reduce
+    exact False.elim (hrepr_ne hrepr_zero)
 
 /-- For a nonzero residue class modulo irreducible `f`, the constant xgcd gcd
 witness has nonzero constant coefficient. -/
