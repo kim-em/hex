@@ -50,10 +50,41 @@ private theorem dot_subtractProjection_self_zero (row basisRow : Vector Rat m)
   simp [projectionCoeff, hnorm]
   grind
 
+private theorem projectionCoeff_subtractProjection_eq_of_dot_zero
+    (row otherBasisRow basisRow : Vector Rat m)
+    (horth : Matrix.dot otherBasisRow basisRow = 0) :
+    projectionCoeff (subtractProjection row otherBasisRow) basisRow =
+      projectionCoeff row basisRow := by
+  by_cases hnorm : Matrix.dot basisRow basisRow = 0
+  · simp [projectionCoeff, hnorm]
+  · simp [projectionCoeff, dot_subtractProjection, horth, hnorm]
+    grind
+
 /-- Reduce a row against the previously constructed orthogonal basis rows. -/
 private def reduceAgainstBasis (basisRev : List (Vector Rat m)) (row : Vector Rat m) :
     Vector Rat m :=
   basisRev.foldl subtractProjection row
+
+private theorem projectionCoeff_reduceAgainstBasis_eq_of_forall_dot_zero
+    (basisRev : List (Vector Rat m)) (row basisRow : Vector Rat m)
+    (horth : ∀ otherBasisRow ∈ basisRev, Matrix.dot otherBasisRow basisRow = 0) :
+    projectionCoeff (reduceAgainstBasis basisRev row) basisRow =
+      projectionCoeff row basisRow := by
+  induction basisRev generalizing row with
+  | nil =>
+      simp [reduceAgainstBasis]
+  | cons otherBasisRow rest ih =>
+      rw [reduceAgainstBasis]
+      simp only [List.foldl_cons]
+      change
+        projectionCoeff (reduceAgainstBasis rest (subtractProjection row otherBasisRow)) basisRow =
+          projectionCoeff row basisRow
+      rw [ih]
+      · exact projectionCoeff_subtractProjection_eq_of_dot_zero
+          (row := row) (otherBasisRow := otherBasisRow) (basisRow := basisRow)
+          (horth otherBasisRow (by simp))
+      · intro laterBasisRow hlater
+        exact horth laterBasisRow (by simp [hlater])
 
 /-- Left-to-right Gram-Schmidt orthogonalization on a list of rows. -/
 private def basisRowsAux (basisRev pending : List (Vector Rat m)) : List (Vector Rat m) :=
