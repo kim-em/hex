@@ -88,10 +88,18 @@ private theorem congr_mod_core (f m : DensePoly (ZMod64 p)) :
     DensePoly.Congr (f % m) f m := by
   exact ⟨0 - (f / m), mod_sub_self_eq_mul_neg_div f m⟩
 
-private theorem mod_eq_mod_of_congr_core (f g m : DensePoly (ZMod64 p))
-    (hcongr : DensePoly.Congr f g m) :
-    f % m = g % m := by
-  sorry
+private theorem eq_add_mul_of_sub_eq_mul {f g m r : DensePoly (ZMod64 p)}
+    (hsub : f - g = m * r) :
+    f = g + m * r := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hcoeff := congrArg (fun x : DensePoly (ZMod64 p) => x.coeff n) hsub
+  have hzero_sub : (0 : ZMod64 p) - (0 : ZMod64 p) = 0 := by grind
+  have hzero_add : (0 : ZMod64 p) + (0 : ZMod64 p) = 0 := by grind
+  change (f - g).coeff n = (m * r).coeff n at hcoeff
+  rw [DensePoly.coeff_sub f g n hzero_sub] at hcoeff
+  rw [DensePoly.coeff_add g (m * r) n hzero_add]
+  grind
 
 private theorem add_sub_add_right (a b c d : DensePoly (ZMod64 p)) :
     (a + b) - (c + d) = (a - c) + (b - d) := by
@@ -104,6 +112,85 @@ private theorem add_sub_add_right (a b c d : DensePoly (ZMod64 p)) :
   rw [DensePoly.coeff_add (a - c) (b - d) n hzero_add]
   rw [DensePoly.coeff_sub a c n hzero_sub, DensePoly.coeff_sub b d n hzero_sub]
   grind
+
+private theorem divMod_remainder_degree_lt_core (f m : DensePoly (ZMod64 p))
+    (hdegree : 0 < m.degree?.getD 0) :
+    (DensePoly.divMod f m).2.degree?.getD 0 < m.degree?.getD 0 := by
+  sorry
+
+private theorem mod_remainder_degree_lt_core (f m : DensePoly (ZMod64 p))
+    (hdegree : 0 < m.degree?.getD 0) :
+    (f % m).degree?.getD 0 < m.degree?.getD 0 := by
+  simpa [DensePoly.mod] using divMod_remainder_degree_lt_core f m hdegree
+
+private theorem canonical_remainder_unique_of_pos_degree
+    (r s m : DensePoly (ZMod64 p))
+    (hr : r.degree?.getD 0 < m.degree?.getD 0)
+    (hs : s.degree?.getD 0 < m.degree?.getD 0)
+    (hcongr : DensePoly.Congr r s m) :
+    r = s := by
+  sorry
+
+private theorem mod_remainders_congr_of_congr (f g m : DensePoly (ZMod64 p))
+    (hcongr : DensePoly.Congr f g m) :
+    DensePoly.Congr (f % m) (g % m) m := by
+  rcases congr_mod_core f m with ⟨rf, hf⟩
+  rcases congr_mod_core g m with ⟨rg, hg⟩
+  rcases hcongr with ⟨q, hq⟩
+  refine ⟨(q + rf) + (0 - rg), ?_⟩
+  have hf_add : f % m = f + m * rf := eq_add_mul_of_sub_eq_mul hf
+  have hg_add : g % m = g + m * rg := eq_add_mul_of_sub_eq_mul hg
+  have hneg_mul : (0 : DensePoly (ZMod64 p)) - m * rg =
+      m * ((0 : DensePoly (ZMod64 p)) - rg) := by
+    calc
+      (0 : DensePoly (ZMod64 p)) - m * rg =
+          (0 : DensePoly (ZMod64 p)) - rg * m := by
+        exact congrArg (fun x : DensePoly (ZMod64 p) => (0 : DensePoly (ZMod64 p)) - x)
+          (DensePoly.mul_comm_poly m rg)
+      _ = m * ((0 : DensePoly (ZMod64 p)) - rg) := by
+        exact (DensePoly.mul_sub_zero_comm m rg).symm
+  calc
+    (f % m) - (g % m)
+        = (f + m * rf) - (g + m * rg) := by rw [hf_add, hg_add]
+    _ = (f - g) + ((m * rf) - (m * rg)) := by
+      exact add_sub_add_right f (m * rf) g (m * rg)
+    _ = m * q + ((m * rf) - (m * rg)) := by rw [hq]
+    _ = m * q + (m * rf + ((0 : DensePoly (ZMod64 p)) - m * rg)) := by
+      exact congrArg (fun x : DensePoly (ZMod64 p) => m * q + x)
+        (DensePoly.sub_eq_add_neg_poly (m * rf) (m * rg))
+    _ = m * q + (m * rf + m * ((0 : DensePoly (ZMod64 p)) - rg)) := by rw [hneg_mul]
+    _ = (m * q + m * rf) + m * ((0 : DensePoly (ZMod64 p)) - rg) := by
+      exact (DensePoly.add_assoc_poly (m * q) (m * rf)
+        (m * ((0 : DensePoly (ZMod64 p)) - rg))).symm
+    _ = m * (q + rf) + m * ((0 : DensePoly (ZMod64 p)) - rg) := by
+      exact congrArg
+        (fun x : DensePoly (ZMod64 p) => x + m * ((0 : DensePoly (ZMod64 p)) - rg))
+        (DensePoly.mul_add_right_poly m q rf).symm
+    _ = m * ((q + rf) + ((0 : DensePoly (ZMod64 p)) - rg)) := by
+      exact (DensePoly.mul_add_right_poly m (q + rf)
+        ((0 : DensePoly (ZMod64 p)) - rg)).symm
+
+private theorem mod_eq_mod_of_congr_pos_degree (f g m : DensePoly (ZMod64 p))
+    (hdegree : 0 < m.degree?.getD 0)
+    (hcongr : DensePoly.Congr f g m) :
+    f % m = g % m := by
+  apply canonical_remainder_unique_of_pos_degree
+  · exact mod_remainder_degree_lt_core f m hdegree
+  · exact mod_remainder_degree_lt_core g m hdegree
+  · exact mod_remainders_congr_of_congr f g m hcongr
+
+private theorem mod_eq_mod_of_congr_not_pos_degree (f g m : DensePoly (ZMod64 p))
+    (hdegree : ¬ 0 < m.degree?.getD 0)
+    (hcongr : DensePoly.Congr f g m) :
+    f % m = g % m := by
+  sorry
+
+private theorem mod_eq_mod_of_congr_core (f g m : DensePoly (ZMod64 p))
+    (hcongr : DensePoly.Congr f g m) :
+    f % m = g % m := by
+  by_cases hdegree : 0 < m.degree?.getD 0
+  · exact mod_eq_mod_of_congr_pos_degree f g m hdegree hcongr
+  · exact mod_eq_mod_of_congr_not_pos_degree f g m hdegree hcongr
 
 private theorem sub_self_right_add (a b : DensePoly (ZMod64 p)) :
     (a + b) - a = b := by
@@ -168,7 +255,7 @@ instance instDivModLawsZMod64Fp (p : Nat) [Bounds p] :
     exact divMod_spec_core f g
   divMod_remainder_degree_lt_of_pos_degree := by
     intro f g hdegree
-    sorry
+    exact divMod_remainder_degree_lt_core f g hdegree
   divModMonic_eq_divMod_of_monic := by
     intro f g hmonic
     sorry
