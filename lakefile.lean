@@ -3,6 +3,7 @@ import Lake
 open System Lake DSL
 
 package Hex where
+  precompileModules := true
 
 require verso from git
   "https://github.com/leanprover/verso.git" @ "v4.30.0-rc2"
