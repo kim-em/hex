@@ -38,8 +38,7 @@ theorem ofZMod_toZMod (a : Hex.ZMod64 p) :
   cases a with
   | mk val isLt =>
       apply Hex.ZMod64.ext
-      simpa [ofZMod, toZMod, Hex.ZMod64.ofNat, Hex.ZMod64.normalize, Nat.mod_eq_of_lt isLt] using
-        (UInt64.ofNatLT_toNat val)
+      simp [ofZMod, toZMod, Hex.ZMod64.ofNat, Hex.ZMod64.normalize, Nat.mod_eq_of_lt isLt]
 
 @[simp]
 theorem toZMod_ofZMod (a : ZMod p) :

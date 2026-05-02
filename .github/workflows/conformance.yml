@@ -8,6 +8,8 @@ on:
 jobs:
   conformance:
     runs-on: ubuntu-latest
+    env:
+      LD_LIBRARY_PATH: /home/runner/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/lib/lean
     strategy:
       fail-fast: false
       matrix:
