@@ -111,17 +111,32 @@ theorem congr_refl (f : ZPoly) (m : Nat) : congr f f m := by
   simp
 
 theorem congr_symm (f g : ZPoly) (m : Nat) (hfg : congr f g m) : congr g f m := by
-  sorry
+  intro i
+  apply Int.emod_eq_zero_of_dvd
+  rcases Int.dvd_of_emod_eq_zero (hfg i) with ⟨c, hc⟩
+  refine ⟨-c, ?_⟩
+  grind
 
 theorem congr_trans (f g h : ZPoly) (m : Nat) (hfg : congr f g m) (hgh : congr g h m) :
     congr f h m := by
-  sorry
+  intro i
+  apply Int.emod_eq_zero_of_dvd
+  rcases Int.dvd_of_emod_eq_zero (hfg i) with ⟨c, hc⟩
+  rcases Int.dvd_of_emod_eq_zero (hgh i) with ⟨d, hd⟩
+  refine ⟨c + d, ?_⟩
+  grind
 
 theorem congr_add (f g f' g' : ZPoly) (m : Nat)
     (hf : congr f f' m) (hg : congr g g' m) :
     congr (f + g) (f' + g') m := by
   intro i
-  sorry
+  rw [DensePoly.coeff_add (R := Int) (hzero := by rfl),
+    DensePoly.coeff_add (R := Int) (hzero := by rfl)]
+  apply Int.emod_eq_zero_of_dvd
+  rcases Int.dvd_of_emod_eq_zero (hf i) with ⟨c, hc⟩
+  rcases Int.dvd_of_emod_eq_zero (hg i) with ⟨d, hd⟩
+  refine ⟨c + d, ?_⟩
+  grind
 
 theorem congr_mul (f g f' g' : ZPoly) (m : Nat)
     (hf : congr f f' m) (hg : congr g g' m) :
