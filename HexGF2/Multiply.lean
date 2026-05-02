@@ -5692,6 +5692,92 @@ private theorem mulWords_size_source_pair
   simp [hxs, hys, foldl_mulWords_size]
   omega
 
+private theorem xorBoolList_range_single_active
+    (f : Nat → Bool) {bound active : Nat}
+    (hactive : active < bound)
+    (hzero : ∀ slot, slot < bound → slot ≠ active → f slot = false) :
+    xorBoolList ((List.range bound).map f) = f active := by
+  induction bound with
+  | zero =>
+      omega
+  | succ bound ih =>
+      rw [List.range_succ, List.map_append, xorBoolList_append]
+      by_cases hlast : active = bound
+      · have hprefix :
+            (List.range bound).map f = (List.range bound).map (fun _ => false) := by
+          apply List.map_congr_left
+          intro slot hslot
+          have hslotLt : slot < bound := List.mem_range.mp hslot
+          exact hzero slot (by omega) (by omega)
+        rw [hprefix, xorBoolList_range_false]
+        simp [xorBoolList, hlast]
+      · have hactiveLt : active < bound := by omega
+        rw [ih hactiveLt]
+        · have htail : f bound = false := hzero bound (by omega) (by omega)
+          simp [xorBoolList, htail]
+        · intro slot hslot hslotNe
+          exact hzero slot (by omega) hslotNe
+
+private theorem xorBoolList_range_two_adjacent_active
+    (f : Nat → Bool) {bound active : Nat}
+    (hactive : active + 1 < bound)
+    (hzero :
+      ∀ slot, slot < bound → slot ≠ active → slot ≠ active + 1 → f slot = false) :
+    xorBoolList ((List.range bound).map f) = (f active != f (active + 1)) := by
+  induction bound with
+  | zero =>
+      omega
+  | succ bound ih =>
+      rw [List.range_succ, List.map_append, xorBoolList_append]
+      by_cases hlast : active + 1 = bound
+      · have hprefix :
+            xorBoolList ((List.range bound).map f) = f active := by
+          apply xorBoolList_range_single_active
+          · omega
+          · intro slot hslot hslotNe
+            exact hzero slot (by omega) hslotNe (by omega)
+        rw [hprefix]
+        simp [xorBoolList, hlast]
+      · have hactiveLt : active + 1 < bound := by omega
+        rw [ih hactiveLt]
+        · have htail : f bound = false := hzero bound (by omega) (by omega) (by omega)
+          simp [xorBoolList, htail]
+        · intro slot hslot hslotNe0 hslotNe1
+          exact hzero slot (by omega) hslotNe0 hslotNe1
+
+private theorem xorBoolList_leftAssocFixedTripleContribs_collapse
+    (i j k : Nat) (x y z : UInt64) (n leftBound : Nat)
+    (hleft : i + j + 1 < leftBound) :
+    xorBoolList (leftAssocFixedTripleContribs i j k x y z n leftBound) =
+      (clmulCoeffAt (i + j + k) (clmul x y).2 z n !=
+        clmulCoeffAt (i + j + k + 1) (clmul x y).1 z n) := by
+  unfold leftAssocFixedTripleContribs
+  rw [xorBoolList_range_two_adjacent_active
+    (fun slot => clmulCoeffAt (slot + k) (clmulWordAt (i + j) x y slot) z n)
+    hleft]
+  · simp [clmulWordAt]
+    have hhigh : (i + j + 1) + k = i + j + k + 1 := by omega
+    simp [hhigh]
+  · intro slot _hslot hneLow hneHigh
+    simp [clmulWordAt, hneLow, hneHigh, clmulCoeffAt_zero_left]
+
+private theorem xorBoolList_rightAssocFixedTripleContribs_collapse
+    (i j k : Nat) (x y z : UInt64) (n rightBound : Nat)
+    (hright : j + k + 1 < rightBound) :
+    xorBoolList (rightAssocFixedTripleContribs i j k x y z n rightBound) =
+      (clmulCoeffAt (i + j + k) x (clmul y z).2 n !=
+        clmulCoeffAt (i + j + k + 1) x (clmul y z).1 n) := by
+  unfold rightAssocFixedTripleContribs
+  rw [xorBoolList_range_two_adjacent_active
+    (fun slot => clmulCoeffAt (i + slot) x (clmulWordAt (j + k) y z slot) n)
+    hright]
+  · simp [clmulWordAt]
+    have hlow : i + (j + k) = i + j + k := by omega
+    have hhigh : i + (j + k + 1) = i + j + k + 1 := by omega
+    simp [hlow, hhigh]
+  · intro slot _hslot hneLow hneHigh
+    simp [clmulWordAt, hneLow, hneHigh, clmulCoeffAt_zero_right]
+
 /-- Fixed source-word associativity for carry-less multiplication after
 expanding only the intermediate packed-word slot. -/
 private theorem xorBoolList_assoc_fixed_sourceTriple
@@ -5699,7 +5785,9 @@ private theorem xorBoolList_assoc_fixed_sourceTriple
     (hleft : i + j + 1 < leftBound) (hright : j + k + 1 < rightBound) :
     xorBoolList (leftAssocFixedTripleContribs i j k x y z n leftBound) =
       xorBoolList (rightAssocFixedTripleContribs i j k x y z n rightBound) := by
-  sorry
+  rw [xorBoolList_leftAssocFixedTripleContribs_collapse i j k x y z n leftBound hleft,
+    xorBoolList_rightAssocFixedTripleContribs_collapse i j k x y z n rightBound hright]
+  exact clmulCoeffAt_assoc_twoWord (i + j + k) n x y z
 
 /-- Regroup the left-associated source expansion by fixed source triples rather
 than by intermediate product slot first. -/
