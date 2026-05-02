@@ -83,6 +83,12 @@ instance : DensePoly.DivModLaws (ZMod64 p) where
   mod_mod_of_not_pos_degree := by
     intro f g hdegree
     sorry
+  mod_add_mod := by
+    intro f g m
+    sorry
+  mod_mul_mod := by
+    intro f g m
+    sorry
 
 /-- The `F_p[x]` gcd law obligations used by finite-field inverse construction. -/
 instance : DensePoly.GcdLaws (ZMod64 p) where

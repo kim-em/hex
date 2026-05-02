@@ -213,6 +213,10 @@ class DivModLaws (R : Type u) [Zero R] [DecidableEq R] [One R] [Add R] [Sub R] [
     ∀ p q : DensePoly R, q ∣ p → p % q = 0
   mod_mod_of_not_pos_degree :
     ∀ p q : DensePoly R, ¬ 0 < q.degree?.getD 0 → (p % q) % q = p % q
+  mod_add_mod :
+    ∀ p q m : DensePoly R, (p + q) % m = ((p % m) + (q % m)) % m
+  mod_mul_mod :
+    ∀ p q m : DensePoly R, (p * q) % m = ((p % m) * (q % m)) % m
 
 /-- Law package for the executable dense-polynomial gcd operations.
 
@@ -350,15 +354,17 @@ theorem mod_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
 
 /-- Reducing both summands before addition preserves the canonical remainder. -/
 theorem mod_add_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q m : DensePoly R) :
     (p + q) % m = ((p % m) + (q % m)) % m := by
-  sorry
+  exact DivModLaws.mod_add_mod p q m
 
 /-- Reducing both factors before multiplication preserves the canonical remainder. -/
 theorem mod_mul_mod [One R] [Add R] [Sub R] [Mul R] [Div R]
+    [DivModLaws R]
     (p q m : DensePoly R) :
     (p * q) % m = ((p % m) * (q % m)) % m := by
-  sorry
+  exact DivModLaws.mod_mul_mod p q m
 
 end DensePoly
 
