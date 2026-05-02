@@ -306,7 +306,7 @@ theorem content_mul_primitivePart (f : ZPoly) :
 
 theorem primitivePart_primitive (f : ZPoly) (h : content f ≠ 0) :
     Primitive (primitivePart f) := by
-  sorry
+  simpa [Primitive, content, primitivePart] using DensePoly.primitivePart_primitive f h
 
 theorem primitiveSquareFreeDecomposition_primitive (f : ZPoly) :
     (primitiveSquareFreeDecomposition f).primitive = primitivePart f := by
