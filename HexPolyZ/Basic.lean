@@ -41,6 +41,53 @@ def Primitive (f : ZPoly) : Prop :=
 def toRatPoly (f : ZPoly) : DensePoly Rat :=
   DensePoly.ofCoeffs <| f.toArray.map fun coeff : Int => (coeff : Rat)
 
+theorem coeff_toRatPoly (f : ZPoly) (n : Nat) :
+    (toRatPoly f).coeff n = (f.coeff n : Rat) := by
+  unfold toRatPoly
+  rw [DensePoly.coeff_ofCoeffs]
+  unfold DensePoly.coeff DensePoly.toArray
+  by_cases hn : n < f.coeffs.size
+  · simp [Array.getD, hn]
+  · simp [Array.getD, hn]
+    change (0 : Rat) = ((0 : Int) : Rat)
+    simp
+
+theorem toRatPoly_zero :
+    toRatPoly (0 : ZPoly) = 0 := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_toRatPoly]
+  change ((0 : ZPoly).coeff n : Rat) = (0 : DensePoly Rat).coeff n
+  rw [DensePoly.coeff_eq_zero_of_size_le (0 : ZPoly) (by simp)]
+  exact (DensePoly.coeff_eq_zero_of_size_le (0 : DensePoly Rat) (by simp)).symm
+
+theorem toRatPoly_C (c : Int) :
+    toRatPoly (DensePoly.C c) = DensePoly.C (c : Rat) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_toRatPoly]
+  rw [DensePoly.coeff_C, DensePoly.coeff_C]
+  by_cases hn : n = 0
+  · simp [hn]
+  · simp [hn]
+    change ((0 : Int) : Rat) = 0
+    simp
+
+theorem toRatPoly_one :
+    toRatPoly (1 : ZPoly) = 1 := by
+  exact toRatPoly_C 1
+
+theorem toRatPoly_scale_int (c : Int) (f : ZPoly) :
+    toRatPoly (DensePoly.scale c f) = DensePoly.scale (c : Rat) (toRatPoly f) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_toRatPoly]
+  rw [DensePoly.coeff_scale (R := Int) c f n (Int.mul_zero c)]
+  rw [DensePoly.coeff_scale (R := Rat) (c : Rat) (toRatPoly f) n (by
+    exact Rat.mul_zero (c : Rat))]
+  rw [coeff_toRatPoly]
+  simp
+
 private def ratCommonDen (coeffs : List Rat) : Nat :=
   coeffs.foldl (fun acc coeff => Nat.lcm acc coeff.den) 1
 
