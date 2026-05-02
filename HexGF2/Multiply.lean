@@ -3402,11 +3402,71 @@ private def rightAssocFixedTripleContribs
   (List.range slotBound).map
     (fun slot => clmulCoeffAt (i + slot) x (clmulWordAt (j + k) y z slot) n)
 
+/-- The selected bit of one machine word, using the same projection shape as
+the existing coefficient bridges. -/
+private def wordBitAt (word : UInt64) (bit : Nat) : Bool :=
+  (((word >>> bit.toUInt64) &&& 1) != 0)
+
+/-- Source bit-triple contribution for the coefficient of total bit index
+`total` in a three-word carry-less product. -/
+private def clmulSourceTripleCoeff (x y z : UInt64) (total : Nat) : Bool :=
+  xorBoolList
+    (List.flatMap
+      (fun a =>
+        List.flatMap
+          (fun b =>
+            (List.range 64).map
+              (fun c =>
+                (wordBitAt x a && wordBitAt y b && wordBitAt z c) &&
+                  decide (a + b + c = total)))
+          (List.range 64))
+      (List.range 64))
+
+private theorem clmulAssoc_left_low_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    wordBitAt (clmul (clmul x y).2 z).2 bit =
+      clmulSourceTripleCoeff x y z bit := by
+  sorry
+
+private theorem clmulAssoc_right_low_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    wordBitAt (clmul x (clmul y z).2).2 bit =
+      clmulSourceTripleCoeff x y z bit := by
+  sorry
+
+private theorem clmulAssoc_left_middle_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    (wordBitAt (clmul (clmul x y).2 z).1 bit !=
+        wordBitAt (clmul (clmul x y).1 z).2 bit) =
+      clmulSourceTripleCoeff x y z (bit + 64) := by
+  sorry
+
+private theorem clmulAssoc_right_middle_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    (wordBitAt (clmul x (clmul y z).2).1 bit !=
+        wordBitAt (clmul x (clmul y z).1).2 bit) =
+      clmulSourceTripleCoeff x y z (bit + 64) := by
+  sorry
+
+private theorem clmulAssoc_left_high_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    wordBitAt (clmul (clmul x y).1 z).1 bit =
+      clmulSourceTripleCoeff x y z (bit + 128) := by
+  sorry
+
+private theorem clmulAssoc_right_high_sourceTriple
+    (x y z : UInt64) (bit : Nat) :
+    wordBitAt (clmul x (clmul y z).1).1 bit =
+      clmulSourceTripleCoeff x y z (bit + 128) := by
+  sorry
+
 private theorem clmulCoeffAt_assoc_twoWord_low
     (x y z : UInt64) (bit : Nat) :
     ((((clmul (clmul x y).2 z).2 >>> bit.toUInt64) &&& 1) != 0) =
       ((((clmul x (clmul y z).2).2 >>> bit.toUInt64) &&& 1) != 0) := by
-  sorry
+  change wordBitAt (clmul (clmul x y).2 z).2 bit =
+    wordBitAt (clmul x (clmul y z).2).2 bit
+  rw [clmulAssoc_left_low_sourceTriple, clmulAssoc_right_low_sourceTriple]
 
 private theorem clmulCoeffAt_assoc_twoWord_middle
     (x y z : UInt64) (bit : Nat) :
@@ -3414,13 +3474,19 @@ private theorem clmulCoeffAt_assoc_twoWord_middle
         ((((clmul (clmul x y).1 z).2 >>> bit.toUInt64) &&& 1) != 0)) =
       (((((clmul x (clmul y z).2).1 >>> bit.toUInt64) &&& 1) != 0) !=
         ((((clmul x (clmul y z).1).2 >>> bit.toUInt64) &&& 1) != 0)) := by
-  sorry
+  change (wordBitAt (clmul (clmul x y).2 z).1 bit !=
+      wordBitAt (clmul (clmul x y).1 z).2 bit) =
+    (wordBitAt (clmul x (clmul y z).2).1 bit !=
+      wordBitAt (clmul x (clmul y z).1).2 bit)
+  rw [clmulAssoc_left_middle_sourceTriple, clmulAssoc_right_middle_sourceTriple]
 
 private theorem clmulCoeffAt_assoc_twoWord_high
     (x y z : UInt64) (bit : Nat) :
     ((((clmul (clmul x y).1 z).1 >>> bit.toUInt64) &&& 1) != 0) =
       ((((clmul x (clmul y z).1).1 >>> bit.toUInt64) &&& 1) != 0) := by
-  sorry
+  change wordBitAt (clmul (clmul x y).1 z).1 bit =
+    wordBitAt (clmul x (clmul y z).1).1 bit
+  rw [clmulAssoc_left_high_sourceTriple, clmulAssoc_right_high_sourceTriple]
 
 private theorem clmulCoeffAt_assoc_twoWord
     (base n : Nat) (x y z : UInt64) :
