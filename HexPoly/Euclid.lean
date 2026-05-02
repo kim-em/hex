@@ -1419,6 +1419,47 @@ theorem content_mul_primitivePart (p : DensePoly Int) :
           exact Int.mul_ediv_cancel' (contentNat_dvd_coeff p n)
         rw [hpart, hmul]
 
+theorem content_scale_neg_one (p : DensePoly Int) :
+    content (scale (-1 : Int) p) = content p := by
+  unfold content
+  apply congrArg Int.ofNat
+  apply Nat.dvd_antisymm
+  · apply dvd_contentNat_of_dvd_coeff
+    intro n
+    have hcoeff := contentNat_dvd_coeff (scale (-1 : Int) p) n
+    rw [coeff_scale (-1 : Int) p n (Int.mul_zero (-1 : Int))] at hcoeff
+    rcases hcoeff with ⟨k, hk⟩
+    refine ⟨-k, ?_⟩
+    have hneg : p.coeff n = -((-1 : Int) * p.coeff n) := by grind
+    rw [hneg, hk]
+    grind
+  · apply dvd_contentNat_of_dvd_coeff
+    intro n
+    rw [coeff_scale (-1 : Int) p n (Int.mul_zero (-1 : Int))]
+    have hcoeff := contentNat_dvd_coeff p n
+    rcases hcoeff with ⟨k, hk⟩
+    refine ⟨-k, ?_⟩
+    rw [hk]
+    grind
+
+theorem scale_neg_one_zero :
+    scale (-1 : Int) (0 : DensePoly Int) = 0 := by
+  apply ext_coeff
+  intro n
+  rw [coeff_scale (-1 : Int) (0 : DensePoly Int) n (Int.mul_zero (-1 : Int))]
+  simp
+
+theorem content_zero :
+    content (0 : DensePoly Int) = 0 := by
+  rfl
+
+theorem primitivePart_eq_zero_of_content_eq_zero (p : DensePoly Int) (h : content p = 0) :
+    primitivePart p = 0 := by
+  have hc : contentNat p = 0 := by
+    rw [← Int.natCast_eq_zero]
+    simpa [content] using h
+  simp [primitivePart, hc]
+
 /-- The primitive part of a polynomial with nonzero content has content `1`. -/
 theorem primitivePart_primitive (p : DensePoly Int) (h : content p ≠ 0) :
     content (primitivePart p) = 1 := by
