@@ -310,7 +310,11 @@ theorem primitivePart_primitive (f : ZPoly) (h : content f ≠ 0) :
 
 theorem primitiveSquareFreeDecomposition_primitive (f : ZPoly) :
     (primitiveSquareFreeDecomposition f).primitive = primitivePart f := by
-  sorry
+  by_cases hzero : (primitivePart f).isZero = true
+  · simp [primitiveSquareFreeDecomposition, hzero]
+  · by_cases hderivative : (DensePoly.derivative (toRatPoly (primitivePart f))).isZero = true
+    · simp [primitiveSquareFreeDecomposition, hzero, hderivative]
+    · simp [primitiveSquareFreeDecomposition, hzero, hderivative]
 
 theorem ratPolyPrimitivePart_primitive (f : DensePoly Rat)
     (h : content (ratPolyPrimitivePart f) ≠ 0) :
