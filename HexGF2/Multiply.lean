@@ -3816,7 +3816,7 @@ private theorem clmulAssoc_left_low_sourceTriple
   sorry
 
 private theorem clmulAssoc_right_low_sourceTriple
-    (x y z : UInt64) (bit : Nat) :
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     wordBitAt (clmul x (clmul y z).2).2 bit =
       clmulSourceTripleCoeff x y z bit := by
   sorry
@@ -3848,12 +3848,12 @@ private theorem clmulAssoc_right_high_sourceTriple
   sorry
 
 private theorem clmulCoeffAt_assoc_twoWord_low
-    (x y z : UInt64) (bit : Nat) :
+    (x y z : UInt64) {bit : Nat} (hbit : bit < 64) :
     ((((clmul (clmul x y).2 z).2 >>> bit.toUInt64) &&& 1) != 0) =
       ((((clmul x (clmul y z).2).2 >>> bit.toUInt64) &&& 1) != 0) := by
   change wordBitAt (clmul (clmul x y).2 z).2 bit =
     wordBitAt (clmul x (clmul y z).2).2 bit
-  rw [clmulAssoc_left_low_sourceTriple, clmulAssoc_right_low_sourceTriple]
+  rw [clmulAssoc_left_low_sourceTriple, clmulAssoc_right_low_sourceTriple x y z hbit]
 
 private theorem clmulCoeffAt_assoc_twoWord_middle
     (x y z : UInt64) (bit : Nat) :
@@ -3884,7 +3884,7 @@ private theorem clmulCoeffAt_assoc_twoWord
   unfold clmulCoeffAt
   by_cases h0 : n / 64 = base
   · have hbase02 : base ≠ base + 1 + 1 := by omega
-    simp [h0, hbase02, clmulCoeffAt_assoc_twoWord_low]
+    simp [h0, hbase02, clmulCoeffAt_assoc_twoWord_low x y z (Nat.mod_lt n (by decide : 0 < 64))]
   · by_cases h1 : n / 64 = base + 1
     · simp [h1, clmulCoeffAt_assoc_twoWord_middle]
     · by_cases h2 : n / 64 = base + 1 + 1
