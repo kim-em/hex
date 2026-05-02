@@ -83,6 +83,10 @@ def prefixRows (M : Matrix R n m) (i : Nat) (hi : i < n) : Matrix R (i + 1) m :=
 def prefixSpan (M : Matrix Rat n m) (i : Nat) (hi : i < n) (v : Vector Rat m) : Prop :=
   ∃ c : Vector Rat (i + 1), Matrix.rowCombination (prefixRows M i hi) c = v
 
+private theorem entry_ofFn (f : Fin n → Fin m → R) (i : Fin n) (j : Fin m) :
+    entry (Matrix.ofFn f) i j = f i j := by
+  simp [entry, Matrix.row, Matrix.ofFn, Vector.getElem_ofFn]
+
 end GramSchmidt
 
 namespace GramSchmidt.Int
@@ -114,12 +118,16 @@ theorem basis_decomposition (b : Matrix Int n m) (i : Nat) (hi : i < n) :
 
 theorem coeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨i, hi⟩ = 1 := by
-  sorry
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn]
 
 theorem coeffs_upper (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
-  sorry
+  have hnot_lt : ¬j < i := Nat.not_lt_of_ge (Nat.le_of_lt hij)
+  have hne : (⟨i, hi⟩ : Fin n) ≠ ⟨j, hj⟩ := by
+    intro h
+    exact (Nat.ne_of_lt hij) (congrArg Fin.val h)
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn, hnot_lt, hne]
 
 theorem basis_span (b : Matrix Int n m) (i : Nat) (hi : i < n) :
     ∀ v : Vector Rat m,
@@ -156,12 +164,16 @@ theorem basis_decomposition (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
 
 theorem coeffs_diag (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨i, hi⟩ = 1 := by
-  sorry
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn]
 
 theorem coeffs_upper (b : Matrix Rat n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
-  sorry
+  have hnot_lt : ¬j < i := Nat.not_lt_of_ge (Nat.le_of_lt hij)
+  have hne : (⟨i, hi⟩ : Fin n) ≠ ⟨j, hj⟩ := by
+    intro h
+    exact (Nat.ne_of_lt hij) (congrArg Fin.val h)
+  simp [coeffs, GramSchmidt.coeffMatrix, GramSchmidt.entry_ofFn, hnot_lt, hne]
 
 theorem basis_span (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     ∀ v : Vector Rat m,
