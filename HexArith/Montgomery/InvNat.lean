@@ -24,7 +24,7 @@ private theorem montPosInvStep_mod_6_to_12 (p x : UInt64)
     (hx : p * x % 64 = 1) :
     p * montPosInvStep p x % 4096 = 1 := by
   unfold montPosInvStep
-  bv_decide (config := { timeout := 30 })
+  bv_decide (config := { timeout := 120 })
 
 private theorem two_pow_dvd_uint64_word {t : Nat} (ht : t ≤ 64) :
     2 ^ t ∣ UInt64.word := by
