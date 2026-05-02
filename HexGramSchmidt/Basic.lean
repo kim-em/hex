@@ -59,6 +59,91 @@ private theorem dot_subtractProjection_self_zero (row basisRow : Vector Rat m)
   simp [projectionCoeff, hnorm]
   grind
 
+private theorem rat_mul_self_nonneg (x : Rat) : 0 ≤ x * x := by
+  simpa [Lean.Grind.Semiring.pow_two] using (Lean.Grind.OrderedRing.sq_nonneg (a := x))
+
+private theorem rat_mul_self_eq_zero_of_nonpos (x : Rat) (h : x * x ≤ 0) : x = 0 := by
+  have hnonneg : 0 ≤ x * x := rat_mul_self_nonneg x
+  have hsquare : x * x = 0 := by
+    grind
+  grind
+
+private theorem foldl_dot_self_start_le (xs : List (Fin m)) (v : Vector Rat m)
+    (acc : Rat) (hacc : 0 ≤ acc) :
+    acc ≤ xs.foldl (fun sum i => sum + v[i] * v[i]) acc := by
+  induction xs generalizing acc with
+  | nil =>
+      simp
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hsq : 0 ≤ v[i] * v[i] := rat_mul_self_nonneg v[i]
+      have hnext : 0 ≤ acc + v[i] * v[i] := by grind
+      exact Rat.le_trans (by grind) (ih (acc := acc + v[i] * v[i]) hnext)
+
+private theorem foldl_dot_self_eq_zero_of_mem (xs : List (Fin m)) (v : Vector Rat m)
+    (acc : Rat) (hacc : 0 ≤ acc)
+    (hzero : xs.foldl (fun sum i => sum + v[i] * v[i]) acc = 0) :
+    ∀ i ∈ xs, v[i] = 0 := by
+  induction xs generalizing acc with
+  | nil =>
+      simp
+  | cons head rest ih =>
+      intro i hi
+      simp only [List.mem_cons] at hi
+      have hsq : 0 ≤ v[head] * v[head] := rat_mul_self_nonneg v[head]
+      have hnext_nonneg : 0 ≤ acc + v[head] * v[head] := by grind
+      have hnext_le_zero :
+          acc + v[head] * v[head] ≤ 0 := by
+        have hle :=
+          foldl_dot_self_start_le (xs := rest) (v := v)
+            (acc := acc + v[head] * v[head]) hnext_nonneg
+        have hzero' :
+            rest.foldl (fun sum i => sum + v[i] * v[i])
+              (acc + v[head] * v[head]) = 0 := by
+          simpa using hzero
+        rw [hzero'] at hle
+        exact hle
+      have hnext_zero : acc + v[head] * v[head] = 0 := by grind
+      have hhead_zero : v[head] = 0 := by
+        apply rat_mul_self_eq_zero_of_nonpos
+        grind
+      cases hi with
+      | inl h =>
+          subst i
+          exact hhead_zero
+      | inr h =>
+          exact ih (acc := acc + v[head] * v[head]) hnext_nonneg hzero i h
+
+private theorem dot_self_eq_zero_get (v : Vector Rat m)
+    (hzero : Matrix.dot v v = 0) (i : Fin m) :
+    v[i] = 0 := by
+  have hmem : i ∈ List.finRange m := by
+    simp
+  exact foldl_dot_self_eq_zero_of_mem (xs := List.finRange m) (v := v)
+    (acc := 0) (by decide) (by simpa [Matrix.dot, Hex.Vector.dotProduct] using hzero) i hmem
+
+private theorem dot_zero_of_dot_self_zero (row v : Vector Rat m)
+    (hzero : Matrix.dot v v = 0) :
+    Matrix.dot row v = 0 := by
+  unfold Matrix.dot Hex.Vector.dotProduct
+  induction List.finRange m with
+  | nil =>
+      simp
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [dot_self_eq_zero_get v hzero i]
+      rw [show row[i] * (0 : Rat) = 0 by grind]
+      rw [show (0 : Rat) + 0 = 0 by grind]
+      change xs.foldl (fun acc i => acc + row[i] * v[i]) 0 = 0
+      exact ih
+
+private theorem dot_subtractProjection_self_zero_of_dot_self_zero
+    (row basisRow : Vector Rat m)
+    (hnorm : Matrix.dot basisRow basisRow = 0) :
+    Matrix.dot (subtractProjection row basisRow) basisRow = 0 := by
+  exact dot_zero_of_dot_self_zero (row := subtractProjection row basisRow)
+    (v := basisRow) hnorm
+
 private theorem foldl_dot_comm_rat (xs : List (Fin m)) (u v : Vector Rat m)
     (accU accV : Rat) (hacc : accU = accV) :
     xs.foldl (fun acc i => acc + u[i] * v[i]) accU =
@@ -120,8 +205,7 @@ private theorem dot_reduceAgainstBasis_zero_of_dot_zero
 private theorem dot_reduceAgainstBasis_of_mem
     (basisRev : List (Vector Rat m)) (row basisRow : Vector Rat m)
     (hmem : basisRow ∈ basisRev)
-    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0))
-    (hnorm : Matrix.dot basisRow basisRow ≠ 0) :
+    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0)) :
     Matrix.dot (reduceAgainstBasis basisRev row) basisRow = 0 := by
   induction basisRev generalizing row with
   | nil =>
@@ -132,7 +216,9 @@ private theorem dot_reduceAgainstBasis_of_mem
       by_cases hhead : head = basisRow
       · subst basisRow
         apply dot_reduceAgainstBasis_zero_of_dot_zero
-        · exact dot_subtractProjection_self_zero row head hnorm
+        · by_cases hnorm : Matrix.dot head head = 0
+          · exact dot_subtractProjection_self_zero_of_dot_self_zero row head hnorm
+          · exact dot_subtractProjection_self_zero row head hnorm
         · intro later hlater
           exact (List.rel_of_pairwise_cons horth hlater).2
       · have htail : basisRow ∈ rest := by
