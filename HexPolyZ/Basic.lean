@@ -138,11 +138,167 @@ theorem congr_add (f g f' g' : ZPoly) (m : Nat)
   refine ⟨c + d, ?_⟩
   grind
 
+private theorem dvd_mul_sub_mul_of_dvd_sub (m a b c d : Int)
+    (hab : m ∣ a - b) (hcd : m ∣ c - d) :
+    m ∣ a * c - b * d := by
+  rcases hab with ⟨u, hu⟩
+  rcases hcd with ⟨v, hv⟩
+  refine ⟨u * c + b * v, ?_⟩
+  grind
+
+private theorem dvd_mulCoeffStep_sub (f g f' g' : ZPoly) (m : Nat)
+    (hf : congr f f' m) (hg : congr g g' m) (n i j : Nat) (a b : Int)
+    (hab : (m : Int) ∣ a - b) :
+    (m : Int) ∣
+      DensePoly.mulCoeffStep f g n i a j -
+        DensePoly.mulCoeffStep f' g' n i b j := by
+  unfold DensePoly.mulCoeffStep
+  by_cases hij : i + j = n
+  · simp [hij]
+    have hprod : (m : Int) ∣ f.coeff i * g.coeff j - f'.coeff i * g'.coeff j :=
+      dvd_mul_sub_mul_of_dvd_sub (m : Int) (f.coeff i) (f'.coeff i) (g.coeff j)
+        (g'.coeff j) (Int.dvd_of_emod_eq_zero (hf i)) (Int.dvd_of_emod_eq_zero (hg j))
+    rcases hab with ⟨u, hu⟩
+    rcases hprod with ⟨v, hv⟩
+    refine ⟨u + v, ?_⟩
+    grind
+  · simp [hij]
+    exact hab
+
+private theorem dvd_mulCoeffStep_fold_sub (f g f' g' : ZPoly) (m : Nat)
+    (hf : congr f f' m) (hg : congr g g' m) (n i : Nat) (xs : List Nat) (a b : Int)
+    (hab : (m : Int) ∣ a - b) :
+    (m : Int) ∣
+      xs.foldl (DensePoly.mulCoeffStep f g n i) a -
+        xs.foldl (DensePoly.mulCoeffStep f' g' n i) b := by
+  induction xs generalizing a b with
+  | nil =>
+      simpa using hab
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      exact ih (DensePoly.mulCoeffStep f g n i a j)
+        (DensePoly.mulCoeffStep f' g' n i b j)
+        (dvd_mulCoeffStep_sub f g f' g' m hf hg n i j a b hab)
+
+private theorem fold_mulCoeffStep_range_add_zero_tail (p q : ZPoly)
+    (n i : Nat) (a : Int) (d : Nat) :
+    (List.range (q.size + d)).foldl (DensePoly.mulCoeffStep p q n i) a =
+      (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) a := by
+  induction d with
+  | zero =>
+      rfl
+  | succ d ih =>
+      rw [Nat.add_succ, List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      unfold DensePoly.mulCoeffStep
+      have hcoeff : q.coeff (q.size + d) = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le q (by omega)
+      by_cases h : i + (q.size + d) = n
+      · simp [h, hcoeff]
+      · simp [h]
+
+private theorem fold_mulCoeffStep_range_of_size_le (p q : ZPoly)
+    (n i : Nat) (a : Int) {s : Nat} (hs : q.size ≤ s) :
+    (List.range s).foldl (DensePoly.mulCoeffStep p q n i) a =
+      (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) a := by
+  have hs' : q.size + (s - q.size) = s := by omega
+  rw [← hs']
+  exact fold_mulCoeffStep_range_add_zero_tail p q n i a (s - q.size)
+
+private theorem fold_mulCoeffStep_zero_left (p q : ZPoly) (n i : Nat) (a : Int)
+    (hi : p.coeff i = 0) :
+    (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) a = a := by
+  induction q.size generalizing a with
+  | zero =>
+      rfl
+  | succ k ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      unfold DensePoly.mulCoeffStep
+      by_cases h : i + k = n
+      · simp [h, hi]
+      · simp [h]
+
+private theorem fold_mulCoeffOuter_range_add_zero_tail (p q : ZPoly)
+    (n d : Nat) :
+    (List.range (p.size + d)).foldl
+        (fun acc i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc) 0 =
+      (List.range p.size).foldl
+        (fun acc i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc) 0 := by
+  induction d with
+  | zero =>
+      rfl
+  | succ d ih =>
+      rw [Nat.add_succ, List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      have hcoeff : p.coeff (p.size + d) = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le p (by omega)
+      exact fold_mulCoeffStep_zero_left p q n (p.size + d)
+        ((List.range p.size).foldl
+          (fun acc i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc) 0)
+        hcoeff
+
+private theorem mulCoeffSum_eq_outer_range_of_size_le (p q : ZPoly)
+    (n : Nat) {s : Nat} (hs : p.size ≤ s) :
+    (List.range s).foldl
+        (fun acc i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc) 0 =
+      DensePoly.mulCoeffSum p q n := by
+  unfold DensePoly.mulCoeffSum
+  have hs' : p.size + (s - p.size) = s := by omega
+  rw [← hs']
+  exact fold_mulCoeffOuter_range_add_zero_tail p q n (s - p.size)
+
+private theorem dvd_mulCoeffOuter_fold_sub (f g f' g' : ZPoly) (m : Nat)
+    (hf : congr f f' m) (hg : congr g g' m) (n innerBound : Nat)
+    (hgb : g.size ≤ innerBound) (hg'b : g'.size ≤ innerBound)
+    (xs : List Nat) (a b : Int) (hab : (m : Int) ∣ a - b) :
+    (m : Int) ∣
+      xs.foldl
+          (fun acc i => (List.range g.size).foldl (DensePoly.mulCoeffStep f g n i) acc) a -
+        xs.foldl
+          (fun acc i => (List.range g'.size).foldl (DensePoly.mulCoeffStep f' g' n i) acc) b := by
+  induction xs generalizing a b with
+  | nil =>
+      simpa using hab
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      have hnext : (m : Int) ∣
+          (List.range g.size).foldl (DensePoly.mulCoeffStep f g n i) a -
+            (List.range g'.size).foldl (DensePoly.mulCoeffStep f' g' n i) b := by
+        rw [← fold_mulCoeffStep_range_of_size_le f g n i a hgb,
+          ← fold_mulCoeffStep_range_of_size_le f' g' n i b hg'b]
+        exact dvd_mulCoeffStep_fold_sub f g f' g' m hf hg n i
+          (List.range innerBound) a b hab
+      exact ih
+        ((List.range g.size).foldl (DensePoly.mulCoeffStep f g n i) a)
+        ((List.range g'.size).foldl (DensePoly.mulCoeffStep f' g' n i) b)
+        hnext
+
 theorem congr_mul (f g f' g' : ZPoly) (m : Nat)
     (hf : congr f f' m) (hg : congr g g' m) :
     congr (f * g) (f' * g') m := by
   intro i
-  sorry
+  rw [DensePoly.coeff_mul, DensePoly.coeff_mul]
+  apply Int.emod_eq_zero_of_dvd
+  let outerBound := max f.size f'.size
+  let innerBound := max g.size g'.size
+  rw [← mulCoeffSum_eq_outer_range_of_size_le f g i (s := outerBound) (by
+    unfold outerBound
+    exact Nat.le_max_left f.size f'.size)]
+  rw [← mulCoeffSum_eq_outer_range_of_size_le f' g' i (s := outerBound) (by
+    unfold outerBound
+    exact Nat.le_max_right f.size f'.size)]
+  exact dvd_mulCoeffOuter_fold_sub f g f' g' m hf hg i innerBound
+    (by
+      unfold innerBound
+      exact Nat.le_max_left g.size g'.size)
+    (by
+      unfold innerBound
+      exact Nat.le_max_right g.size g'.size)
+    (List.range outerBound) 0 0 (by simp)
 
 theorem content_mul_primitivePart (f : ZPoly) :
     DensePoly.scale (content f) (primitivePart f) = f := by
