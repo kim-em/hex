@@ -88,6 +88,95 @@ theorem toRatPoly_scale_int (c : Int) (f : ZPoly) :
   rw [coeff_toRatPoly]
   simp
 
+private theorem size_toRatPoly (f : ZPoly) :
+    (toRatPoly f).size = f.size := by
+  apply Nat.le_antisymm
+  · by_cases hle : (toRatPoly f).size ≤ f.size
+    · exact hle
+    · have hlt : f.size < (toRatPoly f).size := Nat.lt_of_not_ge hle
+      let i := (toRatPoly f).size - 1
+      have hrat_ne : (toRatPoly f).coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size (toRatPoly f) (by omega)
+      have hf_zero : f.coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le f (by
+          unfold i
+          omega)
+      exfalso
+      apply hrat_ne
+      rw [coeff_toRatPoly, hf_zero]
+      rfl
+  · by_cases hle : f.size ≤ (toRatPoly f).size
+    · exact hle
+    · have hlt : (toRatPoly f).size < f.size := Nat.lt_of_not_ge hle
+      let i := f.size - 1
+      have hf_ne : f.coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size f (by omega)
+      have hrat_zero : (toRatPoly f).coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le (toRatPoly f) (by
+          unfold i
+          omega)
+      exfalso
+      apply hf_ne
+      have hcast_zero : ((f.coeff i : Int) : Rat) = 0 := by
+        rw [← coeff_toRatPoly f i]
+        exact hrat_zero
+      exact Rat.intCast_eq_zero_iff.mp hcast_zero
+
+private theorem toRatPoly_mulCoeffStep (f g : ZPoly) (n i : Nat) (a : Int) (j : Nat) :
+    DensePoly.mulCoeffStep (toRatPoly f) (toRatPoly g) n i (a : Rat) j =
+      (DensePoly.mulCoeffStep (R := Int) f g n i a j : Rat) := by
+  unfold DensePoly.mulCoeffStep
+  by_cases hij : i + j = n
+  · simp [hij, coeff_toRatPoly]
+  · simp [hij]
+
+private theorem toRatPoly_mulCoeffStep_fold (f g : ZPoly) (n i : Nat)
+    (xs : List Nat) (a : Int) :
+    xs.foldl (DensePoly.mulCoeffStep (toRatPoly f) (toRatPoly g) n i) (a : Rat) =
+      ((xs.foldl (DensePoly.mulCoeffStep (R := Int) f g n i) a : Int) : Rat) := by
+  induction xs generalizing a with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [toRatPoly_mulCoeffStep]
+      exact ih (DensePoly.mulCoeffStep (R := Int) f g n i a j)
+
+private theorem toRatPoly_mulCoeffOuter_fold (f g : ZPoly) (n : Nat)
+    (xs : List Nat) (a : Int) :
+    xs.foldl
+        (fun acc i =>
+          (List.range (toRatPoly g).size).foldl
+            (DensePoly.mulCoeffStep (toRatPoly f) (toRatPoly g) n i) acc)
+        (a : Rat) =
+      ((xs.foldl
+        (fun acc i =>
+          (List.range g.size).foldl (DensePoly.mulCoeffStep (R := Int) f g n i) acc)
+        a : Int) : Rat) := by
+  induction xs generalizing a with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [size_toRatPoly g]
+      rw [toRatPoly_mulCoeffStep_fold]
+      simpa [size_toRatPoly g] using
+        ih ((List.range g.size).foldl (DensePoly.mulCoeffStep (R := Int) f g n i) a)
+
+private theorem toRatPoly_mulCoeffSum (f g : ZPoly) (n : Nat) :
+    DensePoly.mulCoeffSum (toRatPoly f) (toRatPoly g) n =
+      (DensePoly.mulCoeffSum (R := Int) f g n : Rat) := by
+  unfold DensePoly.mulCoeffSum
+  rw [size_toRatPoly f]
+  exact toRatPoly_mulCoeffOuter_fold f g n (List.range f.size) 0
+
+theorem toRatPoly_mul (f g : ZPoly) :
+    toRatPoly (f * g) = toRatPoly f * toRatPoly g := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_toRatPoly, DensePoly.coeff_mul, DensePoly.coeff_mul]
+  exact (toRatPoly_mulCoeffSum f g n).symm
+
 private def ratCommonDen (coeffs : List Rat) : Nat :=
   coeffs.foldl (fun acc coeff => Nat.lcm acc coeff.den) 1
 
