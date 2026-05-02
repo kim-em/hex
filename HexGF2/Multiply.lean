@@ -3407,6 +3407,100 @@ the existing coefficient bridges. -/
 private def wordBitAt (word : UInt64) (bit : Nat) : Bool :=
   (((word >>> bit.toUInt64) &&& 1) != 0)
 
+/-- The one-hot contribution of a selected source bit of a word. -/
+private def oneHotBitWord (word : UInt64) (bit : Nat) : UInt64 :=
+  if wordBitAt word bit then
+    (1 : UInt64) <<< bit.toUInt64
+  else
+    0
+
+private theorem xorWordList_oneHotBitWords_eq (word : UInt64) :
+    xorWordList ((List.range 64).map (fun bit => oneHotBitWord word bit)) = word := by
+  simp [xorWordList, oneHotBitWord, wordBitAt, List.range, List.range.loop]
+  bv_decide
+
+private theorem clmulCoeffAt_zero_word_right (idx : Nat) (x : UInt64) (n : Nat) :
+    clmulCoeffAt idx x 0 n = false :=
+  clmulCoeffAt_zero_right idx x n
+
+private theorem clmul_rightBitFold_low
+    (x y : UInt64) {bit : Nat} (hbit : bit < 64) :
+    wordBitAt (clmul x y).2 bit =
+      xorBoolList
+        ((List.range 64).map
+          (fun b =>
+            wordBitAt y b &&
+              wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).2 bit)) := by
+  have hlow : bit / 64 = 0 := Nat.div_eq_of_lt hbit
+  have hmod : bit % 64 = bit := Nat.mod_eq_of_lt hbit
+  have hcoeff :
+      wordBitAt (clmul x y).2 bit = clmulCoeffAt 0 x y bit := by
+    unfold wordBitAt clmulCoeffAt
+    simp [hlow, hmod]
+  rw [hcoeff]
+  calc
+    clmulCoeffAt 0 x y bit =
+        clmulCoeffAt 0 x (xorWordList ((List.range 64).map
+          (fun bit => oneHotBitWord y bit))) bit := by
+          rw [xorWordList_oneHotBitWords_eq]
+    _ = xorBoolList
+        (List.map (fun word => clmulCoeffAt 0 x word bit)
+          ((List.range 64).map (fun bit => oneHotBitWord y bit))) := by
+          rw [clmulCoeffAt_xorWordList_right]
+    _ = xorBoolList
+        ((List.range 64).map
+          (fun b =>
+            wordBitAt y b &&
+              wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).2 bit)) := by
+          rw [List.map_map]
+          congr 1
+          apply List.map_congr_left
+          intro b hb
+          cases hyb : wordBitAt y b
+          · simp [oneHotBitWord, hyb, clmulCoeffAt_zero_word_right]
+          · simp [oneHotBitWord, hyb]
+            unfold clmulCoeffAt wordBitAt
+            simp [hlow, hmod]
+
+private theorem clmul_rightBitFold_high
+    (x y : UInt64) {bit : Nat} (hbit : bit < 64) :
+    wordBitAt (clmul x y).1 bit =
+      xorBoolList
+        ((List.range 64).map
+          (fun b =>
+            wordBitAt y b &&
+              wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).1 bit)) := by
+  have hhigh : (bit + 64) / 64 = 0 + 1 := by omega
+  have hmod : (bit + 64) % 64 = bit := by omega
+  have hcoeff :
+      wordBitAt (clmul x y).1 bit = clmulCoeffAt 0 x y (bit + 64) := by
+    unfold wordBitAt clmulCoeffAt
+    simp [hhigh, hmod]
+  rw [hcoeff]
+  calc
+    clmulCoeffAt 0 x y (bit + 64) =
+        clmulCoeffAt 0 x (xorWordList ((List.range 64).map
+          (fun bit => oneHotBitWord y bit))) (bit + 64) := by
+          rw [xorWordList_oneHotBitWords_eq]
+    _ = xorBoolList
+        (List.map (fun word => clmulCoeffAt 0 x word (bit + 64))
+          ((List.range 64).map (fun bit => oneHotBitWord y bit))) := by
+          rw [clmulCoeffAt_xorWordList_right]
+    _ = xorBoolList
+        ((List.range 64).map
+          (fun b =>
+            wordBitAt y b &&
+              wordBitAt (clmul x ((1 : UInt64) <<< b.toUInt64)).1 bit)) := by
+          rw [List.map_map]
+          congr 1
+          apply List.map_congr_left
+          intro b hb
+          cases hyb : wordBitAt y b
+          · simp [oneHotBitWord, hyb, clmulCoeffAt_zero_word_right]
+          · simp [oneHotBitWord, hyb]
+            unfold clmulCoeffAt wordBitAt
+            simp [hhigh, hmod]
+
 /-- Source bit-triple contribution for the coefficient of total bit index
 `total` in a three-word carry-less product. -/
 private def clmulSourceTripleCoeff (x y z : UInt64) (total : Nat) : Bool :=
