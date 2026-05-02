@@ -36,6 +36,15 @@ private theorem dot_subtractProjection (row basisRow target : Vector Rat m) :
       Matrix.dot row target - projectionCoeff row basisRow * Matrix.dot basisRow target := by
   simp [subtractProjection, Matrix.dot_sub_smul_rat]
 
+private theorem subtractProjection_add_projection (row basisRow : Vector Rat m) :
+    row = subtractProjection row basisRow + projectionCoeff row basisRow • basisRow := by
+  apply Vector.ext
+  intro k hk
+  change row[k] =
+    (subtractProjection row basisRow + projectionCoeff row basisRow • basisRow)[k]
+  rw [Vector.getElem_add, subtractProjection, Vector.getElem_sub, Vector.getElem_smul]
+  grind
+
 private theorem dot_subtractProjection_zero_of_dot_zero
     (row basisRow target : Vector Rat m)
     (hrow : Matrix.dot row target = 0) (hbasis : Matrix.dot basisRow target = 0) :
@@ -173,6 +182,13 @@ private theorem entry_ofFn (f : Fin n → Fin m → R) (i : Fin n) (j : Fin m) :
     entry (Matrix.ofFn f) i j = f i j := by
   simp [entry, Matrix.row, Matrix.ofFn, Vector.getElem_ofFn]
 
+private theorem basisMatrix_reconstruction_invariant
+    (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
+    b.row ⟨i, hi⟩ =
+      (basisMatrix b).row ⟨i, hi⟩ +
+        prefixCombination (coeffMatrix b (basisMatrix b)) (basisMatrix b) i hi := by
+  sorry
+
 end GramSchmidt
 
 namespace GramSchmidt.Rat
@@ -199,7 +215,8 @@ theorem basis_decomposition (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     b.row ⟨i, hi⟩ =
       (basis b).row ⟨i, hi⟩ +
         GramSchmidt.prefixCombination (coeffs b) (basis b) i hi := by
-  sorry
+  simpa [basis, coeffs] using
+    GramSchmidt.basisMatrix_reconstruction_invariant (b := b) i hi
 
 theorem coeffs_diag (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     GramSchmidt.entry (coeffs b) ⟨i, hi⟩ ⟨i, hi⟩ = 1 := by
