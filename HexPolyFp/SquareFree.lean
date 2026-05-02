@@ -1500,6 +1500,27 @@ private theorem yunFactorsContribution_initial_state_split
   dsimp
   exact div_gcd_mul_reconstruct f (DensePoly.derivative f)
 
+/--
+Fuel-indexed product invariant for the Yun contribution loop in the
+derivative-active branch.  The state equation `c * w = f` identifies the
+current Yun state with the caller's polynomial, and the conclusion is the
+two-way reconstruction surface needed by `squareFreeAuxRevContribution`.
+-/
+private theorem yunFactorsContribution_derivative_active_loop_invariant
+    (hp : Hex.Nat.Prime p) (f c w : FpPoly p) (multiplicity fuel : Nat)
+    (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 2)
+    (hstate : c * w = f)
+    (hzero : f.isZero = false)
+    (hdf : (DensePoly.derivative f).isZero = false) :
+    let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
+    (isOne contribution.2 = true → contribution.1 = pow f multiplicity) ∧
+      (isOne contribution.2 = false →
+        contribution.1 *
+          squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p)
+            (fuel + 1) =
+          pow f multiplicity) := by
+  sorry
+
 private theorem yunFactorsContribution_derivative_active_split_algebra_succ
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
     (hmultiplicity : 0 < multiplicity) (hfuel : f.size < fuel + 2)
@@ -1514,46 +1535,14 @@ private theorem yunFactorsContribution_derivative_active_split_algebra_succ
           contribution.1 *
             squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) (fuel + 1) =
               pow f multiplicity) := by
-  have hterminal_surface :
-      ∀ (c w : FpPoly p) (multiplicity fuel : Nat),
-        isOne c = true →
-          let contribution := yunFactorsContribution c w multiplicity (fuel + 1)
-          contribution.1 = 1 ∧ contribution.2 = w ∧ c = 1 :=
-    fun c w multiplicity fuel hc =>
-      yunFactorsContribution_terminal_of_isOne c w multiplicity fuel hc
-  have hstep_target_surface :
-      ∀ (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p),
-        isOne c = false →
-          (isOne (c / DensePoly.gcd c w) = true →
-            (yunFactorsContribution
-              (DensePoly.gcd c w) (w / DensePoly.gcd c w)
-              (multiplicity + 1) fuel).1 = target) →
-          (isOne (c / DensePoly.gcd c w) = false →
-            pow (c / DensePoly.gcd c w) multiplicity *
-              (yunFactorsContribution
-                (DensePoly.gcd c w) (w / DensePoly.gcd c w)
-                (multiplicity + 1) fuel).1 = target) →
-          let y := DensePoly.gcd c w
-          let tail :=
-            yunFactorsContribution y (w / y) (multiplicity + 1) fuel
-          let contribution :=
-            yunFactorsContribution c w multiplicity (fuel + 1)
-          contribution.1 = target ∧
-            contribution.2 = tail.2 ∧
-            squareFreeAuxRevContribution (pthRoot contribution.2)
-                (multiplicity * p) fuel =
-              squareFreeAuxRevContribution (pthRoot tail.2)
-                (multiplicity * p) fuel ∧
-              (c / y) * y = c ∧ (w / y) * y = w :=
-    fun c w multiplicity fuel target hc htarget_one htarget_factor =>
-      yunFactorsContribution_step_target_combiner
-        c w multiplicity fuel target hc htarget_one htarget_factor
   let g := DensePoly.gcd f (DensePoly.derivative f)
   let c := f / g
   have hcg : c * g = f := by
     simpa [c, g] using yunFactorsContribution_initial_state_split f
   refine ⟨hcg, ?_⟩
-  sorry
+  exact
+    yunFactorsContribution_derivative_active_loop_invariant
+      hp f c g multiplicity fuel hmultiplicity hfuel hcg hzero hdf
 
 private theorem yunFactorsContribution_derivative_active_split_algebra
     (hp : Hex.Nat.Prime p) (f : FpPoly p) (multiplicity fuel : Nat)
