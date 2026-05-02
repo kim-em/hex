@@ -528,6 +528,32 @@ theorem ratPolyPrimitivePart_rational_associate (f : DensePoly Rat) :
     ∃ unit : Rat, f = DensePoly.scale unit (toRatPoly (ratPolyPrimitivePart f)) := by
   exact ratPolyPrimitivePart_rational_associate_core f
 
+private theorem rat_scale_zero (p : DensePoly Rat) :
+    DensePoly.scale 0 p = 0 := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_scale (R := Rat) 0 p n (Rat.mul_zero 0)]
+  rw [DensePoly.coeff_zero]
+  exact Rat.zero_mul (p.coeff n)
+
+private theorem rat_scale_one (p : DensePoly Rat) :
+    DensePoly.scale 1 p = p := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_scale (R := Rat) 1 p n (Rat.mul_zero 1)]
+  exact Rat.one_mul (p.coeff n)
+
+private theorem densePoly_eq_zero_of_isZero_true {R : Type _} [Zero R] [DecidableEq R]
+    (p : DensePoly R) (h : p.isZero = true) :
+    p = 0 := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hsize : p.size = 0 := by
+    simpa [DensePoly.isZero, DensePoly.size, Array.isEmpty_iff_size_eq_zero] using h
+  rw [DensePoly.coeff_eq_zero_of_size_le p (by omega)]
+  rw [DensePoly.coeff_zero]
+  rfl
+
 theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     let d := primitiveSquareFreeDecomposition f
     ∃ unit : Rat,
