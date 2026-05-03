@@ -284,13 +284,50 @@ def ofBasis (b : Matrix Int n m) (_hind : b.independent) : LLLState n m :=
 
 end LLLState
 
-/-- Outer LLL loop, dispatched by `lll`. Phase 1 keeps the body as a
-type-correct stub returning the input basis; Phase 5 will replace it with
-the SPEC's well-founded recursion in `s.potential` × `n - k`. -/
+/-- Outer LLL loop, dispatched by `lll`.
+
+At row `k`, the loop size-reduces the current row, checks the integer
+Lovasz condition, and either advances to `k + 1` or swaps adjacent rows and
+continues from the previous position. -/
 def lllAux (s : LLLState n m) (k : Nat) (δ : Rat)
-    (_hδ : 1/4 < δ) (_hδ' : δ ≤ 1) (_hind : s.b.independent)
-    (_hk : 1 ≤ k) (_hkn : k ≤ n) : Matrix Int n m :=
-  s.b
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hind : s.b.independent)
+    (hk : 1 ≤ k) (hkn : k ≤ n) : Matrix Int n m :=
+  if hdone : k = n then
+    s.b
+  else
+    have hlt : k < n := Nat.lt_of_le_of_ne hkn hdone
+    have hkm1lt : k - 1 < n :=
+      Nat.lt_of_le_of_lt (Nat.sub_le k 1) hlt
+    let sReduced := s.sizeReduce k
+    let kFin : Fin n := ⟨k, hlt⟩
+    let km1Fin : Fin n := ⟨k - 1, hkm1lt⟩
+    let dkPrev := sReduced.d.get
+      ⟨k - 1, Nat.lt_trans hkm1lt (Nat.lt_succ_self n)⟩
+    let dk := sReduced.d.get ⟨k, Nat.lt_succ_of_lt hlt⟩
+    let dkNext := sReduced.d.get ⟨k + 1, Nat.succ_lt_succ hlt⟩
+    let B := (sReduced.ν.get kFin).get km1Fin
+    let lovaszLhs : Int :=
+      Int.ofNat δ.den * (Int.ofNat dkNext * Int.ofNat dkPrev + B ^ 2)
+    let lovaszRhs : Int :=
+      δ.num * (Int.ofNat dk ^ 2)
+    if lovaszLhs ≥ lovaszRhs then
+      lllAux sReduced (k + 1) δ hδ hδ'
+        (by
+          sorry)
+        (Nat.succ_pos k) (Nat.succ_le_of_lt hlt)
+    else
+      let sSwapped := sReduced.swapStep k
+      let k' := max (k - 1) 1
+      lllAux sSwapped k' δ hδ hδ'
+        (by
+          sorry)
+        (Nat.le_max_right (k - 1) 1)
+        (by
+          exact (Nat.max_le).2
+            ⟨Nat.le_trans (Nat.sub_le k 1) hkn, Nat.le_trans hk hkn⟩)
+termination_by (s.potential, n - k)
+decreasing_by
+  all_goals sorry
 
 /-- Top-level LLL entry point. Builds the canonical integer state via
 `LLLState.ofBasis` and dispatches to `lllAux`. The proof obligations of
