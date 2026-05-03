@@ -133,6 +133,40 @@ private def setArrayEntry (rows : Array (Array Int)) (row col : Nat) (value : In
     Array (Array Int) :=
   rows.set! row (rows[row]!.set! col value)
 
+private theorem getArrayEntry_setArrayEntry_of_row_ne
+    (rows : Array (Array Int)) (row col r c : Nat) (value : Int) (hr : r ≠ row) :
+    getArrayEntry (setArrayEntry rows row col value) r c = getArrayEntry rows r c := by
+  grind [getArrayEntry, setArrayEntry]
+
+private theorem getArrayEntry_setArrayEntry_of_col_ne
+    (rows : Array (Array Int)) (row col c : Nat) (value : Int) (hc : c ≠ col) :
+    getArrayEntry (setArrayEntry rows row col value) row c = getArrayEntry rows row c := by
+  grind [getArrayEntry, setArrayEntry]
+
+private theorem getArrayEntry_foldl_setArrayEntry_col_above
+    (xs : List Nat) (coeffs rows : Array (Array Int)) (k i j : Nat)
+    (hxs : ∀ x ∈ xs, k < x) (hij : i < j) :
+    getArrayEntry
+        (xs.foldl (fun next x => setArrayEntry next x k (getArrayEntry rows x k)) coeffs)
+        i j =
+      getArrayEntry coeffs i j := by
+  induction xs generalizing coeffs with
+  | nil =>
+      simp
+  | cons x xs ih =>
+      have hx : k < x := hxs x (by simp)
+      have hxs' : ∀ y ∈ xs, k < y := by
+        intro y hy
+        exact hxs y (by simp [hy])
+      simp only [List.foldl_cons]
+      rw [ih (setArrayEntry coeffs x k (getArrayEntry rows x k)) hxs']
+      by_cases hrow : i = x
+      · subst x
+        rw [getArrayEntry_setArrayEntry_of_col_ne]
+        omega
+      · rw [getArrayEntry_setArrayEntry_of_row_ne]
+        exact hrow
+
 private def writeScaledColumn (coeffs rows : Array (Array Int)) (n k : Nat) :
     Array (Array Int) :=
   Id.run do
@@ -140,6 +174,27 @@ private def writeScaledColumn (coeffs rows : Array (Array Int)) (n k : Nat) :
     for i in [k + 1:n] do
       next := setArrayEntry next i k (getArrayEntry rows i k)
     return next
+
+private theorem getArrayEntry_writeScaledColumn_above
+    (coeffs rows : Array (Array Int)) (n k i j : Nat) (hij : i < j) :
+    getArrayEntry (writeScaledColumn coeffs rows n k) i j = getArrayEntry coeffs i j := by
+  unfold writeScaledColumn
+  simp [Std.Legacy.Range.forIn_eq_forIn_range', Std.Legacy.Range.size]
+  rw [getArrayEntry_foldl_setArrayEntry_col_above]
+  · by_cases hrow : i = k
+    · subst k
+      rw [getArrayEntry_setArrayEntry_of_col_ne]
+      omega
+    · rw [getArrayEntry_setArrayEntry_of_row_ne]
+      exact hrow
+  · intro x hx
+    simp at hx
+    omega
+  · exact hij
+
+private theorem getArrayEntry_default_row (j : Nat) :
+    (default : Array Int)[j]! = 0 := by
+  rfl
 
 private def stepScaledRows (rows : Array (Array Int)) (n k : Nat)
     (pivot prevPivot : Int) : Array (Array Int) :=
@@ -179,6 +234,47 @@ private def scaledCoeffArrayLoop (n fuel : Nat) (state : ScaledCoeffArrayState) 
           { state with step := state.step + 1, coeffs := coeffs }
       else
         state
+
+private theorem getArrayEntry_zeroRows (n i j : Nat) :
+    getArrayEntry (zeroRows n) i j = 0 := by
+  by_cases hi : i < n
+  · by_cases hj : j < n <;> simp [zeroRows, getArrayEntry, hi, hj]
+  · simp [zeroRows, getArrayEntry, hi, getArrayEntry_default_row]
+
+private theorem getArrayEntry_scaledCoeffArrayLoop_above
+    (n fuel : Nat) (state : ScaledCoeffArrayState)
+    (hcoeffs : ∀ i j, i < j → getArrayEntry state.coeffs i j = 0)
+    (i j : Nat) (hij : i < j) :
+    getArrayEntry (scaledCoeffArrayLoop n fuel state).coeffs i j = 0 := by
+  induction fuel generalizing state with
+  | zero =>
+      exact hcoeffs i j hij
+  | succ fuel ih =>
+      rw [scaledCoeffArrayLoop]
+      by_cases hstep : state.step < n
+      · simp only [hstep, ↓reduceIte]
+        by_cases hnext : state.step + 1 < n
+        · simp only [hnext, ↓reduceIte]
+          by_cases hpivot : getArrayEntry state.matrix state.step state.step = 0
+          · simp only [hpivot, ↓reduceIte]
+            rw [getArrayEntry_writeScaledColumn_above _ _ _ _ _ _ hij]
+            exact hcoeffs i j hij
+          · simp only [hpivot, ↓reduceIte]
+            exact ih
+              { step := state.step + 1
+                matrix := stepScaledRows state.matrix n state.step
+                  (getArrayEntry state.matrix state.step state.step) state.prevPivot
+                coeffs := writeScaledColumn state.coeffs state.matrix n state.step
+                prevPivot := getArrayEntry state.matrix state.step state.step }
+              (by
+                intro r c hrc
+                rw [getArrayEntry_writeScaledColumn_above _ _ _ _ _ _ hrc]
+                exact hcoeffs r c hrc)
+        · simp only [hnext, ↓reduceIte]
+          rw [getArrayEntry_writeScaledColumn_above _ _ _ _ _ _ hij]
+          exact hcoeffs i j hij
+      · simp only [hstep, ↓reduceIte]
+        exact hcoeffs i j hij
 
 /-- Run one no-pivot fraction-free Gram elimination and record each scaled
 coefficient column immediately before the elimination step zeroes it. -/
@@ -237,7 +333,16 @@ theorem scaledCoeffs_diag (b : Matrix Int n m) (i : Nat) (hi : i < n) :
 theorem scaledCoeffs_upper (b : Matrix Int n m)
     (i j : Nat) (hi : i < n) (hj : j < n) (hij : i < j) :
     GramSchmidt.entry (scaledCoeffs b) ⟨i, hi⟩ ⟨j, hj⟩ = 0 := by
-  sorry
+  simpa [scaledCoeffs, rowsToMatrix, scaledCoeffRows, GramSchmidt.entry, Matrix.row,
+    Matrix.ofFn] using getArrayEntry_scaledCoeffArrayLoop_above n n
+    { step := 0
+      matrix := gramRows b
+      coeffs := zeroRows n
+      prevPivot := 1 }
+    (by
+      intro r c hrc
+      exact getArrayEntry_zeroRows n r c)
+    i j hij
 
 theorem normSq_latticeVec_ge_min_basis_normSq
     (b : Matrix Int n m) (hli : independent b)
