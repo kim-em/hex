@@ -51,7 +51,7 @@ Each library with its immediate dependencies:
 - **hex-gfq-field** — hex-gfq-ring
 - **hex-gfq** — hex-gfq-field, hex-conway, hex-gf2
 - **hex-gf2** — hex-poly
-- **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel
+- **hex-berlekamp-zassenhaus** — hex-berlekamp, hex-hensel, hex-lll
 
 Mathlib bridge libraries (each also depends on Mathlib):
 
@@ -67,8 +67,13 @@ Mathlib bridge libraries (each also depends on Mathlib):
 - **hex-gfq-mathlib** — hex-gfq
 - **hex-berlekamp-zassenhaus-mathlib** — hex-berlekamp-zassenhaus, hex-poly-z-mathlib
 
-LLL is completely independent of the polynomial pipeline. The only
-point of contact is at the very top (Berlekamp-Zassenhaus).
+LLL is the recombination primitive used by Berlekamp-Zassenhaus: BZ
+encodes its lifted local factors as a lattice basis and consumes
+`hex-lll`'s reduced basis / short-vector entry points. The two
+libraries can still be developed in parallel up to the point where BZ
+recombination is wired up, but the dependency edge `hex-lll →
+hex-berlekamp-zassenhaus` is part of the production graph, not an
+optional optimisation edge.
 
 ## Library DAG
 
@@ -81,10 +86,10 @@ Three independent roots: hex-poly, hex-arith, hex-matrix.
      /         \       /          /         |
 hex-poly-z  hex-poly-fp          /       hex-lll
      \        /       |         /         /
-     hex-hensel  hex-gfq-ring  /
-               \       |      /
-                \  hex-berlekamp
-                 \      |
+     hex-hensel  hex-gfq-ring  /         /
+               \       |      /         /
+                \  hex-berlekamp       /
+                 \      |             /
                   hex-berlekamp-zassenhaus
 ```
 
