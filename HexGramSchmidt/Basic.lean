@@ -498,12 +498,246 @@ private theorem entry_ofFn (f : Fin n → Fin m → R) (i : Fin n) (j : Fin m) :
     entry (Matrix.ofFn f) i j = f i j := by
   simp [entry, Matrix.row, Matrix.ofFn, Vector.getElem_ofFn]
 
+/-- Index bridge: the value at position `basisRev.length + k` of
+`basisRowsAux basisRev pending` is the reduction of `pending[k]` against the
+basis rows accumulated so far, which equals the reverse of the first
+`basisRev.length + k` elements of the output. -/
+private theorem basisRowsAux_get!_eq_reduceAgainstBasis_take
+    (basisRev pending : List (Vector Rat m)) (k : Nat) (hk : k < pending.length) :
+    (basisRowsAux basisRev pending)[basisRev.length + k]! =
+      reduceAgainstBasis
+        ((basisRowsAux basisRev pending).take (basisRev.length + k)).reverse
+        pending[k]! := by
+  induction pending generalizing basisRev k with
+  | nil => simp at hk
+  | cons row rest ih =>
+    have hstep : basisRowsAux basisRev (row :: rest) =
+        basisRowsAux (reduceAgainstBasis basisRev row :: basisRev) rest := rfl
+    match k, hk with
+    | 0, _ =>
+      simp only [Nat.add_zero]
+      obtain ⟨suffix, hsuffix⟩ :=
+        basisRowsAux_reverse_prefix (reduceAgainstBasis basisRev row :: basisRev) rest
+      rw [hstep, hsuffix]
+      simp only [List.reverse_cons, List.append_assoc]
+      have hlen : basisRev.length = basisRev.reverse.length := by simp
+      have htake :
+          (basisRev.reverse ++ ([reduceAgainstBasis basisRev row] ++ suffix)).take
+              basisRev.length =
+            basisRev.reverse := by
+        rw [hlen]; exact List.take_append_length
+      rw [htake, List.reverse_reverse]
+      rw [List.getElem!_eq_getElem?_getD,
+        List.getElem?_append_right (by simp)]
+      simp
+    | k + 1, hk =>
+      have hk' : k < rest.length := by simpa using hk
+      have ih' := ih (basisRev := reduceAgainstBasis basisRev row :: basisRev) (k := k) hk'
+      have hidx : basisRev.length + (k + 1) =
+          (reduceAgainstBasis basisRev row :: basisRev).length + k := by
+        simp [List.length_cons]; omega
+      rw [hstep, hidx]
+      simpa [List.getElem!_cons_succ] using ih'
+
+/-- Specialization to the public `basisRows` form. -/
+private theorem basisRows_get!_eq_reduceAgainstBasis_take
+    (rows : List (Vector Rat m)) (k : Nat) (hk : k < rows.length) :
+    (basisRows rows)[k]! =
+      reduceAgainstBasis ((basisRows rows).take k).reverse rows[k]! := by
+  simpa [basisRows] using
+    basisRowsAux_get!_eq_reduceAgainstBasis_take
+      (basisRev := ([] : List (Vector Rat m))) (pending := rows) (k := k) hk
+
+/-- The first `k` elements of `basisRows rows` are themselves pairwise
+orthogonal — they form a Pairwise sublist. -/
+private theorem basisRows_take_pairwise (rows : List (Vector Rat m)) (k : Nat) :
+    ((basisRows rows).take k).Pairwise
+      (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0) :=
+  ((basisRows_pairwise rows).sublist (List.take_sublist k _))
+
+/-- Pointwise foldl-with-accumulator-split for vector folds. -/
+private theorem foldl_vec_acc_split_pointwise
+    {α : Type _} (xs : List α) (f : α → Vector Rat m)
+    (acc : Vector Rat m) (idx : Nat) (hidx : idx < m) :
+    (xs.foldl (fun a x => a + f x) acc)[idx] =
+      acc[idx] + (xs.foldl (fun a x => a + f x) 0)[idx] := by
+  induction xs generalizing acc with
+  | nil =>
+      simp [Vector.getElem_zero]
+      grind
+  | cons x rest ih =>
+      simp only [List.foldl_cons]
+      rw [ih (acc := acc + f x), ih (acc := 0 + f x)]
+      rw [Vector.getElem_add, Vector.getElem_add, Vector.getElem_zero]
+      grind
+
+/-- `projectionCombination` extracts the accumulator from the fold. -/
+private theorem projectionCombination_acc_split
+    (basisRev : List (Vector Rat m)) (row acc : Vector Rat m) :
+    projectionCombination row basisRev acc =
+      acc + projectionCombination row basisRev 0 := by
+  apply Vector.ext
+  intro idx hidx
+  rw [Vector.getElem_add]
+  exact foldl_vec_acc_split_pointwise basisRev (fun b => projectionCoeff row b • b) acc idx hidx
+
+/-- `projectionCombination` of a concatenated list splits as a sum. -/
+private theorem projectionCombination_append
+    (l1 l2 : List (Vector Rat m)) (row : Vector Rat m) :
+    projectionCombination row (l1 ++ l2) 0 =
+      projectionCombination row l1 0 + projectionCombination row l2 0 := by
+  show (l1 ++ l2).foldl
+      (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) 0 =
+    l1.foldl (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) 0 +
+      l2.foldl (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) 0
+  rw [List.foldl_append]
+  exact projectionCombination_acc_split (basisRev := l2) (row := row)
+    (acc := l1.foldl (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) 0)
+
+/-- `projectionCombination` for a singleton list. -/
+private theorem projectionCombination_singleton
+    (b row : Vector Rat m) :
+    projectionCombination row [b] 0 = projectionCoeff row b • b := by
+  show List.foldl (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) 0 [b] =
+    projectionCoeff row b • b
+  simp only [List.foldl_cons, List.foldl_nil]
+  apply Vector.ext
+  intro idx hidx
+  simp [Vector.getElem_add, Vector.getElem_zero]
+  grind
+
+/-- `projectionCombination` is invariant under list reversal. -/
+private theorem projectionCombination_reverse
+    (basisRev : List (Vector Rat m)) (row : Vector Rat m) :
+    projectionCombination row basisRev.reverse 0 =
+      projectionCombination row basisRev 0 := by
+  induction basisRev with
+  | nil => simp [projectionCombination]
+  | cons b rest ih =>
+      rw [List.reverse_cons, projectionCombination_append, ih,
+        projectionCombination_singleton]
+      have hsplit := projectionCombination_acc_split (basisRev := rest) (row := row)
+        (acc := 0 + projectionCoeff row b • b)
+      show projectionCombination row rest 0 + projectionCoeff row b • b =
+        projectionCombination row (b :: rest) 0
+      simp only [projectionCombination, List.foldl_cons] at hsplit ⊢
+      rw [hsplit]
+      apply Vector.ext
+      intro idx hidx
+      simp [Vector.getElem_add, Vector.getElem_zero]
+      grind
+
+/-- The k-th basis row obtained by the executable Gram-Schmidt iteration is
+the input row k reduced against the previously generated basis rows in their
+natural (forward) order. -/
+private theorem basisRows_get!_eq_reduceAgainstBasis_forward
+    (rows : List (Vector Rat m)) (k : Nat) (hk : k < rows.length) :
+    rows[k]! =
+      (basisRows rows)[k]! +
+        projectionCombination rows[k]! ((basisRows rows).take k) 0 := by
+  have hreduce :=
+    basisRows_get!_eq_reduceAgainstBasis_take (rows := rows) (k := k) hk
+  have hpair := basisRows_take_pairwise (rows := rows) (k := k)
+  have horth := orthPairwise_reverse ((basisRows rows).take k) hpair
+  have hrec :=
+    reduceAgainstBasis_reconstruction
+      (basisRev := ((basisRows rows).take k).reverse)
+      (row := rows[k]!) horth
+  rw [← hreduce] at hrec
+  rw [projectionCombination_reverse] at hrec
+  exact hrec
+
+/-- The "by-row" prefix sum: a row-indexed variant of `prefixCombination` that
+takes the projection row directly rather than reading it through a coefficient
+matrix. Defined via `foldl` over `List.finRange i` so the conversion to
+`prefixCombination` is a pointwise function-level rewrite. -/
+private def prefixSumByRow (row : Vector Rat m) (basis : Matrix Rat n m)
+    (i : Nat) (hi : i ≤ n) : Vector Rat m :=
+  (List.finRange i).foldl
+    (fun acc j =>
+      let jn : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt hi⟩
+      acc + projectionCoeff row (basis.row jn) • basis.row jn)
+    0
+
+/-- The recursive shape of `prefixSumByRow`: pulling off the last index. -/
+private theorem prefixSumByRow_succ
+    (row : Vector Rat m) (basis : Matrix Rat n m) (k : Nat) (hk : k + 1 ≤ n) :
+    prefixSumByRow row basis (k + 1) hk =
+      prefixSumByRow row basis k (Nat.le_of_succ_le hk) +
+        projectionCoeff row (basis.row ⟨k, Nat.lt_of_succ_le hk⟩) •
+          basis.row ⟨k, Nat.lt_of_succ_le hk⟩ := by
+  unfold prefixSumByRow
+  rw [List.finRange_succ_last]
+  rw [List.foldl_append, List.foldl_map]
+  simp only [List.foldl_cons, List.foldl_nil]
+  rfl
+
+/-- `prefixCombination` over `coeffMatrix b (basisMatrix b)` agrees with
+`prefixSumByRow` taking row `b.row ⟨i, hi⟩`. -/
+private theorem prefixCombination_eq_prefixSumByRow
+    (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
+    prefixCombination (coeffMatrix b (basisMatrix b)) (basisMatrix b) i hi =
+      prefixSumByRow (b.row ⟨i, hi⟩) (basisMatrix b) i (Nat.le_of_lt hi) := by
+  unfold prefixCombination prefixSumByRow
+  congr 1
+  funext acc j
+  show acc + entry (coeffMatrix b (basisMatrix b)) ⟨i, hi⟩
+        ⟨j.val, Nat.lt_trans j.isLt hi⟩ • (basisMatrix b).row ⟨j.val, _⟩ =
+      acc + projectionCoeff (b.row ⟨i, hi⟩)
+        ((basisMatrix b).row ⟨j.val, _⟩) • (basisMatrix b).row ⟨j.val, _⟩
+  have hjlt : j.val < i := j.isLt
+  have hentry : entry (coeffMatrix b (basisMatrix b)) ⟨i, hi⟩
+        ⟨j.val, Nat.lt_trans j.isLt hi⟩ =
+      projectionCoeff (b.row ⟨i, hi⟩)
+        ((basisMatrix b).row ⟨j.val, Nat.lt_trans j.isLt hi⟩) := by
+    simp [coeffMatrix, entry_ofFn, hjlt, Matrix.row]
+  rw [hentry]
+
+/-- `prefixSumByRow` with row free equals `projectionCombination` over the
+first `i` rows of `basisRows b.toList`. -/
+private theorem prefixSumByRow_eq_projectionCombination
+    (b : Matrix Rat n m) (row : Vector Rat m) (i : Nat) (hi : i ≤ n) :
+    prefixSumByRow row (basisMatrix b) i hi =
+      projectionCombination row ((basisRows b.toList).take i) 0 := by
+  have hlen : (basisRows b.toList).length = n := by simp [basisRows_length]
+  induction i with
+  | zero =>
+      simp [prefixSumByRow, projectionCombination]
+  | succ k ih =>
+      have hk_lt : k < n := Nat.lt_of_succ_le hi
+      have hkrows : k < (basisRows b.toList).length := by rw [hlen]; exact hk_lt
+      rw [prefixSumByRow_succ]
+      rw [ih (Nat.le_of_succ_le hi)]
+      have htake : (basisRows b.toList).take (k + 1) =
+          (basisRows b.toList).take k ++ [(basisRows b.toList)[k]!] := by
+        rw [List.take_succ_eq_append_getElem hkrows]
+        congr 1
+        simp [List.getElem!_eq_getElem?_getD,
+          List.getElem?_eq_getElem hkrows]
+      rw [htake, projectionCombination_append, projectionCombination_singleton]
+      have hbasisrow : (basisMatrix b).row ⟨k, hk_lt⟩ = (basisRows b.toList)[k]! := by
+        rw [basisMatrix_row_eq_basisRows_get!]
+      rw [hbasisrow]
+
+/-- Decomposition invariant: each input row equals its reduced basis row plus
+the prefix combination of earlier basis rows weighted by `coeffMatrix`. -/
 private theorem basisMatrix_reconstruction_invariant
     (b : Matrix Rat n m) (i : Nat) (hi : i < n) :
     b.row ⟨i, hi⟩ =
       (basisMatrix b).row ⟨i, hi⟩ +
         prefixCombination (coeffMatrix b (basisMatrix b)) (basisMatrix b) i hi := by
-  sorry
+  have hilen : i < b.toList.length := by simpa using hi
+  have htoList_get : b.toList[i]! = b.row ⟨i, hi⟩ := by
+    simp [Matrix.row, List.getElem!_eq_getElem?_getD,
+      List.getElem?_eq_getElem hilen, Vector.getElem_toList]
+  have hreduce_forward :=
+    basisRows_get!_eq_reduceAgainstBasis_forward
+      (rows := b.toList) (k := i) hilen
+  rw [htoList_get] at hreduce_forward
+  rw [hreduce_forward, ← basisMatrix_row_eq_basisRows_get! b i hi]
+  congr 1
+  rw [prefixCombination_eq_prefixSumByRow,
+    prefixSumByRow_eq_projectionCombination]
 
 end GramSchmidt
 
