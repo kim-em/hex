@@ -85,6 +85,7 @@ private def squareFreeRepeated : ZPoly := DensePoly.ofCoeffs #[1, -2, 1]
 private def squareFreeWithContent : ZPoly := DensePoly.ofCoeffs #[2, -4, 2]
 private def squareFreePowerOfX : ZPoly := DensePoly.ofCoeffs #[0, 0, 1]
 private def squareFreeAlreadyCore : ZPoly := DensePoly.ofCoeffs #[-1, 0, 1]
+private def squareFreeNegativeConstant : ZPoly := DensePoly.ofCoeffs #[-2]
 
 #guard zpolyTypical.toArray.toList = [3, 0, -2]
 #guard zpolyEdge = (0 : ZPoly)
@@ -151,6 +152,8 @@ example : coprimeModP coprimeEdgeF coprimeEdgeG 7 :=
   DensePoly.ofCoeffs #[0, 1]
 #guard (primitiveSquareFreeDecomposition squareFreeAlreadyCore).squareFreeCore =
   squareFreeAlreadyCore
+#guard (primitiveSquareFreeDecomposition squareFreeNegativeConstant).squareFreeCore =
+  (1 : ZPoly)
 #guard squareFreeCore squareFreeRepeated = DensePoly.ofCoeffs #[-1, 1]
 
 example : Primitive (primitivePart contentPrimitive) := by
