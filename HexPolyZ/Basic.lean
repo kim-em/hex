@@ -559,6 +559,123 @@ private theorem rat_scale_one (p : DensePoly Rat) :
   rw [DensePoly.coeff_scale (R := Rat) 1 p n (Rat.mul_zero 1)]
   exact Rat.one_mul (p.coeff n)
 
+private theorem rat_list_foldl_ignore {α : Type _} (xs : List Nat) (init : α) :
+    xs.foldl (fun acc _ => acc) init = init := by
+  induction xs generalizing init with
+  | nil =>
+      rfl
+  | cons _ xs ih =>
+      simpa using ih init
+
+private theorem rat_scale_size_of_ne_zero {u : Rat} (hu : u ≠ 0) (p : DensePoly Rat) :
+    (DensePoly.scale u p).size = p.size := by
+  apply Nat.le_antisymm
+  · by_cases hle : (DensePoly.scale u p).size ≤ p.size
+    · exact hle
+    · have hlt : p.size < (DensePoly.scale u p).size := Nat.lt_of_not_ge hle
+      let i := (DensePoly.scale u p).size - 1
+      have hscaled_ne : (DensePoly.scale u p).coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size (DensePoly.scale u p) (by omega)
+      have hp_zero : p.coeff i = 0 := DensePoly.coeff_eq_zero_of_size_le p (by
+        unfold i
+        omega)
+      exfalso
+      apply hscaled_ne
+      rw [DensePoly.coeff_scale (R := Rat) u p i (Rat.mul_zero u), hp_zero, Rat.mul_zero]
+  · by_cases hle : p.size ≤ (DensePoly.scale u p).size
+    · exact hle
+    · have hlt : (DensePoly.scale u p).size < p.size := Nat.lt_of_not_ge hle
+      let i := p.size - 1
+      have hp_ne : p.coeff i ≠ 0 :=
+        DensePoly.coeff_last_ne_zero_of_pos_size p (by omega)
+      have hscaled_zero : (DensePoly.scale u p).coeff i = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le (DensePoly.scale u p) (by
+          unfold i
+          omega)
+      exfalso
+      apply hp_ne
+      have hmul_zero : u * p.coeff i = 0 := by
+        rw [← DensePoly.coeff_scale (R := Rat) u p i (Rat.mul_zero u)]
+        exact hscaled_zero
+      exact (Rat.mul_eq_zero.mp hmul_zero).resolve_left hu
+
+private theorem rat_scale_mulCoeffStep (u v : Rat) (p q : DensePoly Rat)
+    (n i : Nat) (a : Rat) (j : Nat) :
+    DensePoly.mulCoeffStep (DensePoly.scale u p) (DensePoly.scale v q) n i
+        ((u * v) * a) j =
+      (u * v) * DensePoly.mulCoeffStep p q n i a j := by
+  unfold DensePoly.mulCoeffStep
+  by_cases hij : i + j = n
+  · rw [if_pos hij, if_pos hij]
+    rw [DensePoly.coeff_scale (R := Rat) u p i (Rat.mul_zero u)]
+    rw [DensePoly.coeff_scale (R := Rat) v q j (Rat.mul_zero v)]
+    grind
+  · rw [if_neg hij, if_neg hij]
+
+private theorem rat_scale_mulCoeffStep_fold (u v : Rat) (p q : DensePoly Rat)
+    (n i : Nat) (xs : List Nat) (a : Rat) :
+    xs.foldl
+        (DensePoly.mulCoeffStep (DensePoly.scale u p) (DensePoly.scale v q) n i)
+        ((u * v) * a) =
+      (u * v) * xs.foldl (DensePoly.mulCoeffStep p q n i) a := by
+  induction xs generalizing a with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [rat_scale_mulCoeffStep]
+      exact ih (DensePoly.mulCoeffStep p q n i a j)
+
+private theorem rat_scale_mulCoeffOuter_fold (u v : Rat) (p q : DensePoly Rat)
+    (n : Nat) (xs : List Nat) (a : Rat) :
+    xs.foldl
+        (fun acc i =>
+          (List.range q.size).foldl
+            (DensePoly.mulCoeffStep (DensePoly.scale u p) (DensePoly.scale v q) n i) acc)
+        ((u * v) * a) =
+      (u * v) *
+        xs.foldl
+          (fun acc i => (List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) acc)
+          a := by
+  induction xs generalizing a with
+  | nil =>
+      rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [rat_scale_mulCoeffStep_fold]
+      exact ih ((List.range q.size).foldl (DensePoly.mulCoeffStep p q n i) a)
+
+private theorem rat_scale_mulCoeffSum_of_ne_zero {u v : Rat} (hu : u ≠ 0) (hv : v ≠ 0)
+    (p q : DensePoly Rat) (n : Nat) :
+    DensePoly.mulCoeffSum (DensePoly.scale u p) (DensePoly.scale v q) n =
+      (u * v) * DensePoly.mulCoeffSum p q n := by
+  unfold DensePoly.mulCoeffSum
+  rw [rat_scale_size_of_ne_zero hu p]
+  rw [rat_scale_size_of_ne_zero hv q]
+  simpa using rat_scale_mulCoeffOuter_fold u v p q n (List.range p.size) 0
+
+private theorem rat_scale_mul_scale (u v : Rat) (p q : DensePoly Rat) :
+    DensePoly.scale u p * DensePoly.scale v q =
+      DensePoly.scale (u * v) (p * q) := by
+  by_cases hu : u = 0
+  · subst u
+    rw [rat_scale_zero, Rat.zero_mul, rat_scale_zero]
+    rfl
+  · by_cases hv : v = 0
+    · subst v
+      rw [rat_scale_zero, Rat.mul_zero, rat_scale_zero]
+      apply DensePoly.ext_coeff
+      intro n
+      rw [DensePoly.coeff_mul, DensePoly.coeff_zero]
+      unfold DensePoly.mulCoeffSum
+      simpa using rat_list_foldl_ignore (List.range (DensePoly.scale u p).size) (0 : Rat)
+    · apply DensePoly.ext_coeff
+      intro n
+      rw [DensePoly.coeff_mul]
+      rw [rat_scale_mulCoeffSum_of_ne_zero hu hv]
+      rw [DensePoly.coeff_scale (R := Rat) (u * v) (p * q) n (Rat.mul_zero (u * v))]
+      rw [DensePoly.coeff_mul]
+
 private theorem densePoly_eq_zero_of_isZero_true {R : Type _} [Zero R] [DecidableEq R]
     (p : DensePoly R) (h : p.isZero = true) :
     p = 0 := by
