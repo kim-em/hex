@@ -691,6 +691,40 @@ private theorem rat_scale_one (p : DensePoly Rat) :
   rw [DensePoly.coeff_scale (R := Rat) 1 p n (Rat.mul_zero 1)]
   exact Rat.one_mul (p.coeff n)
 
+private theorem rat_list_getD_map_range (size n : Nat) (f : Nat → Rat) :
+    ((List.range size).map f).getD n 0 =
+      if n < size then f n else 0 := by
+  by_cases hn : n < size
+  · simp [hn, List.getD]
+  · simp [hn, List.getD]
+
+private theorem rat_coeff_derivative (p : DensePoly Rat) (n : Nat) :
+    (DensePoly.derivative p).coeff n = ((n + 1 : Nat) : Rat) * p.coeff (n + 1) := by
+  unfold DensePoly.derivative
+  rw [DensePoly.coeff_ofCoeffs_list]
+  change
+    ((List.range (p.size - 1)).map
+        (fun i => ((i + 1 : Nat) : Rat) * p.coeff (i + 1))).getD n 0 =
+      ((n + 1 : Nat) : Rat) * p.coeff (n + 1)
+  rw [rat_list_getD_map_range]
+  by_cases hn : n < p.size - 1
+  · simp [hn]
+  · have hp : p.size ≤ n + 1 := by omega
+    have hcoeff : p.coeff (n + 1) = 0 :=
+      DensePoly.coeff_eq_zero_of_size_le p hp
+    simp [hn, hcoeff]
+
+private theorem rat_derivative_scale (u : Rat) (p : DensePoly Rat) :
+    DensePoly.derivative (DensePoly.scale u p) =
+      DensePoly.scale u (DensePoly.derivative p) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [rat_coeff_derivative]
+  rw [DensePoly.coeff_scale (R := Rat) u (DensePoly.derivative p) n (Rat.mul_zero u)]
+  rw [rat_coeff_derivative]
+  rw [DensePoly.coeff_scale (R := Rat) u p (n + 1) (Rat.mul_zero u)]
+  grind [Rat.mul_assoc, Rat.mul_comm]
+
 private theorem toRatPoly_normalizePrimitiveSign_rational_associate (p : ZPoly) :
     ∃ unit : Rat, toRatPoly p = DensePoly.scale unit (toRatPoly (normalizePrimitiveSign p)) := by
   by_cases hlead : DensePoly.leadingCoeff p < 0
