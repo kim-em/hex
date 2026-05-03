@@ -67,7 +67,17 @@ def henselLift
 
 def multifactorLift
     (p k : Nat) (f : ZPoly) (factors : Array ZPoly) : Array ZPoly
+
+def multifactorLiftQuadratic
+    (p k : Nat) (f : ZPoly) (factors : Array ZPoly) : Array ZPoly
 ```
+
+`multifactorLift` is the linear-lift reference surface; it is retained
+because its single-step invariant is easy to verify and it acts as the
+oracle against which the production lifter is cross-checked.
+`multifactorLiftQuadratic` is the production lifter used by
+`hex-berlekamp-zassenhaus` and is a Phase 1 deliverable on equal
+footing with `multifactorLift`.
 
 For the multifactor API, the public product convention is the left fold
 of multiplication with identity `1`:
@@ -171,6 +181,14 @@ theorem multifactorLift_spec
     (hp : 1 < p)
     (hinv : MultifactorLiftInvariant p k f factors.toList)
     : ZPoly.congr (Array.polyProduct (multifactorLift p k f factors)) f (p^k)
+
+theorem multifactorLiftQuadratic_spec
+    (hk : 1 ≤ k)
+    (hp : 1 < p)
+    (hinv : MultifactorLiftInvariant p k f factors.toList)
+    : ZPoly.congr
+        (Array.polyProduct (multifactorLiftQuadratic p k f factors))
+        f (p^k)
 ```
 The invariant is recursive over the sequential split tree. Each nontrivial
 split carries the same start invariant, degree preservation hypothesis, and
@@ -178,12 +196,28 @@ Bezout preservation hypothesis required by `henselLift_spec`; the tail carries
 the invariant for the lifted complementary factor. Product congruence modulo
 `p` alone is not sufficient for multifactor lifting.
 
+Both `_spec` theorems are Phase 1 obligations of `hex-hensel`. Lift
+uniqueness — that `multifactorLiftQuadratic` and `multifactorLift`
+produce the same array of lifted factors after canonicalisation by
+`ZPoly.reduceModPow _ p k` — is a `hex-hensel-mathlib` obligation, not
+a `hex-hensel` one.
+
 Theorems that belong in `hex-hensel-mathlib` are the ones that use
 Mathlib's abstract polynomial/divisibility/coprimality infrastructure
 rather than just the computational `ZPoly`/`FpPoly` representations.
-Examples include uniqueness of lifts, `coprime_mod_p_lifts`, and
+Examples include uniqueness of lifts (including the
+linear-vs-quadratic agreement statement), `coprime_mod_p_lifts`, and
 transfer theorems phrased in terms of Mathlib polynomials.
 
-**Strategy**: Start with linear lifting (simpler invariant, easier to
-verify). Add quadratic as an optimization proved equivalent via
-uniqueness (in hex-hensel-mathlib).
+**Strategy**: Quadratic Hensel lifting is the production lifter for
+the Berlekamp–Zassenhaus pipeline, and the `multifactorLiftQuadratic`
+surface is a Phase 1 deliverable, not an optimisation deferred to a
+later phase. Linear Hensel lifting remains specified and implemented
+as a verification-friendly reference: the two paths must agree on
+shared inputs, and that agreement is the obligation of
+`hex-hensel-mathlib` via lift uniqueness. Phase 3 conformance must
+exercise `multifactorLiftQuadratic` end-to-end (cross-checked against
+`multifactorLift` at small `k`); Phase 4 benchmarks must register
+quadratic lifting as the hot path. Treating quadratic lifting as
+"later" is incompatible with the polynomial-time complexity model
+declared for the Berlekamp–Zassenhaus pipeline.
