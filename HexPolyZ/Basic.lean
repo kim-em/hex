@@ -420,7 +420,7 @@ def primitiveSquareFreeDecomposition (f : ZPoly) : PrimitiveSquareFreeDecomposit
     let ratPrimitive := toRatPoly primitive
     let derivative := DensePoly.derivative ratPrimitive
     if derivative.isZero then
-      { primitive, squareFreeCore := primitive, repeatedPart := 1 }
+      { primitive, squareFreeCore := normalizePrimitiveSign primitive, repeatedPart := 1 }
     else
       let repeatedRat := DensePoly.gcd ratPrimitive derivative
       { primitive
@@ -691,6 +691,18 @@ private theorem rat_scale_one (p : DensePoly Rat) :
   rw [DensePoly.coeff_scale (R := Rat) 1 p n (Rat.mul_zero 1)]
   exact Rat.one_mul (p.coeff n)
 
+private theorem toRatPoly_normalizePrimitiveSign_rational_associate (p : ZPoly) :
+    ∃ unit : Rat, toRatPoly p = DensePoly.scale unit (toRatPoly (normalizePrimitiveSign p)) := by
+  by_cases hlead : DensePoly.leadingCoeff p < 0
+  · refine ⟨-1, ?_⟩
+    rw [normalizePrimitiveSign, if_pos hlead]
+    have h := rat_scale_toRatPoly_neg_int (1 : Rat) p
+    rw [rat_scale_one] at h
+    simpa using h
+  · refine ⟨1, ?_⟩
+    rw [normalizePrimitiveSign, if_neg hlead]
+    exact (rat_scale_one (toRatPoly p)).symm
+
 private theorem rat_list_foldl_ignore {α : Type _} (xs : List Nat) (init : α) :
     xs.foldl (fun acc _ => acc) init = init := by
   induction xs generalizing init with
@@ -890,9 +902,12 @@ theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     let ratPrimitive := toRatPoly (primitivePart f)
     let derivative := DensePoly.derivative ratPrimitive
     by_cases hderivative : derivative.isZero = true
-    · refine ⟨1, ?_⟩
+    · rcases toRatPoly_normalizePrimitiveSign_rational_associate (primitivePart f) with
+        ⟨unit, hunit⟩
+      refine ⟨unit, ?_⟩
       rw [if_pos hderivative]
-      rw [toRatPoly_one, DensePoly.mul_one_right_poly, rat_scale_one]
+      rw [toRatPoly_one, DensePoly.mul_one_right_poly]
+      simpa [ratPrimitive] using hunit
     · rw [if_neg hderivative]
       let repeatedRat := DensePoly.gcd ratPrimitive derivative
       let quotientRat := ratPrimitive / repeatedRat
