@@ -1,5 +1,6 @@
 import HexBerlekamp.Irreducibility
 import HexHensel.Multifactor
+import HexHensel.QuadraticMultifactor
 
 /-!
 Executable data records for the Berlekamp-Zassenhaus factorization pipeline.
@@ -517,7 +518,7 @@ def henselLiftData (f : ZPoly) (B : Nat) (d : PrimeChoiceData) : LiftData :=
   let factors := d.factorsModP.map (fun factor => FpPoly.liftToZ factor)
   { p := d.p
     k := B
-    liftedFactors := ZPoly.multifactorLift d.p B f factors }
+    liftedFactors := ZPoly.multifactorLiftQuadratic d.p B f factors }
 
 private def subsetSplits : List ZPoly → List (List ZPoly × List ZPoly)
   | [] => [([], [])]
