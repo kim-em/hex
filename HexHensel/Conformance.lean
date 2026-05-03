@@ -195,37 +195,12 @@ a follow-up issue.
 #guard reduceArrModPow (ZPoly.multifactorLift 5 1 qmEdgeF qmEdgeFactors) 5 1
      = reduceArrModPow (ZPoly.multifactorLiftQuadratic 5 1 qmEdgeF qmEdgeFactors) 5 1
 
-/-
-Deferred cross-check (`k ≥ 2`).
+#guard reduceArrModPow (ZPoly.multifactorLift 5 4 qmTypicalF qmTypicalFactors) 5 4
+     = reduceArrModPow (ZPoly.multifactorLiftQuadratic 5 4 qmTypicalF qmTypicalFactors) 5 4
 
-The SPEC's lift-uniqueness obligation predicts that `multifactorLift` and
-`multifactorLiftQuadratic` agree after canonicalisation by
-`ZPoly.reduceModPow _ p k` for every `k`. Empirically, the agreement
-holds at `k = 1` but breaks at `k ≥ 2` on the fixtures above: on
-`qmTypicalFactors` at `p = 5, k = 4`, the linear path returns
-`#[x + 476, x + 307, x + 18]` while the quadratic path returns
-`#[x + 1, x + 2, x + 3]`, and the product of the linear factors reduces
-to `x³ + 176x² + 226x + 376 (mod 625)` rather than to
-`f = x³ + 6x² + 11x + 6`.
-
-Root cause: `ZPoly.multifactorLift` calls `DensePoly.xgcd` on the
-mod-`p` factors and feeds the raw `(left, right)` Bezout witnesses to
-`henselLift`. `xgcd_bezout` returns `left * g + right * h = gcd`, where
-`gcd` is the last non-zero remainder of the Euclidean iteration —
-typically a non-trivial unit of `F_p`, not `1`. The
-`MultifactorLiftInvariant` precondition explicitly demands
-`liftToZ (left * g + right * h) ≡ 1 (mod p)`, which the raw `xgcd` output
-violates whenever `gcd ≠ 1` in `F_p`. The quadratic path tolerates the
-miscalibration because `quadraticHenselStep` re-normalises the Bezout
-pair on every doubling iteration; the linear path does not.
-
-Fix: have `multifactorLift` (or a shared helper) divide
-`(left, right, gcd)` through by `gcd` in `F_p` before passing the
-witnesses to `henselLift`, restoring the SPEC precondition. That fix is
-tracked as a follow-up issue and is out of scope for this conformance
-file; the corresponding `k ≥ 2` cross-check pair lands together with the
-fix.
--/
+#guard reduceArrModPow (ZPoly.multifactorLift 5 6 qmAdversarialF qmAdversarialFactors) 5 6
+     = reduceArrModPow
+        (ZPoly.multifactorLiftQuadratic 5 6 qmAdversarialF qmAdversarialFactors) 5 6
 
 /-
 Asymptotic-gap commentary (observation only; no timing assertion).
