@@ -5,7 +5,7 @@ Core conformance checks for the executable `HexBerlekampZassenhaus` surface.
 
 Oracle: FLINT or Sage for external integer-factorisation profiles; core uses
 Lean-only property checks.
-Mode: if_available
+Mode: always
 Covered operations:
 - `ZPoly.extractXPower`, `normalizeForFactor`, `normalizationPrefixFactors`,
   and `reassembleNormalizedFactors`
@@ -29,6 +29,8 @@ Covered edge cases:
   reductions
 - empty lifted-factor data, exact linear-factor recombination, and deliberate
   non-divisor recombination data
+- LLL recombination on a ten-local-factor input, exhaustive-oracle agreement on
+  a small input, and empty/single-factor trivial lattices
 - empty, positive, wrong-prime, and malformed nested certificate records
 -/
 
@@ -184,6 +186,36 @@ private def recombineAdversarialLift : LiftData :=
     k := 2
     liftedFactors := #[zpoly #[3, 1]] }
 
+private def linearFactor (root : Int) : ZPoly :=
+  zpoly #[-root, 1]
+
+private def productLinearFactors (roots : List Int) : ZPoly :=
+  Array.polyProduct (roots.map linearFactor).toArray
+
+private def recombineLargeTarget : ZPoly :=
+  productLinearFactors [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+private def recombineLargeLift : LiftData :=
+  { p := 11
+    k := 2
+    liftedFactors := (List.range 10).map (fun i => linearFactor (Int.ofNat (i + 1))) |>.toArray }
+
+private def recombineLargeFactors : Array ZPoly :=
+  factorWithBound recombineLargeTarget 8
+
+private def recombineSingleTarget : ZPoly :=
+  zpoly #[3, 1]
+
+private def recombineSingleLift : LiftData :=
+  { p := 5
+    k := 2
+    liftedFactors := #[recombineSingleTarget] }
+
+private def exhaustiveOracle (f : ZPoly) (d : LiftData) : Array ZPoly :=
+  match recombinationSearch f d.liftedFactors.toList with
+  | some factors => factors.toArray
+  | none => #[]
+
 #guard
   (recombinationSearch recombineTypicalTarget recombineTypicalLift.liftedFactors.toList).isSome
 #guard recombinationSearch (1 : ZPoly) recombineEdgeLift.liftedFactors.toList = some []
@@ -192,7 +224,13 @@ private def recombineAdversarialLift : LiftData :=
 
 #guard factorProductMatches recombineTypicalTarget (recombine recombineTypicalTarget recombineTypicalLift)
 #guard recombine (1 : ZPoly) recombineEdgeLift = #[]
+#guard recombine recombineSingleTarget recombineSingleLift = #[recombineSingleTarget]
 #guard recombine recombineTypicalTarget recombineAdversarialLift = #[]
+#guard recombine recombineTypicalTarget recombineTypicalLift =
+  exhaustiveOracle recombineTypicalTarget recombineTypicalLift
+#guard recombineLargeLift.liftedFactors.size >= 10
+#guard factorProductMatches recombineLargeTarget (recombine recombineLargeTarget recombineLargeLift)
+#guard factorProductMatches recombineLargeTarget recombineLargeFactors
 
 private def factorTypical : ZPoly :=
   zpoly #[2, 3, 1]
