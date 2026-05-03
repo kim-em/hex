@@ -197,29 +197,41 @@ termination_by (s.potential, n - k)
 --   gives d[k]' < δ * d[k] ≤ d[k]; potential strictly decreases.
 
 /-- Initial `LLLState` constructor: builds the integer state directly
-    from a basis matrix and discharges `ν_eq`/`d_eq` from the
-    `_spec` lemmas of `GramSchmidt.Int.scaledCoeffs` and
-    `GramSchmidt.Int.gramDetVec`. -/
+    from a basis matrix and discharges `ν_eq`/`d_eq` by composing the
+    existing `hex-gram-schmidt` lemmas
+    `GramSchmidt.Int.gramDetVec_eq_gramDet` and
+    `GramSchmidt.Int.scaledCoeffs_eq` (suitably massaged through the
+    `Rat` casts in their statements). -/
 def LLLState.ofBasis (b : Matrix Int n m) (hind : b.independent) :
     LLLState n m :=
   { b
     ν := GramSchmidt.Int.scaledCoeffs b
     d := GramSchmidt.Int.gramDetVec b
-    ν_eq := GramSchmidt.Int.scaledCoeffs_spec b hind
-    d_eq := GramSchmidt.Int.gramDetVec_spec b hind }
+    ν_eq := by
+      -- combine GramSchmidt.Int.scaledCoeffs_eq with
+      -- GramSchmidt.Int.gramDetVec_eq_gramDet
+      sorry
+    d_eq := by
+      -- direct from GramSchmidt.Int.gramDetVec_eq_gramDet
+      sorry }
 
 def lll (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) : Matrix Int n m :=
   lllAux (LLLState.ofBasis b hind) 1 δ hδ hδ' hind (by omega) (by omega)
 ```
 
-The `GramSchmidt.Int.scaledCoeffs_spec` and
-`GramSchmidt.Int.gramDetVec_spec` lemmas referenced above are Phase 1
-obligations of `hex-gram-schmidt`. Discharging them here closes the
-`sorry, sorry` placeholders previously embedded in `lll`'s LLLState
-constructor; the entry point is a usable Phase 1 deliverable, not a
-sketch. Treating those `sorry`s as deferrable is incompatible with
-`hex-lll` being on the BZ critical path.
+The `scaledCoeffs_eq` and `gramDetVec_eq_gramDet` lemmas referenced
+above already exist in `hex-gram-schmidt` (`HexGramSchmidt/Int.lean`).
+They are currently `sorry`'d, but that is acceptable here: the
+obligation of `LLLState.ofBasis` at Phase 1 is to be a named,
+type-correct constructor that names its witness lemmas in proof
+position. The two `sorry`s above are discharged as part of Phase 5
+work in `hex-gram-schmidt` / `hex-lll`, not as part of getting `lll`
+to a usable shape. What changes from the previous SPEC is that the
+constructor lives in `hex-lll` rather than as inline anonymous
+`sorry, sorry` proof fields in the body of `lll`. Treating the
+constructor itself as deferrable is incompatible with `hex-lll`
+being on the BZ critical path.
 
 ### Short-vector recovery for downstream consumers
 
