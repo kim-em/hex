@@ -293,6 +293,27 @@ convention `1`. -/
   rw [det_one_by_one]
   simpa using borderedMinor_entry_last_last M 0 hn i j
 
+/-- Determinant form of `leadingPrefix_borderedMinor_eq_leadingPrefix`.
+After expanding a bordered minor along its final border row/column, the
+remaining top-left determinant is the determinant of the source leading
+prefix. -/
+theorem det_leadingPrefix_borderedMinor_eq_det_leadingPrefix {R : Type u}
+    [Lean.Grind.Ring R] (M : Matrix R n n) (k : Nat) (hk : k < n) (i j : Fin n) :
+    det (leadingPrefix (borderedMinor M k hk i j) k (Nat.le_succ k)) =
+      det (leadingPrefix M k (Nat.le_of_lt hk)) := by
+  rw [leadingPrefix_borderedMinor_eq_leadingPrefix]
+
+/-- Determinant form of `leadingPrefix_borderedMinor_succ_eq_borderedMinor`.
+The prefix determinant of the next bordered minor is the current bordered
+minor with the `k`-th source row/column as its border. -/
+theorem det_leadingPrefix_borderedMinor_succ_eq_det_borderedMinor {R : Type u}
+    [Lean.Grind.Ring R] (M : Matrix R n n) (k : Nat)
+    (hk : k < n) (hnext : k + 1 < n) (i j : Fin n) :
+    det (leadingPrefix (borderedMinor M (k + 1) hnext i j) (k + 1)
+        (Nat.le_succ (k + 1))) =
+      det (borderedMinor M k hk ⟨k, hk⟩ ⟨k, hk⟩) := by
+  rw [leadingPrefix_borderedMinor_succ_eq_borderedMinor]
+
 /-- Congruence for the determinant-style left fold over a finite list. -/
 private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
     (xs : List β) (f g : β → R) (z : R)
@@ -1138,6 +1159,48 @@ private theorem detSign_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
     detSign (R := R) v := by
   unfold detSign
   rw [insertAt_last_toList, vector_toList_map, inversionCount_insert_last_castSucc]
+
+/-- Product reindexing for a permutation that fixes the final column. The
+Leibniz product splits into the product on the leading prefix times the final
+row/column entry. -/
+theorem detProduct_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
+    (M : Matrix R (n + 1) (n + 1)) (v : Vector (Fin n) n) :
+    detProduct M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)) =
+      detProduct (leadingPrefix M n (Nat.le_succ n)) v * M[Fin.last n][Fin.last n] := by
+  unfold detProduct
+  rw [← Fin.foldl_eq_foldl_finRange, ← Fin.foldl_eq_foldl_finRange]
+  rw [Fin.foldl_succ_last]
+  have hfold :
+      Fin.foldl n
+          (fun acc i =>
+            acc *
+              M[i.castSucc][
+                (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[i.castSucc]]) 1 =
+        Fin.foldl n
+          (fun acc i => acc * (leadingPrefix M n (Nat.le_succ n))[i][v[i]]) 1 := by
+    congr
+    funext acc i
+    have hget :
+        (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[i.castSucc] =
+          (v[i]).castSucc := by
+      simpa using insertAt_last_get_castSucc (Fin.last n) (v.map Fin.castSucc) i
+    simp [leadingPrefix, ofFn, hget]
+  have hlast :
+      (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))[Fin.last n] =
+        Fin.last n := by
+    exact insertAt_get_self (Fin.last n) (v.map Fin.castSucc) (Fin.last n)
+  rw [hfold]
+  simp [hlast]
+
+/-- Leibniz-term reindexing for a permutation that fixes the final column. This
+packages the sign and product split used by last-row/last-column expansions. -/
+theorem detTerm_insertAt_last {R : Type u} [Lean.Grind.Ring R] {n : Nat}
+    (M : Matrix R (n + 1) (n + 1)) (v : Vector (Fin n) n) :
+    detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)) =
+      detSign (R := R) v *
+        (detProduct (leadingPrefix M n (Nat.le_succ n)) v * M[Fin.last n][Fin.last n]) := by
+  unfold detTerm
+  rw [detSign_insertAt_last, detProduct_insertAt_last]
 
 private theorem detTerm_identity_insertAt_last {R : Type u}
     [Lean.Grind.CommRing R] {n : Nat} (v : Vector (Fin n) n) :
