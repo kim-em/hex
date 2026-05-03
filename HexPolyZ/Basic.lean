@@ -746,7 +746,54 @@ theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     ∃ unit : Rat,
       toRatPoly d.primitive =
         DensePoly.scale unit (toRatPoly d.squareFreeCore * toRatPoly d.repeatedPart) := by
-  sorry
+  unfold primitiveSquareFreeDecomposition
+  by_cases hzero : (primitivePart f).isZero = true
+  · refine ⟨0, ?_⟩
+    rw [if_pos hzero]
+    have hprimitive_zero : primitivePart f = 0 :=
+      densePoly_eq_zero_of_isZero_true (primitivePart f) hzero
+    rw [hprimitive_zero, toRatPoly_zero]
+    rw [rat_scale_zero]
+  · rw [if_neg hzero]
+    let ratPrimitive := toRatPoly (primitivePart f)
+    let derivative := DensePoly.derivative ratPrimitive
+    by_cases hderivative : derivative.isZero = true
+    · refine ⟨1, ?_⟩
+      rw [if_pos hderivative]
+      rw [toRatPoly_one, DensePoly.mul_one_right_poly, rat_scale_one]
+    · rw [if_neg hderivative]
+      let repeatedRat := DensePoly.gcd ratPrimitive derivative
+      let quotientRat := ratPrimitive / repeatedRat
+      rcases ratPolyPrimitivePart_rational_associate quotientRat with
+        ⟨coreUnit, hcore⟩
+      rcases ratPolyPrimitivePart_rational_associate repeatedRat with
+        ⟨repeatedUnit, hrepeated⟩
+      refine ⟨coreUnit * repeatedUnit, ?_⟩
+      have htarget :
+          ratPrimitive =
+            DensePoly.scale (coreUnit * repeatedUnit)
+              (toRatPoly (ratPolyPrimitivePart quotientRat) *
+                toRatPoly (ratPolyPrimitivePart repeatedRat)) := by
+        have hrec : quotientRat * repeatedRat = ratPrimitive := by
+          simpa [quotientRat, repeatedRat] using rat_div_gcd_mul_reconstruct ratPrimitive derivative
+        rw [← hrec]
+        calc
+          quotientRat * repeatedRat =
+              DensePoly.scale coreUnit (toRatPoly (ratPolyPrimitivePart quotientRat)) *
+                repeatedRat := by
+            exact congrArg (fun x => x * repeatedRat) hcore
+          _ =
+              DensePoly.scale coreUnit (toRatPoly (ratPolyPrimitivePart quotientRat)) *
+                DensePoly.scale repeatedUnit (toRatPoly (ratPolyPrimitivePart repeatedRat)) := by
+            exact congrArg
+              (fun x => DensePoly.scale coreUnit (toRatPoly (ratPolyPrimitivePart quotientRat)) * x)
+              hrepeated
+          _ =
+              DensePoly.scale (coreUnit * repeatedUnit)
+                (toRatPoly (ratPolyPrimitivePart quotientRat) *
+                  toRatPoly (ratPolyPrimitivePart repeatedRat)) := by
+            rw [rat_scale_mul_scale]
+      simpa [ratPrimitive, derivative, repeatedRat, quotientRat] using htarget
 
 theorem primitiveSquareFreeDecomposition_squareFreeCore
     (f : ZPoly)
