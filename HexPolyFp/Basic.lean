@@ -125,13 +125,224 @@ private theorem mod_remainder_degree_lt_core
     (f % m).degree?.getD 0 < m.degree?.getD 0 := by
   simpa [DensePoly.mod] using divMod_remainder_degree_lt_core f m hdegree
 
+private theorem foldl_mulCoeffStep_select
+    (f g : DensePoly (ZMod64 p)) (n i m : Nat) (acc : ZMod64 p) :
+    (List.range m).foldl (DensePoly.mulCoeffStep f g n i) acc =
+      acc + (if n < i then 0
+        else if n - i < m then f.coeff i * g.coeff (n - i) else 0) := by
+  induction m generalizing acc with
+  | zero =>
+      simp
+      grind
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      unfold DensePoly.mulCoeffStep
+      by_cases hlt : n < i
+      · have hne : i + m ≠ n := by omega
+        simp [hlt, hne]
+      · by_cases hm : n - i < m
+        · have hne : i + m ≠ n := by omega
+          simp [hlt, hm, hne]
+          grind
+        · by_cases heq : i + m = n
+          · have hsub : n - i = m := by omega
+            simp [hlt, heq, hsub]
+            grind
+          · have hm' : ¬ n - i < m + 1 := by omega
+            simp [hlt, hm, hm', heq]
+
+private theorem foldl_mulCoeffStep_outer
+    (f g : DensePoly (ZMod64 p)) (n : Nat) (xs : List Nat) (acc : ZMod64 p) :
+    xs.foldl
+        (fun acc i =>
+          (List.range g.size).foldl (DensePoly.mulCoeffStep f g n i) acc)
+        acc =
+      xs.foldl
+        (fun acc i =>
+          acc + (if n < i then 0
+            else if n - i < g.size then f.coeff i * g.coeff (n - i) else 0))
+        acc := by
+  induction xs generalizing acc with
+  | nil => rfl
+  | cons i xs ih =>
+      simp only [List.foldl_cons]
+      rw [foldl_mulCoeffStep_select]
+      exact ih _
+
+private theorem foldl_select_index
+    (k m : Nat) (x : ZMod64 p) (acc : ZMod64 p) :
+    (List.range m).foldl
+        (fun acc i => acc + if i = k then x else 0) acc =
+      if k < m then acc + x else acc := by
+  induction m generalizing acc with
+  | zero => simp
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      rw [ih]
+      by_cases hk : k < m
+      · have hne : m ≠ k := by omega
+        have hk' : k < m + 1 := by omega
+        simp [hk, hne, hk']
+        grind
+      · by_cases hkm : m = k
+        · subst k
+          have hkk : ¬ m < m := by omega
+          have hmm : m < m + 1 := by omega
+          simp [hkk, hmm]
+        · have hk' : ¬ k < m + 1 := by omega
+          simp [hk, hk', hkm]
+          grind
+
+private theorem coeff_mul_at_top
+    (f g : DensePoly (ZMod64 p)) (hf : 0 < f.size) (hg : 0 < g.size) :
+    (f * g).coeff (f.size - 1 + (g.size - 1)) =
+      f.coeff (f.size - 1) * g.coeff (g.size - 1) := by
+  rw [DensePoly.coeff_mul]
+  unfold DensePoly.mulCoeffSum
+  rw [foldl_mulCoeffStep_outer]
+  -- For each i ∈ [0, f.size), the inner term is the leading product when i = f.size - 1
+  -- and 0 otherwise.
+  have hfold_eq : ∀ (xs : List Nat) (acc : ZMod64 p),
+      (∀ i ∈ xs, i < f.size) →
+      xs.foldl
+          (fun acc i => acc + (if f.size - 1 + (g.size - 1) < i then 0
+            else if f.size - 1 + (g.size - 1) - i < g.size then
+              f.coeff i * g.coeff (f.size - 1 + (g.size - 1) - i) else 0)) acc =
+        xs.foldl
+          (fun acc i => acc + if i = f.size - 1 then
+            f.coeff (f.size - 1) * g.coeff (g.size - 1) else 0) acc := by
+    intro xs
+    induction xs with
+    | nil => intro acc _; rfl
+    | cons j xs ih =>
+        intro acc hxs
+        simp only [List.foldl_cons]
+        have hj : j < f.size := hxs j (by simp)
+        have hnj : ¬ f.size - 1 + (g.size - 1) < j := by omega
+        by_cases heq : j = f.size - 1
+        · subst j
+          have hsub : f.size - 1 + (g.size - 1) - (f.size - 1) = g.size - 1 := by omega
+          have hbound : g.size - 1 < g.size := by omega
+          simp [hnj, hsub, hbound]
+          exact ih (acc + f.coeff (f.size - 1) * g.coeff (g.size - 1))
+            (fun k hk => hxs k (by simp [hk]))
+        · have hjlt : j < f.size - 1 := by omega
+          have hnotbound : ¬ f.size - 1 + (g.size - 1) - j < g.size := by omega
+          simp [hnj, hnotbound, heq]
+          exact ih (acc + 0) (fun k hk => hxs k (by simp [hk]))
+  rw [hfold_eq (List.range f.size) (Zero.zero : ZMod64 p)
+    (by intro i hi; exact List.mem_range.mp hi)]
+  rw [foldl_select_index]
+  have hfm1 : f.size - 1 < f.size := by omega
+  simp [hfm1]
+  -- Goal: Zero.zero + (lead_prod) = lead_prod
+  show (0 : ZMod64 p) + _ = _
+  grind
+
 private theorem canonical_remainder_unique_of_pos_degree
-    (r s m : DensePoly (ZMod64 p))
+    [PrimeModulus p] (r s m : DensePoly (ZMod64 p))
     (hr : r.degree?.getD 0 < m.degree?.getD 0)
     (hs : s.degree?.getD 0 < m.degree?.getD 0)
     (hcongr : DensePoly.Congr r s m) :
     r = s := by
-  sorry
+  -- We have r - s = m * k for some k.
+  rcases hcongr with ⟨k, hk⟩
+  -- m has positive degree, so m.size ≥ 2.
+  have hm_pos : 0 < m.degree?.getD 0 := Nat.lt_of_le_of_lt (Nat.zero_le _) hr
+  have hm_size_ge : 2 ≤ m.size := by
+    by_cases hms : m.size = 0
+    · simp [DensePoly.degree?, hms] at hm_pos
+    · have hms_pos : 0 < m.size := Nat.pos_of_ne_zero hms
+      have hdeg_eq : m.degree?.getD 0 = m.size - 1 := by
+        simp [DensePoly.degree?, hms]
+      rw [hdeg_eq] at hm_pos
+      omega
+  -- Both r and s have size at most m.size - 1.
+  have hm_deg : m.degree?.getD 0 = m.size - 1 := by
+    have hms : m.size ≠ 0 := by omega
+    simp [DensePoly.degree?, hms]
+  have hr_size_le : r.size ≤ m.size - 1 := by
+    by_cases hrs : r.size = 0
+    · omega
+    · have hr_deg : r.degree?.getD 0 = r.size - 1 := by simp [DensePoly.degree?, hrs]
+      rw [hr_deg, hm_deg] at hr
+      omega
+  have hs_size_le : s.size ≤ m.size - 1 := by
+    by_cases hss : s.size = 0
+    · omega
+    · have hs_deg : s.degree?.getD 0 = s.size - 1 := by simp [DensePoly.degree?, hss]
+      rw [hs_deg, hm_deg] at hs
+      omega
+  -- (r - s) has size ≤ m.size - 1.
+  have hzero_sub : (0 : ZMod64 p) - 0 = 0 := by grind
+  have hrs_top_zero : ∀ i, max r.size s.size ≤ i → (r - s).coeff i = 0 := by
+    intro i hi
+    rw [DensePoly.coeff_sub r s i hzero_sub]
+    have hr_zero := DensePoly.coeff_eq_zero_of_size_le r (by omega : r.size ≤ i)
+    have hs_zero := DensePoly.coeff_eq_zero_of_size_le s (by omega : s.size ≤ i)
+    rw [hr_zero, hs_zero]
+    grind
+  have hmax_le : max r.size s.size ≤ m.size - 1 :=
+    Nat.max_le.mpr ⟨hr_size_le, hs_size_le⟩
+  have hrs_size_le : (r - s).size ≤ m.size - 1 := by
+    by_cases hrs_zero : (r - s).size = 0
+    · omega
+    · have hrs_pos : 0 < (r - s).size := Nat.pos_of_ne_zero hrs_zero
+      have htop := DensePoly.coeff_last_ne_zero_of_pos_size (r - s) hrs_pos
+      have hbound : (r - s).size - 1 < max r.size s.size := by
+        rcases Nat.lt_or_ge ((r - s).size - 1) (max r.size s.size) with h | hge
+        · exact h
+        · exact False.elim (htop (hrs_top_zero ((r - s).size - 1) hge))
+      have hsub_lt : (r - s).size - 1 < m.size - 1 := Nat.lt_of_lt_of_le hbound hmax_le
+      omega
+  -- Case on k.
+  by_cases hk_zero : k.size = 0
+  · -- k = 0, so r - s = m * 0 = 0.
+    have hk_eq : k = 0 := by
+      apply DensePoly.ext_coeff
+      intro i
+      rw [DensePoly.coeff_zero]
+      exact DensePoly.coeff_eq_zero_of_size_le k (by omega)
+    have hmul_zero : m * (0 : DensePoly (ZMod64 p)) = 0 := by
+      have hcomm := DensePoly.mul_comm_poly m (0 : DensePoly (ZMod64 p))
+      have hzm := DensePoly.zero_mul m
+      exact hcomm.trans hzm
+    rw [hk_eq] at hk
+    rw [hmul_zero] at hk
+    -- hk : r - s = 0; conclude r = s.
+    apply DensePoly.ext_coeff
+    intro i
+    have hcoeff := congrArg (fun x : DensePoly (ZMod64 p) => x.coeff i) hk
+    change (r - s).coeff i = (0 : DensePoly (ZMod64 p)).coeff i at hcoeff
+    rw [DensePoly.coeff_sub r s i hzero_sub, DensePoly.coeff_zero] at hcoeff
+    grind
+  · -- k ≠ 0: derive contradiction from sizes.
+    have hk_pos : 0 < k.size := Nat.pos_of_ne_zero hk_zero
+    have hm_pos_size : 0 < m.size := by omega
+    have htop := coeff_mul_at_top m k hm_pos_size hk_pos
+    have hm_lead_ne : m.coeff (m.size - 1) ≠ 0 :=
+      DensePoly.coeff_last_ne_zero_of_pos_size m hm_pos_size
+    have hk_lead_ne : k.coeff (k.size - 1) ≠ 0 :=
+      DensePoly.coeff_last_ne_zero_of_pos_size k hk_pos
+    have hp_prime : Hex.Nat.Prime p := PrimeModulus.prime
+    have hprod_ne : m.coeff (m.size - 1) * k.coeff (k.size - 1) ≠ 0 := by
+      intro hprod
+      rcases ZMod64.eq_zero_or_eq_zero_of_mul_eq_zero hp_prime hprod with hh | hh
+      · exact hm_lead_ne hh
+      · exact hk_lead_ne hh
+    have hcoeff_ne : (m * k).coeff (m.size - 1 + (k.size - 1)) ≠ 0 := by
+      rw [htop]
+      exact hprod_ne
+    have hmk_size_gt : m.size - 1 + (k.size - 1) < (m * k).size := by
+      rcases Nat.lt_or_ge (m.size - 1 + (k.size - 1)) (m * k).size with h | hle
+      · exact h
+      · exact False.elim (hcoeff_ne (DensePoly.coeff_eq_zero_of_size_le (m * k) hle))
+    -- (m * k) = (r - s).
+    have hmk_eq_rs : (m * k).size = (r - s).size := by rw [← hk]
+    omega
 
 private theorem mod_remainders_congr_of_congr (f g m : DensePoly (ZMod64 p))
     (hcongr : DensePoly.Congr f g m) :
