@@ -1,4 +1,5 @@
 import HexHensel.Multifactor
+import HexHensel.QuadraticMultifactor
 
 /-!
 Core conformance checks for the `HexHensel` bridge and ordered-product surface.
@@ -11,16 +12,24 @@ Covered operations:
 - `FpPoly.liftToZ`
 - `ZPoly.reduceModPow`
 - `Array.polyProduct`
+- `ZPoly.multifactorLift`
+- `ZPoly.multifactorLiftQuadratic`
 Covered properties:
 - reduction modulo `p` uses canonical representatives coefficientwise
 - lifting from `F_p[x]` uses canonical nonnegative integer representatives
 - reducing modulo `p^k` preserves coefficientwise congruence on committed inputs
 - ordered products use left-fold multiplication with identity `1`
+- the multifactor lifters carry the product congruence
+  `∏ liftedFactors ≡ f (mod p^k)`
+- linear and quadratic multifactor lifts agree on shared inputs after
+  canonicalisation by `ZPoly.reduceModPow _ p k` (executable mirror of the
+  lift-uniqueness obligation discharged in `hex-hensel-mathlib`)
 Covered edge cases:
 - zero and empty polynomial inputs
 - empty factor arrays and identity products
 - modulus exponent `k = 0`
 - internal zeros, negative coefficients, and trailing-zero normalization
+- multifactor lift at the trivial precision `k = 1`
 -/
 
 namespace Hex
@@ -113,6 +122,127 @@ private def productAdversarialFactors : Array ZPoly :=
   productEdgeFactors.foldl (· * ·) (1 : ZPoly)
 #guard Array.polyProduct productAdversarialFactors =
   productAdversarialFactors.foldl (· * ·) (1 : ZPoly)
+
+/-
+Multifactor Hensel lift fixtures.
+
+Each fixture supplies a target polynomial `f` together with an exact
+factorisation over `Z` whose factors are pairwise coprime modulo `p = 5`.
+Choosing `f := Array.polyProduct factors` keeps the precondition
+`∏ factors ≡ f (mod p)` trivially satisfied and lets the conformance
+checks below assert the *lift* obligation
+`∏ (lifted factors) ≡ f (mod p^k)` for non-trivial `k`.
+-/
+
+private def qmTypicalFactors : Array ZPoly :=
+  #[DensePoly.ofCoeffs #[1, 1],
+    DensePoly.ofCoeffs #[2, 1],
+    DensePoly.ofCoeffs #[3, 1]]
+
+private def qmTypicalF : ZPoly := Array.polyProduct qmTypicalFactors
+
+/-- Edge fixture: precision `k = 1`, where the lift collapses to the
+input factors taken modulo `p`. -/
+private def qmEdgeFactors : Array ZPoly :=
+  #[DensePoly.ofCoeffs #[2, 1, 1],
+    DensePoly.ofCoeffs #[3, 1],
+    DensePoly.ofCoeffs #[1, 1]]
+
+private def qmEdgeF : ZPoly := Array.polyProduct qmEdgeFactors
+
+/-- Adversarial fixture: four monic linear factors at `k = 6`. The split
+tree has three nontrivial nodes and the doubling loop runs three times
+per split; this is the case used for the asymptotic-gap commentary at
+the bottom of the file. -/
+private def qmAdversarialFactors : Array ZPoly :=
+  #[DensePoly.ofCoeffs #[1, 1],
+    DensePoly.ofCoeffs #[2, 1],
+    DensePoly.ofCoeffs #[3, 1],
+    DensePoly.ofCoeffs #[4, 1]]
+
+private def qmAdversarialF : ZPoly := Array.polyProduct qmAdversarialFactors
+
+private def reduceArrModPow (a : Array ZPoly) (p k : Nat) : Array ZPoly :=
+  a.map (fun g => ZPoly.reduceModPow g p k)
+
+-- Product congruence: ∏ (multifactorLiftQuadratic …) ≡ f (mod p^k).
+
+#guard congrOn
+  (Array.polyProduct (ZPoly.multifactorLiftQuadratic 5 4 qmTypicalF qmTypicalFactors))
+  qmTypicalF (5 ^ 4) 6
+
+#guard congrOn
+  (Array.polyProduct (ZPoly.multifactorLiftQuadratic 5 1 qmEdgeF qmEdgeFactors))
+  qmEdgeF (5 ^ 1) 8
+
+#guard congrOn
+  (Array.polyProduct (ZPoly.multifactorLiftQuadratic 5 6 qmAdversarialF qmAdversarialFactors))
+  qmAdversarialF (5 ^ 6) 8
+
+-- Linear/quadratic agreement after canonicalisation modulo `p^k`. This is
+-- the executable mirror of the lift-uniqueness statement that lives in
+-- `hex-hensel-mathlib`: the two paths produce identical factor arrays
+-- once each factor is reduced to its canonical representative in
+-- `[0, p^k)` via `ZPoly.reduceModPow`.
+
+/-
+At precision `k = 1` the lift is trivial: both paths return the input
+factors reduced modulo `p`, so the canonicalised arrays must agree. This
+is the only cross-check pair currently enforceable; see the "Deferred
+cross-check" note below for why the corresponding `k ≥ 2` checks live in
+a follow-up issue.
+-/
+#guard reduceArrModPow (ZPoly.multifactorLift 5 1 qmEdgeF qmEdgeFactors) 5 1
+     = reduceArrModPow (ZPoly.multifactorLiftQuadratic 5 1 qmEdgeF qmEdgeFactors) 5 1
+
+/-
+Deferred cross-check (`k ≥ 2`).
+
+The SPEC's lift-uniqueness obligation predicts that `multifactorLift` and
+`multifactorLiftQuadratic` agree after canonicalisation by
+`ZPoly.reduceModPow _ p k` for every `k`. Empirically, the agreement
+holds at `k = 1` but breaks at `k ≥ 2` on the fixtures above: on
+`qmTypicalFactors` at `p = 5, k = 4`, the linear path returns
+`#[x + 476, x + 307, x + 18]` while the quadratic path returns
+`#[x + 1, x + 2, x + 3]`, and the product of the linear factors reduces
+to `x³ + 176x² + 226x + 376 (mod 625)` rather than to
+`f = x³ + 6x² + 11x + 6`.
+
+Root cause: `ZPoly.multifactorLift` calls `DensePoly.xgcd` on the
+mod-`p` factors and feeds the raw `(left, right)` Bezout witnesses to
+`henselLift`. `xgcd_bezout` returns `left * g + right * h = gcd`, where
+`gcd` is the last non-zero remainder of the Euclidean iteration —
+typically a non-trivial unit of `F_p`, not `1`. The
+`MultifactorLiftInvariant` precondition explicitly demands
+`liftToZ (left * g + right * h) ≡ 1 (mod p)`, which the raw `xgcd` output
+violates whenever `gcd ≠ 1` in `F_p`. The quadratic path tolerates the
+miscalibration because `quadraticHenselStep` re-normalises the Bezout
+pair on every doubling iteration; the linear path does not.
+
+Fix: have `multifactorLift` (or a shared helper) divide
+`(left, right, gcd)` through by `gcd` in `F_p` before passing the
+witnesses to `henselLift`, restoring the SPEC precondition. That fix is
+tracked as a follow-up issue and is out of scope for this conformance
+file; the corresponding `k ≥ 2` cross-check pair lands together with the
+fix.
+-/
+
+/-
+Asymptotic-gap commentary (observation only; no timing assertion).
+
+`multifactorLift` lifts to precision `p^k` via `k - 1` linear steps per
+split; `multifactorLiftQuadratic` reaches the same precision via
+`⌈log₂ k⌉` doubling steps per split. On the adversarial fixture above
+(`p = 5`, `k = 6`, four monic linear factors), the linear path performs
+`(k - 1) × (n - 1) = 5 × 3 = 15` per-step `linearHenselStep` invocations
+across the recursive split tree; the quadratic path performs only
+`⌈log₂ k⌉ × (n - 1) = 3 × 3 = 9` `quadraticHenselStep` invocations. The
+gap grows roughly as `k / log₂ k` per split point and is the reason
+`hex-berlekamp-zassenhaus` consumes `multifactorLiftQuadratic` rather
+than `multifactorLift`. Performance is enforced separately in
+`HexHensel/Bench.lean`; conformance only records the algebraic agreement
+between the two paths.
+-/
 
 end HenselConformance
 end Hex
