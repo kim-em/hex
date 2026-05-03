@@ -676,6 +676,60 @@ private theorem rat_scale_mul_scale (u v : Rat) (p q : DensePoly Rat) :
       rw [DensePoly.coeff_scale (R := Rat) (u * v) (p * q) n (Rat.mul_zero (u * v))]
       rw [DensePoly.coeff_mul]
 
+private instance ratDivModLaws : DensePoly.DivModLaws Rat where
+  divMod_spec := by
+    intro p q
+    sorry
+  divMod_remainder_degree_lt_of_pos_degree := by
+    intro p q hdegree
+    sorry
+  divModMonic_eq_divMod_of_monic := by
+    intro p q hmonic
+    sorry
+  mod_self_eq_zero := by
+    intro p
+    sorry
+  mod_eq_zero_of_dvd := by
+    intro p q hdiv
+    sorry
+  mod_mod_of_not_pos_degree := by
+    intro p q hdegree
+    sorry
+  mod_eq_mod_of_congr := by
+    intro p q m hcongr
+    sorry
+  mod_add_mod := by
+    intro p q m
+    sorry
+  mod_mul_mod := by
+    intro p q m
+    sorry
+
+private instance ratGcdLaws : DensePoly.GcdLaws Rat where
+  gcd_dvd_left := by
+    intro f g
+    sorry
+  gcd_dvd_right := by
+    intro f g
+    sorry
+  dvd_gcd := by
+    intro d f g hdf hdg
+    sorry
+  xgcd_bezout := by
+    intro f g
+    sorry
+
+private theorem rat_div_gcd_mul_reconstruct (f df : DensePoly Rat) :
+    (f / DensePoly.gcd f df) * DensePoly.gcd f df = f := by
+  have hspec := DensePoly.div_mul_add_mod f (DensePoly.gcd f df)
+  have hmod :
+      f % DensePoly.gcd f df = 0 :=
+    DensePoly.mod_eq_zero_of_dvd f (DensePoly.gcd f df)
+      (DensePoly.gcd_dvd_left f df)
+  rw [hmod] at hspec
+  rw [DensePoly.add_zero_poly] at hspec
+  exact hspec
+
 private theorem densePoly_eq_zero_of_isZero_true {R : Type _} [Zero R] [DecidableEq R]
     (p : DensePoly R) (h : p.isZero = true) :
     p = 0 := by
