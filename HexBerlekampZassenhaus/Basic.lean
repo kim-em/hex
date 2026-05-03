@@ -1,6 +1,7 @@
 import HexBerlekamp.Irreducibility
 import HexHensel.Multifactor
 import HexHensel.QuadraticMultifactor
+import HexLLL.Basic
 
 /-!
 Executable data records for the Berlekamp-Zassenhaus factorization pipeline.
@@ -549,6 +550,104 @@ private def exactQuotient? (target candidate : ZPoly) : Option ZPoly :=
     else
       none
 
+private def centeredModNat (z : Int) (m : Nat) : Int :=
+  if m = 0 then
+    z
+  else
+    let r := z % Int.ofNat m
+    if 2 * r.natAbs ≤ m then
+      r
+    else if r < 0 then
+      r + Int.ofNat m
+    else
+      r - Int.ofNat m
+
+private def liftModulus (d : LiftData) : Nat :=
+  d.p ^ d.k
+
+private structure RecombinationLattice where
+  rows : Nat
+  cols : Nat
+  coeffWidth : Nat
+  rows_pos : 1 ≤ rows
+  coeffWidth_le_cols : coeffWidth ≤ cols
+  basis : Matrix Int rows cols
+
+private def recombinationLattice? (d : LiftData) (coeffWidth : Nat) :
+    Option RecombinationLattice :=
+  if hrows : 0 < d.liftedFactors.size then
+    let rows := d.liftedFactors.size
+    let cols := coeffWidth + rows
+    let modulusNat := liftModulus d
+    let modulus := Int.ofNat modulusNat
+    let basis : Matrix Int rows cols :=
+      Matrix.ofFn fun i j =>
+        if hcoeff : j.val < coeffWidth then
+          centeredModNat (d.liftedFactors[i].coeff j.val) modulusNat
+        else if j.val - coeffWidth = i.val then
+          modulus
+        else
+          0
+    some
+      { rows
+        cols
+        coeffWidth
+        rows_pos := hrows
+        coeffWidth_le_cols := Nat.le_add_right coeffWidth rows
+        basis }
+  else
+    none
+
+private theorem lll_delta_lower : (1 / 4 : Rat) < 3 / 4 := by
+  sorry
+
+private theorem lll_delta_upper : (3 / 4 : Rat) ≤ 1 := by
+  sorry
+
+private theorem recombinationLattice_independent (L : RecombinationLattice) :
+    L.basis.independent := by
+  sorry
+
+private def decodeShortVector (coeffWidth cols : Nat) (v : Vector Int cols) : ZPoly :=
+  DensePoly.ofCoeffs <|
+    (List.range coeffWidth).map
+      (fun i =>
+        if h : i < cols then
+          v.get ⟨i, h⟩
+        else
+          0)
+    |>.toArray
+
+private def shortVectorCandidates (L : RecombinationLattice) : Array ZPoly :=
+  (lll.shortVectors L.basis (3 / 4) lll_delta_lower lll_delta_upper L.rows_pos
+      (recombinationLattice_independent L)).map
+    (decodeShortVector L.coeffWidth L.cols)
+
+private structure RecombinationState where
+  target : ZPoly
+  factors : Array ZPoly
+
+private def acceptRecombinationCandidate
+    (state : RecombinationState) (candidate : ZPoly) : RecombinationState :=
+  match exactQuotient? state.target candidate with
+  | some quotient => { target := quotient, factors := state.factors.push candidate }
+  | none => state
+
+private def verifyShortVectorCandidates (target : ZPoly) (candidates : Array ZPoly) :
+    Option (Array ZPoly) :=
+  let final :=
+    candidates.foldl acceptRecombinationCandidate { target, factors := #[] }
+  if final.target = 1 then
+    some final.factors
+  else
+    none
+
+private def recombineLLL? (f : ZPoly) (d : LiftData) : Option (Array ZPoly) :=
+  let coeffWidth := f.degree?.getD 0 + 1
+  match recombinationLattice? d coeffWidth with
+  | none => none
+  | some L => verifyShortVectorCandidates f (shortVectorCandidates L)
+
 private def recombinationSearchAux
     (target : ZPoly) (localFactors : List ZPoly) : Nat → Option (List ZPoly)
   | 0 => none
@@ -575,6 +674,11 @@ then recurses on the quotient and unused local factors.
 def recombinationSearch (f : ZPoly) (localFactors : List ZPoly) : Option (List ZPoly) :=
   recombinationSearchAux f localFactors (localFactors.length + 1)
 
+private def recombineExhaustive (f : ZPoly) (d : LiftData) : Array ZPoly :=
+  match recombinationSearch f d.liftedFactors.toList with
+  | some factors => factors.toArray
+  | none => #[]
+
 /--
 The lifted factors contain enough information for the executable exhaustive
 recombination search to recover factors of `f`.
@@ -590,9 +694,9 @@ checks; it is an explicit recombination failure rather than a replacement of
 the factorization by the original input.
 -/
 def recombine (f : ZPoly) (d : LiftData) : Array ZPoly :=
-  match recombinationSearch f d.liftedFactors.toList with
-  | some factors => factors.toArray
-  | none => #[]
+  match recombineLLL? f d with
+  | some factors => factors
+  | none => recombineExhaustive f d
 
 /-- Factor with an explicit coefficient bound for the recombination stage. -/
 def factorWithBound (f : ZPoly) (B : Nat) : Array ZPoly :=
