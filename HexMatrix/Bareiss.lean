@@ -345,6 +345,81 @@ private theorem noPivotLoop_regular_branch (fuel : Nat) (state : BareissState n)
           singularStep := none } := by
   simp [noPivotLoop, hDone, hp]
 
+private theorem noPivotLoop_matrix_entry_of_row_le_or_col_lt (fuel : Nat)
+    (state : BareissState n) (i j : Fin n)
+    (hfixed : i.val ≤ state.step ∨ j.val < state.step) :
+    (noPivotLoop fuel state).matrix[i][j] = state.matrix[i][j] := by
+  induction fuel generalizing state with
+  | zero =>
+      simp [noPivotLoop]
+  | succ fuel ih =>
+      by_cases hDone : state.step + 1 < n
+      · let k : Fin n :=
+          ⟨state.step, Nat.lt_trans (Nat.lt_succ_self state.step) hDone⟩
+        by_cases hp : state.matrix[k][k] = 0
+        · simp [noPivotLoop_singular_branch fuel state hDone hp]
+        · rw [noPivotLoop_regular_branch fuel state hDone]
+          · let next : BareissState n :=
+              { step := state.step + 1
+                matrix := stepMatrix state.matrix state.step
+                  state.matrix[state.step][state.step] state.prevPivot
+                prevPivot := state.matrix[state.step][state.step]
+                rowSwaps := state.rowSwaps
+                singularStep := none }
+            change (noPivotLoop fuel next).matrix[i][j] = state.matrix[i][j]
+            have hnext : i.val ≤ next.step ∨ j.val < next.step := by
+              cases hfixed with
+              | inl hi =>
+                  exact Or.inl (Nat.le_trans hi (Nat.le_succ state.step))
+              | inr hj =>
+                  exact Or.inr (Nat.lt_trans hj (Nat.lt_succ_self state.step))
+            rw [ih next hnext]
+            dsimp [next]
+            apply stepMatrix_eq_of_not_update
+            · intro htrail
+              cases hfixed with
+              | inl hi =>
+                  exact Nat.not_lt_of_ge hi htrail.1
+              | inr hj =>
+                  exact Nat.not_lt_of_ge (Nat.le_of_lt hj) htrail.2
+            · intro hcol
+              cases hfixed with
+              | inl hi =>
+                  exact Nat.not_lt_of_ge hi hcol.1
+              | inr hj =>
+                  exact Nat.ne_of_lt hj hcol.2
+          · simpa [k] using hp
+      · simp [noPivotLoop_done fuel state hDone]
+
+private theorem noPivotLoop_diag_of_le_step (fuel : Nat) (state : BareissState n)
+    (i : Fin n) (hi : i.val ≤ state.step) :
+    (noPivotLoop fuel state).matrix[i][i] = state.matrix[i][i] :=
+  noPivotLoop_matrix_entry_of_row_le_or_col_lt fuel state i i (Or.inl hi)
+
+private theorem noPivotLoop_rowSwaps (fuel : Nat) (state : BareissState n) :
+    (noPivotLoop fuel state).rowSwaps = state.rowSwaps := by
+  induction fuel generalizing state with
+  | zero =>
+      simp [noPivotLoop]
+  | succ fuel ih =>
+      by_cases hDone : state.step + 1 < n
+      · let k : Fin n :=
+          ⟨state.step, Nat.lt_trans (Nat.lt_succ_self state.step) hDone⟩
+        by_cases hp : state.matrix[k][k] = 0
+        · simp [noPivotLoop_singular_branch fuel state hDone hp]
+        · rw [noPivotLoop_regular_branch fuel state hDone]
+          · let next : BareissState n :=
+              { step := state.step + 1
+                matrix := stepMatrix state.matrix state.step
+                  state.matrix[state.step][state.step] state.prevPivot
+                prevPivot := state.matrix[state.step][state.step]
+                rowSwaps := state.rowSwaps
+                singularStep := none }
+            change (noPivotLoop fuel next).rowSwaps = state.rowSwaps
+            rw [ih next]
+          · simpa [k] using hp
+      · simp [noPivotLoop_done fuel state hDone]
+
 /-- Bareiss elimination with row pivoting. If a column has no nonzero pivot,
 the elimination aborts and the determinant is zero. -/
 private def pivotLoop (fuel : Nat) (state : BareissState n) : BareissState n :=
