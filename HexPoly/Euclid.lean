@@ -41,6 +41,128 @@ private def arrayDegreeAux (coeffs : Array R) : Nat → Option Nat
 private def arrayDegree? (coeffs : Array R) : Option Nat :=
   arrayDegreeAux coeffs coeffs.size
 
+private theorem arrayDegreeAux_some_lt {coeffs : Array R} {fuel rd : Nat}
+    (h : arrayDegreeAux coeffs fuel = some rd) :
+    rd < fuel := by
+  induction fuel generalizing rd with
+  | zero =>
+      simp [arrayDegreeAux] at h
+  | succ fuel ih =>
+      unfold arrayDegreeAux at h
+      by_cases hcoeff : coeffs[fuel]?.getD (Zero.zero : R) = (Zero.zero : R)
+      · simp [hcoeff] at h
+        exact Nat.lt_succ_of_lt (ih h)
+      · simp [hcoeff] at h
+        subst rd
+        omega
+
+private theorem arrayDegreeAux_some_coeff_ne_zero {coeffs : Array R} {fuel rd : Nat}
+    (h : arrayDegreeAux coeffs fuel = some rd) :
+    coeffs.getD rd (Zero.zero : R) ≠ (Zero.zero : R) := by
+  induction fuel generalizing rd with
+  | zero =>
+      simp [arrayDegreeAux] at h
+  | succ fuel ih =>
+      unfold arrayDegreeAux at h
+      by_cases hcoeff : coeffs[fuel]?.getD (Zero.zero : R) = (Zero.zero : R)
+      · simp [hcoeff] at h
+        exact ih h
+      · simp [hcoeff] at h
+        cases h
+        rw [Array.getD_eq_getD_getElem?]
+        exact hcoeff
+
+private theorem arrayDegreeAux_none_getD_eq_zero {coeffs : Array R} {fuel i : Nat}
+    (h : arrayDegreeAux coeffs fuel = none) (hi : i < fuel) :
+    coeffs.getD i (Zero.zero : R) = (Zero.zero : R) := by
+  induction fuel generalizing i with
+  | zero =>
+      omega
+  | succ fuel ih =>
+      unfold arrayDegreeAux at h
+      by_cases hcoeff : coeffs[fuel]?.getD (Zero.zero : R) = (Zero.zero : R)
+      · simp [hcoeff] at h
+        rcases Nat.lt_or_eq_of_le (Nat.le_of_lt_succ hi) with hlt | heq
+        · exact ih h hlt
+        · subst i
+          rw [Array.getD_eq_getD_getElem?]
+          exact hcoeff
+      · simp [hcoeff] at h
+
+private theorem arrayDegreeAux_some_above_eq_zero {coeffs : Array R} {fuel rd i : Nat}
+    (h : arrayDegreeAux coeffs fuel = some rd) (hrd : rd < i) (hi : i < fuel) :
+    coeffs.getD i (Zero.zero : R) = (Zero.zero : R) := by
+  induction fuel generalizing rd i with
+  | zero =>
+      omega
+  | succ fuel ih =>
+      unfold arrayDegreeAux at h
+      by_cases hcoeff : coeffs[fuel]?.getD (Zero.zero : R) = (Zero.zero : R)
+      · simp [hcoeff] at h
+        rcases Nat.lt_or_eq_of_le (Nat.le_of_lt_succ hi) with hlt | heq
+        · exact ih h hrd hlt
+        · subst i
+          rw [Array.getD_eq_getD_getElem?]
+          exact hcoeff
+      · simp [hcoeff] at h
+        cases h
+        omega
+
+private theorem arrayDegree?_some_lt {coeffs : Array R} {rd : Nat}
+    (h : arrayDegree? coeffs = some rd) :
+    rd < coeffs.size := by
+  exact arrayDegreeAux_some_lt h
+
+private theorem arrayDegree?_some_coeff_ne_zero {coeffs : Array R} {rd : Nat}
+    (h : arrayDegree? coeffs = some rd) :
+    coeffs.getD rd (Zero.zero : R) ≠ (Zero.zero : R) := by
+  exact arrayDegreeAux_some_coeff_ne_zero h
+
+private theorem arrayDegree?_some_above_eq_zero {coeffs : Array R} {rd i : Nat}
+    (h : arrayDegree? coeffs = some rd) (hrd : rd < i) :
+    coeffs.getD i (Zero.zero : R) = (Zero.zero : R) := by
+  by_cases hi : i < coeffs.size
+  · exact arrayDegreeAux_some_above_eq_zero h hrd hi
+  · unfold Array.getD
+    exact dif_neg hi
+
+private theorem arrayDegree?_none_getD_eq_zero {coeffs : Array R} {i : Nat}
+    (h : arrayDegree? coeffs = none) :
+    coeffs.getD i (Zero.zero : R) = (Zero.zero : R) := by
+  by_cases hi : i < coeffs.size
+  · exact arrayDegreeAux_none_getD_eq_zero h hi
+  · unfold Array.getD
+    exact dif_neg hi
+
+private theorem ofCoeffs_degree_getD_lt_of_forall_zero_ge {coeffs : Array R} {bound : Nat}
+    (hpos : 0 < bound)
+    (hzero : ∀ i, bound ≤ i → coeffs.getD i (Zero.zero : R) = (Zero.zero : R)) :
+    (ofCoeffs coeffs : DensePoly R).degree?.getD 0 < bound := by
+  let p : DensePoly R := ofCoeffs coeffs
+  have hsize_le : p.size ≤ bound := by
+    by_cases hle : p.size ≤ bound
+    · exact hle
+    · have hlt : bound < p.size := Nat.lt_of_not_ge hle
+      let i := p.size - 1
+      have hpos_size : 0 < p.size := by omega
+      have hbound_i : bound ≤ i := by omega
+      have hcoeff_zero : coeffs.getD i (Zero.zero : R) = (Zero.zero : R) :=
+        hzero i hbound_i
+      have hpcoeff_zero : p.coeff i = (Zero.zero : R) := by
+        dsimp [p]
+        rw [coeff_ofCoeffs]
+        exact hcoeff_zero
+      have hpcoeff_ne : p.coeff i ≠ (Zero.zero : R) :=
+        coeff_last_ne_zero_of_pos_size p hpos_size
+      exact False.elim (hpcoeff_ne hpcoeff_zero)
+  by_cases hsize_zero : p.size = 0
+  · simp [p, degree?, hsize_zero, hpos]
+  · have hpos_size : 0 < p.size := Nat.pos_of_ne_zero hsize_zero
+    have hdeg : p.degree?.getD 0 = p.size - 1 := by
+      simp [degree?, hsize_zero]
+    rw [hdeg]
+    omega
+
 private def subtractScaledShift [Sub R] [Mul R]
     (rem q : Array R) (shift : Nat) (coeff : R) : Array R :=
   Id.run do
