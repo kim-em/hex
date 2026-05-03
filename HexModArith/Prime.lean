@@ -36,6 +36,29 @@ theorem eq_zero_or_eq_zero_of_mul_eq_zero (hp : Hex.Nat.Prime p) {a b : ZMod64 p
   · exact Or.inl (eq_zero_of_dvd_modulus hA)
   · exact Or.inr (eq_zero_of_dvd_modulus hB)
 
+/-- Nonzero residues modulo a prime have multiplicative inverses. -/
+theorem inv_mul_eq_one_of_prime (hp : Hex.Nat.Prime p) {a : ZMod64 p}
+    (ha : a ≠ 0) : ZMod64.inv a * a = 1 := by
+  apply ext
+  apply UInt64.toNat_inj.mp
+  let aval := a.toNat
+  have haval : aval = a.toNat := rfl
+  have hnotdvd : ¬ p ∣ aval := by
+    intro hdiv
+    exact ha (eq_zero_of_dvd_modulus (by simpa [haval] using hdiv))
+  have hcop : Nat.Coprime aval p := by
+    rw [Nat.Coprime]
+    have hgcd_dvd_p : Nat.gcd aval p ∣ p := Nat.gcd_dvd_right aval p
+    rcases hp.2 (Nat.gcd aval p) hgcd_dvd_p with hgcd | hgcd
+    · exact hgcd
+    · exfalso
+      apply hnotdvd
+      rw [← hgcd]
+      exact Nat.gcd_dvd_left aval p
+  change (ZMod64.mul (ZMod64.inv a) a).toNat = (1 : ZMod64 p).toNat
+  rw [ZMod64.inv_mul_eq_one a (by simpa [haval] using hcop)]
+  exact ZMod64.toNat_one.symm
+
 /--
 Fermat's little theorem for `ZMod64`: raising a residue mod a prime `p` to the
 `p`th power returns the original residue.

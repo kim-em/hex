@@ -163,14 +163,122 @@ private theorem ofCoeffs_degree_getD_lt_of_forall_zero_ge {coeffs : Array R} {bo
     rw [hdeg]
     omega
 
+private def subtractScaledShiftStep [Sub R] [Mul R]
+    (q : Array R) (shift : Nat) (coeff : R) (next : Array R) (j : Nat) : Array R :=
+  let idx := shift + j
+  next.set! idx (next.getD idx (Zero.zero : R) - coeff * q.getD j (Zero.zero : R))
+
 private def subtractScaledShift [Sub R] [Mul R]
     (rem q : Array R) (shift : Nat) (coeff : R) : Array R :=
-  Id.run do
-    let mut next := rem
-    for j in [0:q.size] do
-      let idx := shift + j
-      next := next.set! idx (next.getD idx (Zero.zero : R) - coeff * q.getD j (Zero.zero : R))
-    return next
+  (List.range q.size).foldl (subtractScaledShiftStep q shift coeff) rem
+
+omit [DecidableEq R] in
+private theorem array_getD_set!_same (xs : Array R) (n : Nat) (v : R)
+    (hn : n < xs.size) :
+    (xs.set! n v).getD n (Zero.zero : R) = v := by
+  simp [Array.getD, hn]
+
+omit [DecidableEq R] in
+private theorem array_getD_set!_ne (xs : Array R) (n k : Nat) (v : R)
+    (hne : k ≠ n) :
+    (xs.set! k v).getD n (Zero.zero : R) = xs.getD n (Zero.zero : R) := by
+  by_cases hkn : k = n
+  · exact False.elim (hne hkn)
+  · by_cases hn : n < xs.size
+    · unfold Array.getD
+      simp [Array.set!_eq_setIfInBounds, hn, hkn]
+    · unfold Array.getD
+      simp [Array.set!_eq_setIfInBounds, hn]
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_fold_getD_of_forall_ne [Sub R] [Mul R]
+    (rem q : Array R) (shift : Nat) (coeff : R) (n : Nat) (xs : List Nat)
+    (hne : ∀ j, j ∈ xs → shift + j ≠ n) :
+    (xs.foldl (subtractScaledShiftStep q shift coeff) rem).getD n (Zero.zero : R) =
+      rem.getD n (Zero.zero : R) := by
+  induction xs generalizing rem with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih (rem := subtractScaledShiftStep q shift coeff rem j) (by
+        intro k hk
+        exact hne k (List.mem_cons_of_mem j hk))]
+      unfold subtractScaledShiftStep
+      exact array_getD_set!_ne rem n (shift + j)
+        (rem.getD (shift + j) (Zero.zero : R) -
+          coeff * q.getD j (Zero.zero : R))
+        (hne j List.mem_cons_self)
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_fold_size [Sub R] [Mul R]
+    (rem q : Array R) (shift : Nat) (coeff : R) (xs : List Nat) :
+    (xs.foldl (subtractScaledShiftStep q shift coeff) rem).size = rem.size := by
+  induction xs generalizing rem with
+  | nil =>
+      rfl
+  | cons j xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih]
+      unfold subtractScaledShiftStep
+      simp [Array.set!_eq_setIfInBounds]
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_getD_of_forall_ne [Sub R] [Mul R]
+    (rem q : Array R) (shift : Nat) (coeff : R) (n : Nat)
+    (hne : ∀ j, j < q.size → shift + j ≠ n) :
+    (subtractScaledShift rem q shift coeff).getD n (Zero.zero : R) =
+      rem.getD n (Zero.zero : R) := by
+  unfold subtractScaledShift
+  apply subtractScaledShift_fold_getD_of_forall_ne
+  intro j hj
+  exact hne j (List.mem_range.mp hj)
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_getD_last [Sub R] [Mul R]
+    (rem q : Array R) (shift qDegree : Nat) (coeff : R)
+    (hsize : q.size = qDegree + 1) (hidx : shift + qDegree < rem.size) :
+    (subtractScaledShift rem q shift coeff).getD (shift + qDegree) (Zero.zero : R) =
+      rem.getD (shift + qDegree) (Zero.zero : R) -
+        coeff * q.getD qDegree (Zero.zero : R) := by
+  unfold subtractScaledShift
+  rw [hsize, List.range_succ, List.foldl_append]
+  simp only [List.foldl_cons, List.foldl_nil]
+  have hprefix :
+      ((List.range qDegree).foldl (subtractScaledShiftStep q shift coeff) rem).getD
+          (shift + qDegree) (Zero.zero : R) =
+        rem.getD (shift + qDegree) (Zero.zero : R) := by
+    apply subtractScaledShift_fold_getD_of_forall_ne
+    intro j hj
+    have hjlt : j < qDegree := List.mem_range.mp hj
+    omega
+  have hprefix_size :
+      ((List.range qDegree).foldl (subtractScaledShiftStep q shift coeff) rem).size =
+        rem.size :=
+    subtractScaledShift_fold_size rem q shift coeff (List.range qDegree)
+  change
+    (((List.range qDegree).foldl (subtractScaledShiftStep q shift coeff) rem).set!
+        (shift + qDegree)
+        (((List.range qDegree).foldl (subtractScaledShiftStep q shift coeff) rem).getD
+          (shift + qDegree) (Zero.zero : R) -
+          coeff * q.getD qDegree (Zero.zero : R))).getD
+      (shift + qDegree) (Zero.zero : R) =
+        rem.getD (shift + qDegree) (Zero.zero : R) -
+          coeff * q.getD qDegree (Zero.zero : R)
+  rw [array_getD_set!_same]
+  · rw [hprefix]
+  · simpa [hprefix_size] using hidx
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_getD_above_last [Sub R] [Mul R]
+    (rem q : Array R) (shift qDegree : Nat) (coeff : R) (n : Nat)
+    (hsize : q.size = qDegree + 1) (hn : shift + qDegree < n) :
+    (subtractScaledShift rem q shift coeff).getD n (Zero.zero : R) =
+      rem.getD n (Zero.zero : R) := by
+  apply subtractScaledShift_getD_of_forall_ne
+  intro j hj
+  have hjle : j ≤ qDegree := by omega
+  omega
 
 private def divModArrayAux [Sub R] [Mul R]
     (q : Array R) (qDegree : Nat) (scaleLead : R → R)
