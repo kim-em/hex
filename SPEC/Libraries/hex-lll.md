@@ -254,7 +254,7 @@ def lll.firstShortVector (b : Matrix Int n m) (δ : Rat)
 def lll.shortVectors (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
     Array (Vector Int m) :=
-  (lll b δ hδ hδ' hn hind).toRowArray
+  (lll b δ hδ hδ' hn hind).toArray
 ```
 
 Both entry points are Phase 1 deliverables; conformance must exercise
