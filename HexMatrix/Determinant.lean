@@ -287,11 +287,32 @@ convention `1`. -/
     inversionCount, List.finRange]
   grind
 
+@[simp] theorem det_two_by_two {R : Type u} [Lean.Grind.CommRing R]
+    (M : Matrix R 2 2) :
+    det M = M[0][0] * M[1][1] - M[1][0] * M[0][1] := by
+  simp [det, detTerm, detSign, detProduct, permutationVectors, emptyVec, insertAt,
+    inversionCount, List.finRange]
+  grind
+
 @[simp] theorem det_borderedMinor_zero {R : Type u} [Lean.Grind.Ring R]
     (M : Matrix R n n) (hn : 0 < n) (i j : Fin n) :
     det (borderedMinor M 0 hn i j) = M[i][j] := by
   rw [det_one_by_one]
   simpa using borderedMinor_entry_last_last M 0 hn i j
+
+/-- The `k = 0` Desnanot-Jacobi convention for bordered minors. The previous
+pivot is the empty leading-prefix determinant, hence `1`. This is the base
+shape used by Bareiss before the general bordered-minor identity takes over. -/
+theorem det_borderedMinor_one_mul_prevPivot_zero (M : Matrix Int n n)
+    (h1 : 1 < n) (i j : Fin n) :
+    det (borderedMinor M 1 h1 i j) *
+        det (leadingPrefix M 0 (Nat.zero_le n)) =
+      det (borderedMinor M 0 (Nat.zero_lt_of_lt h1) ⟨0, Nat.zero_lt_of_lt h1⟩
+          ⟨0, Nat.zero_lt_of_lt h1⟩) *
+        det (borderedMinor M 0 (Nat.zero_lt_of_lt h1) i j) -
+    det (borderedMinor M 0 (Nat.zero_lt_of_lt h1) i ⟨0, Nat.zero_lt_of_lt h1⟩) *
+        det (borderedMinor M 0 (Nat.zero_lt_of_lt h1) ⟨0, Nat.zero_lt_of_lt h1⟩ j) := by
+  simp [det_two_by_two, borderedMinor, ofFn]
 
 /-- Determinant form of `leadingPrefix_borderedMinor_eq_leadingPrefix`.
 After expanding a bordered minor along its final border row/column, the
