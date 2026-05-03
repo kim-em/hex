@@ -64,6 +64,10 @@ private def exactDiv (num denom : Int) : Int :=
   else
     0
 
+private theorem exactDiv_eq_divExact {num denom : Int} (h : denom ∣ num) :
+    exactDiv num denom = Int.divExact num denom h := by
+  simp [exactDiv, h]
+
 /-- Search column `col` for a nonzero pivot at or below `start`. -/
 private def findPivotAux (M : Matrix Int n n) (col : Fin n) (start fuel : Nat) :
     Option (Fin n) :=
@@ -120,6 +124,54 @@ private theorem stepMatrix_pivot_col_below
     (hi : k < i.val) (hcolK : colK.val = k) :
     (stepMatrix M k pivot prevPivot)[i][colK] = 0 := by
   simp [stepMatrix, Matrix.ofFn, hi, hcolK]
+
+private theorem stepMatrix_update_eq
+    (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) (i j : Fin n)
+    (hi : k < i.val) (hj : k < j.val) :
+    (stepMatrix M k pivot prevPivot)[i][j] =
+      (let colK : Fin n := ⟨k, Nat.lt_trans hi i.isLt⟩
+       let rowK : Fin n := ⟨k, Nat.lt_trans hj j.isLt⟩
+       exactDiv (pivot * M[i][j] - M[i][colK] * M[rowK][j]) prevPivot) := by
+  simp [stepMatrix, Matrix.ofFn, hi, hj]
+
+private theorem stepMatrix_borderedMinor_update
+    (source current : Matrix Int n n) (k : Nat) (hk : k < n) (hnext : k + 1 < n)
+    (i j : Fin n) (hi : k < i.val) (hj : k < j.val) (pivot prevPivot : Int)
+    (hpivot :
+      pivot =
+        det (borderedMinor source k hk
+          (⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n)
+          (⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)))
+    (hentry :
+      current[i][j] = det (borderedMinor source k hk i j))
+    (hleft :
+      current[i][(⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)] =
+        det (borderedMinor source k hk i (⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)))
+    (htop :
+      current[(⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n)][j] =
+        det (borderedMinor source k hk (⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n) j))
+    (hexact :
+      exactDiv
+        (det (borderedMinor source k hk
+            (⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n)
+            (⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)) *
+          det (borderedMinor source k hk i j) -
+          det (borderedMinor source k hk i (⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)) *
+          det (borderedMinor source k hk (⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n) j))
+        prevPivot =
+          det (borderedMinor source (k + 1) hnext i j)) :
+    (stepMatrix current k pivot prevPivot)[i][j] =
+      det (borderedMinor source (k + 1) hnext i j) := by
+  rw [stepMatrix_update_eq current k pivot prevPivot i j hi hj]
+  change
+    exactDiv
+      (pivot * current[i][j] -
+        current[i][(⟨k, Nat.lt_trans hi i.isLt⟩ : Fin n)] *
+        current[(⟨k, Nat.lt_trans hj j.isLt⟩ : Fin n)][j])
+      prevPivot =
+        det (borderedMinor source (k + 1) hnext i j)
+  rw [hpivot, hentry, hleft, htop]
+  exact hexact
 
 private structure BareissArrayState where
   step : Nat
