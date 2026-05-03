@@ -98,6 +98,29 @@ private def stepMatrix (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) :
     else
       M[i][j]
 
+private theorem stepMatrix_eq_of_not_update
+    (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) (i j : Fin n)
+    (htrail : ¬ (k < i.val ∧ k < j.val))
+    (hcol : ¬ (k < i.val ∧ j.val = k)) :
+    (stepMatrix M k pivot prevPivot)[i][j] = M[i][j] := by
+  simp [stepMatrix, Matrix.ofFn, htrail, hcol]
+
+private theorem stepMatrix_diag_of_le
+    (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) (i : Fin n)
+    (hi : i.val ≤ k) :
+    (stepMatrix M k pivot prevPivot)[i][i] = M[i][i] := by
+  apply stepMatrix_eq_of_not_update
+  · intro htrail
+    exact Nat.not_lt_of_ge hi htrail.1
+  · intro hcol
+    exact Nat.not_lt_of_ge hi hcol.1
+
+private theorem stepMatrix_pivot_col_below
+    (M : Matrix Int n n) (k : Nat) (pivot prevPivot : Int) (i colK : Fin n)
+    (hi : k < i.val) (hcolK : colK.val = k) :
+    (stepMatrix M k pivot prevPivot)[i][colK] = 0 := by
+  simp [stepMatrix, Matrix.ofFn, hi, hcolK]
+
 private structure BareissArrayState where
   step : Nat
   matrix : Array (Array Int)
@@ -241,6 +264,34 @@ private def noPivotLoop (fuel : Nat) (state : BareissState n) : BareissState n :
           noPivotLoop fuel next
       else
         state
+
+private theorem noPivotLoop_zero_fuel (state : BareissState n) :
+    noPivotLoop 0 state = state := by
+  rfl
+
+private theorem noPivotLoop_done (fuel : Nat) (state : BareissState n)
+    (hDone : ¬ state.step + 1 < n) :
+    noPivotLoop (fuel + 1) state = state := by
+  simp [noPivotLoop, hDone]
+
+private theorem noPivotLoop_singular_branch (fuel : Nat) (state : BareissState n)
+    (hDone : state.step + 1 < n)
+    (hp : state.matrix[state.step][state.step] = 0) :
+    noPivotLoop (fuel + 1) state = { state with singularStep := some state.step } := by
+  simp [noPivotLoop, hDone, hp]
+
+private theorem noPivotLoop_regular_branch (fuel : Nat) (state : BareissState n)
+    (hDone : state.step + 1 < n)
+    (hp : state.matrix[state.step][state.step] ≠ 0) :
+    noPivotLoop (fuel + 1) state =
+      noPivotLoop fuel
+        { step := state.step + 1
+          matrix := stepMatrix state.matrix state.step state.matrix[state.step][state.step]
+            state.prevPivot
+          prevPivot := state.matrix[state.step][state.step]
+          rowSwaps := state.rowSwaps
+          singularStep := none } := by
+  simp [noPivotLoop, hDone, hp]
 
 /-- Bareiss elimination with row pivoting. If a column has no nonzero pivot,
 the elimination aborts and the determinant is zero. -/
