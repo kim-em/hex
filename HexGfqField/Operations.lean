@@ -12,7 +12,9 @@ namespace Hex
 
 namespace GFqField
 
-variable {p : Nat} [ZMod64.Bounds p] {hp : Hex.Nat.Prime p}
+set_option linter.unusedSectionVars false
+
+variable {p : Nat} [ZMod64.Bounds p] [ZMod64.PrimeModulus p] {hp : Hex.Nat.Prime p}
 
 /-- Natural-number literals reuse the quotient-ring cast and then rewrap the
 resulting reduced residue. -/

@@ -113,12 +113,14 @@ private theorem add_sub_add_right (a b c d : DensePoly (ZMod64 p)) :
   rw [DensePoly.coeff_sub a c n hzero_sub, DensePoly.coeff_sub b d n hzero_sub]
   grind
 
-private theorem divMod_remainder_degree_lt_core (f m : DensePoly (ZMod64 p))
+private theorem divMod_remainder_degree_lt_core
+    [PrimeModulus p] (f m : DensePoly (ZMod64 p))
     (hdegree : 0 < m.degree?.getD 0) :
     (DensePoly.divMod f m).2.degree?.getD 0 < m.degree?.getD 0 := by
   sorry
 
-private theorem mod_remainder_degree_lt_core (f m : DensePoly (ZMod64 p))
+private theorem mod_remainder_degree_lt_core
+    [PrimeModulus p] (f m : DensePoly (ZMod64 p))
     (hdegree : 0 < m.degree?.getD 0) :
     (f % m).degree?.getD 0 < m.degree?.getD 0 := by
   simpa [DensePoly.mod] using divMod_remainder_degree_lt_core f m hdegree
@@ -170,7 +172,8 @@ private theorem mod_remainders_congr_of_congr (f g m : DensePoly (ZMod64 p))
       exact (DensePoly.mul_add_right_poly m (q + rf)
         ((0 : DensePoly (ZMod64 p)) - rg)).symm
 
-private theorem mod_eq_mod_of_congr_pos_degree (f g m : DensePoly (ZMod64 p))
+private theorem mod_eq_mod_of_congr_pos_degree
+    [PrimeModulus p] (f g m : DensePoly (ZMod64 p))
     (hdegree : 0 < m.degree?.getD 0)
     (hcongr : DensePoly.Congr f g m) :
     f % m = g % m := by
@@ -185,7 +188,8 @@ private theorem mod_eq_mod_of_congr_not_pos_degree (f g m : DensePoly (ZMod64 p)
     f % m = g % m := by
   sorry
 
-private theorem mod_eq_mod_of_congr_core (f g m : DensePoly (ZMod64 p))
+private theorem mod_eq_mod_of_congr_core
+    [PrimeModulus p] (f g m : DensePoly (ZMod64 p))
     (hcongr : DensePoly.Congr f g m) :
     f % m = g % m := by
   by_cases hdegree : 0 < m.degree?.getD 0
@@ -248,7 +252,7 @@ private theorem mul_left_remainder_delta (f g m rf rg : DensePoly (ZMod64 p))
 These are the concrete finite-field instances of the generic `DensePoly.DivModLaws` proof
 surface used by downstream quotient-ring code; the executable division operations
 themselves are inherited from `DensePoly`. -/
-instance instDivModLawsZMod64Fp (p : Nat) [Bounds p] :
+instance instDivModLawsZMod64Fp (p : Nat) [Bounds p] [PrimeModulus p] :
     DensePoly.DivModLaws (ZMod64 p) where
   divMod_spec := by
     intro f g

@@ -24,7 +24,9 @@ end FpPoly
 
 namespace GFqRing
 
-variable {p : Nat} [ZMod64.Bounds p]
+set_option linter.unusedSectionVars false
+
+variable {p : Nat} [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
 
 /-- Canonical remainder reduction modulo `f`, using the existing division surface. -/
 def reduceMod (f : FpPoly p) : FpPoly p → FpPoly p :=

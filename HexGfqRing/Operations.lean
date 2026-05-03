@@ -13,7 +13,9 @@ namespace Hex
 
 namespace GFqRing
 
-variable {p : Nat} [ZMod64.Bounds p]
+set_option linter.unusedSectionVars false
+
+variable {p : Nat} [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
 
 /-- The quotient zero element. -/
 def zero (f : FpPoly p) (hf : 0 < FpPoly.degree f) : PolyQuotient f hf :=
@@ -654,7 +656,7 @@ private theorem nsmul_go_eq_acc_add_linearNSmul
                   = add (add acc base) (linearNSmul (add base base) (k / 2)) := by
                     exact ih (k / 2) hlt (add acc base) (add base base)
               _ = add acc (add base (linearNSmul (add base base) (k / 2))) := by
-                    exact @linearNSmul_add_assoc_raw p _ f hf acc base
+                    exact @linearNSmul_add_assoc_raw p _ _ f hf acc base
                       (linearNSmul (add base base) (k / 2))
               _ = add acc (linearNSmul base (2 * (k / 2) + 1)) := by
                     rw [linearNSmul_double_add_one]
@@ -978,7 +980,7 @@ private theorem pow_go_eq_acc_mul_linearPow
                   = mul (mul acc base) (linearPow (mul base base) (k / 2)) := by
                     exact ih (k / 2) hlt (mul acc base) (mul base base)
               _ = mul acc (mul base (linearPow (mul base base) (k / 2))) := by
-                    exact @linearPow_mul_assoc_raw p _ f hf acc base
+                    exact @linearPow_mul_assoc_raw p _ _ f hf acc base
                       (linearPow (mul base base) (k / 2))
               _ = mul acc (linearPow base (2 * (k / 2) + 1)) := by
                     rw [linearPow_double_add_one]

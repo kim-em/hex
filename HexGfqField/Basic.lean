@@ -75,8 +75,9 @@ def repr {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
 @[simp] theorem degree_repr_lt_degree
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
     (x : FiniteField f hf hp hirr) :
-    FpPoly.degree (repr x) < FpPoly.degree f :=
-  GFqRing.degree_repr_lt_degree x.toQuotient
+    FpPoly.degree (repr x) < FpPoly.degree f := by
+  letI : ZMod64.PrimeModulus p := ZMod64.primeModulusOfPrime hp
+  exact GFqRing.degree_repr_lt_degree x.toQuotient
 
 @[ext] theorem ext
     {f : FpPoly p} {hf : 0 < FpPoly.degree f} {hirr : FpPoly.Irreducible f}
