@@ -242,20 +242,152 @@ private theorem ratCoeffToIntWithDen_cast (den : Nat) (coeff : Rat)
     _ = ((coeff.den * k : Nat) : Rat) * coeff := by
           rw [hcoeff]
 
+private theorem ratCommonDen_pos (coeffs : List Rat) :
+    0 < ratCommonDen coeffs := by
+  unfold ratCommonDen
+  generalize hacc : 1 = acc
+  have hpos : 0 < acc := by omega
+  clear hacc
+  induction coeffs generalizing acc with
+  | nil =>
+      simpa using hpos
+  | cons coeff coeffs ih =>
+      simp only [List.foldl_cons]
+      exact ih (Nat.lcm acc coeff.den) (Nat.lcm_pos hpos coeff.den_pos)
+
+private theorem ratCoeffToIntWithDen_zero (den : Nat) :
+    ratCoeffToIntWithDen den 0 = 0 := by
+  unfold ratCoeffToIntWithDen
+  simp
+
+private theorem list_getD_map_ratCoeffToIntWithDen (den : Nat) (coeffs : List Rat)
+    (n : Nat) :
+    (((coeffs.map fun coeff => ratCoeffToIntWithDen den coeff).getD n 0 : Int) : Rat) =
+      ((ratCoeffToIntWithDen den (coeffs.getD n 0) : Int) : Rat) := by
+  induction coeffs generalizing n with
+  | nil =>
+      simp [ratCoeffToIntWithDen_zero]
+  | cons coeff coeffs ih =>
+      cases n with
+      | zero =>
+          simp
+      | succ n =>
+          simpa using ih n
+
+private theorem list_getD_toArray_eq_coeff (f : DensePoly Rat) (n : Nat) :
+    f.toArray.toList.getD n 0 = f.coeff n := by
+  unfold DensePoly.toArray DensePoly.coeff Array.getD
+  by_cases hn : n < f.coeffs.size
+  · simp [hn, Array.getElem_toList]
+  · simp [hn]
+    rfl
+
+private theorem ratCommonDen_dvd_coeff (f : DensePoly Rat) (n : Nat) :
+    (f.coeff n).den ∣ ratCommonDen f.toArray.toList := by
+  by_cases hn : n < f.size
+  · apply ratCommonDen_dvd_of_mem
+    unfold DensePoly.coeff DensePoly.toArray Array.getD
+    simp [show n < f.coeffs.size by simpa [DensePoly.size] using hn]
+  · have hcoeff : f.coeff n = 0 :=
+      DensePoly.coeff_eq_zero_of_size_le f (Nat.le_of_not_gt hn)
+    rw [hcoeff]
+    exact Nat.one_dvd _
+
+private def ratPolyPrimitivePartCleared (f : DensePoly Rat) : ZPoly :=
+  let den := ratCommonDen f.toArray.toList
+  DensePoly.ofCoeffs <|
+    f.toArray.toList.map (fun coeff => ratCoeffToIntWithDen den coeff) |>.toArray
+
+private theorem toRatPoly_ratPolyPrimitivePartCleared (f : DensePoly Rat) :
+    toRatPoly (ratPolyPrimitivePartCleared f) =
+      DensePoly.scale (ratCommonDen f.toArray.toList : Rat) f := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [coeff_toRatPoly]
+  unfold ratPolyPrimitivePartCleared
+  rw [DensePoly.coeff_ofCoeffs_list]
+  change (((f.toArray.toList.map
+      (fun coeff => ratCoeffToIntWithDen (ratCommonDen f.toArray.toList) coeff)).getD n
+        (0 : Int) : Int) : Rat) =
+    (DensePoly.scale (ratCommonDen f.toArray.toList : Rat) f).coeff n
+  rw [list_getD_map_ratCoeffToIntWithDen]
+  rw [DensePoly.coeff_scale (R := Rat) (ratCommonDen f.toArray.toList : Rat) f n
+    (Rat.mul_zero _)]
+  rw [list_getD_toArray_eq_coeff]
+  exact ratCoeffToIntWithDen_cast (ratCommonDen f.toArray.toList) (f.coeff n)
+    (ratCommonDen_dvd_coeff f n)
+
+private theorem rat_scale_div_of_scale_eq {c d : Rat} (hd : d ≠ 0)
+    {p q : DensePoly Rat}
+    (h : DensePoly.scale c p = DensePoly.scale d q) :
+    q = DensePoly.scale (c / d) p := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hcoeff := congrArg (fun r : DensePoly Rat => r.coeff n) h
+  change (DensePoly.scale c p).coeff n = (DensePoly.scale d q).coeff n at hcoeff
+  rw [DensePoly.coeff_scale (R := Rat) c p n (Rat.mul_zero c)] at hcoeff
+  rw [DensePoly.coeff_scale (R := Rat) d q n (Rat.mul_zero d)] at hcoeff
+  rw [DensePoly.coeff_scale (R := Rat) (c / d) p n (Rat.mul_zero (c / d))]
+  grind [Rat.div_def, Rat.mul_assoc, Rat.mul_comm]
+
+private theorem rat_scale_toRatPoly_neg_int (u : Rat) (p : ZPoly) :
+    DensePoly.scale u (toRatPoly p) =
+      DensePoly.scale (-u) (toRatPoly (DensePoly.scale (-1 : Int) p)) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_scale (R := Rat) u (toRatPoly p) n (Rat.mul_zero u)]
+  rw [toRatPoly_scale_int]
+  change u * (toRatPoly p).coeff n =
+    (DensePoly.scale (-u) (DensePoly.scale (-1 : Rat) (toRatPoly p))).coeff n
+  rw [DensePoly.coeff_scale (R := Rat) (-u)
+    (DensePoly.scale (-1 : Rat) (toRatPoly p)) n (Rat.mul_zero (-u))]
+  rw [DensePoly.coeff_scale (R := Rat) (-1 : Rat) (toRatPoly p) n (Rat.mul_zero (-1 : Rat))]
+  grind
+
 /--
 Clear denominators in a rational polynomial and return the primitive integer
 representative of the resulting rational associate.
 -/
 def ratPolyPrimitivePart (f : DensePoly Rat) : ZPoly :=
-  let den := ratCommonDen f.toArray.toList
-  let scaled :=
-    DensePoly.ofCoeffs <|
-      f.toArray.toList.map (fun coeff => ratCoeffToIntWithDen den coeff) |>.toArray
-  normalizePrimitiveSign (primitivePart scaled)
+  normalizePrimitiveSign (primitivePart (ratPolyPrimitivePartCleared f))
 
 private theorem ratPolyPrimitivePart_rational_associate_core (f : DensePoly Rat) :
     ∃ unit : Rat, f = DensePoly.scale unit (toRatPoly (ratPolyPrimitivePart f)) := by
-  sorry
+  let den := ratCommonDen f.toArray.toList
+  let scaled := ratPolyPrimitivePartCleared f
+  have hden_ne : (den : Rat) ≠ 0 := by
+    exact_mod_cast (Nat.ne_of_gt (ratCommonDen_pos f.toArray.toList))
+  have hcleared : toRatPoly scaled = DensePoly.scale (den : Rat) f := by
+    simpa [den, scaled] using toRatPoly_ratPolyPrimitivePartCleared f
+  have hreconstruct :
+      DensePoly.scale ((content scaled : Int) : Rat) (toRatPoly (primitivePart scaled)) =
+        DensePoly.scale (den : Rat) f := by
+    rw [← toRatPoly_scale_int (content scaled) (primitivePart scaled)]
+    change toRatPoly (DensePoly.scale (DensePoly.content scaled) (DensePoly.primitivePart scaled)) =
+      DensePoly.scale (den : Rat) f
+    rw [DensePoly.content_mul_primitivePart]
+    exact hcleared
+  have hbase :
+      f = DensePoly.scale (((content scaled : Int) : Rat) / (den : Rat))
+        (toRatPoly (primitivePart scaled)) := by
+    exact rat_scale_div_of_scale_eq hden_ne hreconstruct
+  by_cases hlead : DensePoly.leadingCoeff (primitivePart scaled) < 0
+  · refine ⟨-(((content scaled : Int) : Rat) / (den : Rat)), ?_⟩
+    rw [ratPolyPrimitivePart]
+    change f =
+      DensePoly.scale (-(((content scaled : Int) : Rat) / (den : Rat)))
+        (toRatPoly (normalizePrimitiveSign (primitivePart scaled)))
+    rw [normalizePrimitiveSign, if_pos hlead]
+    rw [← rat_scale_toRatPoly_neg_int (((content scaled : Int) : Rat) / (den : Rat))
+      (primitivePart scaled)]
+    exact hbase
+  · refine ⟨(((content scaled : Int) : Rat) / (den : Rat)), ?_⟩
+    rw [ratPolyPrimitivePart]
+    change f =
+      DensePoly.scale (((content scaled : Int) : Rat) / (den : Rat))
+        (toRatPoly (normalizePrimitiveSign (primitivePart scaled)))
+    rw [normalizePrimitiveSign, if_neg hlead]
+    exact hbase
 
 /--
 Executable primitive square-free decomposition data for integer-polynomial
