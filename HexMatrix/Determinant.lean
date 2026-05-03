@@ -280,6 +280,19 @@ convention `1`. -/
   simp [det, detTerm, detSign, detProduct, permutationVectors, emptyVec, inversionCount]
   grind
 
+@[simp] theorem det_one_by_one {R : Type u} [Lean.Grind.Ring R]
+    (M : Matrix R 1 1) :
+    det M = M[0][0] := by
+  simp [det, detTerm, detSign, detProduct, permutationVectors, emptyVec, insertAt,
+    inversionCount, List.finRange]
+  grind
+
+@[simp] theorem det_borderedMinor_zero {R : Type u} [Lean.Grind.Ring R]
+    (M : Matrix R n n) (hn : 0 < n) (i j : Fin n) :
+    det (borderedMinor M 0 hn i j) = M[i][j] := by
+  rw [det_one_by_one]
+  simpa using borderedMinor_entry_last_last M 0 hn i j
+
 /-- Congruence for the determinant-style left fold over a finite list. -/
 private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
     (xs : List β) (f g : β → R) (z : R)
