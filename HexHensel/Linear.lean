@@ -1018,7 +1018,7 @@ private theorem linearHenselStep_raw_factor_congr_from_correction
     linearHenselStep_product_expansion_congr p k f g h r hCorrection hk hprod hscaled
 
 private theorem linearHenselStep_raw_factor_congr
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
@@ -1054,7 +1054,7 @@ private theorem linearHenselStep_raw_factor_congr
       p k f g h r hCorrection eMod hk hprod hcorr
 
 private theorem linearHenselStep_reduced_factor_congr
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
@@ -1139,7 +1139,7 @@ def henselLift
 
 /-- The lifted factors still multiply to `f` modulo the next power of `p`. -/
 theorem linearHenselStep_spec
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hprod : ZPoly.congr (g * h) f (p ^ k))
@@ -1471,7 +1471,7 @@ theorem linearHenselStep_h_degree?_eq
       simpa [e, gMod, hMod, eMod, qr, hCorrection, h'] using hhRawDegree
 
 private theorem henselLiftLoop_invariant
-    (p steps current : Nat) [ZMod64.Bounds p]
+    (p steps current : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f : ZPoly) (s t : FpPoly p) (acc : LinearLiftResult)
     (hp : 1 < p)
     (hcurrent : 1 ≤ current)
@@ -1522,7 +1522,7 @@ private theorem henselLiftLoop_invariant
 
 /-- The iterative linear wrapper lifts the factorization to congruence modulo `p^k`. -/
 theorem henselLift_spec
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hp : 1 < p)
@@ -1562,7 +1562,7 @@ theorem henselLift_spec
 
 /-- The iterative linear wrapper preserves monicity of the lifted `g` factor. -/
 theorem henselLift_monic
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f g h : ZPoly) (s t : FpPoly p)
     (hk : 1 ≤ k)
     (hp : 1 < p)

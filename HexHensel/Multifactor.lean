@@ -107,7 +107,7 @@ private theorem polyProduct_singleton_append (g : ZPoly) (rest : Array ZPoly) :
         list_foldl_mul_eq_mul_foldl_one g xs
 
 private theorem multifactorLiftList_spec
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f : ZPoly) (factors : List ZPoly)
     (hk : 1 ≤ k)
     (hp : 1 < p)
@@ -163,7 +163,7 @@ The product of the lifted factors is congruent to `f` modulo `p^k`, provided
 each recursive binary split supplies the linear Hensel invariant package.
 -/
 theorem multifactorLift_spec
-    (p k : Nat) [ZMod64.Bounds p]
+    (p k : Nat) [ZMod64.Bounds p] [ZMod64.PrimeModulus p]
     (f : ZPoly) (factors : Array ZPoly)
     (hk : 1 ≤ k)
     (hp : 1 < p)

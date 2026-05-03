@@ -1316,7 +1316,7 @@ private theorem pthRoot_reachable_of_derivative_zero
   rw [hf_one]
   exact pthRoot_one hp
 
-private theorem div_gcd_mul_reconstruct (f df : FpPoly p) :
+private theorem div_gcd_mul_reconstruct [ZMod64.PrimeModulus p] (f df : FpPoly p) :
     (f / DensePoly.gcd f df) * DensePoly.gcd f df = f := by
   have hspec := DensePoly.div_mul_add_mod f (DensePoly.gcd f df)
   have hmod :
@@ -1327,12 +1327,12 @@ private theorem div_gcd_mul_reconstruct (f df : FpPoly p) :
   rw [add_zero] at hspec
   exact hspec
 
-private theorem gcd_mul_div_reconstruct (f df : FpPoly p) :
+private theorem gcd_mul_div_reconstruct [ZMod64.PrimeModulus p] (f df : FpPoly p) :
     DensePoly.gcd f df * (f / DensePoly.gcd f df) = f := by
   rw [mul_comm]
   exact div_gcd_mul_reconstruct f df
 
-private theorem div_gcd_right_mul_reconstruct (c w : FpPoly p) :
+private theorem div_gcd_right_mul_reconstruct [ZMod64.PrimeModulus p] (c w : FpPoly p) :
     (w / DensePoly.gcd c w) * DensePoly.gcd c w = w := by
   have hspec := DensePoly.div_mul_add_mod w (DensePoly.gcd c w)
   have hmod :
@@ -1343,12 +1343,13 @@ private theorem div_gcd_right_mul_reconstruct (c w : FpPoly p) :
   rw [add_zero] at hspec
   exact hspec
 
-private theorem gcd_mul_div_right_reconstruct (c w : FpPoly p) :
+private theorem gcd_mul_div_right_reconstruct [ZMod64.PrimeModulus p] (c w : FpPoly p) :
     DensePoly.gcd c w * (w / DensePoly.gcd c w) = w := by
   rw [mul_comm]
   exact div_gcd_right_mul_reconstruct c w
 
 private theorem yunFactorsContribution_step_split
+    [ZMod64.PrimeModulus p]
     (c w : FpPoly p) :
     let y := DensePoly.gcd c w
     let z := c / y
@@ -1409,6 +1410,7 @@ private theorem yunFactorsContribution_tail_repeated_descent
   · simp [yunFactorsContribution, hc, hz]
 
 private theorem yunFactorsContribution_step_preserves_target
+    [ZMod64.PrimeModulus p]
     (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p)
     (hc : isOne c = false)
     (htarget_one :
@@ -1457,6 +1459,7 @@ for the recursive tail, and the lemma returns the corresponding current-state
 facts plus the two gcd/division reconstruction equalities.
 -/
 private theorem yunFactorsContribution_step_target_combiner
+    [ZMod64.PrimeModulus p]
     (c w : FpPoly p) (multiplicity fuel : Nat) (target : FpPoly p)
     (hc : isOne c = false)
     (htarget_one :
@@ -1493,6 +1496,7 @@ private theorem yunFactorsContribution_step_target_combiner
       htarget.2.2.1, htarget.2.2.2⟩
 
 private theorem yunFactorsContribution_initial_state_split
+    [ZMod64.PrimeModulus p]
     (f : FpPoly p) :
     let g := DensePoly.gcd f (DensePoly.derivative f)
     let c := f / g
@@ -1568,6 +1572,7 @@ private theorem yunFactorsContribution_derivative_active_split_algebra_succ
           contribution.1 *
             squareFreeAuxRevContribution (pthRoot contribution.2) (multiplicity * p) (fuel + 1) =
               pow f multiplicity) := by
+  letI : ZMod64.PrimeModulus p := ZMod64.primeModulusOfPrime hp
   let g := DensePoly.gcd f (DensePoly.derivative f)
   let c := f / g
   have hcg : c * g = f := by
