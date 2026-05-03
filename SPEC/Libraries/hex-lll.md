@@ -1,13 +1,22 @@
 # hex-lll (LLL lattice basis reduction, depends on hex-gram-schmidt)
 
-**Completely independent of the polynomial libraries.** Can be developed
-in parallel from day one.
+`hex-lll` is the recombination primitive used by
+`hex-berlekamp-zassenhaus`: BZ encodes the lifted local factors of an
+integer polynomial as a lattice basis, runs `lll`, and reads off
+candidate `Z[x]` factors from the short vectors. The Phase 1 surface
+must be self-contained — usable from BZ without any `sorry`-blocked
+constructors — and must include a short-vector recovery entry point
+described under "Short-vector recovery for downstream consumers"
+below.
 
 **Contents:**
 - LLL algorithm using the d-representation (all integer arithmetic,
   no rationals stored; rational GS quantities as `noncomputable` projections)
 - Size reduction (ensure |coeffs[i][j]| ≤ 1/2)
 - Lovász condition check and basis swap
+- A `LLLState.ofBasis` initial-state constructor whose proof
+  obligations (`ν_eq`, `d_eq`) are discharged in this library, and a
+  short-vector recovery entry point for BZ recombination
 
 **Definitions:**
 ```lean
@@ -187,11 +196,72 @@ termination_by (s.potential, n - k)
 -- Swap: the failing Lovász condition (read from d and ν via d_eq/ν_eq)
 --   gives d[k]' < δ * d[k] ≤ d[k]; potential strictly decreases.
 
+/-- Initial `LLLState` constructor: builds the integer state directly
+    from a basis matrix and discharges `ν_eq`/`d_eq` by composing the
+    existing `hex-gram-schmidt` lemmas
+    `GramSchmidt.Int.gramDetVec_eq_gramDet` and
+    `GramSchmidt.Int.scaledCoeffs_eq` (suitably massaged through the
+    `Rat` casts in their statements). -/
+def LLLState.ofBasis (b : Matrix Int n m) (hind : b.independent) :
+    LLLState n m :=
+  { b
+    ν := GramSchmidt.Int.scaledCoeffs b
+    d := GramSchmidt.Int.gramDetVec b
+    ν_eq := by
+      -- combine GramSchmidt.Int.scaledCoeffs_eq with
+      -- GramSchmidt.Int.gramDetVec_eq_gramDet
+      sorry
+    d_eq := by
+      -- direct from GramSchmidt.Int.gramDetVec_eq_gramDet
+      sorry }
+
 def lll (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) : Matrix Int n m :=
-  lllAux ⟨b, GramSchmidt.Int.scaledCoeffs b, GramSchmidt.Int.gramDetVec b, sorry, sorry⟩
-    1 δ hδ hδ' hind (by omega) (by omega)
+  lllAux (LLLState.ofBasis b hind) 1 δ hδ hδ' hind (by omega) (by omega)
 ```
+
+The `scaledCoeffs_eq` and `gramDetVec_eq_gramDet` lemmas referenced
+above already exist in `hex-gram-schmidt` (`HexGramSchmidt/Int.lean`).
+They are currently `sorry`'d, but that is acceptable here: the
+obligation of `LLLState.ofBasis` at Phase 1 is to be a named,
+type-correct constructor that names its witness lemmas in proof
+position. The two `sorry`s above are discharged as part of Phase 5
+work in `hex-gram-schmidt` / `hex-lll`, not as part of getting `lll`
+to a usable shape. What changes from the previous SPEC is that the
+constructor lives in `hex-lll` rather than as inline anonymous
+`sorry, sorry` proof fields in the body of `lll`. Treating the
+constructor itself as deferrable is incompatible with `hex-lll`
+being on the BZ critical path.
+
+### Short-vector recovery for downstream consumers
+
+The reduced basis returned by `lll` is canonically ordered with
+shorter vectors first; `hex-berlekamp-zassenhaus` consumes this
+ordering to drive recombination. The Phase 1 entry point exposed for
+that consumer is:
+
+```lean
+/-- The first row of the reduced basis (shortest vector under the
+    LLL guarantee). Marked as the canonical short-vector entry point
+    for downstream consumers such as hex-berlekamp-zassenhaus. -/
+def lll.firstShortVector (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
+    Vector Int m :=
+  (lll b δ hδ hδ' hn hind)[0]
+
+/-- The full reduced basis viewed as an ordered list of candidate
+    short vectors. -/
+def lll.shortVectors (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
+    Array (Vector Int m) :=
+  (lll b δ hδ hδ' hn hind).toArray
+```
+
+Both entry points are Phase 1 deliverables; conformance must exercise
+them on the kind of basis matrix BZ recombination produces (one row
+per lifted local factor), and Phase 4 benchmarks must register
+`lll`/`lll.firstShortVector` as the recombination hot path inherited
+from `hex-berlekamp-zassenhaus`.
 
 The swap bound `potential_initial ≤ (maxNormSq b)^{n*(n-1)/2}` follows
 from Hadamard's inequality: `gramDet b k ≤ prod_{i<k} ||b[i]||^2 ≤

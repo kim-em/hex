@@ -1,14 +1,15 @@
 # hex-berlekamp-zassenhaus (the capstone)
 
-Depends on hex-berlekamp + hex-hensel.
+Depends on hex-berlekamp + hex-hensel + hex-lll.
 
 Complete factoring of univariate polynomials over `Z`.
 
-This library should expose one stable public factoring API. The initial
-implementation may use exhaustive recombination; later revisions may
-replace or refine the recombination step using LLL, but that should
-happen behind the same public interface rather than through a long-lived
-strategy parameter.
+This library should expose one stable public factoring API. The Phase 1
+implementation of `recombine` is LLL-based: lifted local factors are
+encoded as a lattice via `hex-lll`, short vectors recovered, and integer
+factors reconstructed from those short vectors. Exhaustive subset
+recombination is admissible only as a small-input fallback or as a
+conformance-test oracle, never as the production code path.
 
 The public API should accept arbitrary input polynomials and normalize
 internally: extract content, remove powers of `X`, and reduce to the
@@ -56,9 +57,11 @@ structure LiftData where
 
 `LiftData` is the pipeline's shared "we have factors mod `p^k`"
 record: it is the output of the Hensel-lift stage and the input to
-recombination. There is no separate `RecombinationData`; if a future
-LLL-based recombination needs extra metadata, introduce it as a
-dedicated internal helper record at that point.
+recombination. The LLL-based recombination needs extra internal
+metadata (a basis matrix encoding the lifted factors as a sublattice
+of `Z^n`, plus the short-vector results); these live in dedicated
+internal helper records inside the recombination implementation,
+rather than expanding `LiftData` itself.
 
 Suggested stage helpers:
 ```lean
@@ -67,21 +70,37 @@ def henselLiftData (f : ZPoly) (B : Nat) (d : PrimeChoiceData) : LiftData
 def recombine (f : ZPoly) (d : LiftData) : Array ZPoly
 ```
 
-`recombine` is a named public helper. Its initial implementation may be
-exhaustive subset recombination; a later LLL-based implementation should
-refine the same interface rather than replacing it.
+`recombine` is a named public helper. Its Phase 1 implementation is
+LLL-based: the lifted factors in `d.liftedFactors` are encoded as a
+lattice basis (one basis row per local factor, columns indexed by
+coefficient positions truncated to `p^k`), `hex-lll`'s reduction +
+short-vector surface is invoked to recover candidate short vectors,
+and each short vector is decoded into a candidate `ZPoly` factor whose
+divisibility against the current target is verified before acceptance.
+The signature of `recombine` is fixed and does not carry a strategy
+parameter; an exhaustive subset path may be retained as an internal
+fallback for inputs with very few local factors and as an oracle in
+conformance tests, but it is not the production code path and is not
+part of the public surface.
 
 **Pipeline:**
 1. Normalize `f` (content, powers of `X`, square-free part)
 2. Choose a good prime `p` and factor `f mod p`
 3. Hensel lift the modular factors to `mod p^k` for a sufficiently large
-   bound-dependent `k`
-4. Recombine lifted local factors into true factors in `Z[x]`
+   bound-dependent `k` (using `multifactorLiftQuadratic` from `hex-hensel`)
+4. Encode the lifted factors as a lattice basis, run `hex-lll`'s
+   reduction + short-vector recovery, and decode short vectors into
+   candidate integer factors of `f`, verifying divisibility before
+   acceptance
 
-The exhaustive recombination path is acceptable as the initial
-implementation. It is correct but exponential in the number of local
-factors. LLL enters later at the recombination stage as an optimization
-and eventual polynomial-time improvement, not as a separate public API.
+The Phase 1 contract for stage 4 is the LLL-based recombination
+sketched above; it is the production code path and is what Phase 4
+benchmarks register as the recombination hot path. Treating LLL
+recombination as "later" or as an optional optimisation is
+incompatible with the polynomial-time complexity model declared for
+the pipeline. An exhaustive subset fallback may be retained as an
+internal small-input shortcut and as a conformance-test oracle, but
+never as the production path.
 
 **Conditional correctness (proved in this library, no Mathlib):**
 
