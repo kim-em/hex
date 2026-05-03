@@ -2,7 +2,7 @@ import HexHensel.Multifactor
 import HexHensel.Quadratic
 
 /-!
-Quadratic multifactor Hensel lifting (Phase 1 scaffolding).
+Quadratic multifactor Hensel lifting.
 
 This module exposes `multifactorLiftQuadratic`, the production multifactor
 Hensel lifter named on equal footing with `multifactorLift` in
@@ -11,9 +11,8 @@ Hensel lifter named on equal footing with `multifactorLift` in
 `multifactorLift`. Iteration to the requested precision `p^k` is handled
 by a doubling loop on the Bezout-witnessed `QuadraticLiftResult`.
 
-Phase 1 deliverable: type signatures and an executable surface; the
-spec proof is left as a single `sorry` (see `multifactorLiftQuadratic_spec`).
-The linear-vs-quadratic agreement obligation lives in
+The companion theorem states the ordered-product congruence contract for
+the lifted array. The linear-vs-quadratic agreement obligation lives in
 `hex-hensel-mathlib`.
 -/
 
@@ -80,9 +79,8 @@ The product of the lifted factors is congruent to `f` modulo `p^k`,
 under the same recursive precondition package consumed by
 `multifactorLift_spec`.
 
-Phase 1: the proof is deferred. The lift-uniqueness companion
-(linear-vs-quadratic agreement after canonicalisation) lives in
-`hex-hensel-mathlib`.
+The lift-uniqueness companion (linear-vs-quadratic agreement after
+canonicalisation) lives in `hex-hensel-mathlib`.
 -/
 theorem multifactorLiftQuadratic_spec
     (p k : Nat) [ZMod64.Bounds p]
