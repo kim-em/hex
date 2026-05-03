@@ -280,6 +280,18 @@ private theorem subtractScaledShift_getD_above_last [Sub R] [Mul R]
   have hjle : j ≤ qDegree := by omega
   omega
 
+omit [DecidableEq R] in
+private theorem subtractScaledShift_getD_last_cancel [Sub R] [Mul R]
+    (rem q : Array R) (shift qDegree : Nat) (coeff : R)
+    (hsize : q.size = qDegree + 1) (hidx : shift + qDegree < rem.size)
+    (hcancel :
+      rem.getD (shift + qDegree) (Zero.zero : R) -
+        coeff * q.getD qDegree (Zero.zero : R) = (Zero.zero : R)) :
+    (subtractScaledShift rem q shift coeff).getD (shift + qDegree) (Zero.zero : R) =
+      (Zero.zero : R) := by
+  rw [subtractScaledShift_getD_last rem q shift qDegree coeff hsize hidx]
+  exact hcancel
+
 private def divModArrayAux [Sub R] [Mul R]
     (q : Array R) (qDegree : Nat) (scaleLead : R → R)
     (fuel : Nat) (quot rem : Array R) : Array R × Array R :=
@@ -298,6 +310,72 @@ private def divModArrayAux [Sub R] [Mul R]
             let rem := subtractScaledShift rem q shift coeff
             divModArrayAux q qDegree scaleLead fuel quot rem
 
+private theorem divModArrayAux_remainder_zero_ge [Sub R] [Mul R]
+    (q : Array R) (qDegree : Nat) (scaleLead : R → R)
+    (fuel : Nat) (quot rem : Array R)
+    (hsize : q.size = qDegree + 1)
+    (hcancel :
+      ∀ a : R, a - scaleLead a * q.getD qDegree (Zero.zero : R) = (Zero.zero : R))
+    (hzero : ∀ i, qDegree + fuel ≤ i → rem.getD i (Zero.zero : R) = (Zero.zero : R)) :
+    ∀ i, qDegree ≤ i →
+      (divModArrayAux q qDegree scaleLead fuel quot rem).2.getD i (Zero.zero : R) =
+        (Zero.zero : R) := by
+  induction fuel generalizing quot rem with
+  | zero =>
+      intro i hi
+      simpa [divModArrayAux] using hzero i (by simpa using hi)
+  | succ fuel ih =>
+      intro i hi
+      unfold divModArrayAux
+      cases hdeg : arrayDegree? rem with
+      | none =>
+          exact arrayDegree?_none_getD_eq_zero hdeg
+      | some rd =>
+          by_cases hrd_lt : rd < qDegree
+          · simp [hrd_lt]
+            simpa [Array.getD_eq_getD_getElem?] using
+              arrayDegree?_some_above_eq_zero hdeg (by omega : rd < i)
+          · simp [hrd_lt]
+            let shift := rd - qDegree
+            let coeff := scaleLead (rem.getD rd (Zero.zero : R))
+            have hrd_nonzero : rem.getD rd (Zero.zero : R) ≠ (Zero.zero : R) :=
+              arrayDegree?_some_coeff_ne_zero hdeg
+            have hrd_le : rd ≤ qDegree + fuel := by
+              by_cases hle : rd ≤ qDegree + fuel
+              · exact hle
+              · exfalso
+                have hbound : qDegree + (fuel + 1) ≤ rd := by omega
+                exact hrd_nonzero (hzero rd hbound)
+            have hrd_eq : shift + qDegree = rd := by
+              dsimp [shift]
+              omega
+            have hrd_size : rd < rem.size := arrayDegree?_some_lt hdeg
+            have hrec := ih
+              (quot := quot.set! (rd - qDegree) (scaleLead (rem.getD rd (Zero.zero : R))))
+              (rem := subtractScaledShift rem q (rd - qDegree)
+                (scaleLead (rem.getD rd (Zero.zero : R))))
+              (by
+                intro n hn
+                rcases Nat.lt_trichotomy rd n with hlt | heq | hgt
+                · rw [subtractScaledShift_getD_above_last rem q shift qDegree coeff n hsize]
+                  · exact arrayDegree?_some_above_eq_zero hdeg hlt
+                  · omega
+                · subst n
+                  have hlast :
+                      (subtractScaledShift rem q shift coeff).getD
+                          (shift + qDegree) (Zero.zero : R) = (Zero.zero : R) := by
+                    apply subtractScaledShift_getD_last_cancel
+                    · exact hsize
+                    · simpa [hrd_eq] using hrd_size
+                    · rw [hrd_eq]
+                      exact hcancel (rem.getD rd (Zero.zero : R))
+                  simpa [shift, coeff, hrd_eq] using hlast
+                · have hle : n ≤ rd := by omega
+                  exfalso
+                  omega)
+              i hi
+            simpa [Array.getD_eq_getD_getElem?] using hrec
+
 private def divModArray [Sub R] [Mul R]
     (p q : DensePoly R) (scaleLead : R → R) : DensePoly R × DensePoly R :=
   if q.isZero then
@@ -308,6 +386,72 @@ private def divModArray [Sub R] [Mul R]
     let quot := Array.replicate quotientSize (Zero.zero : R)
     let qr := divModArrayAux q.toArray qDegree scaleLead p.size quot p.toArray
     (ofCoeffs qr.1, ofCoeffs qr.2)
+
+theorem divModArray_remainder_degree_lt_of_pos_degree [Sub R] [Mul R]
+    (p q : DensePoly R) (scaleLead : R → R)
+    (hdegree : 0 < q.degree?.getD 0)
+    (hcancel : ∀ a : R, a - scaleLead a * q.leadingCoeff = (Zero.zero : R)) :
+    (divModArray p q scaleLead).2.degree?.getD 0 < q.degree?.getD 0 := by
+  unfold divModArray
+  by_cases hqzero : q.isZero
+  · have hqsize : q.size = 0 := by
+      simp [isZero] at hqzero
+      simpa [size] using hqzero
+    have hdeg_zero : q.degree?.getD 0 = 0 := by
+      simp [degree?, hqsize]
+    omega
+  · rw [if_neg hqzero]
+    let qDegree := q.size - 1
+    let quotientSize := p.size - qDegree
+    let quot := Array.replicate quotientSize (Zero.zero : R)
+    let qr := divModArrayAux q.toArray qDegree scaleLead p.size quot p.toArray
+    have hqpos : 0 < q.size := Nat.pos_of_ne_zero (by
+      intro hsize_zero
+      apply hqzero
+      have hcoeffs : q.coeffs.size = 0 := by
+        simpa [size] using hsize_zero
+      have hisempty : q.coeffs.isEmpty = true := by
+        simpa [Array.isEmpty_iff_size_eq_zero] using hcoeffs
+      simpa [isZero] using hisempty)
+    have hdeg_eq : q.degree?.getD 0 = qDegree := by
+      simp [degree?, Nat.ne_of_gt hqpos, qDegree]
+    have hsize : q.toArray.size = qDegree + 1 := by
+      have hcoeffpos : 0 < q.coeffs.size := by
+        simpa [size] using hqpos
+      have hraw : q.coeffs.size = (q.coeffs.size - 1) + 1 := by omega
+      simpa [qDegree, toArray, size] using hraw
+    have hlead : q.toArray.getD qDegree (Zero.zero : R) = q.leadingCoeff := by
+      unfold leadingCoeff toArray
+      dsimp [qDegree]
+      change q.coeffs.getD (q.coeffs.size - 1) (Zero.zero : R) =
+        q.coeffs.back?.getD (Zero.zero : R)
+      have hidx : q.coeffs.size - 1 < q.coeffs.size := by
+        simpa [size] using Nat.sub_one_lt_of_lt hqpos
+      rw [Array.getD_eq_getD_getElem?]
+      rw [Array.getElem?_eq_getElem hidx]
+      rw [Array.back?_eq_getElem?]
+      rw [Array.getElem?_eq_getElem hidx]
+    have hzero_start :
+        ∀ i, qDegree + p.size ≤ i → p.toArray.getD i (Zero.zero : R) = (Zero.zero : R) := by
+      intro i hi
+      unfold toArray Array.getD
+      have hle : p.coeffs.size ≤ i := by
+        simpa [size] using (by omega : p.size ≤ i)
+      rw [dif_neg (Nat.not_lt.mpr hle)]
+    have hzero_final :
+        ∀ i, qDegree ≤ i → qr.2.getD i (Zero.zero : R) = (Zero.zero : R) := by
+      dsimp [qr, quot]
+      apply divModArrayAux_remainder_zero_ge
+      · exact hsize
+      · intro a
+        rw [hlead]
+        exact hcancel a
+      · exact hzero_start
+    rw [hdeg_eq]
+    dsimp [qr]
+    apply ofCoeffs_degree_getD_lt_of_forall_zero_ge
+    · simpa [hdeg_eq] using hdegree
+    · exact hzero_final
 
 /-- Long division by a monic divisor over a commutative ring. -/
 private def divModMonicAux [One R] [Add R] [Sub R] [Mul R]
@@ -365,6 +509,18 @@ def divMod [One R] [Add R] [Sub R] [Mul R] [Div R]
     (0, p)
   else
     divModArray p q (fun coeff => coeff / q.leadingCoeff)
+
+theorem divMod_remainder_degree_lt_of_pos_degree_core [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R)
+    (hdegree : 0 < q.degree?.getD 0)
+    (hcancel : ∀ a : R, a - (a / q.leadingCoeff) * q.leadingCoeff = (Zero.zero : R)) :
+    (divMod p q).2.degree?.getD 0 < q.degree?.getD 0 := by
+  unfold divMod
+  by_cases hlt : p.degree?.getD 0 < q.degree?.getD 0
+  · simp [hlt]
+  · rw [if_neg hlt]
+    exact divModArray_remainder_degree_lt_of_pos_degree p q
+      (fun coeff => coeff / q.leadingCoeff) hdegree hcancel
 
 /-- Quotient from polynomial long division over a field. -/
 def div [One R] [Add R] [Sub R] [Mul R] [Div R]

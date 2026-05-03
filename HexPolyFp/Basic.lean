@@ -117,7 +117,50 @@ private theorem divMod_remainder_degree_lt_core
     [PrimeModulus p] (f m : DensePoly (ZMod64 p))
     (hdegree : 0 < m.degree?.getD 0) :
     (DensePoly.divMod f m).2.degree?.getD 0 < m.degree?.getD 0 := by
-  sorry
+  apply DensePoly.divMod_remainder_degree_lt_of_pos_degree_core f m hdegree
+  intro a
+  let lead := m.leadingCoeff
+  have hpos_size : 0 < m.size := by
+    by_cases hzero : m.size = 0
+    · have hdeg_zero : m.degree?.getD 0 = 0 := by
+        simp [DensePoly.degree?, hzero]
+      omega
+    · exact Nat.pos_of_ne_zero hzero
+  have hlead_eq : lead = m.coeff (m.size - 1) := by
+    unfold lead DensePoly.leadingCoeff DensePoly.coeff
+    have hidx : m.coeffs.size - 1 < m.coeffs.size := by
+      simpa [DensePoly.size] using Nat.sub_one_lt_of_lt hpos_size
+    change m.coeffs.back?.getD (0 : ZMod64 p) =
+      m.coeffs.getD (m.coeffs.size - 1) (Zero.zero : ZMod64 p)
+    rw [Array.back?_eq_getElem?]
+    rw [Array.getD_eq_getD_getElem?]
+    rw [Array.getElem?_eq_getElem hidx]
+    rfl
+  have hlead_ne : lead ≠ (Zero.zero : ZMod64 p) := by
+    rw [hlead_eq]
+    exact DensePoly.coeff_last_ne_zero_of_pos_size m hpos_size
+  have hinv : ZMod64.inv lead * lead = (1 : ZMod64 p) :=
+    ZMod64.inv_mul_eq_one_of_prime (PrimeModulus.prime (p := p)) hlead_ne
+  have hmul : (a / lead) * lead = a := by
+    change (ZMod64.mul a (ZMod64.inv lead)) * lead = a
+    calc
+      (ZMod64.mul a (ZMod64.inv lead)) * lead =
+          a * (ZMod64.inv lead * lead) := by
+            exact Lean.Grind.Semiring.mul_assoc a (ZMod64.inv lead) lead
+      _ = a * (1 : ZMod64 p) := by rw [hinv]
+      _ = a := by exact Lean.Grind.Semiring.mul_one a
+  change a - (a / lead) * lead = (Zero.zero : ZMod64 p)
+  rw [hmul]
+  change ZMod64.sub a a = (Zero.zero : ZMod64 p)
+  apply ZMod64.ext
+  apply UInt64.toNat_inj.mp
+  change (ZMod64.sub a a).toNat = (Zero.zero : ZMod64 p).toNat
+  rw [ZMod64.toNat_sub]
+  have hsum : a.toNat + (p - a.toNat) = p := by
+    have ha : a.toNat < p := a.toNat_lt
+    omega
+  rw [hsum, Nat.mod_self]
+  exact ZMod64.toNat_zero.symm
 
 private theorem mod_remainder_degree_lt_core
     [PrimeModulus p] (f m : DensePoly (ZMod64 p))
