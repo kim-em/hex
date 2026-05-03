@@ -522,6 +522,85 @@ theorem divMod_remainder_degree_lt_of_pos_degree_core [One R] [Add R] [Sub R] [M
     exact divModArray_remainder_degree_lt_of_pos_degree p q
       (fun coeff => coeff / q.leadingCoeff) hdegree hcancel
 
+theorem divMod_remainder_eq_zero_of_degree_zero_core [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R)
+    (hqsize : q.size = 1)
+    (hcancel : ∀ a : R, a - (a / q.leadingCoeff) * q.leadingCoeff = (Zero.zero : R)) :
+    (divMod p q).2 = 0 := by
+  unfold divMod
+  have hqdeg : q.degree?.getD 0 = 0 := by
+    simp [degree?, hqsize]
+  have hnot_lt : ¬ p.degree?.getD 0 < q.degree?.getD 0 := by
+    rw [hqdeg]
+    exact Nat.not_lt_zero _
+  rw [if_neg hnot_lt]
+  unfold divModArray
+  have hqzero : q.isZero = false := by
+    cases h : q.isZero
+    · rfl
+    · have hsize0 : q.size = 0 := by
+        simp [isZero] at h
+        simpa [size] using h
+      omega
+  rw [if_neg (by simpa [Bool.not_eq_true] using hqzero)]
+  let qDegree := q.size - 1
+  let quotientSize := p.size - qDegree
+  let quot := Array.replicate quotientSize (Zero.zero : R)
+  let qr := divModArrayAux q.toArray qDegree (fun coeff => coeff / q.leadingCoeff)
+    p.size quot p.toArray
+  have hcoeffs_size : q.coeffs.size = 1 := by
+    simpa [size] using hqsize
+  have hqDegree_zero : qDegree = 0 := by
+    dsimp [qDegree]
+    omega
+  have hsize : q.toArray.size = qDegree + 1 := by
+    simp [toArray, hcoeffs_size, hqDegree_zero]
+  have hlead : q.toArray.getD qDegree (Zero.zero : R) = q.leadingCoeff := by
+    unfold leadingCoeff toArray
+    rw [hqDegree_zero]
+    change q.coeffs.getD 0 (Zero.zero : R) = q.coeffs.back?.getD (Zero.zero : R)
+    rw [Array.getD_eq_getD_getElem?]
+    have hidx : 0 < q.coeffs.size := by omega
+    rw [Array.getElem?_eq_getElem hidx]
+    rw [Array.back?_eq_getElem?]
+    have hlast : q.coeffs.size - 1 = 0 := by omega
+    rw [hlast, Array.getElem?_eq_getElem hidx]
+  have hzero_start :
+      ∀ i, qDegree + p.size ≤ i → p.toArray.getD i (Zero.zero : R) = (Zero.zero : R) := by
+    intro i hi
+    unfold toArray Array.getD
+    have hle : p.coeffs.size ≤ i := by
+      simpa [size] using (by omega : p.size ≤ i)
+    rw [dif_neg (Nat.not_lt.mpr hle)]
+  have hzero_final :
+      ∀ i, qDegree ≤ i → qr.2.getD i (Zero.zero : R) = (Zero.zero : R) := by
+    dsimp [qr, quot]
+    apply divModArrayAux_remainder_zero_ge
+    · exact hsize
+    · intro a
+      rw [hlead]
+      exact hcancel a
+    · exact hzero_start
+  apply ext_coeff
+  intro i
+  rw [coeff_zero]
+  change (ofCoeffs qr.2).coeff i = (Zero.zero : R)
+  rw [coeff_ofCoeffs]
+  exact hzero_final i (by omega)
+
+theorem divMod_remainder_eq_self_of_size_zero_core [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) (hqsize : q.size = 0) :
+    (divMod p q).2 = p := by
+  unfold divMod
+  have hnot_lt : ¬ p.degree?.getD 0 < q.degree?.getD 0 := by
+    simp [degree?, hqsize]
+  rw [if_neg hnot_lt]
+  unfold divModArray
+  have hqzero : q.isZero = true := by
+    simp [isZero, size] at hqsize ⊢
+    simpa [Array.isEmpty_iff_size_eq_zero] using hqsize
+  simp [hqzero]
+
 /-- Quotient from polynomial long division over a field. -/
 def div [One R] [Add R] [Sub R] [Mul R] [Div R]
     (p q : DensePoly R) : DensePoly R :=
