@@ -261,6 +261,59 @@ theorem potential_eq_gramDetProduct (s : LLLState n m) :
         1 := by
   simp [potential, s.d_eq]
 
+/-- Initial `LLLState` constructor: build the integer state directly from a
+basis matrix. The `ν` field is the integral scaled Gram-Schmidt coefficient
+matrix and the `d` field is the leading Gram-determinant vector. The
+`ν_eq` and `d_eq` proof fields are discharged in Phase 5 by composing
+`GramSchmidt.Int.scaledCoeffs_eq` and `GramSchmidt.Int.gramDetVec_eq_gramDet`;
+those witness lemmas are stated in `HexGramSchmidt/Int.lean` and currently
+`sorry`'d, so the constructor's proof fields are left as `sorry` here. -/
+def ofBasis (b : Matrix Int n m) (_hind : b.independent) : LLLState n m :=
+  { b
+    ν := GramSchmidt.Int.scaledCoeffs b
+    d := GramSchmidt.Int.gramDetVec b
+    ν_eq := by
+      -- combine `GramSchmidt.Int.scaledCoeffs_eq` with
+      -- `GramSchmidt.Int.gramDetVec_eq_gramDet`
+      intro i j hi hj hji
+      sorry
+    d_eq := by
+      -- direct from `GramSchmidt.Int.gramDetVec_eq_gramDet`
+      intro i hi
+      sorry }
+
 end LLLState
+
+/-- Outer LLL loop, dispatched by `lll`. Phase 1 keeps the body as a
+type-correct stub returning the input basis; Phase 5 will replace it with
+the SPEC's well-founded recursion in `s.potential` × `n - k`. -/
+def lllAux (s : LLLState n m) (k : Nat) (δ : Rat)
+    (_hδ : 1/4 < δ) (_hδ' : δ ≤ 1) (_hind : s.b.independent)
+    (_hk : 1 ≤ k) (_hkn : k ≤ n) : Matrix Int n m :=
+  s.b
+
+/-- Top-level LLL entry point. Builds the canonical integer state via
+`LLLState.ofBasis` and dispatches to `lllAux`. The proof obligations of
+`LLLState.ofBasis` are discharged inside the constructor itself, so the
+body of `lll` carries no `sorry` placeholders. -/
+def lll (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
+    Matrix Int n m :=
+  lllAux (LLLState.ofBasis b hind) 1 δ hδ hδ' hind (Nat.le_refl 1) hn
+
+/-- The first row of the reduced basis (shortest vector under the LLL
+guarantee). Canonical short-vector entry point for downstream consumers
+such as `hex-berlekamp-zassenhaus` recombination. -/
+def lll.firstShortVector (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
+    Vector Int m :=
+  (lll b δ hδ hδ' hn hind)[0]
+
+/-- The full reduced basis viewed as an ordered array of candidate short
+vectors. -/
+def lll.shortVectors (b : Matrix Int n m) (δ : Rat)
+    (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
+    Array (Vector Int m) :=
+  (lll b δ hδ hδ' hn hind).toArray
 
 end Hex
