@@ -57,7 +57,7 @@ private def multifactorLiftQuadraticList
   | g :: rest =>
       let restFactors := rest.toArray
       let h := Array.polyProduct restFactors
-      let xgcd := DensePoly.xgcd (ZPoly.modP p g) (ZPoly.modP p h)
+      let xgcd := ZPoly.normalizedXGCD p g h
       let s := FpPoly.liftToZ xgcd.left
       let t := FpPoly.liftToZ xgcd.right
       let lifted := henselLiftQuadratic p k f g h s t

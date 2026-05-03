@@ -20,6 +20,19 @@ namespace Hex
 
 namespace ZPoly
 
+/--
+Extended gcd witnesses scaled so their Bezout combination is monic when the
+raw Euclidean gcd is a nonzero constant unit.
+-/
+def normalizedXGCD
+    (p : Nat) [ZMod64.Bounds p]
+    (g h : ZPoly) : DensePoly.XGCDResult (ZMod64 p) :=
+  let raw := DensePoly.xgcd (modP p g) (modP p h)
+  let unitInv := (DensePoly.leadingCoeff raw.gcd)⁻¹
+  { gcd := DensePoly.scale unitInv raw.gcd
+    left := DensePoly.scale unitInv raw.left
+    right := DensePoly.scale unitInv raw.right }
+
 private def multifactorLiftList
     (p k : Nat) [ZMod64.Bounds p]
     (f : ZPoly) : List ZPoly → Array ZPoly
@@ -28,7 +41,7 @@ private def multifactorLiftList
   | g :: rest =>
       let restFactors := rest.toArray
       let h := Array.polyProduct restFactors
-      let xgcd := DensePoly.xgcd (modP p g) (modP p h)
+      let xgcd := normalizedXGCD p g h
       let lifted := henselLift p k f g h xgcd.left xgcd.right
       #[lifted.g] ++ multifactorLiftList p k lifted.h rest
 
@@ -55,7 +68,7 @@ def MultifactorLiftInvariant
   | [_g] => True
   | g :: rest =>
       let h := Array.polyProduct rest.toArray
-      let xgcd := DensePoly.xgcd (modP p g) (modP p h)
+      let xgcd := normalizedXGCD p g h
       let lifted := henselLift p k f g h xgcd.left xgcd.right
       LinearLiftLoopInvariant p 1 f xgcd.left xgcd.right
         { g := reduceModPow g p 1
@@ -125,7 +138,7 @@ private theorem multifactorLiftList_spec
       | cons h tail =>
           let restFactors := (h :: tail).toArray
           let splitProduct := Array.polyProduct restFactors
-          let xgcd := DensePoly.xgcd (ZPoly.modP p g) (ZPoly.modP p splitProduct)
+          let xgcd := normalizedXGCD p g splitProduct
           let lifted := henselLift p k f g splitProduct xgcd.left xgcd.right
           rcases hinv with ⟨hstart, hstepDegree, hstepBezout, htail⟩
           have htailCongr :
