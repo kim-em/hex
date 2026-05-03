@@ -98,6 +98,7 @@ lean_lib HexPolyMathlib where
 lean_lib HexMatrixMathlib where
 
 lean_lib HexModArithMathlib where
+  precompileModules := false
 
 lean_lib HexGramSchmidtMathlib where
 

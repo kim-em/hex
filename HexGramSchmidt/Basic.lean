@@ -252,6 +252,85 @@ private theorem projectionCoeff_reduceAgainstBasis_eq_of_forall_dot_zero
       · intro laterBasisRow hlater
         exact horth laterBasisRow (by simp [hlater])
 
+private def projectionCombination (row : Vector Rat m) (basisRev : List (Vector Rat m))
+    (acc : Vector Rat m) : Vector Rat m :=
+  basisRev.foldl (fun acc basisRow => acc + projectionCoeff row basisRow • basisRow) acc
+
+private theorem projectionCombination_congr
+    (basisRev : List (Vector Rat m)) (row row' acc : Vector Rat m)
+    (hcoeff :
+      ∀ basisRow ∈ basisRev, projectionCoeff row basisRow = projectionCoeff row' basisRow) :
+    projectionCombination row basisRev acc = projectionCombination row' basisRev acc := by
+  induction basisRev generalizing acc with
+  | nil =>
+      simp [projectionCombination]
+  | cons basisRow rest ih =>
+      simp only [projectionCombination, List.foldl_cons]
+      have hhead := hcoeff basisRow (by simp)
+      rw [hhead]
+      exact ih (acc := acc + projectionCoeff row' basisRow • basisRow)
+        (by
+          intro laterBasisRow hlater
+          exact hcoeff laterBasisRow (by simp [hlater]))
+
+private theorem subtractProjection_add_projection_with_acc
+    (row basisRow acc : Vector Rat m) :
+    subtractProjection row basisRow +
+        (acc + projectionCoeff row basisRow • basisRow) =
+      row + acc := by
+  apply Vector.ext
+  intro k hk
+  have hrow := subtractProjection_add_projection (row := row) (basisRow := basisRow)
+  have hrowk := congrArg (fun v : Vector Rat m => v[k]) hrow
+  simp only [Vector.getElem_add, Vector.getElem_smul] at hrowk ⊢
+  grind
+
+private theorem reduceAgainstBasis_reconstruction_acc
+    (basisRev : List (Vector Rat m)) (row acc : Vector Rat m)
+    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0)) :
+    reduceAgainstBasis basisRev row + projectionCombination row basisRev acc =
+      row + acc := by
+  induction basisRev generalizing row acc with
+  | nil =>
+      simp [reduceAgainstBasis, projectionCombination]
+  | cons basisRow rest ih =>
+      simp only [reduceAgainstBasis, List.foldl_cons, projectionCombination]
+      change
+        reduceAgainstBasis rest (subtractProjection row basisRow) +
+            projectionCombination row rest
+              (acc + projectionCoeff row basisRow • basisRow) =
+          row + acc
+      rw [← projectionCombination_congr
+        (basisRev := rest)
+        (row := subtractProjection row basisRow)
+        (row' := row)
+        (acc := acc + projectionCoeff row basisRow • basisRow)]
+      · rw [ih (row := subtractProjection row basisRow)
+          (acc := acc + projectionCoeff row basisRow • basisRow)
+          (horth := List.Pairwise.of_cons horth)]
+        exact subtractProjection_add_projection_with_acc row basisRow acc
+      · intro laterBasisRow hlater
+        exact projectionCoeff_subtractProjection_eq_of_dot_zero
+          (row := row) (otherBasisRow := basisRow) (basisRow := laterBasisRow)
+          (List.rel_of_pairwise_cons horth hlater).1
+
+private theorem reduceAgainstBasis_reconstruction
+    (basisRev : List (Vector Rat m)) (row : Vector Rat m)
+    (horth : basisRev.Pairwise (fun x y => Matrix.dot x y = 0 ∧ Matrix.dot y x = 0)) :
+    row =
+      reduceAgainstBasis basisRev row +
+        projectionCombination row basisRev 0 := by
+  have h :=
+    reduceAgainstBasis_reconstruction_acc (basisRev := basisRev) (row := row)
+      (acc := 0) horth
+  have hzero : row + (0 : Vector Rat m) = row := by
+    apply Vector.ext
+    intro k hk
+    simp
+    grind
+  rw [hzero] at h
+  exact h.symm
+
 /-- Left-to-right Gram-Schmidt orthogonalization on a list of rows. -/
 private def basisRowsAux (basisRev pending : List (Vector Rat m)) : List (Vector Rat m) :=
   match pending with
