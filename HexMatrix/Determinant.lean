@@ -272,6 +272,14 @@ def detTerm {R : Type u} [Lean.Grind.Ring R] {n : Nat}
 def det {R : Type u} [Lean.Grind.Ring R] {n : Nat} (M : Matrix R n n) : R :=
   (permutationVectors n).foldl (fun acc perm => acc + detTerm M perm) 0
 
+/-- The determinant of the empty leading prefix is the Bareiss previous-pivot
+convention `1`. -/
+@[simp] theorem det_leadingPrefix_zero {R : Type u} [Lean.Grind.Ring R]
+    (M : Matrix R n n) :
+    det (leadingPrefix M 0 (Nat.zero_le n)) = (1 : R) := by
+  simp [det, detTerm, detSign, detProduct, permutationVectors, emptyVec, inversionCount]
+  grind
+
 /-- Congruence for the determinant-style left fold over a finite list. -/
 private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
     (xs : List β) (f g : β → R) (z : R)

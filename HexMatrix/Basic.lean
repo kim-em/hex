@@ -159,5 +159,85 @@ def submatrix (M : Matrix R n n) (k : Fin n) : Matrix R (k.val + 1) (k.val + 1) 
     let jj : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt (Nat.succ_le_of_lt k.isLt)⟩
     M[ii][jj]
 
+/-- Leading principal `k × k` prefix of a square matrix. This variant includes
+the empty prefix and is convenient for Bareiss pivot/minor statements. -/
+def leadingPrefix (M : Matrix R n n) (k : Nat) (hk : k ≤ n) : Matrix R k k :=
+  ofFn fun i j =>
+    let ii : Fin n := ⟨i.val, Nat.lt_of_lt_of_le i.isLt hk⟩
+    let jj : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt hk⟩
+    M[ii][jj]
+
+@[simp] theorem leadingPrefix_entry (M : Matrix R n n) (k : Nat) (hk : k ≤ n)
+    (i j : Fin k) :
+    (leadingPrefix M k hk)[i][j] =
+      (let ii : Fin n := ⟨i.val, Nat.lt_of_lt_of_le i.isLt hk⟩
+       let jj : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt hk⟩
+       M[ii][jj]) := by
+  simp [leadingPrefix, ofFn]
+
+@[simp] theorem submatrix_entry (M : Matrix R n n) (k : Fin n)
+    (i j : Fin (k.val + 1)) :
+    (submatrix M k)[i][j] =
+      (let ii : Fin n := ⟨i.val, Nat.lt_of_lt_of_le i.isLt (Nat.succ_le_of_lt k.isLt)⟩
+       let jj : Fin n := ⟨j.val, Nat.lt_of_lt_of_le j.isLt (Nat.succ_le_of_lt k.isLt)⟩
+       M[ii][jj]) := by
+  simp [submatrix, ofFn]
+
+/-- The existing `submatrix` API is the `(k + 1)` leading-prefix API at the
+same boundary. -/
+theorem submatrix_eq_leadingPrefix (M : Matrix R n n) (k : Fin n) :
+    submatrix M k = leadingPrefix M (k.val + 1) (Nat.succ_le_of_lt k.isLt) := by
+  apply Vector.ext
+  intro i hi
+  apply Vector.ext
+  intro j hj
+  simp [submatrix, leadingPrefix, ofFn]
+
+/-- Bordered Bareiss minor with the first `k` rows/columns and one extra
+border row `i` and column `j`. For Bareiss applications `i` and `j` are in the
+trailing part, but the constructor is total and leaves that side condition to
+the invariant using it. -/
+def borderedMinor (M : Matrix R n n) (k : Nat) (hk : k < n) (i j : Fin n) :
+    Matrix R (k + 1) (k + 1) :=
+  ofFn fun r c =>
+    let rr : Fin n :=
+      if hr : r.val < k then
+        ⟨r.val, Nat.lt_trans hr hk⟩
+      else
+        i
+    let cc : Fin n :=
+      if hc : c.val < k then
+        ⟨c.val, Nat.lt_trans hc hk⟩
+      else
+        j
+    M[rr][cc]
+
+@[simp] theorem borderedMinor_entry_lt_lt (M : Matrix R n n) (k : Nat) (hk : k < n)
+    (i j : Fin n) (r c : Fin (k + 1)) (hr : r.val < k) (hc : c.val < k) :
+    (borderedMinor M k hk i j)[r][c] =
+      (let rr : Fin n := ⟨r.val, Nat.lt_trans hr hk⟩
+       let cc : Fin n := ⟨c.val, Nat.lt_trans hc hk⟩
+       M[rr][cc]) := by
+  simp [borderedMinor, ofFn, hr, hc]
+
+@[simp] theorem borderedMinor_entry_lt_last (M : Matrix R n n) (k : Nat) (hk : k < n)
+    (i j : Fin n) (r : Fin (k + 1)) (hr : r.val < k) :
+    (borderedMinor M k hk i j)[r][Fin.last k] =
+      (let rr : Fin n := ⟨r.val, Nat.lt_trans hr hk⟩
+       M[rr][j]) := by
+  simp [borderedMinor, ofFn, hr]
+
+@[simp] theorem borderedMinor_entry_last_lt (M : Matrix R n n) (k : Nat) (hk : k < n)
+    (i j : Fin n) (c : Fin (k + 1)) (hc : c.val < k) :
+    (borderedMinor M k hk i j)[Fin.last k][c] =
+      (let cc : Fin n := ⟨c.val, Nat.lt_trans hc hk⟩
+       M[i][cc]) := by
+  simp [borderedMinor, ofFn, hc]
+
+@[simp] theorem borderedMinor_entry_last_last (M : Matrix R n n) (k : Nat) (hk : k < n)
+    (i j : Fin n) :
+    (borderedMinor M k hk i j)[Fin.last k][Fin.last k] = M[i][j] := by
+  simp [borderedMinor, ofFn]
+
 end Matrix
 end Hex
