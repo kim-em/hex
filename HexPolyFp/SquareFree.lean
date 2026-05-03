@@ -220,6 +220,12 @@ private theorem zmod64_add_pow_prime
     (a + b) ^ p = a ^ p + b ^ p := by
   rw [ZMod64.pow_prime hp (a + b), ZMod64.pow_prime hp a, ZMod64.pow_prime hp b]
 
+private theorem zmod64_natCast_choose_prime_eq_zero
+    (hp : Hex.Nat.Prime p) {k : Nat} (hk0 : 0 < k) (hkp : k < p) :
+    ((Hex.Nat.choose p k : Nat) : ZMod64 p) = 0 := by
+  exact (ZMod64.natCast_eq_zero_iff_dvd (p := p) (Hex.Nat.choose p k)).2
+    (Hex.Nat.choose_prime_dvd hp hk0 hkp)
+
 private theorem zmod64_fold_add_pow_prime_acc
     (hp : Hex.Nat.Prime p) (xs : List (ZMod64 p)) (acc : ZMod64 p) :
     (xs.foldl (fun acc x => acc + x) acc) ^ p =
