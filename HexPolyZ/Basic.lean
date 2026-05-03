@@ -183,27 +183,6 @@ private def ratCommonDen (coeffs : List Rat) : Nat :=
 private def ratCoeffToIntWithDen (den : Nat) (coeff : Rat) : Int :=
   coeff.num * Int.ofNat (den / coeff.den)
 
-private theorem ratCoeffToIntWithDen_cast (den : Nat) (coeff : Rat)
-    (hden : coeff.den ∣ den) :
-    ((ratCoeffToIntWithDen den coeff : Int) : Rat) = (den : Rat) * coeff := by
-  rcases hden with ⟨k, rfl⟩
-  unfold ratCoeffToIntWithDen
-  rw [Nat.mul_div_right _ coeff.den_pos]
-  have hden_ne : ((coeff.den : Nat) : Rat) ≠ 0 := by
-    simp [coeff.den_nz]
-  have hcoeff : ((coeff.num : Rat) / (coeff.den : Rat)) = coeff := by
-    simpa [Rat.divInt_eq_div] using coeff.num_divInt_den
-  calc
-    ((coeff.num * Int.ofNat k : Int) : Rat)
-        = (coeff.num : Rat) * (k : Rat) := by
-          rw [Rat.intCast_mul, Int.ofNat_eq_natCast, Rat.intCast_natCast]
-    _ = ((coeff.num : Rat) * (k : Rat) * (coeff.den : Rat)) / (coeff.den : Rat) := by
-          exact (Rat.mul_div_cancel hden_ne).symm
-    _ = ((coeff.den * k : Nat) : Rat) * ((coeff.num : Rat) / (coeff.den : Rat)) := by
-          grind [Rat.div_def, Rat.mul_assoc, Rat.mul_comm]
-    _ = ((coeff.den * k : Nat) : Rat) * coeff := by
-          rw [hcoeff]
-
 private def normalizePrimitiveSign (f : ZPoly) : ZPoly :=
   if DensePoly.leadingCoeff f < 0 then
     DensePoly.scale (-1 : Int) f
@@ -245,7 +224,23 @@ private theorem ratCommonDen_dvd_of_mem (coeffs : List Rat) {q : Rat} (hq : q �
 private theorem ratCoeffToIntWithDen_cast (den : Nat) (coeff : Rat)
     (hden : coeff.den ∣ den) :
     ((ratCoeffToIntWithDen den coeff : Int) : Rat) = (den : Rat) * coeff := by
-  sorry
+  rcases hden with ⟨k, rfl⟩
+  unfold ratCoeffToIntWithDen
+  rw [Nat.mul_div_right _ coeff.den_pos]
+  have hden_ne : ((coeff.den : Nat) : Rat) ≠ 0 := by
+    simp [coeff.den_nz]
+  have hcoeff : ((coeff.num : Rat) / (coeff.den : Rat)) = coeff := by
+    simpa [Rat.divInt_eq_div] using coeff.num_divInt_den
+  calc
+    ((coeff.num * Int.ofNat k : Int) : Rat)
+        = (coeff.num : Rat) * (k : Rat) := by
+          rw [Rat.intCast_mul, Int.ofNat_eq_natCast, Rat.intCast_natCast]
+    _ = ((coeff.num : Rat) * (k : Rat) * (coeff.den : Rat)) / (coeff.den : Rat) := by
+          exact (Rat.mul_div_cancel hden_ne).symm
+    _ = ((coeff.den * k : Nat) : Rat) * ((coeff.num : Rat) / (coeff.den : Rat)) := by
+          grind [Rat.div_def, Rat.mul_assoc, Rat.mul_comm]
+    _ = ((coeff.den * k : Nat) : Rat) * coeff := by
+          rw [hcoeff]
 
 /--
 Clear denominators in a rational polynomial and return the primitive integer
