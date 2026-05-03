@@ -199,7 +199,7 @@ def scaledCoeffs (b : Matrix Int n m) : Matrix Int n n :=
 
 theorem gramDet_zero (b : Matrix Int n m) :
     gramDet b 0 (Nat.zero_le n) = 1 := by
-  sorry
+  rfl
 
 theorem gramDetVec_eq_gramDet (b : Matrix Int n m) (k : Nat) (hk : k ≤ n) :
     (gramDetVec b).get ⟨k, Nat.lt_succ_of_le hk⟩ = gramDet b k hk := by
