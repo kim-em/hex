@@ -3438,6 +3438,18 @@ the existing coefficient bridges. -/
 private def wordBitAt (word : UInt64) (bit : Nat) : Bool :=
   (((word >>> bit.toUInt64) &&& 1) != 0)
 
+private theorem wordBitAt_getElem!_eq_coeff
+    (p : GF2Poly) {i bit : Nat} (hbit : bit < 64) :
+    wordBitAt p.words[i]! bit = p.coeff (64 * i + bit) := by
+  have hdiv : (64 * i + bit) / 64 = i := by
+    rw [Nat.mul_add_div (by decide : 64 > 0)]
+    rw [Nat.div_eq_of_lt hbit, Nat.add_zero]
+  have hmod : (64 * i + bit) % 64 = bit := by
+    rw [Nat.mul_add_mod]
+    exact Nat.mod_eq_of_lt hbit
+  rw [Array.getElem!_eq_getD]
+  simp [coeff, coeffWords, wordBitAt, hdiv, hmod, default]
+
 /-- The one-hot contribution of a selected source bit of a word. -/
 private def oneHotBitWord (word : UInt64) (bit : Nat) : UInt64 :=
   if wordBitAt word bit then
@@ -5741,6 +5753,46 @@ private theorem xorBoolList_range_single_active
           simp [xorBoolList, htail]
         · intro slot hslot hslotNe
           exact hzero slot (by omega) hslotNe
+
+private theorem clmulSourcePairCoeff_single_active
+    (x y : UInt64) {a₀ b₀ total : Nat}
+    (ha₀ : a₀ < 64) (hb₀ : b₀ < 64)
+    (hx₀ : wordBitAt x a₀ = true) (hy₀ : wordBitAt y b₀ = true)
+    (hsum : a₀ + b₀ = total)
+    (hzero :
+      ∀ a b, a < 64 → b < 64 → a + b = total → a ≠ a₀ ∨ b ≠ b₀ →
+        (wordBitAt x a && wordBitAt y b) = false) :
+    clmulSourcePairCoeff x y total = true := by
+  unfold clmulSourcePairCoeff
+  rw [← xorBoolList_map_xorBoolList]
+  rw [xorBoolList_range_single_active
+    (fun b =>
+      xorBoolList
+        ((List.range 64).map
+          (fun a => (wordBitAt x a && wordBitAt y b) && decide (a + b = total))))
+    hb₀]
+  · rw [xorBoolList_range_single_active
+      (fun a => (wordBitAt x a && wordBitAt y b₀) && decide (a + b₀ = total))
+      ha₀]
+    · simp [hx₀, hy₀, hsum]
+    · intro a ha hne
+      by_cases hsum' : a + b₀ = total
+      · have hfalse := hzero a b₀ ha hb₀ hsum' (Or.inl hne)
+        simp [hfalse, hsum']
+      · simp [hsum']
+  · intro b hb hne
+    have hinner :
+        (List.range 64).map
+            (fun a => (wordBitAt x a && wordBitAt y b) && decide (a + b = total)) =
+          (List.range 64).map (fun _ => false) := by
+      apply List.map_congr_left
+      intro a haMem
+      have ha : a < 64 := List.mem_range.mp haMem
+      by_cases hsum' : a + b = total
+      · have hfalse := hzero a b ha hb hsum' (Or.inr hne)
+        simp [hfalse, hsum']
+      · simp [hsum']
+    rw [hinner, xorBoolList_range_false]
 
 private theorem xorBoolList_range_two_adjacent_active
     (f : Nat → Bool) {bound active : Nat}
