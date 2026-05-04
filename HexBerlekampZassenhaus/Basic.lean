@@ -642,7 +642,16 @@ private def verifyShortVectorCandidates (target : ZPoly) (candidates : Array ZPo
   else
     none
 
-private def recombineLLL? (f : ZPoly) (d : LiftData) : Option (Array ZPoly) :=
+/--
+Recombine lifted local factors via LLL short-vector enumeration.
+
+The production recombination path; returns `none` when the LLL pass produces
+no candidates that exactly partition `f`. Exposed (rather than `private`) so
+the SPEC-sanctioned LLL-vs-exhaustive cross-check in `HexBerlekampZassenhaus/
+CrossCheck.lean` can compare its output against `recombinationSearch` on the
+same lifted-factor set.
+-/
+def recombineLLL? (f : ZPoly) (d : LiftData) : Option (Array ZPoly) :=
   let coeffWidth := f.degree?.getD 0 + 1
   match recombinationLattice? d coeffWidth with
   | none => none
