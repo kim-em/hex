@@ -1,5 +1,6 @@
 import HexHensel.Multifactor
 import HexHensel.Quadratic
+import HexHensel.QuadraticMultifactor
 import LeanBench
 
 /-!
@@ -20,6 +21,8 @@ Scientific registrations:
 * `runQuadraticHenselStepChecksum`: one quadratic Hensel correction, `O(n^2)`.
 * `runPolyProductChecksum`: ordered product of `n` linear factors, `O(n^2)`.
 * `runMultifactorLiftChecksum`: two-factor ordered multifactor lift, `O(n^2)`.
+* `runMultifactorLiftQuadraticChecksum`: production quadratic multifactor lift,
+  `O(n^2)`.
 -/
 
 namespace Hex
@@ -190,6 +193,14 @@ def runPolyProductChecksum (input : MultifactorInput) : UInt64 :=
 def runMultifactorLiftChecksum (input : MultifactorInput) : UInt64 :=
   checksumZPolyArray <| ZPoly.multifactorLift 5 3 input.f input.factors
 
+/-- Benchmark target: production quadratic ordered multifactor lift. -/
+def runMultifactorLiftQuadraticChecksum (input : MultifactorInput) : UInt64 :=
+  checksumZPolyArray <| ZPoly.multifactorLiftQuadratic 5 3 input.f input.factors
+
+/-
+Coefficient reduction maps each of the `n` dense integer coefficients once and
+then normalizes the result, so the bridge operation has linear cost.
+-/
 setup_benchmark runModPChecksum n => n
   with prep := prepBridgeInput
   where {
@@ -201,6 +212,10 @@ setup_benchmark runModPChecksum n => n
     signalFloorMultiplier := 1.0
   }
 
+/-
+Canonical lifting maps each of the `n` finite-field coefficients to its
+integer representative and normalizes the dense result, giving linear cost.
+-/
 setup_benchmark runLiftToZChecksum n => n
   with prep := prepBridgeInput
   where {
@@ -212,6 +227,10 @@ setup_benchmark runLiftToZChecksum n => n
     signalFloorMultiplier := 1.0
   }
 
+/-
+Reduction modulo a fixed power `5^3` performs one bounded integer reduction per
+dense coefficient followed by normalization, so the model is linear in `n`.
+-/
 setup_benchmark runReduceModPowChecksum n => n
   with prep := prepBridgeInput
   where {
@@ -289,6 +308,23 @@ with a fixed number of factors, the delegated Hensel lift dominates at
 quadratic dense-polynomial cost.
 -/
 setup_benchmark runMultifactorLiftChecksum n => n * n
+  with prep := prepMultifactorLiftInput
+  where {
+    paramFloor := 64
+    paramCeiling := 512
+    paramSchedule := .custom #[64, 96, 128, 192, 256, 384, 512]
+    maxSecondsPerCall := 6.0
+    targetInnerNanos := 200000000
+    signalFloorMultiplier := 1.0
+  }
+
+/-
+The production multifactor path uses the same fixed two-factor fixture but
+delegates the binary lift to the quadratic doubling step; with fixed target
+precision and dense degree-`n` factors, the factor/Bezout correction products
+dominate at quadratic cost.
+-/
+setup_benchmark runMultifactorLiftQuadraticChecksum n => n * n
   with prep := prepMultifactorLiftInput
   where {
     paramFloor := 64

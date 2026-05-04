@@ -1,0 +1,4 @@
+Reviewed in issue #1952.
+All HexHensel Phase 4 parametric benchmark registrations returned verdicts
+consistent with their declared complexity, including the production
+quadratic multifactor lift hot path.
