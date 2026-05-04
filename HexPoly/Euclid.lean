@@ -906,6 +906,40 @@ private theorem ofCoeffs_toArray (p : DensePoly R) :
   rw [coeff_ofCoeffs]
   rfl
 
+private theorem ofCoeffs_set!_eq_add_monomial {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (coeffs : Array S) (shift : Nat) (coeff : S)
+    (hshift : shift < coeffs.size)
+    (hzero : coeffs.getD shift (Zero.zero : S) = (Zero.zero : S)) :
+    (ofCoeffs (coeffs.set! shift coeff) : DensePoly S) =
+      ofCoeffs coeffs + monomial shift coeff := by
+  apply ext_coeff
+  intro n
+  have hzero_add : (0 : S) + (0 : S) = 0 := by grind
+  have hzero_add_left : ∀ x : S, (Zero.zero : S) + x = x := by
+    intro x
+    change (0 : S) + x = x
+    grind
+  have hadd_zero_right : ∀ x : S, x + (Zero.zero : S) = x := by
+    intro x
+    change x + (0 : S) = x
+    grind
+  rw [coeff_ofCoeffs]
+  rw [coeff_add (ofCoeffs coeffs) (monomial shift coeff) n hzero_add]
+  rw [coeff_ofCoeffs, coeff_monomial]
+  by_cases hn : n = shift
+  · subst n
+    rw [array_getD_set!_same]
+    · rw [hzero]
+      rw [if_pos rfl]
+      exact (hzero_add_left coeff).symm
+    · exact hshift
+  · rw [array_getD_set!_ne]
+    · rw [if_neg hn]
+      exact (hadd_zero_right (coeffs.getD n (Zero.zero : S))).symm
+    · intro h
+      exact hn h.symm
+
 theorem divModArray_eq_zero_self_of_degree_lt [Sub R] [Mul R]
     (p q : DensePoly R) (scaleLead : R → R)
     (hdeg : p.degree?.getD 0 < q.degree?.getD 0) :
