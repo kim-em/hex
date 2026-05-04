@@ -1015,7 +1015,81 @@ private theorem coeffFoldPowerCoeff_prime_coeff
         if n / p < m then (g.coeff (n / p)) ^ p else 0
       else
         0 := by
-  sorry
+  have hp_pos : 0 < p := by
+    have hp2 := Hex.Nat.Prime.two_le hp
+    omega
+  rw [← powLinear_coeffFold_prime_coeff_expansion]
+  induction m with
+  | zero =>
+      have hcoeffFold_zero : coeffFold g 0 = 0 := by
+        unfold coeffFold
+        simp [List.range_zero]
+      rw [hcoeffFold_zero]
+      have hpow_zero_p_coeff : (powLinear (0 : FpPoly p) p).coeff n = 0 := by
+        have hgeneral : ∀ k, 0 < k →
+            (powLinear (0 : FpPoly p) k).coeff n = 0 := by
+          intro k hk
+          cases k with
+          | zero => omega
+          | succ k' =>
+              rw [powLinear, powLinearBinom_mul_zero]
+              exact DensePoly.coeff_zero n
+        exact hgeneral p hp_pos
+      rw [hpow_zero_p_coeff]
+      have hne : ¬ n / p < 0 := Nat.not_lt_zero _
+      by_cases hmod : n % p = 0
+      · rw [if_pos hmod, if_neg hne]
+      · rw [if_neg hmod]
+  | succ m ih =>
+      have hsucc : coeffFold g (m + 1) = coeffFold g m + coeffTerm g m := by
+        unfold coeffFold
+        rw [List.range_succ, List.foldl_append]
+        simp only [List.foldl_cons, List.foldl_nil]
+      rw [hsucc, powLinear_add_prime hp,
+        DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff,
+        ih, powLinear_coeffTerm_coeff]
+      by_cases hmod : n % p = 0
+      · rw [if_pos hmod, if_pos hmod]
+        have hn_eq : n = p * (n / p) := by
+          have hdiv := Nat.div_add_mod n p
+          omega
+        by_cases hlt : n / p < m
+        · rw [if_pos hlt]
+          have hne : n ≠ p * m := by
+            intro heq
+            have hmul : p * (n / p) = p * m := by rw [← hn_eq]; exact heq
+            have hdivm : n / p = m := Nat.eq_of_mul_eq_mul_left hp_pos hmul
+            omega
+          rw [if_neg hne]
+          have hltsucc : n / p < m + 1 := by omega
+          rw [if_pos hltsucc]
+          exact zmod64_add_zero_coeff (g.coeff (n / p) ^ p)
+        · rw [if_neg hlt]
+          by_cases heq : n / p = m
+          · have hnm : n = p * m := by rw [hn_eq, heq]
+            rw [if_pos hnm]
+            have hltsucc : n / p < m + 1 := by omega
+            rw [if_pos hltsucc]
+            rw [heq]
+            exact zmod64_zero_add_coeff (g.coeff m ^ p)
+          · have hne : n ≠ p * m := by
+              intro habs
+              have hmul : p * (n / p) = p * m := by rw [← hn_eq]; exact habs
+              have hdivm : n / p = m := Nat.eq_of_mul_eq_mul_left hp_pos hmul
+              exact heq hdivm
+            rw [if_neg hne]
+            have hltsucc : ¬ n / p < m + 1 := by omega
+            rw [if_neg hltsucc]
+            exact zmod64_add_zero_zero_coeff
+      · rw [if_neg hmod, if_neg hmod]
+        have hne : n ≠ p * m := by
+          intro heq
+          have hmodzero : n % p = 0 := by
+            rw [heq]
+            exact Nat.mul_mod_right p m
+          exact hmod hmodzero
+        rw [if_neg hne]
+        exact zmod64_add_zero_zero_coeff
 
 private theorem coeffFoldPowerCoeff_prime_coeff_of_mod_ne_zero
     (hp : Hex.Nat.Prime p) (g : FpPoly p) (m n : Nat) (hn : n % p ≠ 0) :
