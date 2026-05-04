@@ -60,6 +60,18 @@ jobs:
             emit: hexpolyfp_emit_fixtures
             script: scripts/oracle/polyfp_flint.py
             fixture: conformance-fixtures/HexPolyFp/poly.jsonl
+          - lib: HexBerlekamp
+            emit: hexberlekamp_emit_fixtures
+            script: scripts/oracle/berlekamp_flint.py
+            fixture: conformance-fixtures/HexBerlekamp/berlekamp.jsonl
+          - lib: HexMatrix
+            emit: hexmatrix_emit_fixtures
+            script: scripts/oracle/matrix_flint.py
+            fixture: conformance-fixtures/HexMatrix/matrix.jsonl
+          - lib: HexBerlekampZassenhaus
+            emit: hexbz_emit_fixtures
+            script: scripts/oracle/bz_flint.py
+            fixture: conformance-fixtures/HexBerlekampZassenhaus/bz.jsonl
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
