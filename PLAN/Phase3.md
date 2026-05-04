@@ -63,6 +63,9 @@ Reviewer checklist for Phase 3 PRs:
   derivable from the function's documented contract.
 - [ ] `lake build HexFoo` green.
 - [ ] Conformance workflow green on the PR.
+- [ ] CI conformance matrix builds this library (either via the
+  derivation script picking up the root-import, or via an explicit
+  matrix entry).
 
 ## Oracle wiring (forward reference)
 
