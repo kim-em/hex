@@ -479,7 +479,30 @@ private theorem nonzero_degree_zero_eq_one {p : GF2Poly}
 theorem degree_le_of_dvd_nonzero {p q : GF2Poly}
     (hp : p ≠ 0) (hq : q ≠ 0) :
     p ∣ q → p.degree ≤ q.degree := by
-  sorry
+  intro hdvd
+  rcases hdvd with ⟨r, hr⟩
+  have hpzeroFalse : p.isZero = false := by
+    cases hpzero : p.isZero
+    · rfl
+    · exfalso
+      exact hp (eq_zero_of_isZero hpzero)
+  have hrne : r ≠ 0 := by
+    intro hrzero
+    apply hq
+    rw [hr, hrzero, mul_zero]
+  have hrzeroFalse : r.isZero = false := by
+    cases hrzero : r.isZero
+    · rfl
+    · exfalso
+      exact hrne (eq_zero_of_isZero hrzero)
+  obtain ⟨dp, hdp⟩ := degree?_isSome_of_isZero_false hpzeroFalse
+  obtain ⟨dr, hdr⟩ := degree?_isSome_of_isZero_false hrzeroFalse
+  have hq_degree? : q.degree? = some (dp + dr) := by
+    rw [hr]
+    exact degree?_mul_of_degree?_eq_some hdp hdr
+  rw [degree_eq_of_degree?_eq_some hdp,
+    degree_eq_of_degree?_eq_some hq_degree?]
+  omega
 
 private theorem coeff_eq_false_of_reduced_le {p : GF2Poly} {bound n : Nat}
     (hred : p.isZero = true ∨ p.degree < bound) (hbound : bound ≤ n) :

@@ -332,7 +332,7 @@ decreasing_by
 /-- Top-level LLL entry point. Builds the canonical integer state via
 `LLLState.ofBasis` and dispatches to `lllAux`. The proof obligations of
 `LLLState.ofBasis` are discharged inside the constructor itself, so the
-body of `lll` carries no `sorry` placeholders. -/
+body of `lll` has no deferred proof terms. -/
 def lll (b : Matrix Int n m) (δ : Rat)
     (hδ : 1/4 < δ) (hδ' : δ ≤ 1) (hn : 1 ≤ n) (hind : b.independent) :
     Matrix Int n m :=
