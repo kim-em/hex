@@ -310,6 +310,27 @@ private def divModArrayAux [Sub R] [Mul R]
             let rem := subtractScaledShift rem q shift coeff
             divModArrayAux q qDegree scaleLead fuel quot rem
 
+private theorem divModArrayAux_scaleLead_congr [Sub R] [Mul R]
+    (q : Array R) (qDegree : Nat) {scaleLead₁ scaleLead₂ : R → R}
+    (hscale : ∀ a : R, scaleLead₁ a = scaleLead₂ a)
+    (fuel : Nat) (quot rem : Array R) :
+    divModArrayAux q qDegree scaleLead₁ fuel quot rem =
+      divModArrayAux q qDegree scaleLead₂ fuel quot rem := by
+  induction fuel generalizing quot rem with
+  | zero =>
+      rfl
+  | succ fuel ih =>
+      unfold divModArrayAux
+      cases hdeg : arrayDegree? rem with
+      | none =>
+          rfl
+      | some rd =>
+          by_cases hrd : rd < qDegree
+          · simp [hrd]
+          · simp [hrd]
+            rw [hscale]
+            exact ih _ _
+
 private theorem divModArrayAux_remainder_zero_ge [Sub R] [Mul R]
     (q : Array R) (qDegree : Nat) (scaleLead : R → R)
     (fuel : Nat) (quot rem : Array R)
@@ -386,6 +407,19 @@ private def divModArray [Sub R] [Mul R]
     let quot := Array.replicate quotientSize (Zero.zero : R)
     let qr := divModArrayAux q.toArray qDegree scaleLead p.size quot p.toArray
     (ofCoeffs qr.1, ofCoeffs qr.2)
+
+/-- The array-backed long division result depends only on the pointwise values of the
+leading-coefficient scaling function. -/
+theorem divModArray_scaleLead_congr [Sub R] [Mul R]
+    (p q : DensePoly R) {scaleLead₁ scaleLead₂ : R → R}
+    (hscale : ∀ a : R, scaleLead₁ a = scaleLead₂ a) :
+    divModArray p q scaleLead₁ = divModArray p q scaleLead₂ := by
+  unfold divModArray
+  by_cases hqzero : q.isZero
+  · simp [hqzero]
+  · simp [hqzero]
+    rw [divModArrayAux_scaleLead_congr q.toArray (q.size - 1) hscale]
+    simp
 
 theorem divModArray_remainder_degree_lt_of_pos_degree [Sub R] [Mul R]
     (p q : DensePoly R) (scaleLead : R → R)
@@ -756,6 +790,18 @@ theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
     p.degree?.getD 0 < q.degree?.getD 0 → divMod p q = (0, p) := by
   intro hdeg
   simp [divMod, hdeg]
+
+/-- If field-style coefficient division agrees pointwise with the monic scaling function, then
+the executable monic division path agrees with the general `divMod` path away from the early
+degree shortcut. -/
+theorem divModMonic_eq_divMod_of_monic_core [One R] [Add R] [Sub R] [Mul R] [Div R]
+    (p q : DensePoly R) (hq : Monic q)
+    (hnot_lt : ¬ p.degree?.getD 0 < q.degree?.getD 0)
+    (hscale : ∀ a : R, a / q.leadingCoeff = a) :
+    divModMonic p q hq = divMod p q := by
+  unfold divModMonic divMod
+  rw [if_neg hnot_lt]
+  exact (divModArray_scaleLead_congr p q (fun a => hscale a)).symm
 
 /-- Core division invariant: for positive-degree divisors, `divMod` returns a remainder whose
 degree is strictly smaller than the divisor degree. -/
@@ -1708,6 +1754,14 @@ theorem add_mul_sub_cancel_right {S : Type _}
   rw [coeff_sub r (t * q) n hzero_sub]
   rw [coeff_add (p * q) r n hzero_add]
   grind
+
+/-- One long-division reconstruction step preserves the accumulated identity
+`quot * q + rem`. -/
+theorem divMod_reconstruction_step {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (quot term q rem : DensePoly S) :
+    (quot + term) * q + (rem - term * q) = quot * q + rem := by
+  exact add_mul_sub_cancel_right quot term q rem
 
 theorem zero_mul {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
