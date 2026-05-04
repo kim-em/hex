@@ -481,6 +481,58 @@ theorem degree_le_of_dvd_nonzero {p q : GF2Poly}
     p ∣ q → p.degree ≤ q.degree := by
   sorry
 
+private theorem coeff_eq_false_of_reduced_le {p : GF2Poly} {bound n : Nat}
+    (hred : p.isZero = true ∨ p.degree < bound) (hbound : bound ≤ n) :
+    p.coeff n = false := by
+  cases hred with
+  | inl hzero =>
+      rw [eq_zero_of_isZero hzero, coeff_zero]
+  | inr hdegree =>
+      by_cases hpzero : p.isZero = true
+      · rw [eq_zero_of_isZero hpzero, coeff_zero]
+      · have hpzeroFalse : p.isZero = false := by
+          cases h : p.isZero <;> simp [h] at hpzero ⊢
+        obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hpzeroFalse
+        have hdn : d < n := by
+          have hdegree' : d < bound := by
+            simpa [degree, hd] using hdegree
+          omega
+        exact coeff_eq_false_of_degree?_lt hd hdn
+
+private theorem add_reduced_of_reduced {p q : GF2Poly} {bound : Nat}
+    (hp : p.isZero = true ∨ p.degree < bound)
+    (hq : q.isZero = true ∨ q.degree < bound) :
+    (p + q).isZero = true ∨ (p + q).degree < bound := by
+  by_cases hsumZero : (p + q).isZero = true
+  · exact Or.inl hsumZero
+  · right
+    have hsumZeroFalse : (p + q).isZero = false := by
+      cases h : (p + q).isZero <;> simp [h] at hsumZero ⊢
+    obtain ⟨d, hd⟩ := degree?_isSome_of_isZero_false hsumZeroFalse
+    have hdbound : d < bound := by
+      by_cases hbound : bound ≤ d
+      · have hpfalse := coeff_eq_false_of_reduced_le (p := p) hp hbound
+        have hqfalse := coeff_eq_false_of_reduced_le (p := q) hq hbound
+        have htrue := coeff_eq_true_of_degree?_eq_some hd
+        rw [coeff_add_eq_bne, hpfalse, hqfalse] at htrue
+        contradiction
+      · omega
+    change (p + q).degree < bound
+    simpa [degree, hd] using hdbound
+
+private theorem reduced_dvd_eq_zero {f r : GF2Poly}
+    (hf : f ≠ 0) (hred : r.isZero = true ∨ r.degree < f.degree)
+    (hdvd : f ∣ r) :
+    r = 0 := by
+  by_cases hr : r = 0
+  · exact hr
+  · cases hred with
+    | inl hzero =>
+        exact eq_zero_of_isZero hzero
+    | inr hlt =>
+        have hle : f.degree ≤ r.degree := degree_le_of_dvd_nonzero hf hr hdvd
+        omega
+
 private theorem irreducible_common_divisor_eq_one_of_reduced
     {a f d : GF2Poly} (hf : Irreducible f) (ha : a ≠ 0)
     (hred : a.IsZero ∨ a.degree < f.degree)
@@ -515,7 +567,54 @@ private theorem irreducible_common_divisor_eq_one_of_reduced
 
 private theorem mod_eq_of_add_right_multiple (a c f : GF2Poly) :
     (a + c * f) % f = a % f := by
-  sorry
+  by_cases hf : f = 0
+  · simp [hf]
+  · let q₁ := (divMod (a + c * f) f).1
+    let r₁ := (divMod (a + c * f) f).2
+    let q₂ := (divMod a f).1
+    let r₂ := (divMod a f).2
+    have hspec₁ : q₁ * f + r₁ = a + c * f := by
+      simpa [q₁, r₁] using divMod_spec (a + c * f) f
+    have hspec₂ : q₂ * f + r₂ = a := by
+      simpa [q₂, r₂] using divMod_spec a f
+    have hsum :
+        (q₁ * f + q₂ * f) + (r₁ + r₂) = c * f := by
+      calc
+        (q₁ * f + q₂ * f) + (r₁ + r₂)
+            = (q₁ * f + r₁) + (q₂ * f + r₂) := by
+                rw [add_pair_swap]
+        _ = (a + c * f) + a := by rw [hspec₁, hspec₂]
+        _ = c * f := by
+          have haa : a + a = 0 := by
+            simp
+          rw [add_comm a (c * f), add_assoc, haa, add_zero]
+    have hdvd_sum : f ∣ r₁ + r₂ := by
+      refine ⟨q₁ + q₂ + c, ?_⟩
+      have hprod : q₁ * f + q₂ * f = (q₁ + q₂) * f := by
+        rw [left_distrib]
+      calc
+        r₁ + r₂ = (q₁ * f + q₂ * f) + ((q₁ * f + q₂ * f) + (r₁ + r₂)) := by
+          simp
+        _ = (q₁ * f + q₂ * f) + c * f := by rw [hsum]
+        _ = (q₁ + q₂ + c) * f := by
+          calc
+            (q₁ * f + q₂ * f) + c * f = (q₁ + q₂) * f + c * f := by
+              exact congrArg (fun x => x + c * f) hprod
+            _ = (q₁ + q₂ + c) * f := by
+              exact (left_distrib (q₁ + q₂) c f).symm
+        _ = f * (q₁ + q₂ + c) := by rw [mul_comm]
+    have hred₁ : r₁.isZero = true ∨ r₁.degree < f.degree := by
+      simpa [mod, r₁] using mod_degree_lt (a + c * f) f hf
+    have hred₂ : r₂.isZero = true ∨ r₂.degree < f.degree := by
+      simpa [mod, r₂] using mod_degree_lt a f hf
+    have hsumZero : r₁ + r₂ = 0 :=
+      reduced_dvd_eq_zero hf (add_reduced_of_reduced hred₁ hred₂) hdvd_sum
+    have hr₁eq : r₁ = r₂ := by
+      calc
+        r₁ = r₁ + 0 := by rw [add_zero]
+        _ = r₁ + (r₁ + r₂) := by rw [hsumZero, add_zero]
+        _ = r₂ := by rw [add_add_cancel_left]
+    simpa [mod, r₁, r₂] using hr₁eq
 
 /-- Any nonzero reduced residue modulo an irreducible packed polynomial is
 coprime to the modulus, as computed by the packed Euclidean algorithm. -/
