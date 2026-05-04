@@ -72,6 +72,10 @@ jobs:
             emit: hexbz_emit_fixtures
             script: scripts/oracle/bz_flint.py
             fixture: conformance-fixtures/HexBerlekampZassenhaus/bz.jsonl
+          - lib: HexGfqField
+            emit: hexgfqfield_emit_fixtures
+            script: scripts/oracle/gfqfield_flint.py
+            fixture: conformance-fixtures/HexGfqField/gfqfield.jsonl
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
