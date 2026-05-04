@@ -311,6 +311,12 @@ Separately, the default `lake build` MUST elaborate every
 `HexFoo/Conformance.lean` as part of the ordinary library build, so
 even the minimal CI job (no oracle) catches broken `#guard`s.
 
+When the workflow's matrix is derived (e.g. via
+`scripts/conformance_targets.py`), ensuring the new library appears
+amounts to importing `Hex<X>.Conformance` from `Hex<X>.lean`. When
+the matrix is hand-listed, the same PR that lands `Conformance.lean`
+MUST update the matrix.
+
 ## Infrastructure contract
 
 Lean produces and consumes a simple serialised case/result format —
