@@ -26,7 +26,7 @@ from pathlib import Path
 
 
 CONFORMANCE_IMPORT_RE = re.compile(
-    r"^\s*import\s+([A-Za-z0-9_]+)\.Conformance\b"
+    r"^\s*import\s+([A-Za-z0-9_]+)\.Conformance\s*$"
 )
 
 

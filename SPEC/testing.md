@@ -335,11 +335,60 @@ Python or shell driver scripts are responsible for:
 - normalising oracle outputs into the shared format
 - gracefully skipping checks when an optional tool is unavailable
 
-The serialised artefact layout (where JSON/JSONL files live, which
-Lean target emits them, where oracle drivers read them) is specified
-alongside the first oracle-backed library's Phase 3 work, not
-upfront. The initial `core` profile does not require JSONL; a
-library's `#guard`s suffice until its oracle is wired.
+### Layout
+
+The oracle infrastructure is bootstrapped by the `hex-poly`
+python-flint cross-check; subsequent libraries replicate the same
+pattern.
+
+- **JSONL fixture+result stream.** One record per line. Fixture
+  records use kinds `poly` / `matrix` / `lattice` / `prime`; result
+  records carry `kind="result"` plus an `op` string and Lean's
+  computed `value`. Schemas live in `scripts/oracle/common.py`.
+- **Lean-side emission.** `Hex/Conformance/Emit.lean` provides
+  `emitPolyFixture`, `emitMatrixFixture`, `emitLatticeFixture`,
+  `emitPrimeFixture`, and `emitResult`. Per-library drivers live
+  under `Hex<X>/EmitFixtures.lean` and define a `main`; lakefile
+  exposes them as `lean_exe hex<x>_emit_fixtures`. Output goes to
+  `stdout` by default, or to the file named by `HEX_FIXTURE_OUTPUT`.
+- **Committed sample fixtures.** Each library commits a small
+  `conformance-fixtures/Hex<X>/<topic>.jsonl` snapshot so oracle
+  drivers can be developed and replayed without re-running Lean. CI
+  diffs the freshly-emitted JSONL against the committed file before
+  invoking the oracle, so any drift trips the build.
+- **Oracle drivers.** `scripts/oracle/<lib>_<oracle>.py`, e.g.
+  `scripts/oracle/poly_flint.py`. Drivers reuse
+  `scripts/oracle/common.py` for `read_fixtures`, `assert_equal`,
+  and `write_failure`. A driver MUST treat a missing oracle import
+  as a `SKIP` (exit 0) when the SPEC oracle mode is `if_available`,
+  and MUST exit non-zero on any mismatch.
+- **Failure records.** On mismatch, the driver writes a JSON record
+  to `conformance-failures/<library>-<seed>-<case_id>.json`. The
+  directory is gitignored except for a sentinel `README.md`. CI
+  uploads any records as a workflow artifact named
+  `oracle-<driver>-failures` so the failing case is replayable from
+  the recorded input.
+
+### Adding a new oracle
+
+1. Add a per-library emit driver `Hex<X>/EmitFixtures.lean`
+   following `HexPoly/EmitFixtures.lean`.
+2. Register it as `lean_exe hex<x>_emit_fixtures` in the lakefile.
+3. Commit a JSONL snapshot at
+   `conformance-fixtures/Hex<X>/<topic>.jsonl` produced by running
+   the new driver.
+4. Add `scripts/oracle/<lib>_<oracle>.py` mirroring
+   `scripts/oracle/poly_flint.py`: it must read the JSONL stream,
+   re-run each `op` through the external oracle, and call
+   `assert_equal` against the Lean `value`.
+5. Add a CI job (or extend `oracle-pyflint`) in
+   `.github/workflows/conformance.yml` that installs the oracle,
+   diffs the freshly-emitted JSONL against the committed fixture,
+   and pipes Lean's emission into the driver. Upload
+   `conformance-failures/*.json` on failure.
+
+The initial `core` profile does not require JSONL; a library's
+`#guard`s suffice until its oracle is wired.
 
 ## Sage strategy
 
