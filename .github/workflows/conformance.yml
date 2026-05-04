@@ -111,6 +111,18 @@ jobs:
         run: |
           lake exe hexbz_emit_fixtures \
             | python3 scripts/oracle/bz_flint.py
+      - name: Build hexgf2_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexgf2_emit_fixtures
+      - name: Cross-check HexGF2 Lean emission against committed fixture
+        run: |
+          lake exe hexgf2_emit_fixtures > /tmp/hexgf2-fresh.jsonl
+          diff -u conformance-fixtures/HexGF2/gf2.jsonl /tmp/hexgf2-fresh.jsonl
+      - name: Run HexGF2 python-flint oracle
+        run: |
+          lake exe hexgf2_emit_fixtures \
+            | python3 scripts/oracle/gf2_flint.py
       - name: Upload failure records
         if: failure()
         uses: actions/upload-artifact@v4
