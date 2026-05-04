@@ -51,6 +51,8 @@ extern_lib hexmodarithffi (pkg) := do
   let oTarget ← zmod64MulOTarget pkg
   buildStaticLib (pkg.staticLibDir / name) #[oTarget]
 
+lean_lib Hex where
+
 lean_lib HexArith where
   precompileModules := true
   moreLinkArgs := #[
@@ -124,6 +126,9 @@ lean_exe hexarith_bench where
 
 lean_exe hexpoly_bench where
   root := `HexPoly.Bench
+
+lean_exe hexpoly_emit_fixtures where
+  root := `HexPoly.EmitFixtures
 
 lean_exe hexpolyz_bench where
   root := `HexPolyZ.Bench

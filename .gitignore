@@ -1,3 +1,4 @@
 .lake/
 build/
 __pycache__/
+conformance-failures/*.json
