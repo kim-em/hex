@@ -10,6 +10,9 @@ Covered operations:
 - `Hex.Matrix.memLattice`
 - `Hex.Matrix.independent`
 - `Hex.isLLLReduced`
+- `Hex.lll`
+- `Hex.lll.firstShortVector`
+- `Hex.lll.shortVectors`
 - `Hex.LLLState.sizeReduceColumn`
 - `Hex.LLLState.sizeReduce`
 - `Hex.LLLState.swapStep`
@@ -25,6 +28,8 @@ Covered properties:
   stored Gram determinants unchanged.
 - adjacent swaps perform the specified row swap and update the affected stored
   determinant and scaled coefficients.
+- downstream short-vector entry points expose the first reduced row and the
+  ordered reduced rows on a BZ-shaped integer coefficient basis.
 - stored rational Gram-Schmidt coefficients recover the quotient `ν[i][j]/d[j+1]`.
 - potential multiplies the stored determinant prefix `d₁, ..., dₙ₋₁`.
 
@@ -34,6 +39,7 @@ Covered edge cases:
 - a size-reduction pivot with positive quotient and an already-small pivot that
   does not change the state.
 - adjacent swaps at the first and second nonzero row positions.
+- a downstream basis with one integer coefficient row per lifted local factor.
 - out-of-range `sizeReduce` / `swapStep` calls that leave the state unchanged.
 -/
 
@@ -72,11 +78,23 @@ private def typical3 : Matrix Int 3 3 :=
     | 2, 2 => 1
     | _, _ => 0
 
+private def bzStyleBasis : Matrix Int 3 4 :=
+  Matrix.ofFn fun i j =>
+    match i.val, j.val with
+    | 0, 0 => 1
+    | 0, 3 => 1
+    | 1, 1 => 1
+    | 1, 3 => -1
+    | 2, 2 => 1
+    | 2, 3 => 2
+    | _, _ => 0
+
 private abbrev f0_2 : Fin 2 := ⟨0, by decide⟩
 private abbrev f1_2 : Fin 2 := ⟨1, by decide⟩
 private abbrev f0_3 : Fin 3 := ⟨0, by decide⟩
 private abbrev f1_3 : Fin 3 := ⟨1, by decide⟩
 private abbrev f2_3 : Fin 3 := ⟨2, by decide⟩
+private abbrev f3_4 : Fin 4 := ⟨3, by decide⟩
 
 private def identityLatticeVec : Vector Int 2 :=
   Vector.ofFn fun i => if i.val = 0 then 7 else -2
@@ -178,7 +196,6 @@ private def typicalState : LLLState 3 3 := stateOf typical3
 private abbrev f0_4 : Fin 4 := ⟨0, by decide⟩
 private abbrev f1_4 : Fin 4 := ⟨1, by decide⟩
 private abbrev f2_4 : Fin 4 := ⟨2, by decide⟩
-private abbrev f3_4 : Fin 4 := ⟨3, by decide⟩
 
 #guard (identityState.d.get f0_3) = 1
 #guard (identityState.d.get f1_3) = 1
@@ -195,6 +212,26 @@ private abbrev f3_4 : Fin 4 := ⟨3, by decide⟩
 #guard (typicalState.d.get f2_4) = 3
 #guard (typicalState.d.get f3_4) = 4
 #guard typicalState.potential = 6
+
+#guard independentCheck bzStyleBasis
+#guard (Matrix.row bzStyleBasis f0_3).get f0_4 = 1
+#guard (Matrix.row bzStyleBasis f1_3).get f1_4 = 1
+#guard (Matrix.row bzStyleBasis f2_3).get f2_4 = 1
+#guard (Matrix.row bzStyleBasis f0_3).get f3_4 = 1
+#guard (Matrix.row bzStyleBasis f1_3).get f3_4 = -1
+#guard (Matrix.row bzStyleBasis f2_3).get f3_4 = 2
+
+example (hδ : (1 / 4 : Rat) < 3 / 4) (hδ' : (3 / 4 : Rat) ≤ 1)
+    (hind : bzStyleBasis.independent) :
+    lll.firstShortVector bzStyleBasis (3 / 4) hδ hδ' (by decide) hind =
+      Matrix.row (lll bzStyleBasis (3 / 4) hδ hδ' (by decide) hind) f0_3 := by
+  rfl
+
+example (hδ : (1 / 4 : Rat) < 3 / 4) (hδ' : (3 / 4 : Rat) ≤ 1)
+    (hind : bzStyleBasis.independent) :
+    lll.shortVectors bzStyleBasis (3 / 4) hδ hδ' (by decide) hind =
+      (lll bzStyleBasis (3 / 4) hδ hδ' (by decide) hind).toArray := by
+  rfl
 
 example :
     identityState.gramSchmidtCoeff 1 0 (by decide) (by decide) =
