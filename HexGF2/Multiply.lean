@@ -6533,6 +6533,69 @@ private theorem coeffWords_mulWords_degree_add_of_degree?_eq_some
       exact clmulCoeffAt_degree_add_eq_false_of_not_leading_word hp hq (Or.inl hineq)
     rw [hinner, xorBoolList_range_false]
 
+private theorem clmulCoeffAt_above_degree_add_eq_false
+    {p q : GF2Poly} {dp dq i j n : Nat}
+    (hp : p.degree? = some dp) (hq : q.degree? = some dq)
+    (hn : dp + dq < n) :
+    clmulCoeffAt (i + j) p.words[i]! q.words[j]! n = false := by
+  rw [clmulCoeffAt_sourcePairCoeff]
+  by_cases hlow : n / 64 = i + j
+  · simp only [if_pos hlow]
+    apply clmulSourcePairCoeff_eq_false_of_forall
+    intro a b ha hb hsum
+    have htotal : 64 * i + a + (64 * j + b) = n := by
+      have hndecomp := Nat.div_add_mod n 64
+      omega
+    by_cases hpgt : dp < 64 * i + a
+    · have hpfalse := wordBitAt_getElem!_eq_false_of_degree?_lt hp ha hpgt
+      simp [hpfalse]
+    · have hqgt : dq < 64 * j + b := by omega
+      have hqfalse := wordBitAt_getElem!_eq_false_of_degree?_lt hq hb hqgt
+      simp [hqfalse]
+  · by_cases hhigh : n / 64 = i + j + 1
+    · simp only [if_neg hlow, if_pos hhigh]
+      apply clmulSourcePairCoeff_eq_false_of_forall
+      intro a b ha hb hsum
+      have htotal : 64 * i + a + (64 * j + b) = n := by
+        have hndecomp := Nat.div_add_mod n 64
+        omega
+      by_cases hpgt : dp < 64 * i + a
+      · have hpfalse := wordBitAt_getElem!_eq_false_of_degree?_lt hp ha hpgt
+        simp [hpfalse]
+      · have hqgt : dq < 64 * j + b := by omega
+        have hqfalse := wordBitAt_getElem!_eq_false_of_degree?_lt hq hb hqgt
+        simp [hqfalse]
+    · simp only [if_neg hlow, if_neg hhigh]
+
+private theorem coeffWords_mulWords_above_degree_add_eq_false
+    {p q : GF2Poly} {dp dq n : Nat}
+    (hp : p.degree? = some dp) (hq : q.degree? = some dq)
+    (hn : dp + dq < n) :
+    coeffWords (mulWords p.words q.words) n = false := by
+  rw [coeffWords_mulWords_contrib]
+  rw [← xorBoolList_map_xorBoolList (List.range p.words.size)
+    (fun i =>
+      (List.range q.words.size).map
+        (fun j => clmulCoeffAt (i + j) p.words[i]! q.words[j]! n))]
+  have hrows :
+      (List.range p.words.size).map
+          (fun i =>
+            xorBoolList
+              ((List.range q.words.size).map
+                (fun j => clmulCoeffAt (i + j) p.words[i]! q.words[j]! n))) =
+        (List.range p.words.size).map (fun _ => false) := by
+    apply List.map_congr_left
+    intro i _hi
+    have hinner :
+        (List.range q.words.size).map
+            (fun j => clmulCoeffAt (i + j) p.words[i]! q.words[j]! n) =
+          (List.range q.words.size).map (fun _ => false) := by
+      apply List.map_congr_left
+      intro j _hj
+      exact clmulCoeffAt_above_degree_add_eq_false hp hq hn
+    rw [hinner, xorBoolList_range_false]
+  rw [hrows, xorBoolList_range_false]
+
 /-- The top coefficient of a product is the product of the two top
 coefficients, hence set for nonzero `GF(2)` polynomials. -/
 theorem coeff_mul_degree_add_of_degree?_eq_some {p q : GF2Poly} {dp dq : Nat}
@@ -6540,6 +6603,25 @@ theorem coeff_mul_degree_add_of_degree?_eq_some {p q : GF2Poly} {dp dq : Nat}
     (p * q).coeff (dp + dq) = true := by
   rw [coeff_mul]
   exact coeffWords_mulWords_degree_add_of_degree?_eq_some hp hq
+
+/-- Coefficients of a packed `GF(2)` product strictly above the sum of the
+factor degrees vanish. -/
+theorem coeff_mul_eq_false_of_degree_add_lt {p q : GF2Poly} {dp dq n : Nat}
+    (hp : p.degree? = some dp) (hq : q.degree? = some dq)
+    (hn : dp + dq < n) :
+    (p * q).coeff n = false := by
+  rw [coeff_mul]
+  exact coeffWords_mulWords_above_degree_add_eq_false hp hq hn
+
+/-- The packed `GF(2)` product of two nonzero polynomials has degree exactly the
+sum of the two factor degrees. -/
+theorem degree?_mul_of_degree?_eq_some {p q : GF2Poly} {dp dq : Nat}
+    (hp : p.degree? = some dp) (hq : q.degree? = some dq) :
+    (p * q).degree? = some (dp + dq) := by
+  apply degree?_eq_some_of_coeff_eq_true_of_forall_gt_false
+  · exact coeff_mul_degree_add_of_degree?_eq_some hp hq
+  · intro m hm
+    exact coeff_mul_eq_false_of_degree_add_lt hp hq hm
 
 /-- Left distributivity of packed `GF(2)` polynomial multiplication over
 addition. -/
