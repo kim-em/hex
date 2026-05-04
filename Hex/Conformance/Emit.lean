@@ -173,4 +173,7 @@ def polyValue (coeffs : List Int) : String := jsonIntList coeffs
 def divModValue (quot rem : List Int) : String :=
   "[" ++ jsonIntList quot ++ "," ++ jsonIntList rem ++ "]"
 
+/-- Lattice-shaped result value: a basis as a list of integer rows. -/
+def latticeValue (basis : List (List Int)) : String := jsonIntMatrix basis
+
 end Hex.Conformance.Emit
