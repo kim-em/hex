@@ -1929,6 +1929,130 @@ theorem divMod_reconstruction_step {S : Type _}
     (quot + term) * q + (rem - term * q) = quot * q + rem := by
   exact add_mul_sub_cancel_right quot term q rem
 
+/-- The polynomial-level reading of one step of the array-based long-division
+remainder update: subtracting `coeff * q * x^shift` from `rem`, in coefficient
+form, matches the in-place `subtractScaledShift` array update whenever the
+update window stays within `rem`. -/
+private theorem ofCoeffs_subtractScaledShift_eq_sub_monomial_mul {S : Type _}
+    [Lean.Grind.CommRing S] [DecidableEq S]
+    (rem q : Array S) (shift : Nat) (coeff : S)
+    (hbound : ∀ j, j < q.size → shift + j < rem.size) :
+    ofCoeffs (subtractScaledShift rem q shift coeff) =
+      ofCoeffs rem - monomial shift coeff * ofCoeffs q := by
+  apply ext_coeff
+  intro n
+  have hzero_sub : (0 : S) - (0 : S) = 0 := by grind
+  rw [coeff_ofCoeffs]
+  rw [coeff_sub (ofCoeffs rem) (monomial shift coeff * ofCoeffs q) n hzero_sub]
+  rw [coeff_ofCoeffs]
+  rw [coeff_mul]
+  rw [mulCoeffSum_eq_diagonal]
+  rw [diagonalSum_eq_degree_bound]
+  rw [subtractScaledShift_getD rem q shift coeff n hbound]
+  -- Compute each diagonal term using the monomial's coefficient law.
+  have hterm : ∀ i,
+      diagonalMulCoeffTerm (monomial shift coeff) (ofCoeffs q) n i =
+        if i = shift ∧ shift ≤ n
+          then coeff * q.getD (n - shift) (Zero.zero : S)
+          else 0 := by
+    intro i
+    unfold diagonalMulCoeffTerm
+    rw [coeff_monomial, coeff_ofCoeffs]
+    by_cases hni : n < i
+    · by_cases hieq : i = shift
+      · subst i
+        have hshift_gt : ¬ shift ≤ n := by omega
+        simp [hni, hshift_gt]
+      · simp [hni, hieq]
+    · have hile : i ≤ n := by omega
+      by_cases hieq : i = shift
+      · subst i
+        simp [hni, hile]
+      · simp [hni, hieq]
+        exact Lean.Grind.Semiring.zero_mul _
+  -- Lift the term-by-term rewrite to the foldl.
+  have hfold : ∀ (xs : List Nat) (acc : S),
+      xs.foldl (fun acc i =>
+          acc + diagonalMulCoeffTerm (monomial shift coeff) (ofCoeffs q) n i) acc =
+        xs.foldl (fun acc i =>
+          acc + if i = shift ∧ shift ≤ n
+            then coeff * q.getD (n - shift) (Zero.zero : S)
+            else 0) acc := by
+    intro xs
+    induction xs with
+    | nil => intro acc; rfl
+    | cons i xs ih =>
+        intro acc
+        simp only [List.foldl_cons]
+        rw [hterm i]
+        exact ih _
+  rw [hfold (List.range (n + 1)) 0]
+  by_cases hshift : shift ≤ n
+  · -- Collapse the conjunction `i = shift ∧ shift ≤ n` to `i = shift`.
+    have hsimp : ∀ i,
+        (if i = shift ∧ shift ≤ n
+            then coeff * q.getD (n - shift) (Zero.zero : S)
+            else 0) =
+        (if i = shift
+            then coeff * q.getD (n - shift) (Zero.zero : S)
+            else 0) := by
+      intro i
+      simp [hshift]
+    have hfold2 : ∀ (xs : List Nat) (acc : S),
+        xs.foldl (fun acc i =>
+            acc + if i = shift ∧ shift ≤ n
+              then coeff * q.getD (n - shift) (Zero.zero : S)
+              else 0) acc =
+          xs.foldl (fun acc i =>
+            acc + if i = shift
+              then coeff * q.getD (n - shift) (Zero.zero : S)
+              else 0) acc := by
+      intro xs
+      induction xs with
+      | nil => intro acc; rfl
+      | cons i xs ih =>
+          intro acc
+          simp only [List.foldl_cons]
+          rw [hsimp i]
+          exact ih _
+    rw [hfold2 (List.range (n + 1)) 0]
+    rw [fold_single_index]
+    have hshift_lt : shift < n + 1 := by omega
+    rw [if_pos hshift_lt]
+    by_cases hsize : n - shift < q.size
+    · rw [if_pos ⟨hshift, hsize⟩]
+    · have hand : ¬ (shift ≤ n ∧ n - shift < q.size) := fun ⟨_, h⟩ => hsize h
+      rw [if_neg hand]
+      have hq0 : q.getD (n - shift) (Zero.zero : S) = (0 : S) := by
+        unfold Array.getD
+        rw [dif_neg (Nat.not_lt.mpr (Nat.le_of_not_lt hsize))]
+        rfl
+      rw [hq0]
+      grind
+  · -- All terms are zero; the fold yields zero.
+    have hzero_fold : ∀ (xs : List Nat) (acc : S),
+        xs.foldl (fun acc i =>
+            acc + if i = shift ∧ shift ≤ n
+              then coeff * q.getD (n - shift) (Zero.zero : S)
+              else 0) acc = acc := by
+      intro xs
+      induction xs with
+      | nil => intro acc; rfl
+      | cons i xs ih =>
+          intro acc
+          simp only [List.foldl_cons]
+          have h0 : (if i = shift ∧ shift ≤ n
+              then coeff * q.getD (n - shift) (Zero.zero : S)
+              else (0 : S)) = 0 := by
+            simp [hshift]
+          rw [h0]
+          rw [show acc + (0 : S) = acc by grind]
+          exact ih _
+    rw [hzero_fold (List.range (n + 1)) 0]
+    have hand : ¬ (shift ≤ n ∧ n - shift < q.size) := fun ⟨h, _⟩ => hshift h
+    rw [if_neg hand]
+    grind
+
 theorem zero_mul {S : Type _}
     [Lean.Grind.CommRing S] [DecidableEq S]
     (p : DensePoly S) :
