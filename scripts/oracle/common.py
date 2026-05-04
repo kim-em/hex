@@ -9,14 +9,21 @@ external-tool import (e.g. ``flint`` from ``python-flint``).
 
 JSONL fixture record shape (one record per line):
 
-* ``poly``    — ``{"kind": "poly",    "lib": str, "case": str,
-                   "coeffs": [int...], "modulus": int|null}``
-* ``matrix``  — ``{"kind": "matrix",  "lib": str, "case": str,
-                   "rows": [[int...]...]}``
-* ``lattice`` — ``{"kind": "lattice", "lib": str, "case": str,
-                   "basis": [[int...]...]}``
-* ``prime``   — ``{"kind": "prime",   "lib": str, "case": str,
-                   "p": int, "n": int}``
+* ``poly``       — ``{"kind": "poly",       "lib": str, "case": str,
+                      "coeffs": [int...], "modulus": int|null}``
+* ``matrix``     — ``{"kind": "matrix",     "lib": str, "case": str,
+                      "rows": [[int...]...]}``
+* ``lattice``    — ``{"kind": "lattice",    "lib": str, "case": str,
+                      "basis": [[int...]...]}``
+* ``prime``      — ``{"kind": "prime",      "lib": str, "case": str,
+                      "p": int, "n": int}``
+* ``gfq_bridge`` — ``{"kind": "gfq_bridge", "lib": str, "case": str,
+                      "p": int, "modulus": [int...],
+                      "a": [int...], "b": [int...]}``
+                     (two reduced operands `a` and `b` over `F_p[x] /
+                      (modulus)`; carries the inputs both Lean
+                      representations consume so the oracle can verify
+                      packed and generic answers independently.)
 
 Result records (emitted by Lean alongside the fixture, on the same
 JSONL stream) carry the operation name and Lean's computed answer:
@@ -46,7 +53,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 
-VALID_FIXTURE_KINDS = frozenset({"poly", "matrix", "lattice", "prime"})
+VALID_FIXTURE_KINDS = frozenset({"poly", "matrix", "lattice", "prime", "gfq_bridge"})
 
 
 class FixtureError(ValueError):
@@ -93,6 +100,15 @@ def _validate_fixture(record: dict[str, Any]) -> None:
         for key in ("p", "n"):
             if not isinstance(record.get(key), int):
                 raise FixtureError(f"prime.{key} must be int: {record!r}")
+    elif kind == "gfq_bridge":
+        if not isinstance(record.get("p"), int):
+            raise FixtureError(f"gfq_bridge.p must be int: {record!r}")
+        for key in ("modulus", "a", "b"):
+            value = record.get(key)
+            if not isinstance(value, list) or not all(isinstance(c, int) for c in value):
+                raise FixtureError(
+                    f"gfq_bridge.{key} must be List[int]: {record!r}"
+                )
     elif kind == "result":
         if not isinstance(record.get("op"), str):
             raise FixtureError(f"result.op must be str: {record!r}")
