@@ -555,6 +555,59 @@ private theorem powLinear_add_binom_sum
       rw [powLinearBinomSum_top_succ f g n]
       exact DensePoly.mul_add_left_poly f g (powLinearBinomSum f g n (n + 1))
 
+private theorem powLinearBinomTerm_prime_zero (f g : FpPoly p) :
+    powLinearBinomTerm f g p 0 = powLinear f p := by
+  unfold powLinearBinomTerm
+  simp
+  change DensePoly.scale (1 : ZMod64 p) (powLinear f p * powLinear g 0) =
+    powLinear f p
+  rw [powLinearBinom_scalar_one]
+  exact DensePoly.mul_one_right_poly (powLinear f p)
+
+private theorem powLinearBinomTerm_prime_top (f g : FpPoly p) :
+    powLinearBinomTerm f g p p = powLinear g p := by
+  unfold powLinearBinomTerm
+  rw [choose_self]
+  have hsub : p - p = 0 := by omega
+  rw [hsub]
+  change DensePoly.scale (1 : ZMod64 p) (powLinear f 0 * powLinear g p) =
+    powLinear g p
+  rw [powLinearBinom_scalar_one]
+  exact one_mul (powLinear g p)
+
+private theorem powLinearBinomTerm_prime_middle
+    (hp : Hex.Nat.Prime p) (f g : FpPoly p) {k : Nat} (hk0 : 0 < k) (hkp : k < p) :
+    powLinearBinomTerm f g p k = 0 := by
+  unfold powLinearBinomTerm
+  rw [zmod64_natCast_choose_prime_eq_zero hp hk0 hkp]
+  exact powLinearBinom_scalar_zero _
+
+private theorem powLinearBinomSum_prime_middle
+    (hp : Hex.Nat.Prime p) (f g : FpPoly p) {m : Nat} (hm : m < p) :
+    powLinearBinomSum f g p (m + 1) = powLinear f p := by
+  induction m with
+  | zero =>
+      rw [powLinearBinomSum, powLinearBinomTerm_prime_zero]
+      exact DensePoly.zero_add _
+  | succ m ih =>
+      rw [powLinearBinomSum, ih (by omega)]
+      rw [powLinearBinomTerm_prime_middle hp f g (by omega : 0 < m + 1) (by omega)]
+      exact DensePoly.add_zero_poly _
+
+private theorem powLinear_add_prime
+    (hp : Hex.Nat.Prime p) (f g : FpPoly p) :
+    powLinear (f + g) p = powLinear f p + powLinear g p := by
+  have hp_two : 2 ≤ p := Hex.Nat.Prime.two_le hp
+  have hp_pos : 0 < p := by omega
+  rw [powLinear_add_binom_sum]
+  rw [powLinearBinomSum]
+  have hmid : powLinearBinomSum f g p p = powLinear f p := by
+    have hmid0 :
+        powLinearBinomSum f g p ((p - 1) + 1) = powLinear f p :=
+      powLinearBinomSum_prime_middle hp f g (by omega : p - 1 < p)
+    simpa [Nat.sub_add_cancel hp_pos] using hmid0
+  rw [hmid, powLinearBinomTerm_prime_top]
+
 private theorem foldl_poly_sum_mul_right
     {α : Type _} (xs : List α) (term : α → FpPoly p) (acc h : FpPoly p) :
     (xs.foldl (fun acc x => acc + term x) acc) * h =
@@ -991,49 +1044,8 @@ private theorem powLinear_add_prime_coeff
     (hp : Hex.Nat.Prime p) (f g : FpPoly p) (n : Nat) :
     (powLinear (f + g) p).coeff n =
       (powLinear f p).coeff n + (powLinear g p).coeff n := by
-  let m := max f.size g.size
-  have hf_bound : f.size ≤ m := by
-    exact Nat.le_max_left f.size g.size
-  have hg_bound : g.size ≤ m := by
-    exact Nat.le_max_right f.size g.size
-  have hf_eq : coeffFold f m = f :=
-    coeffFold_eq_of_size_le f m hf_bound
-  have hg_eq : coeffFold g m = g :=
-    coeffFold_eq_of_size_le g m hg_bound
-  have hfg_eq : coeffFold (f + g) m = f + g := by
-    apply DensePoly.ext_coeff
-    intro i
-    rw [coeffFold_coeff]
-    by_cases hi : i < m
-    · rw [if_pos hi]
-    · rw [if_neg hi]
-      have hfi : f.coeff i = 0 :=
-        DensePoly.coeff_eq_zero_of_size_le f (by omega)
-      have hgi : g.coeff i = 0 :=
-        DensePoly.coeff_eq_zero_of_size_le g (by omega)
-      rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff, hfi, hgi]
-      exact zmod64_add_zero_zero_coeff.symm
-  calc
-    (powLinear (f + g) p).coeff n =
-        (powLinear (coeffFold (f + g) m) p).coeff n := by
-          rw [hfg_eq]
-    _ = (powLinear (coeffFold f m) p).coeff n +
-          (powLinear (coeffFold g m) p).coeff n := by
-          rw [powLinear_coeffFold_prime_coeff hp (f + g) m n]
-          rw [powLinear_coeffFold_prime_coeff hp f m n]
-          rw [powLinear_coeffFold_prime_coeff hp g m n]
-          by_cases hn : n % p = 0
-          · rw [if_pos hn, if_pos hn, if_pos hn]
-            by_cases hdiv : n / p < m
-            · rw [if_pos hdiv, if_pos hdiv, if_pos hdiv]
-              rw [DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff]
-              exact zmod64_add_pow_prime hp (f.coeff (n / p)) (g.coeff (n / p))
-            · rw [if_neg hdiv, if_neg hdiv, if_neg hdiv]
-              exact zmod64_add_zero_zero_coeff.symm
-          · rw [if_neg hn, if_neg hn, if_neg hn]
-            exact zmod64_add_zero_zero_coeff.symm
-    _ = (powLinear f p).coeff n + (powLinear g p).coeff n := by
-          rw [hf_eq, hg_eq]
+  rw [powLinear_add_prime hp f g]
+  exact DensePoly.coeff_add _ _ _ zmod64_add_zero_zero_coeff
 
 /--
 Freshman's-dream coefficient support for a `p`th power over `F_p[x]`.
