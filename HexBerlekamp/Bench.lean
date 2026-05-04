@@ -13,7 +13,7 @@ compact checksums or summaries of the computed structures.
 Scientific registrations:
 
 * `runBerlekampMatrixChecksum`: build `Q_f` for a degree-`n` input,
-  `O(n^3 log n)`.
+  `O(n^2)` for fixed small `p` (sparse `X^p mod f`).
 * `runRabinTestChecksum`: Rabin irreducibility test on a degree-`n` input,
   `O(n^3)`.
 * `runBerlekampFactorChecksum`: Berlekamp split-step factorization,
@@ -139,17 +139,19 @@ def runDistinctDegreeChecksum (input : MonicInput) : UInt64 :=
   checksumDistinctDegree <| distinctDegreeFactor input.poly input.monic
 
 /-
-The implementation constructs one Frobenius column for each basis vector.
-Column construction reduces powers modulo a degree-`n` polynomial with dense
-quadratic arithmetic and logarithmic exponent height, so the declared model is
-Theta(n^3 log n).
+The implementation constructs one Frobenius column for each basis vector via
+the iterative recurrence `column (j + 1) = column j * (X^p mod f) mod f`.
+For fixed small `p = 5` and `n > p`, `X^p mod f = X^p` is the sparse single
+monomial `X^5`, so each iterative step costs `O(p * n)` (shift by `p`
+positions plus at most `p` monic reductions, each `O(n)`); over `n` columns
+the total is `O(p * n^2) = O(n^2)` for fixed `p`.
 -/
-setup_benchmark runBerlekampMatrixChecksum n => n * n * n * Nat.log2 (n + 1)
+setup_benchmark runBerlekampMatrixChecksum n => n * n
   with prep := prepLinearProductInput
   where {
-    paramFloor := 8
-    paramCeiling := 64
-    paramSchedule := .custom #[8, 12, 16, 24, 32, 48, 64]
+    paramFloor := 16
+    paramCeiling := 192
+    paramSchedule := .custom #[16, 24, 32, 48, 64, 96, 128, 192]
     maxSecondsPerCall := 6.0
     targetInnerNanos := 200000000
     signalFloorMultiplier := 1.0
