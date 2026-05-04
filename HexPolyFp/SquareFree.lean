@@ -287,6 +287,242 @@ private theorem scale_mul_right (c : ZMod64 p) (f g : FpPoly p) :
     _ = f * DensePoly.scale c g := by
       exact DensePoly.mul_comm_poly (DensePoly.scale c g) f
 
+private theorem choose_eq_zero_of_lt {n k : Nat} (h : n < k) :
+    Hex.Nat.choose n k = 0 := by
+  induction n generalizing k with
+  | zero =>
+      cases k with
+      | zero => omega
+      | succ k => rfl
+  | succ n ih =>
+      cases k with
+      | zero => omega
+      | succ k =>
+          simp [Hex.Nat.choose]
+          by_cases hk : n < k
+          · simp [ih hk]
+            exact ih (by omega)
+          · exfalso
+            omega
+
+private theorem choose_self (n : Nat) : Hex.Nat.choose n n = 1 := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+      simp [Hex.Nat.choose, ih, choose_eq_zero_of_lt (by omega : n < n + 1)]
+
+private theorem powLinear_succ_left (f : FpPoly p) (n : Nat) :
+    powLinear f (n + 1) = f * powLinear f n := by
+  rw [powLinear]
+  exact DensePoly.mul_comm_poly (powLinear f n) f
+
+private theorem powLinearBinom_scalar_add
+    (a b : Nat) (h : FpPoly p) :
+    DensePoly.scale (((a + b : Nat) : ZMod64 p)) h =
+      DensePoly.scale (a : ZMod64 p) h + DensePoly.scale (b : ZMod64 p) h := by
+  have hcast : (((a + b : Nat) : ZMod64 p)) = (a : ZMod64 p) + (b : ZMod64 p) := by
+    grind
+  rw [hcast]
+  exact scale_add_scalar (a : ZMod64 p) (b : ZMod64 p) h
+
+private theorem powLinearBinom_scalar_zero (h : FpPoly p) :
+    DensePoly.scale (0 : ZMod64 p) h = 0 := by
+  apply DensePoly.ext_coeff
+  intro n
+  have hzero : (0 : ZMod64 p) * (0 : ZMod64 p) = 0 := by grind
+  rw [DensePoly.coeff_scale _ _ _ hzero]
+  rw [DensePoly.coeff_zero]
+  grind
+
+private theorem powLinearBinom_scalar_one (h : FpPoly p) :
+    DensePoly.scale (1 : ZMod64 p) h = h :=
+  scale_one_left h
+
+private theorem powLinearBinom_mul_zero (h : FpPoly p) :
+    h * (0 : FpPoly p) = 0 :=
+  Eq.trans (DensePoly.mul_comm_poly h 0) (DensePoly.zero_mul h)
+
+private theorem mul_powLinearBinom_scaled_left
+    (c : ZMod64 p) (f a b : FpPoly p) :
+    f * DensePoly.scale c (a * b) = DensePoly.scale c ((f * a) * b) := by
+  calc
+    f * DensePoly.scale c (a * b) =
+        DensePoly.scale c (f * (a * b)) := by
+          exact (scale_mul_right c f (a * b)).symm
+    _ = DensePoly.scale c ((f * a) * b) := by
+          exact congrArg (fun x => DensePoly.scale c x)
+            (DensePoly.mul_assoc_poly f a b).symm
+
+private theorem mul_powLinearBinom_scaled_right
+    (c : ZMod64 p) (g a b : FpPoly p) :
+    g * DensePoly.scale c (a * b) = DensePoly.scale c (a * (g * b)) := by
+  calc
+    g * DensePoly.scale c (a * b) =
+        DensePoly.scale c (a * b) * g := by
+          exact DensePoly.mul_comm_poly g (DensePoly.scale c (a * b))
+    _ = DensePoly.scale c ((a * b) * g) := by
+          exact (scale_mul_left c (a * b) g).symm
+    _ = DensePoly.scale c (a * (g * b)) := by
+          apply congrArg (fun x => DensePoly.scale c x)
+          calc
+            (a * b) * g = a * (b * g) := DensePoly.mul_assoc_poly a b g
+            _ = a * (g * b) := by
+                  exact congrArg (fun x => a * x) (DensePoly.mul_comm_poly b g)
+
+private def powLinearBinomTerm (f g : FpPoly p) (n k : Nat) : FpPoly p :=
+  DensePoly.scale (Hex.Nat.choose n k : ZMod64 p)
+    (powLinear f (n - k) * powLinear g k)
+
+private def powLinearBinomSum (f g : FpPoly p) (n : Nat) : Nat → FpPoly p
+  | 0 => 0
+  | k + 1 => powLinearBinomSum f g n k + powLinearBinomTerm f g n k
+
+private theorem powLinearBinomTerm_succ_zero (f g : FpPoly p) (n : Nat) :
+    powLinearBinomTerm f g (n + 1) 0 =
+      f * powLinearBinomTerm f g n 0 := by
+  unfold powLinearBinomTerm
+  simp [Hex.Nat.choose]
+  change DensePoly.scale (1 : ZMod64 p) (powLinear f (n + 1) * powLinear g 0) =
+    f * DensePoly.scale (1 : ZMod64 p) (powLinear f n * powLinear g 0)
+  rw [powLinearBinom_scalar_one]
+  rw [powLinearBinom_scalar_one]
+  have hg0 : powLinear g 0 = 1 := rfl
+  rw [hg0]
+  calc
+    powLinear f (n + 1) * 1 = powLinear f (n + 1) :=
+      DensePoly.mul_one_right_poly (powLinear f (n + 1))
+    _ = f * powLinear f n := powLinear_succ_left f n
+    _ = f * (powLinear f n * 1) := by
+          exact congrArg (fun x => f * x)
+            (DensePoly.mul_one_right_poly (powLinear f n)).symm
+
+private theorem powLinearBinomTerm_succ_succ_of_lt
+    (f g : FpPoly p) {n k : Nat} (hk : k < n) :
+    powLinearBinomTerm f g (n + 1) (k + 1) =
+      f * powLinearBinomTerm f g n (k + 1) +
+        g * powLinearBinomTerm f g n k := by
+  unfold powLinearBinomTerm
+  rw [Hex.Nat.choose_succ_succ]
+  rw [powLinearBinom_scalar_add]
+  have hsub : n + 1 - (k + 1) = n - k := by omega
+  rw [hsub]
+  have hf :
+      (f * powLinear f (n - (k + 1))) * powLinear g (k + 1) =
+        powLinear f (n - k) * powLinear g (k + 1) := by
+    have hsub' : n - k = n - (k + 1) + 1 := by omega
+    have hbase :
+        f * powLinear f (n - (k + 1)) = powLinear f (n - k) := by
+      rw [hsub', powLinear_succ_left]
+    exact congrArg (fun x => x * powLinear g (k + 1)) hbase
+  have hg :
+      powLinear f (n - k) * (g * powLinear g k) =
+        powLinear f (n - k) * powLinear g (k + 1) := by
+    exact congrArg (fun x => powLinear f (n - k) * x)
+      (powLinear_succ_left g k).symm
+  rw [mul_powLinearBinom_scaled_left]
+  rw [mul_powLinearBinom_scaled_right]
+  rw [hf, hg]
+  exact DensePoly.add_comm_poly _ _
+
+private theorem powLinearBinomTerm_succ_succ_top
+    (f g : FpPoly p) (n : Nat) :
+    powLinearBinomTerm f g (n + 1) (n + 1) =
+      f * powLinearBinomTerm f g n (n + 1) +
+        g * powLinearBinomTerm f g n n := by
+  unfold powLinearBinomTerm
+  rw [Hex.Nat.choose_succ_succ]
+  have hzero_choose : Hex.Nat.choose n (n + 1) = 0 :=
+    choose_eq_zero_of_lt (by omega)
+  rw [hzero_choose]
+  rw [choose_self]
+  have hcast : (((1 + 0 : Nat) : ZMod64 p)) = (1 : ZMod64 p) := by grind
+  rw [hcast]
+  have hsub_left : n + 1 - (n + 1) = 0 := by omega
+  have hsub_mid : n - (n + 1) = 0 := by omega
+  have hsub_right : n - n = 0 := by omega
+  rw [hsub_left, hsub_mid, hsub_right]
+  change DensePoly.scale (1 : ZMod64 p) (powLinear f 0 * powLinear g (n + 1)) =
+    f * DensePoly.scale (0 : ZMod64 p) (powLinear f 0 * powLinear g (n + 1)) +
+      g * DensePoly.scale (1 : ZMod64 p) (powLinear f 0 * powLinear g n)
+  rw [powLinearBinom_scalar_one]
+  rw [powLinearBinom_scalar_zero]
+  rw [powLinearBinom_mul_zero]
+  have hzadd : (0 : FpPoly p) +
+      g * DensePoly.scale (1 : ZMod64 p) (powLinear f 0 * powLinear g n) =
+        g * DensePoly.scale (1 : ZMod64 p) (powLinear f 0 * powLinear g n) :=
+    DensePoly.zero_add _
+  rw [hzadd]
+  rw [powLinearBinom_scalar_one]
+  have hf0 : powLinear f 0 = 1 := rfl
+  rw [hf0]
+  calc
+    1 * powLinear g (n + 1) = powLinear g (n + 1) := by
+      exact one_mul (powLinear g (n + 1))
+    _ = g * powLinear g n := powLinear_succ_left g n
+    _ = g * (1 * powLinear g n) := by
+          rw [one_mul]
+
+private theorem powLinearBinomTerm_succ_succ
+    (f g : FpPoly p) {n k : Nat} (hk : k ≤ n) :
+    powLinearBinomTerm f g (n + 1) (k + 1) =
+      f * powLinearBinomTerm f g n (k + 1) +
+        g * powLinearBinomTerm f g n k := by
+  by_cases hlt : k < n
+  · exact powLinearBinomTerm_succ_succ_of_lt f g hlt
+  · have hk_eq : k = n := by omega
+    subst k
+    exact powLinearBinomTerm_succ_succ_top f g n
+
+private theorem powLinearBinomSum_succ_row
+    (f g : FpPoly p) (n m : Nat) (hm : m ≤ n + 1) :
+    powLinearBinomSum f g (n + 1) (m + 1) =
+      f * powLinearBinomSum f g n (m + 1) +
+        g * powLinearBinomSum f g n m := by
+  induction m with
+  | zero =>
+      simp [powLinearBinomSum, powLinearBinomTerm_succ_zero]
+      calc
+        0 + f * powLinearBinomTerm f g n 0 =
+            f * powLinearBinomTerm f g n 0 := DensePoly.zero_add _
+        _ = f * (0 + powLinearBinomTerm f g n 0) + 0 := by
+              have hz : (0 : FpPoly p) + powLinearBinomTerm f g n 0 =
+                  powLinearBinomTerm f g n 0 := DensePoly.zero_add _
+              rw [hz]
+              exact (DensePoly.add_zero_poly _).symm
+  | succ m ih =>
+      rw [powLinearBinomSum, ih (by omega)]
+      rw [powLinearBinomSum]
+      rw [powLinearBinomSum]
+      rw [powLinearBinomTerm_succ_succ f g (by omega : m ≤ n)]
+      have hdistL :
+          f * (powLinearBinomSum f g n m + powLinearBinomTerm f g n m) =
+            f * powLinearBinomSum f g n m + f * powLinearBinomTerm f g n m :=
+        DensePoly.mul_add_right_poly f
+          (powLinearBinomSum f g n m) (powLinearBinomTerm f g n m)
+      have hdistR₁ :
+          f * (powLinearBinomSum f g n (m + 1) +
+              powLinearBinomTerm f g n (m + 1)) =
+            f * powLinearBinomSum f g n (m + 1) +
+              f * powLinearBinomTerm f g n (m + 1) :=
+        DensePoly.mul_add_right_poly f
+          (powLinearBinomSum f g n (m + 1)) (powLinearBinomTerm f g n (m + 1))
+      have hdistR₂ :
+          g * (powLinearBinomSum f g n m + powLinearBinomTerm f g n m) =
+            g * powLinearBinomSum f g n m + g * powLinearBinomTerm f g n m :=
+        DensePoly.mul_add_right_poly g
+          (powLinearBinomSum f g n m) (powLinearBinomTerm f g n m)
+      rw [hdistL, hdistR₁, hdistR₂]
+      have hsum :
+          powLinearBinomSum f g n (m + 1) =
+            powLinearBinomSum f g n m + powLinearBinomTerm f g n m := rfl
+      rw [hsum]
+      rw [← hdistL]
+      apply DensePoly.ext_coeff
+      intro i
+      have hzero_add : (0 : ZMod64 p) + 0 = 0 := by grind
+      repeat rw [DensePoly.coeff_add _ _ _ hzero_add]
+      grind
+
 private theorem foldl_poly_sum_mul_right
     {α : Type _} (xs : List α) (term : α → FpPoly p) (acc h : FpPoly p) :
     (xs.foldl (fun acc x => acc + term x) acc) * h =
