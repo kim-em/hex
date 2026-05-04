@@ -48,6 +48,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LD_LIBRARY_PATH: /home/runner/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/lib/lean
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lib: HexPoly
+            emit: hexpoly_emit_fixtures
+            script: scripts/oracle/poly_flint.py
+            fixture: conformance-fixtures/HexPoly/poly.jsonl
+          - lib: HexPolyFp
+            emit: hexpolyfp_emit_fixtures
+            script: scripts/oracle/polyfp_flint.py
+            fixture: conformance-fixtures/HexPolyFp/poly.jsonl
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
@@ -60,22 +72,21 @@ jobs:
         run: |
           toolchain="$(sed 's|/|--|; s|:|---|' lean-toolchain)"
           echo "LD_LIBRARY_PATH=$HOME/.elan/toolchains/$toolchain/lib/lean:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-      - name: Build hexpoly_emit_fixtures
+      - name: Build ${{ matrix.emit }}
         uses: leanprover/lean-action@v1
         with:
-          build-args: hexpoly_emit_fixtures
+          build-args: ${{ matrix.emit }}
       - name: Cross-check Lean emission against committed fixture
         run: |
-          lake exe hexpoly_emit_fixtures > /tmp/hexpoly-fresh.jsonl
-          diff -u conformance-fixtures/HexPoly/poly.jsonl /tmp/hexpoly-fresh.jsonl
+          lake exe ${{ matrix.emit }} > /tmp/${{ matrix.lib }}-fresh.jsonl
+          diff -u ${{ matrix.fixture }} /tmp/${{ matrix.lib }}-fresh.jsonl
       - name: Run python-flint oracle
         run: |
-          lake exe hexpoly_emit_fixtures \
-            | python3 scripts/oracle/poly_flint.py
+          lake exe ${{ matrix.emit }} | python3 ${{ matrix.script }}
       - name: Upload failure records
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: oracle-pyflint-failures
+          name: oracle-pyflint-failures-${{ matrix.lib }}
           path: conformance-failures/*.json
           if-no-files-found: ignore
