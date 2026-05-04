@@ -24,6 +24,12 @@ JSONL fixture record shape (one record per line):
                       (modulus)`; carries the inputs both Lean
                       representations consume so the oracle can verify
                       packed and generic answers independently.)
+* ``gfqfield``   — ``{"kind": "gfqfield",   "lib": str, "case": str,
+                      "p": int, "modulus": [int...],
+                      "a": [int...], "b": [int...], "zexp": int}``
+                     (a, b are reduced operands modulo `m(x)`; `zexp`
+                      is the integer exponent for the `zpow` op.  `b`
+                      must be nonzero so that `a / b` is well-defined.)
 
 Result records (emitted by Lean alongside the fixture, on the same
 JSONL stream) carry the operation name and Lean's computed answer:
@@ -53,7 +59,9 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 
-VALID_FIXTURE_KINDS = frozenset({"poly", "matrix", "lattice", "prime", "gfq_bridge"})
+VALID_FIXTURE_KINDS = frozenset(
+    {"poly", "matrix", "lattice", "prime", "gfq_bridge", "gfqfield"}
+)
 
 
 class FixtureError(ValueError):
@@ -108,6 +116,17 @@ def _validate_fixture(record: dict[str, Any]) -> None:
             if not isinstance(value, list) or not all(isinstance(c, int) for c in value):
                 raise FixtureError(
                     f"gfq_bridge.{key} must be List[int]: {record!r}"
+                )
+    elif kind == "gfqfield":
+        if not isinstance(record.get("p"), int):
+            raise FixtureError(f"gfqfield.p must be int: {record!r}")
+        if not isinstance(record.get("zexp"), int):
+            raise FixtureError(f"gfqfield.zexp must be int: {record!r}")
+        for key in ("modulus", "a", "b"):
+            seq = record.get(key)
+            if not isinstance(seq, list) or not all(isinstance(x, int) for x in seq):
+                raise FixtureError(
+                    f"gfqfield.{key} must be List[int]: {record!r}"
                 )
     elif kind == "result":
         if not isinstance(record.get("op"), str):

@@ -145,6 +145,9 @@ lean_exe hexgfq_emit_fixtures where
 lean_exe hexhensel_emit_fixtures where
   root := `HexHensel.EmitFixtures
 
+lean_exe hexgfqfield_emit_fixtures where
+  root := `HexGfqField.EmitFixtures
+
 lean_exe hexpolyz_bench where
   root := `HexPolyZ.Bench
 

@@ -156,6 +156,23 @@ def emitGfqBridgeFixture (lib case : String) (p : Int)
     ("b",       jsonIntList b)
   ]
 
+/-- Emit a `gfqfield` fixture record carrying the prime `p`, the
+modulus polynomial coefficients, two reduced operands `a` / `b`
+(with `b` nonzero so `a / b` is well-defined), and the integer
+exponent `zexp` used by the `zpow` op. -/
+def emitGfqFieldFixture (lib case : String) (p : Int)
+    (modulus a b : List Int) (zexp : Int) : IO Unit := do
+  emitLine <| jsonObject [
+    ("kind",    jsonString "gfqfield"),
+    ("lib",     jsonString lib),
+    ("case",    jsonString case),
+    ("p",       jsonInt p),
+    ("modulus", jsonIntList modulus),
+    ("a",       jsonIntList a),
+    ("b",       jsonIntList b),
+    ("zexp",    jsonInt zexp)
+  ]
+
 /-- Emit a `result` record carrying Lean's computed answer for one op
 on a previously-emitted case.  `value` must be a valid raw JSON
 fragment; helpers below build the common shapes. -/
