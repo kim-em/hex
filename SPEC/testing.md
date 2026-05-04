@@ -170,6 +170,15 @@ MUST NOT appear in any `Conformance.lean`:
   it's implementable), don't paper over it with a test that says
   "this wrong output is expected".
 
+  *Process rule.* Don't compute the expected RHS by running the
+  function under test, even with the result hand-copied into the
+  source. The expected value must be independently derivable from
+  the function's documented contract on the committed input —
+  via a closed-form identity, an oracle, a hand calculation, or
+  a different implementation. If the implementation isn't ready,
+  leave a `-- TODO` comment and stop; don't write the `#guard`
+  against output you obtained by running the function.
+
 - **`native_decide`.** Banned project-wide (see
   [SPEC.md](SPEC.md#project-wide-proof-policy)). Restated here because
   conformance checks on large fixtures are a common temptation.

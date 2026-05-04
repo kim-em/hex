@@ -58,6 +58,9 @@ Reviewer checklist for Phase 3 PRs:
 - [ ] No `#guard` / `example` where RHS is a literal copy of the
   LHS's evaluation (i.e. the assertion carries content beyond "the
   evaluator is deterministic").
+- [ ] No `#guard f(x) = literal` where the literal was obtained by
+  running `f`. Each `#guard`'s expected value must be independently
+  derivable from the function's documented contract.
 - [ ] `lake build HexFoo` green.
 - [ ] Conformance workflow green on the PR.
 
