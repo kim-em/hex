@@ -85,6 +85,45 @@ jobs:
         run: |
           lake exe hexberlekamp_emit_fixtures \
             | python3 scripts/oracle/berlekamp_flint.py
+      - name: Build hexmatrix_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexmatrix_emit_fixtures
+      - name: Cross-check HexMatrix Lean emission against committed fixture
+        run: |
+          lake exe hexmatrix_emit_fixtures > /tmp/hexmatrix-fresh.jsonl
+          diff -u conformance-fixtures/HexMatrix/matrix.jsonl \
+            /tmp/hexmatrix-fresh.jsonl
+      - name: Run HexMatrix python-flint oracle
+        run: |
+          lake exe hexmatrix_emit_fixtures \
+            | python3 scripts/oracle/matrix_flint.py
+      - name: Build hexbz_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexbz_emit_fixtures
+      - name: Cross-check HexBerlekampZassenhaus Lean emission against committed fixture
+        run: |
+          lake exe hexbz_emit_fixtures > /tmp/hexbz-fresh.jsonl
+          diff -u conformance-fixtures/HexBerlekampZassenhaus/bz.jsonl \
+            /tmp/hexbz-fresh.jsonl
+      - name: Run HexBerlekampZassenhaus python-flint oracle
+        run: |
+          lake exe hexbz_emit_fixtures \
+            | python3 scripts/oracle/bz_flint.py
+      - name: Build hexgfqfield_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexgfqfield_emit_fixtures
+      - name: Cross-check HexGfqField Lean emission against committed fixture
+        run: |
+          lake exe hexgfqfield_emit_fixtures > /tmp/hexgfqfield-fresh.jsonl
+          diff -u conformance-fixtures/HexGfqField/gfqfield.jsonl \
+            /tmp/hexgfqfield-fresh.jsonl
+      - name: Run HexGfqField python-flint oracle
+        run: |
+          lake exe hexgfqfield_emit_fixtures \
+            | python3 scripts/oracle/gfqfield_flint.py
       - name: Upload failure records
         if: failure()
         uses: actions/upload-artifact@v4
