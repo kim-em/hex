@@ -100,14 +100,26 @@ jobs:
         uses: leanprover/lean-action@v1
         with:
           build-args: hexhensel_emit_fixtures
-      - name: Cross-check Lean emission against committed fixture
+      - name: Cross-check HexHensel Lean emission against committed fixture
         run: |
           lake exe hexhensel_emit_fixtures > /tmp/hexhensel-fresh.jsonl
           diff -u conformance-fixtures/HexHensel/hensel.jsonl /tmp/hexhensel-fresh.jsonl
-      - name: Run PARI oracle
+      - name: Run HexHensel PARI oracle
         run: |
           lake exe hexhensel_emit_fixtures \
             | python3 scripts/oracle/hensel_pari.py
+      - name: Build hexconway_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexconway_emit_fixtures
+      - name: Cross-check HexConway Lean emission against committed fixture
+        run: |
+          lake exe hexconway_emit_fixtures > /tmp/hexconway-fresh.jsonl
+          diff -u conformance-fixtures/HexConway/conway.jsonl /tmp/hexconway-fresh.jsonl
+      - name: Run HexConway PARI + Lübeck-cache oracle
+        run: |
+          lake exe hexconway_emit_fixtures \
+            | python3 scripts/oracle/conway_pari.py
       - name: Upload failure records
         if: failure()
         uses: actions/upload-artifact@v4
