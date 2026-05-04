@@ -2138,6 +2138,21 @@ theorem det_finalColumn_expansion {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
         det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
         rw [det_finalColumn_diagonal_sum]
 
+/-- Final-column expansion specialized to a bordered minor. The diagonal
+contribution is rewritten as the source leading-prefix determinant times the
+border entry. -/
+theorem det_borderedMinor_finalColumn_expansion {R : Type u}
+    [Lean.Grind.CommRing R] (M : Matrix R n n) (k : Nat)
+    (hk : k < n) (i j : Fin n) :
+    det (borderedMinor M k hk i j) =
+      (permutationVectors k).foldl
+          (fun acc v => acc + detFinalColumnOffDiagonal (borderedMinor M k hk i j) v)
+          0 +
+        det (leadingPrefix M k (Nat.le_of_lt hk)) * M[i][j] := by
+  rw [det_finalColumn_expansion]
+  rw [det_leadingPrefix_borderedMinor_eq_det_leadingPrefix M k hk i j]
+  rw [borderedMinor_entry_last_last]
+
 /-- Final-column expansion specialized to the next bordered minor in the
 Bareiss recurrence. The diagonal contribution is rewritten as the current
 pivot bordered minor times the new bottom-right source entry. -/
