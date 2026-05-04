@@ -235,6 +235,102 @@ private theorem subtractScaledShift_getD_of_forall_ne [Sub R] [Mul R]
   exact hne j (List.mem_range.mp hj)
 
 omit [DecidableEq R] in
+private theorem subtractScaledShift_fold_getD_range [Lean.Grind.CommRing R]
+    (rem q : Array R) (shift : Nat) (coeff : R) (n m : Nat)
+    (hbound : ∀ j, j < m → shift + j < rem.size) :
+    ((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).getD n
+        (Zero.zero : R) =
+      if shift ≤ n ∧ n - shift < m then
+        rem.getD n (Zero.zero : R) - coeff * q.getD (n - shift) (Zero.zero : R)
+      else
+        rem.getD n (Zero.zero : R) := by
+  induction m with
+  | zero =>
+      simp
+  | succ m ih =>
+      rw [List.range_succ, List.foldl_append]
+      simp only [List.foldl_cons, List.foldl_nil]
+      by_cases hnlast : n = shift + m
+      · subst n
+        have hprefix :
+            ((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).getD
+                (shift + m) (Zero.zero : R) =
+              rem.getD (shift + m) (Zero.zero : R) := by
+          rw [ih]
+          · simp
+          · intro j hj
+            exact hbound j (by omega)
+        have hprefix_size :
+            ((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).size =
+              rem.size :=
+          subtractScaledShift_fold_size rem q shift coeff (List.range m)
+        change
+          (((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).set!
+              (shift + m)
+              (((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).getD
+                (shift + m) (Zero.zero : R) -
+                coeff * q.getD m (Zero.zero : R))).getD
+            (shift + m) (Zero.zero : R) =
+              if shift ≤ shift + m ∧ shift + m - shift < m + 1 then
+                rem.getD (shift + m) (Zero.zero : R) -
+                  coeff * q.getD (shift + m - shift) (Zero.zero : R)
+              else
+                rem.getD (shift + m) (Zero.zero : R)
+        rw [array_getD_set!_same]
+        · rw [hprefix]
+          have hsub : shift + m - shift = m := by omega
+          simp [hsub]
+        · simpa [hprefix_size] using hbound m (by omega)
+      · change
+          (((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).set!
+              (shift + m)
+              (((List.range m).foldl (subtractScaledShiftStep q shift coeff) rem).getD
+                (shift + m) (Zero.zero : R) -
+                coeff * q.getD m (Zero.zero : R))).getD n (Zero.zero : R) =
+              if shift ≤ n ∧ n - shift < m + 1 then
+                rem.getD n (Zero.zero : R) - coeff * q.getD (n - shift) (Zero.zero : R)
+              else
+                rem.getD n (Zero.zero : R)
+        rw [array_getD_set!_ne]
+        · rw [ih]
+          · by_cases h : shift ≤ n ∧ n - shift < m
+            · have hsucc : shift ≤ n ∧ n - shift < m + 1 := ⟨h.1, by omega⟩
+              simp [h, hsucc]
+            · have hnot_m : ¬ (shift ≤ n ∧ n - shift = m) := by
+                intro hm
+                apply hnlast
+                omega
+              have hiff : (shift ≤ n ∧ n - shift < m + 1) ↔
+                  (shift ≤ n ∧ n - shift < m) := by
+                constructor
+                · intro hsucc
+                  have hne : n - shift ≠ m := by
+                    intro hm
+                    exact hnot_m ⟨hsucc.1, hm⟩
+                  exact ⟨hsucc.1, by omega⟩
+                · intro hlt
+                  exact ⟨hlt.1, by omega⟩
+              by_cases hsucc : shift ≤ n ∧ n - shift < m + 1
+              · have h' : shift ≤ n ∧ n - shift < m := hiff.mp hsucc
+                exact False.elim (h h')
+              · simp [h, hsucc]
+          · intro j hj
+            exact hbound j (by omega)
+        · omega
+
+omit [DecidableEq R] in
+private theorem subtractScaledShift_getD [Lean.Grind.CommRing R]
+    (rem q : Array R) (shift : Nat) (coeff : R) (n : Nat)
+    (hbound : ∀ j, j < q.size → shift + j < rem.size) :
+    (subtractScaledShift rem q shift coeff).getD n (Zero.zero : R) =
+      if shift ≤ n ∧ n - shift < q.size then
+        rem.getD n (Zero.zero : R) - coeff * q.getD (n - shift) (Zero.zero : R)
+      else
+        rem.getD n (Zero.zero : R) := by
+  unfold subtractScaledShift
+  exact subtractScaledShift_fold_getD_range rem q shift coeff n q.size hbound
+
+omit [DecidableEq R] in
 private theorem subtractScaledShift_getD_last [Sub R] [Mul R]
     (rem q : Array R) (shift qDegree : Nat) (coeff : R)
     (hsize : q.size = qDegree + 1) (hidx : shift + qDegree < rem.size) :
