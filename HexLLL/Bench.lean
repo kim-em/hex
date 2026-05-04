@@ -1,4 +1,5 @@
 import HexLLL
+import Init.Data.Rat.Lemmas
 import LeanBench
 
 /-!
@@ -21,6 +22,9 @@ Scientific registrations:
   integer `ν` and `d`, wrapped in a fixed hot loop for signal-floor stability.
 * `runPotential`: prefix product of the stored Gram determinants, wrapped in a
   fixed hot loop for signal-floor stability.
+* `runFirstShortVectorChecksum`: the public BZ-facing LLL recombination entry
+  point, with fixture construction and independence checking hoisted into
+  `prep`.
 -/
 
 namespace Hex.LLLBench
@@ -44,6 +48,19 @@ structure StateInput where
 instance : Hashable StateInput where
   hash input :=
     hash (input.rows, input.cols, input.j.val, input.k.val)
+
+/-- Prepared public `lll` input. The valid case stores the independence witness
+computed during `prep`; the invalid case keeps registration total if a future
+fixture change accidentally loses full rank. -/
+inductive PublicLLLInput where
+  | valid (rows cols : Nat) (basis : Matrix Int rows cols)
+      (hn : 1 ≤ rows) (hind : basis.independent)
+  | invalid
+
+instance : Hashable PublicLLLInput where
+  hash
+    | .valid rows cols _ _ _ => hash (rows, cols, true)
+    | .invalid => hash false
 
 /-- Deterministic small integer entry generator keyed by shape and position.
 The diagonal offset keeps the prepared bases independent in the benchmark
@@ -71,6 +88,21 @@ def flatBasis (rows cols salt : Nat) : Array Int :=
 /-- Reconstruct a typed dense matrix from row-major entries. -/
 def matrixOfFlat (input : IntBasisInput) : Matrix Int input.rows input.cols :=
   Matrix.ofFn fun i j => input.entries.getD (i.val * input.cols + j.val) 0
+
+/-- Executable independence predicate used only during benchmark preparation. -/
+def independentCheck (b : Matrix Int n m) : Bool :=
+  (List.finRange n).all fun k =>
+    0 < Matrix.det (Matrix.submatrix (Matrix.gramMatrix b) k)
+
+private theorem independent_of_independentCheck_eq_true
+    {b : Matrix Int n m} (h : independentCheck b = true) : b.independent := by
+  simpa [Matrix.independent, independentCheck] using h
+
+private theorem quarter_lt_threeQuarter : (1 / 4 : Rat) < 3 / 4 := by
+  grind
+
+private theorem threeQuarter_le_one : (3 / 4 : Rat) ≤ 1 := by
+  grind
 
 /-- Build the certified executable LLL state for a deterministic matrix. -/
 def stateOf (b : Matrix Int n m) : LLLState n m where
@@ -105,6 +137,24 @@ def prepStateInput (n : Nat) : StateInput :=
     hjk := by
       change n + 1 < n + 2
       omega }
+
+/-- Per-parameter public LLL fixture: a BZ-shaped integer basis with one row per
+synthetic lifted factor and one coefficient column per ambient lattice
+coordinate. The independence decision is intentionally hoisted out of the timed
+body. -/
+def prepPublicLLLInput (n : Nat) : PublicLLLInput :=
+  let rows := n + 3
+  let cols := 2 * rows + 1
+  let flat : IntBasisInput :=
+    { rows := rows
+      cols := cols
+      entries := flatBasis rows cols 313 }
+  let basis := matrixOfFlat flat
+  if hcheck : independentCheck basis then
+    .valid rows cols basis (by simp [rows])
+      (independent_of_independentCheck_eq_true (by simpa using hcheck))
+  else
+    .invalid
 
 /-- Stable checksum for integer vectors. -/
 def intVectorChecksum (v : Vector Int n) : Int :=
@@ -159,6 +209,14 @@ def potentialComplexity (n : Nat) : Nat :=
   let rows := n + 3
   rows * rows * rows
 
+/-- Model for public LLL recombination on the prepared `rows x (2 rows + 1)`
+fixture. The timed call includes `LLLState.ofBasis`'s integer Gram surface,
+followed by a no-backtracking LLL pass on this diagonal-dominant family and a
+linear checksum of the first reduced row. -/
+def firstShortVectorComplexity (n : Nat) : Nat :=
+  let rows := n + 3
+  rows * rows * rows + rows * rows * (2 * rows + 1)
+
 /-- Fixed repeat count for one-step linear state updates. This is independent
 of `n`, so it changes only the constant factor in the declared linear model. -/
 def stateStepHotRepeats : Nat := 2048
@@ -175,6 +233,11 @@ def gramSchmidtCoeffHotRepeats : Nat := 65536
 /-- Fixed repeat count for determinant-prefix products. This is independent of
 `n`, so it changes only the constant factor in the declared linear model. -/
 def potentialHotRepeats : Nat := 128
+
+/-- Fixed repeat count for the public LLL recombination surface. This is
+independent of `n`, so it changes only the constant factor in the declared
+Gram-surface-plus-loop model. -/
+def firstShortVectorHotRepeats : Nat := 8
 
 /-- Repeat a deterministic integer-valued target with a rolling checksum. -/
 def repeatIntChecksum (repeats : Nat) (f : Unit → Int) : Int :=
@@ -223,6 +286,16 @@ def runGramSchmidtCoeffChecksum (input : StateInput) : Int :=
 def runPotential (input : StateInput) : Nat :=
   repeatNatChecksum potentialHotRepeats fun _ =>
     input.state.potential
+
+/-- Benchmark target: run the public downstream short-vector entry point and
+checksum the reduced first row. -/
+def runFirstShortVectorChecksum : PublicLLLInput → Int
+  | .valid _ _ basis hn hind =>
+      repeatIntChecksum firstShortVectorHotRepeats fun _ =>
+        intVectorChecksum
+          (lll.firstShortVector basis (3 / 4 : Rat)
+            quarter_lt_threeQuarter threeQuarter_le_one hn hind)
+  | .invalid => 0
 
 /- Complexity derivation: `prepStateInput n` gives `rows = n + 3` and
 `cols = 2 * (n + 3) + 1`. A single targeted reduction updates one basis row
@@ -295,6 +368,23 @@ setup_benchmark runPotential n => potentialComplexity n
     paramSchedule := .custom #[192, 208, 224]
     maxSecondsPerCall := 8.0
     targetInnerNanos := 200000000
+  }
+
+/- Complexity derivation: `lll.firstShortVector` calls the public `lll`
+surface, so the timed body builds the initial integer state from the basis,
+runs the LLL loop, and reads the first reduced row. On this BZ-shaped
+diagonal-dominant fixture the loop performs the linear advance schedule without
+backtracking; the dominant intended surface is the same shared integer Gram
+construction used by `LLLState.ofBasis`, with the fixed hot-loop repeat count
+independent of `n`. -/
+setup_benchmark runFirstShortVectorChecksum n => firstShortVectorComplexity n
+  with prep := prepPublicLLLInput
+  where {
+    paramFloor := 5
+    paramCeiling := 7
+    paramSchedule := .custom #[5, 6, 7]
+    maxSecondsPerCall := 8.0
+    targetInnerNanos := 600000000
   }
 
 end Hex.LLLBench
