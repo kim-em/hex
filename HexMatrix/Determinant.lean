@@ -2138,6 +2138,22 @@ theorem det_finalColumn_expansion {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
         det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
         rw [det_finalColumn_diagonal_sum]
 
+/-- Final-column expansion specialized to the next bordered minor in the
+Bareiss recurrence. The diagonal contribution is rewritten as the current
+pivot bordered minor times the new bottom-right source entry. -/
+theorem det_borderedMinor_succ_finalColumn_expansion {R : Type u}
+    [Lean.Grind.CommRing R] (M : Matrix R n n) (k : Nat)
+    (hk : k < n) (hnext : k + 1 < n) (i j : Fin n) :
+    det (borderedMinor M (k + 1) hnext i j) =
+      (permutationVectors (k + 1)).foldl
+          (fun acc v =>
+            acc + detFinalColumnOffDiagonal (borderedMinor M (k + 1) hnext i j) v)
+          0 +
+        det (borderedMinor M k hk ⟨k, hk⟩ ⟨k, hk⟩) * M[i][j] := by
+  rw [det_finalColumn_expansion]
+  rw [det_leadingPrefix_borderedMinor_succ_eq_det_borderedMinor M k hk hnext i j]
+  rw [borderedMinor_entry_last_last]
+
 private theorem rowSwap_rowAddDuplicate_eq {R : Type u} {n : Nat}
     (M : Matrix R n n) (src dst : Fin n) (_h : src ≠ dst) :
     rowSwap (rowAddDuplicate M src dst) src dst = rowAddDuplicate M src dst := by
