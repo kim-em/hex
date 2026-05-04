@@ -63,7 +63,7 @@ end FpPoly
 
 namespace FiniteField
 
-variable {p : Nat} [Hex.ZMod64.Bounds p]
+variable {p : Nat} [Hex.ZMod64.Bounds p] [Hex.ZMod64.PrimeModulus p]
 variable {f : Hex.FpPoly p}
 variable {hf : 0 < Hex.FpPoly.degree f}
 variable {hp : Hex.Nat.Prime p}
@@ -152,7 +152,7 @@ end FiniteField
 
 namespace GFq
 
-variable {p n : Nat} [Hex.ZMod64.Bounds p]
+variable {p n : Nat} [Hex.ZMod64.Bounds p] [Hex.ZMod64.PrimeModulus p]
 
 /-- Canonical Conway-backed `GFq` values inherit the generic finite-field
 enumeration. -/
