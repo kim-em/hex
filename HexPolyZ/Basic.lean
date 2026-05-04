@@ -895,7 +895,14 @@ private instance ratDivModLaws : DensePoly.DivModLaws Rat where
     exact rat_divMod_remainder_degree_lt_core p q hdegree
   divModMonic_eq_divMod_of_monic := by
     intro p q hmonic
-    sorry
+    by_cases hlt : p.degree?.getD 0 < q.degree?.getD 0
+    · rw [DensePoly.divMod_eq_zero_self_of_degree_lt p q hlt]
+      unfold DensePoly.divModMonic
+      exact DensePoly.divModArray_eq_zero_self_of_degree_lt p q id hlt
+    · apply DensePoly.divModMonic_eq_divMod_of_monic_core p q hmonic hlt
+      intro a
+      rw [hmonic]
+      grind [Rat.div_def]
   mod_self_eq_zero := by
     intro p
     sorry
