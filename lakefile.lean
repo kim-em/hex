@@ -142,8 +142,14 @@ lean_exe hexmatrix_emit_fixtures where
 lean_exe hexbz_emit_fixtures where
   root := `HexBerlekampZassenhaus.EmitFixtures
 
+lean_exe hexgf2_emit_fixtures where
+  root := `HexGF2.EmitFixtures
+
 lean_exe hexhensel_emit_fixtures where
   root := `HexHensel.EmitFixtures
+
+lean_exe hexlll_emit_fixtures where
+  root := `HexLLL.EmitFixtures
 
 lean_exe hexgfqfield_emit_fixtures where
   root := `HexGfqField.EmitFixtures
