@@ -1,5 +1,4 @@
 import HexBerlekampZassenhaus.Basic
-import HexBerlekampZassenhaus.Conformance
 
 /-!
 The `HexBerlekampZassenhaus` library exposes the executable integer
