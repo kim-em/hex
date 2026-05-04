@@ -64,14 +64,27 @@ jobs:
         uses: leanprover/lean-action@v1
         with:
           build-args: hexpoly_emit_fixtures
-      - name: Cross-check Lean emission against committed fixture
+      - name: Cross-check HexPoly Lean emission against committed fixture
         run: |
           lake exe hexpoly_emit_fixtures > /tmp/hexpoly-fresh.jsonl
           diff -u conformance-fixtures/HexPoly/poly.jsonl /tmp/hexpoly-fresh.jsonl
-      - name: Run python-flint oracle
+      - name: Run HexPoly python-flint oracle
         run: |
           lake exe hexpoly_emit_fixtures \
             | python3 scripts/oracle/poly_flint.py
+      - name: Build hexberlekamp_emit_fixtures
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: hexberlekamp_emit_fixtures
+      - name: Cross-check HexBerlekamp Lean emission against committed fixture
+        run: |
+          lake exe hexberlekamp_emit_fixtures > /tmp/hexberlekamp-fresh.jsonl
+          diff -u conformance-fixtures/HexBerlekamp/berlekamp.jsonl \
+            /tmp/hexberlekamp-fresh.jsonl
+      - name: Run HexBerlekamp python-flint oracle
+        run: |
+          lake exe hexberlekamp_emit_fixtures \
+            | python3 scripts/oracle/berlekamp_flint.py
       - name: Upload failure records
         if: failure()
         uses: actions/upload-artifact@v4
