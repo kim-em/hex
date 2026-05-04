@@ -7,8 +7,8 @@ import HexLLL.Basic
 Executable data records for the Berlekamp-Zassenhaus factorization pipeline.
 
 This module contains the shared records passed between prime selection,
-Hensel lifting, and integer recombination in the `ZPoly` factorization
-pipeline.
+Hensel lifting, and LLL-based integer recombination in the `ZPoly`
+factorization pipeline.
 -/
 namespace Hex
 
@@ -679,6 +679,11 @@ private def recombineExhaustive (f : ZPoly) (d : LiftData) : Array ZPoly :=
   | some factors => factors.toArray
   | none => #[]
 
+private def exhaustiveRecombinationLocalFactorLimit : Nat := 4
+
+private def canUseExhaustiveRecombination (d : LiftData) : Bool :=
+  d.liftedFactors.size ≤ exhaustiveRecombinationLocalFactorLimit
+
 /--
 The lifted factors contain enough information for the executable exhaustive
 recombination search to recover factors of `f`.
@@ -687,16 +692,40 @@ def LiftedFactorsRecombineTo (f : ZPoly) (d : LiftData) : Prop :=
   ∃ factors, recombinationSearch f d.liftedFactors.toList = some factors
 
 /--
-Exhaustively recombine lifted local factors into integer factors.
+Recombine lifted local factors into integer factors.
 
-An empty result means the lifted data did not pass the exact-divisibility
-checks; it is an explicit recombination failure rather than a replacement of
-the factorization by the original input.
+The production path is LLL-based. Exhaustive subset recombination is retained
+only as a small-input fallback; for larger inputs, an LLL miss is reported as
+an explicit recombination failure.
 -/
 def recombine (f : ZPoly) (d : LiftData) : Array ZPoly :=
   match recombineLLL? f d with
   | some factors => factors
-  | none => recombineExhaustive f d
+  | none =>
+      if canUseExhaustiveRecombination d then
+        recombineExhaustive f d
+      else
+        #[]
+
+private def recombineLLLBranchGuardFactors : Array ZPoly :=
+  #[DensePoly.ofCoeffs #[-1, 1],
+    DensePoly.ofCoeffs #[-2, 1],
+    DensePoly.ofCoeffs #[-3, 1],
+    DensePoly.ofCoeffs #[-4, 1],
+    DensePoly.ofCoeffs #[-5, 1]]
+
+private def recombineLLLBranchGuardInput : ZPoly :=
+  Array.polyProduct recombineLLLBranchGuardFactors
+
+private def recombineLLLBranchGuardLift : LiftData :=
+  { p := 2
+    k := 8
+    liftedFactors := recombineLLLBranchGuardFactors }
+
+#guard !canUseExhaustiveRecombination recombineLLLBranchGuardLift
+
+#guard Array.polyProduct (recombine recombineLLLBranchGuardInput recombineLLLBranchGuardLift) =
+  recombineLLLBranchGuardInput
 
 /-- Factor with an explicit coefficient bound for the recombination stage. -/
 def factorWithBound (f : ZPoly) (B : Nat) : Array ZPoly :=

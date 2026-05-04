@@ -3,6 +3,6 @@ import HexBerlekampZassenhaus.Basic
 /-!
 The `HexBerlekampZassenhaus` library exposes the executable integer
 Berlekamp-Zassenhaus factorization pipeline: normalization, good-prime
-selection, Hensel-lift packaging, exhaustive recombination, bounded/default
+selection, Hensel-lift packaging, LLL-based recombination, bounded/default
 factor entry points, and the integer irreducibility certificate checker.
 -/
