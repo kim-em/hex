@@ -169,6 +169,12 @@ def emitResult (lib case op : String) (value : String) : IO Unit := do
 /-- Polynomial-shaped result value: a coefficient list. -/
 def polyValue (coeffs : List Int) : String := jsonIntList coeffs
 
+/-- Integer-list result value (e.g. a vector of leading determinants). -/
+def intListValue (xs : List Int) : String := jsonIntList xs
+
+/-- Integer-matrix result value (rows of integers). -/
+def intMatrixValue (rows : List (List Int)) : String := jsonIntMatrix rows
+
 /-- `divmod`-shaped result value: a `[quotient, remainder]` coefficient pair. -/
 def divModValue (quot rem : List Int) : String :=
   "[" ++ jsonIntList quot ++ "," ++ jsonIntList rem ++ "]"
