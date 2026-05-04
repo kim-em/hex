@@ -133,6 +133,9 @@ lean_exe hexpoly_emit_fixtures where
 lean_exe hexberlekamp_emit_fixtures where
   root := `HexBerlekamp.EmitFixtures
 
+lean_exe hexmatrix_emit_fixtures where
+  root := `HexMatrix.EmitFixtures
+
 lean_exe hexhensel_emit_fixtures where
   root := `HexHensel.EmitFixtures
 
