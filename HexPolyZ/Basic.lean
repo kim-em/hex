@@ -919,6 +919,126 @@ private theorem densePoly_eq_zero_of_isZero_true {R : Type _} [Zero R] [Decidabl
   rw [DensePoly.coeff_zero]
   rfl
 
+private theorem rat_coeff_succ_eq_zero_of_derivative_zero {p : DensePoly Rat}
+    (hderivative : DensePoly.derivative p = 0) (n : Nat) :
+    p.coeff (n + 1) = 0 := by
+  have hcoeff := congrArg (fun q : DensePoly Rat => q.coeff n) hderivative
+  change (DensePoly.derivative p).coeff n = (0 : DensePoly Rat).coeff n at hcoeff
+  rw [rat_coeff_derivative, DensePoly.coeff_zero] at hcoeff
+  have hnat : ((n + 1 : Nat) : Rat) ≠ 0 := by
+    exact_mod_cast Nat.succ_ne_zero n
+  exact (Rat.mul_eq_zero.mp hcoeff).resolve_left hnat
+
+private theorem rat_size_le_one_of_derivative_zero (p : DensePoly Rat)
+    (hderivative : DensePoly.derivative p = 0) :
+    p.size ≤ 1 := by
+  by_cases hle : p.size ≤ 1
+  · exact hle
+  · exfalso
+    have hgt : 1 < p.size := Nat.lt_of_not_ge hle
+    let i := p.size - 1
+    have hlast_ne : p.coeff i ≠ 0 :=
+      DensePoly.coeff_last_ne_zero_of_pos_size p (by omega)
+    have hi : i = (p.size - 2) + 1 := by
+      unfold i
+      omega
+    have hzero : p.coeff i = 0 := by
+      rw [hi]
+      exact rat_coeff_succ_eq_zero_of_derivative_zero hderivative (p.size - 2)
+    exact hlast_ne hzero
+
+private theorem size_le_one_of_toRatPoly_derivative_zero (p : ZPoly)
+    (hderivative : DensePoly.derivative (toRatPoly p) = 0) :
+    p.size ≤ 1 := by
+  have hrat := rat_size_le_one_of_derivative_zero (toRatPoly p) hderivative
+  simpa [size_toRatPoly p] using hrat
+
+private theorem densePoly_eq_C_coeff_zero_of_size_le_one {R : Type _} [Zero R] [DecidableEq R]
+    (p : DensePoly R) (hsize : p.size ≤ 1) :
+    p = DensePoly.C (p.coeff 0) := by
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_C]
+  cases n with
+  | zero =>
+      simp
+  | succ n =>
+      have hp_zero : p.coeff (n + 1) = 0 :=
+        DensePoly.coeff_eq_zero_of_size_le p (by omega)
+      rw [hp_zero]
+      rfl
+
+private theorem content_C_int (c : Int) :
+    content (DensePoly.C c) = Int.ofNat c.natAbs := by
+  simpa [content] using DensePoly.content_C c
+
+private theorem int_eq_one_or_neg_one_of_natAbs_eq_one {c : Int}
+    (habs : c.natAbs = 1) :
+    c = 1 ∨ c = -1 := by
+  cases c with
+  | ofNat n =>
+      left
+      simp at habs
+      subst n
+      rfl
+  | negSucc n =>
+      right
+      simp at habs
+      have hn : n = 0 := by omega
+      subst n
+      rfl
+
+private theorem normalizePrimitiveSign_C_one :
+    normalizePrimitiveSign (DensePoly.C (1 : Int)) = 1 := by
+  unfold normalizePrimitiveSign
+  have hlead : ¬ DensePoly.leadingCoeff (DensePoly.C (1 : Int)) < 0 := by
+    simp [DensePoly.leadingCoeff, DensePoly.coeffs_C_of_ne_zero (by decide : (1 : Int) ≠ 0)]
+  rw [if_neg hlead]
+  rfl
+
+private theorem normalizePrimitiveSign_C_neg_one :
+    normalizePrimitiveSign (DensePoly.C (-1 : Int)) = 1 := by
+  unfold normalizePrimitiveSign
+  have hlead : DensePoly.leadingCoeff (DensePoly.C (-1 : Int)) < 0 := by
+    simp [DensePoly.leadingCoeff, DensePoly.coeffs_C_of_ne_zero (by decide : (-1 : Int) ≠ 0)]
+  rw [if_pos hlead]
+  apply DensePoly.ext_coeff
+  intro n
+  rw [DensePoly.coeff_scale (R := Int) (-1 : Int) (DensePoly.C (-1 : Int)) n
+    (Int.mul_zero (-1 : Int))]
+  change -1 * (DensePoly.C (-1 : Int)).coeff n = (DensePoly.C (1 : Int)).coeff n
+  rw [DensePoly.coeff_C, DensePoly.coeff_C]
+  by_cases hn : n = 0
+  · simp [hn]
+  · simp [hn]
+    change - (0 : Int) = (0 : Int)
+    rfl
+
+private theorem normalizePrimitiveSign_eq_one_of_primitive_size_le_one
+    (p : ZPoly) (hprimitive : Primitive p) (hsize : p.size ≤ 1) :
+    normalizePrimitiveSign p = 1 := by
+  have hpC := densePoly_eq_C_coeff_zero_of_size_le_one p hsize
+  have hcontent :
+      content (DensePoly.C (p.coeff 0)) = 1 := by
+    have hprimitive_eq : content p = 1 := hprimitive
+    rw [hpC] at hprimitive_eq
+    exact hprimitive_eq
+  have habs : (p.coeff 0).natAbs = 1 := by
+    have hcast : ((p.coeff 0).natAbs : Int) = 1 := by
+      simpa [content_C_int] using hcontent
+    exact_mod_cast hcast
+  rcases int_eq_one_or_neg_one_of_natAbs_eq_one habs with hcoeff | hcoeff
+  · rw [hpC, hcoeff]
+    exact normalizePrimitiveSign_C_one
+  · rw [hpC, hcoeff]
+    exact normalizePrimitiveSign_C_neg_one
+
+private theorem squareFreeRat_one :
+    SquareFreeRat 1 := by
+  unfold SquareFreeRat
+  rw [toRatPoly_one]
+  rfl
+
 theorem primitiveSquareFreeDecomposition_reassembly_over_rat (f : ZPoly) :
     let d := primitiveSquareFreeDecomposition f
     ∃ unit : Rat,
@@ -980,7 +1100,40 @@ theorem primitiveSquareFreeDecomposition_squareFreeCore
     (f : ZPoly)
     (hcore : (primitiveSquareFreeDecomposition f).squareFreeCore ≠ 0) :
     SquareFreeRat (primitiveSquareFreeDecomposition f).squareFreeCore := by
-  sorry
+  unfold primitiveSquareFreeDecomposition at hcore ⊢
+  by_cases hzero : (primitivePart f).isZero = true
+  · simp [hzero] at hcore
+  · simp [hzero]
+    let p := primitivePart f
+    let ratPrimitive := toRatPoly p
+    let derivative := DensePoly.derivative ratPrimitive
+    by_cases hderivative : derivative.isZero = true
+    · have hderivative_eq : derivative = 0 :=
+        densePoly_eq_zero_of_isZero_true derivative hderivative
+      have hcontent_ne : content f ≠ 0 := by
+        intro hcontent
+        have hpart_zero : primitivePart f = 0 := by
+          simpa [primitivePart] using
+            DensePoly.primitivePart_eq_zero_of_content_eq_zero f
+              (by simpa [content] using hcontent)
+        have hisZero : (primitivePart f).isZero = true := by
+          rw [hpart_zero]
+          rfl
+        rw [hisZero] at hzero
+        contradiction
+      have hprimitive : Primitive p := by
+        simpa [p] using primitivePart_primitive f hcontent_ne
+      have hsize : p.size ≤ 1 := by
+        exact size_le_one_of_toRatPoly_derivative_zero p (by
+          simpa [derivative, ratPrimitive] using hderivative_eq)
+      have hcore_eq : normalizePrimitiveSign p = 1 :=
+        normalizePrimitiveSign_eq_one_of_primitive_size_le_one p hprimitive hsize
+      rw [if_pos hderivative]
+      change SquareFreeRat (normalizePrimitiveSign p)
+      rw [hcore_eq]
+      exact squareFreeRat_one
+    · rw [if_neg hderivative]
+      sorry
 
 theorem coprimeModP_of_bezout
     (f g s t : ZPoly) (p : Nat)
