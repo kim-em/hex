@@ -1827,6 +1827,14 @@ theorem content_zero :
     content (0 : DensePoly Int) = 0 := by
   rfl
 
+theorem content_C (c : Int) :
+    content (C c) = Int.ofNat c.natAbs := by
+  unfold content contentNat toArray
+  by_cases hc : c = 0
+  · simp [hc]
+  · rw [coeffs_C_of_ne_zero hc]
+    simp
+
 theorem primitivePart_eq_zero_of_content_eq_zero (p : DensePoly Int) (h : content p = 0) :
     primitivePart p = 0 := by
   have hc : contentNat p = 0 := by
