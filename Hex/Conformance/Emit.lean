@@ -137,6 +137,23 @@ def emitPrimeFixture (lib case : String) (p n : Int) : IO Unit := do
     ("n",    jsonInt n)
   ]
 
+/-- Emit a `gfqfield` fixture record carrying the prime `p`, the
+modulus polynomial coefficients, two reduced operands `a` / `b`
+(with `b` nonzero so `a / b` is well-defined), and the integer
+exponent `zexp` used by the `zpow` op. -/
+def emitGfqFieldFixture (lib case : String) (p : Int)
+    (modulus a b : List Int) (zexp : Int) : IO Unit := do
+  emitLine <| jsonObject [
+    ("kind",    jsonString "gfqfield"),
+    ("lib",     jsonString lib),
+    ("case",    jsonString case),
+    ("p",       jsonInt p),
+    ("modulus", jsonIntList modulus),
+    ("a",       jsonIntList a),
+    ("b",       jsonIntList b),
+    ("zexp",    jsonInt zexp)
+  ]
+
 /-- Emit a `result` record carrying Lean's computed answer for one op
 on a previously-emitted case.  `value` must be a valid raw JSON
 fragment; helpers below build the common shapes. -/
@@ -166,5 +183,8 @@ def polyRatValue (coeffs : List Rat) : String :=
   let dens := coeffs.map fun r => (r.den : Int)
   "{" ++ jsonString "num" ++ ":" ++ jsonIntList nums ++
   "," ++ jsonString "den" ++ ":" ++ jsonIntList dens ++ "}"
+
+/-- Lattice-shaped result value: a basis as a list of integer rows. -/
+def latticeValue (basis : List (List Int)) : String := jsonIntMatrix basis
 
 end Hex.Conformance.Emit
