@@ -791,6 +791,76 @@ theorem divMod_eq_zero_self_of_degree_lt [One R] [Add R] [Sub R] [Mul R] [Div R]
   intro hdeg
   simp [divMod, hdeg]
 
+private theorem ofCoeffs_replicate_zero (n : Nat) :
+    (ofCoeffs (Array.replicate n (Zero.zero : R)) : DensePoly R) = 0 := by
+  apply ext_coeff
+  intro i
+  rw [coeff_ofCoeffs]
+  change (Array.replicate n (Zero.zero : R)).getD i (Zero.zero : R) = (Zero.zero : R)
+  simp [Array.getD]
+
+private theorem ofCoeffs_empty :
+    (ofCoeffs (#[] : Array R) : DensePoly R) = 0 := by
+  rfl
+
+private theorem ofCoeffs_toArray (p : DensePoly R) :
+    ofCoeffs p.toArray = p := by
+  apply ext_coeff
+  intro i
+  rw [coeff_ofCoeffs]
+  rfl
+
+theorem divModArray_eq_zero_self_of_degree_lt [Sub R] [Mul R]
+    (p q : DensePoly R) (scaleLead : R → R)
+    (hdeg : p.degree?.getD 0 < q.degree?.getD 0) :
+    divModArray p q scaleLead = (0, p) := by
+  unfold divModArray
+  by_cases hqzero : q.isZero
+  · have hqsize : q.size = 0 := by
+      simp [isZero] at hqzero
+      simpa [size] using hqzero
+    simp [degree?, hqsize] at hdeg
+  · rw [if_neg hqzero]
+    let qDegree := q.size - 1
+    let quotientSize := p.size - qDegree
+    let quot := Array.replicate quotientSize (Zero.zero : R)
+    have hqpos : 0 < q.size := by
+      have hcoeffs : q.coeffs.size ≠ 0 := by
+        simpa [isZero, Array.isEmpty_iff_size_eq_zero] using hqzero
+      simpa [size, Nat.pos_iff_ne_zero] using hcoeffs
+    have hqdeg : q.degree?.getD 0 = qDegree := by
+      simp [degree?, qDegree, Nat.ne_of_gt hqpos]
+    have hpsize_le : p.size ≤ qDegree := by
+      by_cases hppos : 0 < p.size
+      · have hpdeg : p.degree?.getD 0 = p.size - 1 := by
+          simp [degree?, Nat.ne_of_gt hppos]
+        rw [hpdeg, hqdeg] at hdeg
+        omega
+      · have hpzero : p.size = 0 := by omega
+        omega
+    have hquot_zero : quotientSize = 0 := by
+      dsimp [quotientSize]
+      omega
+    cases hpsize : p.size with
+    | zero =>
+        simp [divModArrayAux, ofCoeffs_toArray, ofCoeffs_empty]
+    | succ fuel =>
+        cases harray : arrayDegree? p.toArray with
+        | none =>
+            simp [divModArrayAux, ofCoeffs_replicate_zero, ofCoeffs_toArray, harray]
+        | some rd =>
+            have hrd_lt_size : rd < p.size := by
+              simpa [toArray] using arrayDegree?_some_lt harray
+            have hrd_lt : rd < qDegree := by omega
+            have hrd_lt' : rd < q.size - 1 := by
+              simpa [qDegree] using hrd_lt
+            have hquot_zero' : fuel + 1 - (q.size - 1) = 0 := by
+              have : p.size - qDegree = 0 := by
+                simpa [quotientSize] using hquot_zero
+              omega
+            simp [divModArrayAux, ofCoeffs_toArray, ofCoeffs_empty, harray, hrd_lt',
+              hquot_zero']
+
 /-- If field-style coefficient division agrees pointwise with the monic scaling function, then
 the executable monic division path agrees with the general `divMod` path away from the early
 degree shortcut. -/
