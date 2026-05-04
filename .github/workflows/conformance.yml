@@ -6,22 +6,29 @@ on:
   workflow_dispatch:
 
 jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.derive.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify conformance matrix invariant
+        run: python3 scripts/conformance_targets.py --check
+      - id: derive
+        name: Derive conformance matrix
+        run: |
+          targets="$(python3 scripts/conformance_targets.py --json)"
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+
   conformance:
+    needs: setup
     runs-on: ubuntu-latest
     env:
       LD_LIBRARY_PATH: /home/runner/.elan/toolchains/leanprover--lean4---v4.30.0-rc2/lib/lean
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - HexArith
-          - HexPoly
-          - HexGfqRing
-          - HexGfqField
-          - HexGfq
-          - HexPolyZ
-          - HexMatrix
-          - HexModArithMathlib
+        target: ${{ fromJSON(needs.setup.outputs.targets) }}
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
