@@ -329,6 +329,17 @@ private theorem foldl_det_sum_congr {R : Type u} [Add R] {β : Type v}
       intro y hy
       exact h y (List.mem_cons_of_mem x hy)
 
+private theorem foldl_acc_congr {α : Type u} {β : Type v}
+    (xs : List β) (f g : α → β → α) (z : α)
+    (h : ∀ acc x, x ∈ xs → f acc x = g acc x) :
+    xs.foldl f z = xs.foldl g z := by
+  induction xs generalizing z with
+  | nil => rfl
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      rw [h z x (by simp)]
+      exact ih (g z x) (fun acc y hy => h acc y (List.mem_cons_of_mem x hy))
+
 private theorem foldl_det_sum_perm {R : Type u} [Lean.Grind.CommRing R]
     {β : Type v} (f : β → R) {xs ys : List β} (hperm : xs.Perm ys) (z : R) :
     xs.foldl (fun acc x => acc + f x) z =
@@ -408,6 +419,21 @@ private theorem foldl_det_sum_mul_left_zero {R : Type u} [Lean.Grind.CommRing R]
   have hzero : c * 0 = 0 := by grind
   simpa [hzero] using (foldl_det_sum_mul_left (R := R) xs c f 0)
 
+private theorem foldl_det_sum_mul_right_zero {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f : β → R) (c : R) :
+    xs.foldl (fun acc x => acc + f x * c) 0 =
+      xs.foldl (fun acc x => acc + f x) 0 * c := by
+  calc
+    xs.foldl (fun acc x => acc + f x * c) 0 =
+        xs.foldl (fun acc x => acc + c * f x) 0 := by
+          apply foldl_det_sum_congr
+          intro x _hmem
+          grind
+    _ = c * xs.foldl (fun acc x => acc + f x) 0 := by
+          exact foldl_det_sum_mul_left_zero xs c f
+    _ = xs.foldl (fun acc x => acc + f x) 0 * c := by
+          grind
+
 private theorem foldl_det_sum_add_start {R : Type u} [Lean.Grind.CommRing R]
     {β : Type v} (xs : List β) (f g : β → R) (a b : R) :
     xs.foldl (fun acc x => acc + (f x + g x)) (a + b) =
@@ -441,6 +467,19 @@ private theorem foldl_det_sum_add_zero {R : Type u} [Lean.Grind.CommRing R]
       xs.foldl (fun acc x => acc + f x) 0 +
         xs.foldl (fun acc x => acc + g x) 0 := by
         exact foldl_det_sum_add_start xs f g 0 0
+
+private theorem foldl_det_sum_start {R : Type u} [Lean.Grind.CommRing R]
+    {β : Type v} (xs : List β) (f : β → R) (z : R) :
+    xs.foldl (fun acc x => acc + f x) z =
+      z + xs.foldl (fun acc x => acc + f x) 0 := by
+  induction xs generalizing z with
+  | nil =>
+      have hzero : z + (0 : R) = z := by grind
+      exact hzero.symm
+  | cons x xs ih =>
+      simp only [List.foldl_cons]
+      rw [ih (z + f x), ih (0 + f x)]
+      grind
 
 private theorem foldl_det_sum_flatMap {R : Type u} [Add R] {β γ : Type v}
     (xs : List β) (f : β → List γ) (g : γ → R) (z : R) :
@@ -1970,6 +2009,113 @@ private theorem foldl_det_sum_map {R : Type u} [Zero R] [Add R]
     (xs.map map).foldl (fun acc x => acc + f x) 0 =
       xs.foldl (fun acc x => acc + f (map x)) 0 := by
   simp [List.foldl_map]
+
+private theorem foldl_det_sum_map_start {R : Type u} [Add R]
+    {β : Type v} {γ : Type w} (xs : List β) (map : β → γ) (f : γ → R) (z : R) :
+    (xs.map map).foldl (fun acc x => acc + f x) z =
+      xs.foldl (fun acc x => acc + f (map x)) z := by
+  simp [List.foldl_map]
+
+private theorem foldl_det_sum_finRange_succ_last {R : Type u} [Add R]
+    {n : Nat} (f : Fin (n + 1) → R) (z : R) :
+    (List.finRange (n + 1)).foldl (fun acc i => acc + f i) z =
+      (List.finRange n).foldl (fun acc i => acc + f i.castSucc) z + f (Fin.last n) := by
+  rw [← Fin.foldl_eq_foldl_finRange, Fin.foldl_succ_last, Fin.foldl_eq_foldl_finRange]
+
+/-- Off-diagonal final-column contribution for the determinant expansion that
+partitions permutations by the row mapped to the final column. -/
+def detFinalColumnOffDiagonal {R : Type u} [Lean.Grind.Ring R] {n : Nat}
+    (M : Matrix R (n + 1) (n + 1)) (v : Vector (Fin n) n) : R :=
+  (List.finRange n).foldl
+    (fun acc i =>
+      acc + detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) i.castSucc))
+    0
+
+/-- The diagonal part of the final-column partition is the determinant of the
+leading prefix times the final row/final column entry. -/
+theorem det_finalColumn_diagonal_sum {R : Type u}
+    [Lean.Grind.CommRing R] {n : Nat} (M : Matrix R (n + 1) (n + 1)) :
+    (permutationVectors n).foldl
+        (fun acc v =>
+          acc + detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))) 0 =
+      det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
+  calc
+    (permutationVectors n).foldl
+        (fun acc v =>
+          acc + detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))) 0 =
+        (permutationVectors n).foldl
+          (fun acc v =>
+            acc + detTerm (leadingPrefix M n (Nat.le_succ n)) v *
+              M[Fin.last n][Fin.last n]) 0 := by
+          apply foldl_det_sum_congr
+          intro v _hmem
+          rw [detTerm_insertAt_last]
+          unfold detTerm
+          grind
+    _ =
+        (permutationVectors n).foldl
+          (fun acc v => acc + detTerm (leadingPrefix M n (Nat.le_succ n)) v) 0 *
+            M[Fin.last n][Fin.last n] := by
+          exact foldl_det_sum_mul_right_zero
+            (permutationVectors n)
+            (fun v => detTerm (leadingPrefix M n (Nat.le_succ n)) v)
+            M[Fin.last n][Fin.last n]
+    _ = det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
+          rfl
+
+/-- Partition the Leibniz determinant by the row whose image is the final
+column. The first summand is the explicit off-diagonal final-column border
+contribution; the second summand is the diagonal final-row/final-column term,
+rewritten as the determinant of the leading prefix times the bottom-right
+entry. -/
+theorem det_finalColumn_expansion {R : Type u} [Lean.Grind.CommRing R] {n : Nat}
+    (M : Matrix R (n + 1) (n + 1)) :
+    det M =
+      (permutationVectors n).foldl
+          (fun acc v => acc + detFinalColumnOffDiagonal M v)
+          0 +
+        det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
+  unfold det
+  simp only [permutationVectors]
+  rw [foldl_det_sum_flatMap]
+  calc
+    (permutationVectors n).foldl
+        (fun acc v =>
+          ((List.finRange (n + 1)).map fun i =>
+              insertAt (Fin.last n) (v.map Fin.castSucc) i).foldl
+            (fun acc perm => acc + detTerm M perm) acc)
+        0 =
+      (permutationVectors n).foldl
+        (fun acc v =>
+          acc +
+            (detFinalColumnOffDiagonal M v +
+              detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n))))
+        0 := by
+        apply foldl_acc_congr
+        intro acc v _hmem
+        rw [foldl_det_sum_map_start]
+        rw [foldl_det_sum_finRange_succ_last]
+        rw [foldl_det_sum_start]
+        unfold detFinalColumnOffDiagonal
+        grind
+    _ =
+      (permutationVectors n).foldl
+          (fun acc v => acc + detFinalColumnOffDiagonal M v)
+          0 +
+        (permutationVectors n).foldl
+          (fun acc v =>
+            acc + detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)))
+          0 := by
+        exact foldl_det_sum_add_zero (permutationVectors n)
+          (fun v => detFinalColumnOffDiagonal M v)
+          (fun v =>
+            detTerm M (insertAt (Fin.last n) (v.map Fin.castSucc) (Fin.last n)))
+    _ =
+      (permutationVectors n).foldl
+          (fun acc v => acc + detFinalColumnOffDiagonal M v)
+          0 +
+        det (leadingPrefix M n (Nat.le_succ n)) * M[Fin.last n][Fin.last n] := by
+        rw [det_finalColumn_diagonal_sum]
 
 private theorem rowSwap_rowAddDuplicate_eq {R : Type u} {n : Nat}
     (M : Matrix R n n) (src dst : Fin n) (_h : src ≠ dst) :
