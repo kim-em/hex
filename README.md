@@ -48,6 +48,8 @@ library.
 | Component | Computational | Mathlib layer |
 |---|---|---|
 | Foundations | [HexBasic](https://github.com/leanprover/hex-basic) | — |
+| Dense polynomials | [HexPoly](https://github.com/leanprover/hex-poly) | [HexPolyMathlib](https://github.com/leanprover/hex-poly-mathlib) |
+| Multivariate polynomials | [HexMvPoly](https://github.com/leanprover/hex-mv-poly) | [HexMvPolyMathlib](https://github.com/leanprover/hex-mv-poly-mathlib) |
 | Matrices | [HexMatrix](https://github.com/leanprover/hex-matrix) | [HexMatrixMathlib](https://github.com/leanprover/hex-matrix-mathlib) |
 | Row reduction | [HexRowReduce](https://github.com/leanprover/hex-row-reduce) | [HexRowReduceMathlib](https://github.com/leanprover/hex-row-reduce-mathlib) |
 | Determinants | [HexDeterminant](https://github.com/leanprover/hex-determinant) | [HexDeterminantMathlib](https://github.com/leanprover/hex-determinant-mathlib) |

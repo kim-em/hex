@@ -7,6 +7,11 @@ revisions.
 
 The currently pinned upstream split repos for `hex` are:
 
+- `hex-basic`
+- `hex-poly`
+- `hex-poly-mathlib`
+- `hex-mv-poly`
+- `hex-mv-poly-mathlib`
 - `hex-matrix`
 - `hex-matrix-mathlib`
 - `hex-gram-schmidt`

@@ -1,9 +1,34 @@
 name = "hex"
 defaultTargets = ["Hex"]
 
-# Aggregator: requires the full released hex-lll-mathlib closure at a single
-# coherent pinned SHA set. Require `hex` to depend on everything released; or
-# require an individual library (e.g. hex-lll) for just that piece.
+# Aggregator: requires every released Hex library at a single coherent pinned
+# SHA set. Require `hex` to depend on everything released; or require an
+# individual library (e.g. hex-mv-poly or hex-lll) for just that piece.
+
+[[require]]
+name = "HexBasic"
+git = "https://github.com/leanprover/hex-basic.git"
+rev = "5354a7153ade8a60effaf6431bda7af22cc3410f"
+
+[[require]]
+name = "HexPoly"
+git = "https://github.com/leanprover/hex-poly.git"
+rev = "edadb24574148105a354f737d59a367a4acbf51d"
+
+[[require]]
+name = "HexPolyMathlib"
+git = "https://github.com/leanprover/hex-poly-mathlib.git"
+rev = "5541f9251d277359aac7727eaf789a13003ab1a8"
+
+[[require]]
+name = "HexMvPoly"
+git = "https://github.com/leanprover/hex-mv-poly.git"
+rev = "8b1c0352464de36642734d50a11bbbe4b6ca7e1f"
+
+[[require]]
+name = "HexMvPolyMathlib"
+git = "https://github.com/leanprover/hex-mv-poly-mathlib.git"
+rev = "fe53b6b62397a3a8c11c18193f79610f8ddba5d6"
 
 [[require]]
 name = "HexMatrix"

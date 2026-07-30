@@ -1,5 +1,10 @@
 module
 
+public import HexBasic
+public import HexPoly
+public import HexPolyMathlib
+public import HexMvPoly
+public import HexMvPolyMathlib
 public import HexMatrix
 public import HexMatrixMathlib
 public import HexGramSchmidt
@@ -12,9 +17,9 @@ public section
 /-!
 `Hex` — convenience aggregator for the released hex libraries.
 
-Requiring `hex` pulls in the whole released `hex-lll-mathlib` closure (the
-executable cores and their Mathlib correspondence proofs) at a single coherent
-pinned set. `import Hex` re-exports all of them; or import an individual
-library directly. To depend on just the executable LLL core without Mathlib,
-require `hex-lll` instead of `hex`.
+Requiring `hex` pulls in every released executable core and Mathlib
+correspondence layer at a single coherent pinned set. `import Hex` re-exports
+all of them; or import an individual library directly. To depend on just a
+Mathlib-free computational package, require that package (for example
+`hex-mv-poly` or `hex-lll`) instead of `hex`.
 -/
