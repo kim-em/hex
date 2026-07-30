@@ -28,7 +28,7 @@ rev = "abd64dac3b4e517b09412db5fc089d7443a4590d"
 [[require]]
 name = "HexMvPolyMathlib"
 git = "https://github.com/leanprover/hex-mv-poly-mathlib.git"
-rev = "d840707ed4a0dabac2f1a8efd4b18321b33e98ca"
+rev = "73bf7d487ab1824072e8c837d0de0696e775fbcc"
 
 [[require]]
 name = "HexMatrix"
