@@ -8,57 +8,57 @@ defaultTargets = ["Hex"]
 [[require]]
 name = "HexBasic"
 git = "https://github.com/leanprover/hex-basic.git"
-rev = "5354a7153ade8a60effaf6431bda7af22cc3410f"
+rev = "a3ab4fd9a79efbe6b07337836b3b5828d22d65a6"
 
 [[require]]
 name = "HexPoly"
 git = "https://github.com/leanprover/hex-poly.git"
-rev = "edadb24574148105a354f737d59a367a4acbf51d"
+rev = "069aaf4c0ebd966306f3254d7a180586f9ab893f"
 
 [[require]]
 name = "HexPolyMathlib"
 git = "https://github.com/leanprover/hex-poly-mathlib.git"
-rev = "5541f9251d277359aac7727eaf789a13003ab1a8"
+rev = "e139e3635ec2748ba3c3784b1f83874efcb2410e"
 
 [[require]]
 name = "HexMvPoly"
 git = "https://github.com/leanprover/hex-mv-poly.git"
-rev = "abd64dac3b4e517b09412db5fc089d7443a4590d"
+rev = "801923b512e27e83f717775c71c156c2e7a15436"
 
 [[require]]
 name = "HexMvPolyMathlib"
 git = "https://github.com/leanprover/hex-mv-poly-mathlib.git"
-rev = "73bf7d487ab1824072e8c837d0de0696e775fbcc"
+rev = "7de55e027a7e622eea102574a165bb439e2ff2a3"
 
 [[require]]
 name = "HexMatrix"
 git = "https://github.com/leanprover/hex-matrix.git"
-rev = "d45bf749d6283726b8df43b5be9e6dde350666d6"
+rev = "9b6ec9285021793e9f43e1c7b3b37da957b6f2c4"
 
 [[require]]
 name = "HexMatrixMathlib"
 git = "https://github.com/leanprover/hex-matrix-mathlib.git"
-rev = "be15f40e4942fe78ed28f037c9407a94bc3c10ce"
+rev = "7b28ee80d5f372054e167b7ce0a4fe57dac90e13"
 
 [[require]]
 name = "HexGramSchmidt"
 git = "https://github.com/leanprover/hex-gram-schmidt.git"
-rev = "6bae0c6ed6c19c44956dc69eb31487fc3596f01d"
+rev = "4a3b351e56d510026a2327b77bf3711687ddeced"
 
 [[require]]
 name = "HexGramSchmidtMathlib"
 git = "https://github.com/leanprover/hex-gram-schmidt-mathlib.git"
-rev = "06acf34175d105ef322e24a60efeba1b0d8460bf"
+rev = "12308baf178176edb54060d75fea8d954b736b5b"
 
 [[require]]
 name = "HexLLL"
 git = "https://github.com/leanprover/hex-lll.git"
-rev = "a73f188bbd7ea48c4a1bb1e6d608b4f131026512"
+rev = "76338eba34901960a7be341ea5d20e4f3d8fd215"
 
 [[require]]
 name = "HexLLLMathlib"
 git = "https://github.com/leanprover/hex-lll-mathlib.git"
-rev = "c10d6681dee9a4f963c1035bcbe34fc3eb60a769"
+rev = "65645933516b49231316ba7ab4ecf887dd8254bd"
 
 [[lean_lib]]
 name = "Hex"
