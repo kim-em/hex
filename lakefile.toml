@@ -13,52 +13,52 @@ rev = "a3ab4fd9a79efbe6b07337836b3b5828d22d65a6"
 [[require]]
 name = "HexPoly"
 git = "https://github.com/leanprover/hex-poly.git"
-rev = "069aaf4c0ebd966306f3254d7a180586f9ab893f"
+rev = "0e9bc2960cb36fea9cb8766f6deaff347e340915"
 
 [[require]]
 name = "HexPolyMathlib"
 git = "https://github.com/leanprover/hex-poly-mathlib.git"
-rev = "e139e3635ec2748ba3c3784b1f83874efcb2410e"
+rev = "350d579211dbe191cb6608ec1070c002e8ecd154"
 
 [[require]]
 name = "HexMvPoly"
 git = "https://github.com/leanprover/hex-mv-poly.git"
-rev = "801923b512e27e83f717775c71c156c2e7a15436"
+rev = "948ad47eef946522a45053006f472081a845f06a"
 
 [[require]]
 name = "HexMvPolyMathlib"
 git = "https://github.com/leanprover/hex-mv-poly-mathlib.git"
-rev = "7de55e027a7e622eea102574a165bb439e2ff2a3"
+rev = "27337b7cc13f4752557ee78cd78019adc0ebff7e"
 
 [[require]]
 name = "HexMatrix"
 git = "https://github.com/leanprover/hex-matrix.git"
-rev = "9b6ec9285021793e9f43e1c7b3b37da957b6f2c4"
+rev = "ce6c24451327c1a7ddfea3cd31739966f3622038"
 
 [[require]]
 name = "HexMatrixMathlib"
 git = "https://github.com/leanprover/hex-matrix-mathlib.git"
-rev = "7b28ee80d5f372054e167b7ce0a4fe57dac90e13"
+rev = "b4516b56eef24f60af1e344932b333c60337b0ee"
 
 [[require]]
 name = "HexGramSchmidt"
 git = "https://github.com/leanprover/hex-gram-schmidt.git"
-rev = "4a3b351e56d510026a2327b77bf3711687ddeced"
+rev = "6c3cd2177f45b15367af96e5bb3360d77633c858"
 
 [[require]]
 name = "HexGramSchmidtMathlib"
 git = "https://github.com/leanprover/hex-gram-schmidt-mathlib.git"
-rev = "12308baf178176edb54060d75fea8d954b736b5b"
+rev = "05b64528b3f1842cd4b63b3488cf62c89f2ebda9"
 
 [[require]]
 name = "HexLLL"
 git = "https://github.com/leanprover/hex-lll.git"
-rev = "76338eba34901960a7be341ea5d20e4f3d8fd215"
+rev = "554f5b452a7866e206d2fd31b08a533b4c985b7c"
 
 [[require]]
 name = "HexLLLMathlib"
 git = "https://github.com/leanprover/hex-lll-mathlib.git"
-rev = "65645933516b49231316ba7ab4ecf887dd8254bd"
+rev = "bb91c9383eb715c0d358ca0ef1417404aec6db02"
 
 [[lean_lib]]
 name = "Hex"
