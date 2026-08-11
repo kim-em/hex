@@ -70,5 +70,12 @@ library.
 | Integer polynomial factorization | [HexBerlekampZassenhaus](https://github.com/leanprover/hex-berlekamp-zassenhaus) | [HexBerlekampZassenhausMathlib](https://github.com/leanprover/hex-berlekamp-zassenhaus-mathlib) |
 <!-- LIBRARIES:END -->
 
+# Announcements
+
+<!-- ANNOUNCEMENTS:BEGIN (generated from released.yml; do not edit by hand) -->
+- LLL lattice reduction ([HexLLL](https://github.com/leanprover/hex-lll)): [blog post](https://kim-em.github.io/blog/2026-7-7-lattice-basis-reduction-using-the-hex-lean-library/), [Zulip](https://leanprover.zulipchat.com/#narrow/channel/579630-Project-announcements/topic/Hex%3A.20a.20computational.20algebra.20library/near/608173688), [LinkedIn](https://www.linkedin.com/posts/kim-morrison-219962b_lattice-basis-reduction-using-the-hex-lean-share-7480672935360266241-WF7o/)
+- Integer polynomial factorization ([HexBerlekampZassenhaus](https://github.com/leanprover/hex-berlekamp-zassenhaus)): [blog post](https://kim-em.github.io/blog/2026-8-10-certified-integer-polynomial-factorization-in-lean/), [Zulip](https://leanprover.zulipchat.com/#narrow/channel/579630-Project-announcements/topic/Hex%3A.20integer.20polynomial.20factorization/near/615747356), [LinkedIn](https://www.linkedin.com/feed/update/urn:li:activity:7492744920349192193)
+<!-- ANNOUNCEMENTS:END -->
+
 Development of the full project (including unreleased libraries) happens in the
 [`hex-dev`](https://github.com/kim-em/hex-dev) monorepo.
