@@ -54,7 +54,7 @@ library.
 | Dense univariate polynomials | [HexPoly](https://github.com/leanprover/hex-poly) | [HexPolyMathlib](https://github.com/leanprover/hex-poly-mathlib) |
 | Sparse multivariate polynomials | [HexMvPoly](https://github.com/leanprover/hex-mv-poly) | [HexMvPolyMathlib](https://github.com/leanprover/hex-mv-poly-mathlib) |
 | Modular arithmetic | [HexModArith](https://github.com/leanprover/hex-mod-arith) | [HexModArithMathlib](https://github.com/leanprover/hex-mod-arith-mathlib) |
-| Polynomials over a prime field | [HexPolyFp](https://github.com/leanprover/hex-poly-fp) | n/a |
+| Polynomials over a prime field | [HexPolyFp](https://github.com/leanprover/hex-poly-fp) | [HexPolyFpMathlib](https://github.com/leanprover/hex-poly-fp-mathlib) |
 | Integer polynomials | [HexPolyZ](https://github.com/leanprover/hex-poly-z) | [HexPolyZMathlib](https://github.com/leanprover/hex-poly-z-mathlib) |
 | Quotient rings `F_p[x]/(f)` | [HexGFqRing](https://github.com/leanprover/hex-gfq-ring) | n/a |
 | Hensel lifting | [HexHensel](https://github.com/leanprover/hex-hensel) | [HexHenselMathlib](https://github.com/leanprover/hex-hensel-mathlib) |
@@ -63,6 +63,10 @@ library.
 | Matrices | [HexMatrix](https://github.com/leanprover/hex-matrix) | [HexMatrixMathlib](https://github.com/leanprover/hex-matrix-mathlib) |
 | Row reduction | [HexRowReduce](https://github.com/leanprover/hex-row-reduce) | [HexRowReduceMathlib](https://github.com/leanprover/hex-row-reduce-mathlib) |
 | Finite-field factorization | [HexBerlekamp](https://github.com/leanprover/hex-berlekamp) | [HexBerlekampMathlib](https://github.com/leanprover/hex-berlekamp-mathlib) |
+| Conway polynomials | [HexConway](https://github.com/leanprover/hex-conway) | n/a |
+| Finite fields `F_p[x]/(f)` | [HexGFqField](https://github.com/leanprover/hex-gfq-field) | n/a |
+| Packed GF(2) polynomials | [HexGF2](https://github.com/leanprover/hex-gf2) | [HexGF2Mathlib](https://github.com/leanprover/hex-gf2-mathlib) |
+| Canonical finite fields | [HexGFq](https://github.com/leanprover/hex-gfq) | [HexGFqMathlib](https://github.com/leanprover/hex-gfq-mathlib) |
 | Determinants | [HexDeterminant](https://github.com/leanprover/hex-determinant) | [HexDeterminantMathlib](https://github.com/leanprover/hex-determinant-mathlib) |
 | Bareiss determinant | [HexBareiss](https://github.com/leanprover/hex-bareiss) | [HexBareissMathlib](https://github.com/leanprover/hex-bareiss-mathlib) |
 | Gram-Schmidt | [HexGramSchmidt](https://github.com/leanprover/hex-gram-schmidt) | [HexGramSchmidtMathlib](https://github.com/leanprover/hex-gram-schmidt-mathlib) |
