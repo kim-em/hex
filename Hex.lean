@@ -18,8 +18,6 @@ public import HexGF2
 public import HexGF2Mathlib
 public import HexGFq
 public import HexGFqMathlib
-public import HexCharPoly
-public import HexCharPolyMathlib
 
 public section
 

@@ -95,15 +95,5 @@ name = "HexGFqMathlib"
 git = "https://github.com/leanprover/hex-gfq-mathlib.git"
 rev = "af61107eb0c6752b178cdb334bfc6d62210eab26"
 
-[[require]]
-name = "HexCharPoly"
-git = "https://github.com/leanprover/hex-char-poly.git"
-rev = ""
-
-[[require]]
-name = "HexCharPolyMathlib"
-git = "https://github.com/leanprover/hex-char-poly-mathlib.git"
-rev = ""
-
 [[lean_lib]]
 name = "Hex"
