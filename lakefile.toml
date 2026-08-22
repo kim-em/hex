@@ -68,7 +68,7 @@ rev = "e46f2f401aaf969d77db8003f235686449cf0c3f"
 [[require]]
 name = "HexConway"
 git = "https://github.com/leanprover/hex-conway.git"
-rev = "6ca8ad40bc073b0f7439bafd880e5615f861e3d6"
+rev = "0f46f5bc5b2708acc26d25873244a2a0dfa0a153"
 
 [[require]]
 name = "HexGFqField"
@@ -83,17 +83,17 @@ rev = "22a330f6ae7cfac7330b3d0a289f3db761a3a940"
 [[require]]
 name = "HexGF2Mathlib"
 git = "https://github.com/leanprover/hex-gf2-mathlib.git"
-rev = "dd1261bd2e0b843c9d631d1af08ef5accac45acf"
+rev = "4ea3a43f29afce886e8b22ca1c9322d7f0928ccb"
 
 [[require]]
 name = "HexGFq"
 git = "https://github.com/leanprover/hex-gfq.git"
-rev = "41295c559a2848c9a9536d6e1527d45b2335e810"
+rev = "f5cbc41d54becac3d63deb77a48bb629dc6a693d"
 
 [[require]]
 name = "HexGFqMathlib"
 git = "https://github.com/leanprover/hex-gfq-mathlib.git"
-rev = "af61107eb0c6752b178cdb334bfc6d62210eab26"
+rev = "2662735c3d871f78fe20257253ed7456b77c9cdb"
 
 [[lean_lib]]
 name = "Hex"

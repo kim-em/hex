@@ -69,6 +69,7 @@ library.
 | Canonical finite fields | [HexGFq](https://github.com/leanprover/hex-gfq) | [HexGFqMathlib](https://github.com/leanprover/hex-gfq-mathlib) |
 | Determinants | [HexDeterminant](https://github.com/leanprover/hex-determinant) | [HexDeterminantMathlib](https://github.com/leanprover/hex-determinant-mathlib) |
 | Bareiss determinant | [HexBareiss](https://github.com/leanprover/hex-bareiss) | [HexBareissMathlib](https://github.com/leanprover/hex-bareiss-mathlib) |
+| Characteristic polynomials | [HexCharPoly](https://github.com/leanprover/hex-char-poly) | [HexCharPolyMathlib](https://github.com/leanprover/hex-char-poly-mathlib) |
 | Gram-Schmidt | [HexGramSchmidt](https://github.com/leanprover/hex-gram-schmidt) | [HexGramSchmidtMathlib](https://github.com/leanprover/hex-gram-schmidt-mathlib) |
 | LLL lattice reduction | [HexLLL](https://github.com/leanprover/hex-lll) | [HexLLLMathlib](https://github.com/leanprover/hex-lll-mathlib) |
 | Integer polynomial factorization | [HexBerlekampZassenhaus](https://github.com/leanprover/hex-berlekamp-zassenhaus) | [HexBerlekampZassenhausMathlib](https://github.com/leanprover/hex-berlekamp-zassenhaus-mathlib) |
