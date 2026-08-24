@@ -5,6 +5,8 @@ public import HexPoly
 public import HexPolyMathlib
 public import HexMvPoly
 public import HexMvPolyMathlib
+public import HexSparsePoly
+public import HexSparsePolyMathlib
 public import HexMatrix
 public import HexMatrixMathlib
 public import HexGramSchmidt

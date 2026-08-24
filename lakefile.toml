@@ -36,6 +36,16 @@ git = "https://github.com/leanprover/hex-matrix.git"
 rev = "049bf8e57b33cb87b4012ed9d2da4cce0af296d9"
 
 [[require]]
+name = "HexSparsePoly"
+git = "https://github.com/leanprover/hex-sparse-poly.git"
+rev = "31fd3c5ff151bfa93797c388208a9e86b86ac45f"
+
+[[require]]
+name = "HexSparsePolyMathlib"
+git = "https://github.com/leanprover/hex-sparse-poly-mathlib.git"
+rev = "626ed3c6467ddabcf130513c4360450f5f304837"
+
+[[require]]
 name = "HexMatrixMathlib"
 git = "https://github.com/leanprover/hex-matrix-mathlib.git"
 rev = "7da10508fdb5a489805004e5550992662b8b533c"
