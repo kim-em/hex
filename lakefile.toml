@@ -8,7 +8,7 @@ defaultTargets = ["Hex"]
 [[require]]
 name = "HexBasic"
 git = "https://github.com/leanprover/hex-basic.git"
-rev = "da8a864cd17ccca780d8c76af403e88585bc4734"
+rev = "a47240943e925951a676d1a1c2f2a615ae68fdef"
 
 [[require]]
 name = "HexArith"
@@ -18,22 +18,22 @@ rev = "ea246536c442464a68210ecce973eb7708968f59"
 [[require]]
 name = "HexPrimality"
 git = "https://github.com/leanprover/hex-primality.git"
-rev = "799a8590e7666a44e05c8bf7da615df1a07fdbcd"
+rev = "d5b5d9eb91e39ad187b011e280da6bf80b6fe5b6"
 
 [[require]]
 name = "HexPrimalityMathlib"
 git = "https://github.com/leanprover/hex-primality-mathlib.git"
-rev = "48757e8716a9bf10de28c8a043dc9f7ae79924a0"
+rev = "26183dfd6c4ddbc881f57e495e40c2c05c55c5d9"
 
 [[require]]
 name = "HexPoly"
 git = "https://github.com/leanprover/hex-poly.git"
-rev = "bf67a5243d68c909bcd059a89fd9d3f1c54ba7d8"
+rev = "1f7f31c7733ee5f0fa30d4a376adfa5125895c29"
 
 [[require]]
 name = "HexMvPoly"
 git = "https://github.com/leanprover/hex-mv-poly.git"
-rev = "51f56155b0165ab8bd334cebce788a56c9e79b7a"
+rev = "673d31ece9204eb6304d8fe52feb6784b18aaf73"
 
 [[require]]
 name = "HexModArith"
@@ -43,32 +43,32 @@ rev = "67c1559800bc1f62622165d3fe5d6d346661539d"
 [[require]]
 name = "HexSparsePoly"
 git = "https://github.com/leanprover/hex-sparse-poly.git"
-rev = "9d99201ff495fe903b4d7467f7de2f017a5d46f8"
+rev = "6b980b6ee9c296f872bde1cc34b2343459d05180"
 
 [[require]]
 name = "HexPolyMathlib"
 git = "https://github.com/leanprover/hex-poly-mathlib.git"
-rev = "d4bbb82b87704d3016c6c1d822ae1f77c793958a"
+rev = "a9eb9de8c92b96f57660d02c468f9f8622066641"
 
 [[require]]
 name = "HexSparsePolyMathlib"
 git = "https://github.com/leanprover/hex-sparse-poly-mathlib.git"
-rev = "b11678201cd541a6879dd5780dc5c3d15c12b2d8"
+rev = "89a465b9060f161cddf10d5d517efae99eba40f3"
 
 [[require]]
 name = "HexMvPolyMathlib"
 git = "https://github.com/leanprover/hex-mv-poly-mathlib.git"
-rev = "da1e70967201991c161875582bd3482bbb2193fd"
+rev = "a822a2cdedc8094e7c115ec5efab3aa85503b975"
 
 [[require]]
 name = "HexPolyFp"
 git = "https://github.com/leanprover/hex-poly-fp.git"
-rev = "da25459d8ebb26693edfcc70a9217fa6a5c1a1eb"
+rev = "ab1e4419cc16a219d0432bc1c535a8430385d329"
 
 [[require]]
 name = "HexPolyZ"
 git = "https://github.com/leanprover/hex-poly-z.git"
-rev = "037df2d4b50602d07892e7591547c4b641b03c63"
+rev = "385df1df6b2667aeb001b6b781f7109943de243b"
 
 [[require]]
 name = "HexModArithMathlib"
@@ -78,202 +78,202 @@ rev = "5aa0aa69b47c153189d708c3047aa294a594113f"
 [[require]]
 name = "HexPolyFpMathlib"
 git = "https://github.com/leanprover/hex-poly-fp-mathlib.git"
-rev = "9b1b631edb95e006252d513dcf6030bc07cbb1d0"
+rev = "245ec193c808cceb61e2327382ccb8f0123ff4b9"
 
 [[require]]
 name = "HexGFqRing"
 git = "https://github.com/leanprover/hex-gfq-ring.git"
-rev = "39a0d7414c3eaa1c5718f63212c620782fa5bd4f"
+rev = "c8e9ae656852744edb51cdf11801248085a7a8d5"
 
 [[require]]
 name = "HexHensel"
 git = "https://github.com/leanprover/hex-hensel.git"
-rev = "e9cdca38baa5b0c9e6449300715cb4defc342f9c"
+rev = "67e940994ef10106a47b03a9d63ff8cd4a7a7daf"
 
 [[require]]
 name = "HexPolyZMathlib"
 git = "https://github.com/leanprover/hex-poly-z-mathlib.git"
-rev = "d9b7ba1f1ef5bc456f9b7467f694b940d5e5200a"
+rev = "db6441e818dd3a21e99bd7bf7a1b53291a140207"
 
 [[require]]
 name = "HexHenselMathlib"
 git = "https://github.com/leanprover/hex-hensel-mathlib.git"
-rev = "e85d72ef90da456027bcc59a3f2ca04fa326fc24"
+rev = "109d08c1128941d4ef1bc99dd116dc95010e0ffa"
 
 [[require]]
 name = "HexRoots"
 git = "https://github.com/leanprover/hex-roots.git"
-rev = "5de271feb738cd92d96b8140ba7a9bac2f245d3d"
+rev = "1cbee8873adc3c6587a00aa288f675be6d105818"
 
 [[require]]
 name = "HexRealRoots"
 git = "https://github.com/leanprover/hex-real-roots.git"
-rev = "ffe6d10182fb0294b6202d2d2da49879ff29df2d"
+rev = "5ea6914dc230e7519722d237b46e02ec6e5ff2d0"
 
 [[require]]
 name = "HexRootsMathlib"
 git = "https://github.com/leanprover/hex-roots-mathlib.git"
-rev = "a8774c9e1a27e194e3ab8f3cd0761c8c3bdad257"
+rev = "c57e7cfaf6469ca8eea81c12e201143692f272ad"
 
 [[require]]
 name = "HexRealRootsMathlib"
 git = "https://github.com/leanprover/hex-real-roots-mathlib.git"
-rev = "2eb1d01e82b3dfcd7d5fc0bad1aeed56014fe45a"
+rev = "3634195024275435520c6b6d106f371f5c45df67"
 
 [[require]]
 name = "HexMatrix"
 git = "https://github.com/leanprover/hex-matrix.git"
-rev = "25cfbbd8a689eb782fad408c46a9c1796dd943b2"
+rev = "a99dc4690f411538088463b6db94e38958e65a81"
 
 [[require]]
 name = "HexRowReduce"
 git = "https://github.com/leanprover/hex-row-reduce.git"
-rev = "967216591082d290bc3f9e1b7405effd910bdef9"
+rev = "7550b5334bea67cba65c9a96a87d24557090784f"
 
 [[require]]
 name = "HexBerlekamp"
 git = "https://github.com/leanprover/hex-berlekamp.git"
-rev = "038357670f6b370babd6d46254f994c4e5493ad8"
+rev = "1abc06a7bf0a0fb570116f88df049a412df7187a"
 
 [[require]]
 name = "HexConway"
 git = "https://github.com/leanprover/hex-conway.git"
-rev = "6e10f5759ed62fcffbf8405cb18522f87a363042"
+rev = "72fc70fd0a1301e04d08344c10954761983ef36b"
 
 [[require]]
 name = "HexGFqField"
 git = "https://github.com/leanprover/hex-gfq-field.git"
-rev = "2c11ca0095c536cc7da19ed3dd65993195fc67d6"
+rev = "c3dfd91cdb2b6ea1f7f53497a7ab4352529125f2"
 
 [[require]]
 name = "HexGF2"
 git = "https://github.com/leanprover/hex-gf2.git"
-rev = "b24279750a96757fbd99f8682a88bd52a248d6ca"
+rev = "d573907fa60ccc90bb510c5078a147fc73cfed1e"
 
 [[require]]
 name = "HexGF2Mathlib"
 git = "https://github.com/leanprover/hex-gf2-mathlib.git"
-rev = "5bb8e8dd4a9a592020d0ac38a3dc680ad2a041c1"
+rev = "16ee5edf9dfe2c87640083f745a299770bde33e3"
 
 [[require]]
 name = "HexGFq"
 git = "https://github.com/leanprover/hex-gfq.git"
-rev = "c36742c34d403dac6b160fe763e2529f620a8d6f"
+rev = "81e2052577b02821b87997de3a920a1d44edf4e6"
 
 [[require]]
 name = "HexGFqMathlib"
 git = "https://github.com/leanprover/hex-gfq-mathlib.git"
-rev = "80b182c3f5464678d6f2afbd6c3d0a09b26bac9d"
+rev = "188454035489124f1efbf3d2e895938229607039"
 
 [[require]]
 name = "HexDeterminant"
 git = "https://github.com/leanprover/hex-determinant.git"
-rev = "01c471058f6d7b84c4bc37a2d200f264f356328b"
+rev = "2c122657aee7dcd9f7a619dc0d8971a3415e127a"
 
 [[require]]
 name = "HexBareiss"
 git = "https://github.com/leanprover/hex-bareiss.git"
-rev = "4e0b52c59c96f20956db753ed2ed1ed9d11c59c4"
+rev = "23ac1d50878f839e306c2f395a9ac576b352f06b"
 
 [[require]]
 name = "HexMatrixMathlib"
 git = "https://github.com/leanprover/hex-matrix-mathlib.git"
-rev = "7c5744ca46a91252712f1c421911e9a2463d5fd6"
+rev = "7e610d89729859968ae51cbbecb8aaef537d7225"
 
 [[require]]
 name = "HexRowReduceMathlib"
 git = "https://github.com/leanprover/hex-row-reduce-mathlib.git"
-rev = "5b0b760e455c2a5e0bd1811803598075c2e81a0b"
+rev = "5ad579c7fdea10924bae382aa76322be8fabeff7"
 
 [[require]]
 name = "HexDeterminantMathlib"
 git = "https://github.com/leanprover/hex-determinant-mathlib.git"
-rev = "594ef2a30aac874e2ea0500ec797892bbfabff8c"
+rev = "2d55aeb045db4c85465d6127cf1d540ac44251f8"
 
 [[require]]
 name = "HexBareissMathlib"
 git = "https://github.com/leanprover/hex-bareiss-mathlib.git"
-rev = "b3162b7ba3a8bfaca67408cdae82f26b8895a707"
+rev = "d021b513e4b2d0a498eab607d5d628da10c1acda"
 
 [[require]]
 name = "HexBerlekampMathlib"
 git = "https://github.com/leanprover/hex-berlekamp-mathlib.git"
-rev = "0cbca7c7455434693fe270088fb3cff1e5bcedcc"
+rev = "cdc574ac2c4d07c520d8d930e69d2c7778e8bd87"
 
 [[require]]
 name = "HexGramSchmidt"
 git = "https://github.com/leanprover/hex-gram-schmidt.git"
-rev = "b508982f1e270918d76b61a35e4471975a3498b1"
+rev = "8fe742b19616ec636fad7bfaf3c69742765ad489"
 
 [[require]]
 name = "HexGramSchmidtMathlib"
 git = "https://github.com/leanprover/hex-gram-schmidt-mathlib.git"
-rev = "2079039e908154577aee65abe678ab42e49803d5"
+rev = "1fe2b7d38268092996b29a15b0b60ca3c4669586"
 
 [[require]]
 name = "HexLLL"
 git = "https://github.com/leanprover/hex-lll.git"
-rev = "0136e0582ac585cb157ba688235ef2b24f11345e"
+rev = "127d47d7c248c4e26c3b269eb46ceaed29b99ea4"
 
 [[require]]
 name = "HexBerlekampZassenhaus"
 git = "https://github.com/leanprover/hex-berlekamp-zassenhaus.git"
-rev = "a75e874fc96b8e87916c6026a8e7cabcf7a99447"
+rev = "5b59d167f5bac139c2bf6f7a654476881314ff23"
 
 [[require]]
 name = "HexLLLMathlib"
 git = "https://github.com/leanprover/hex-lll-mathlib.git"
-rev = "52dc3389fd80ee32372eb5f2e1d1c237715d8f65"
+rev = "8f9c2d98fd4cce338196d7febf23fc288e2134b9"
 
 [[require]]
 name = "HexBerlekampZassenhausMathlib"
 git = "https://github.com/leanprover/hex-berlekamp-zassenhaus-mathlib.git"
-rev = "a64dd3e6c11d864be268121845c9705eb230b1fe"
+rev = "4e959c0ae8e83316ec1038a3b1abbd5964a08c51"
 
 [[require]]
 name = "HexGraphIso"
 git = "https://github.com/leanprover/hex-graph-iso.git"
-rev = "7986a1da25c6deac4c91d7f0a237e55d375f33c5"
+rev = "6617ecbe4a73912db8bc255624299e9761c1d935"
 
 [[require]]
 name = "HexGraphIsoMathlib"
 git = "https://github.com/leanprover/hex-graph-iso-mathlib.git"
-rev = "0166acffb3929dd26495863e0404f82a8671e0c0"
+rev = "dc9d758c5e512b91284cf073b2d9d584e91921bb"
 
 [[require]]
 name = "HexResultant"
 git = "https://github.com/leanprover/hex-resultant.git"
-rev = "73847eaaf06e829a7bad6bff02cd95b1e75f8707"
+rev = "449bea55585ac61e8a8cbd6ef5b0c8625283beff"
 
 [[require]]
 name = "HexResultantMathlib"
 git = "https://github.com/leanprover/hex-resultant-mathlib.git"
-rev = "b40bef9d6083c1df635867813fac6c3bc8455a4e"
+rev = "42a7f1de16b18e1425bea094d221d2a88bc66ed4"
 
 [[require]]
 name = "HexNumberField"
 git = "https://github.com/leanprover/hex-number-field.git"
-rev = "f75c4cb92b73dc053230f7087fa9a8a7f4edd21b"
+rev = "302f88b3c675038bc7a6f4fb4b19dfe450e01ff3"
 
 [[require]]
 name = "HexNumberFieldMathlib"
 git = "https://github.com/leanprover/hex-number-field-mathlib.git"
-rev = "8197b38919eb8e76248c2e9b28d37cd96f6007c4"
+rev = "03503806986cba2c7e68b6da2058b54ca81c3b92"
 
 [[require]]
 name = "HexNumberFieldTower"
 git = "https://github.com/leanprover/hex-number-field-tower.git"
-rev = "98e91f4d44afa362edf95878b0795bed0928e6a8"
+rev = "4fa6533f991e6cdd42f6cc5a4e8173b4e98620dd"
 
 [[require]]
 name = "HexNumberFieldTowerMathlib"
 git = "https://github.com/leanprover/hex-number-field-tower-mathlib.git"
-rev = "6e71e197698fea3d95ad0bf6acb382a6178b21bc"
+rev = "3dc0b3accd5a16d1b575ba8fe6e38e450e657ed6"
 
 [[require]]
 name = "HexRCF"
 git = "https://github.com/leanprover/hex-rcf.git"
-rev = "1a7e83d857d0aabd2fa709fa398856dc628d60f0"
+rev = "dbe226844384cc51c9a06da230c2ebaa52b4940d"
 
 [[lean_lib]]
 name = "Hex"
