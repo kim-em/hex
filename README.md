@@ -44,7 +44,8 @@ core) instead of the aggregator.
 
 Each computational library is Mathlib-free; its Mathlib correspondence proofs
 and Mathlib-facing API, where they exist, live in a separate `*-mathlib`
-library.
+library. A library whose subject is a Mathlib-facing tactic, such as
+`hex-rcf`, has no computational half and appears only in the Mathlib column.
 
 <!-- LIBRARIES:BEGIN (generated from released.yml; do not edit by hand) -->
 | Component | Computational | Mathlib layer |
@@ -75,6 +76,10 @@ library.
 | LLL lattice reduction | [HexLLL](https://github.com/leanprover/hex-lll) | [HexLLLMathlib](https://github.com/leanprover/hex-lll-mathlib) |
 | Integer polynomial factorization | [HexBerlekampZassenhaus](https://github.com/leanprover/hex-berlekamp-zassenhaus) | [HexBerlekampZassenhausMathlib](https://github.com/leanprover/hex-berlekamp-zassenhaus-mathlib) |
 | Graph canonical labelling | [HexGraphIso](https://github.com/leanprover/hex-graph-iso) | [HexGraphIsoMathlib](https://github.com/leanprover/hex-graph-iso-mathlib) |
+| Resultants and discriminants | [HexResultant](https://github.com/leanprover/hex-resultant) | [HexResultantMathlib](https://github.com/leanprover/hex-resultant-mathlib) |
+| Algebraic numbers | [HexNumberField](https://github.com/leanprover/hex-number-field) | [HexNumberFieldMathlib](https://github.com/leanprover/hex-number-field-mathlib) |
+| Number field towers | [HexNumberFieldTower](https://github.com/leanprover/hex-number-field-tower) | [HexNumberFieldTowerMathlib](https://github.com/leanprover/hex-number-field-tower-mathlib) |
+| Real-closed-field decision (`rcf` tactic) | n/a | [HexRCF](https://github.com/leanprover/hex-rcf) |
 <!-- LIBRARIES:END -->
 
 # Announcements
