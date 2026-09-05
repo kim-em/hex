@@ -51,6 +51,7 @@ library.
 |---|---|---|
 | Foundations | [HexBasic](https://github.com/leanprover/hex-basic) | n/a |
 | Exact word arithmetic | [HexArith](https://github.com/leanprover/hex-arith) | n/a |
+| Certified primality | [HexPrimality](https://github.com/leanprover/hex-primality) | [HexPrimalityMathlib](https://github.com/leanprover/hex-primality-mathlib) |
 | Dense univariate polynomials | [HexPoly](https://github.com/leanprover/hex-poly) | [HexPolyMathlib](https://github.com/leanprover/hex-poly-mathlib) |
 | Sparse multivariate polynomials | [HexMvPoly](https://github.com/leanprover/hex-mv-poly) | [HexMvPolyMathlib](https://github.com/leanprover/hex-mv-poly-mathlib) |
 | Modular arithmetic | [HexModArith](https://github.com/leanprover/hex-mod-arith) | [HexModArithMathlib](https://github.com/leanprover/hex-mod-arith-mathlib) |
@@ -73,6 +74,7 @@ library.
 | Gram-Schmidt | [HexGramSchmidt](https://github.com/leanprover/hex-gram-schmidt) | [HexGramSchmidtMathlib](https://github.com/leanprover/hex-gram-schmidt-mathlib) |
 | LLL lattice reduction | [HexLLL](https://github.com/leanprover/hex-lll) | [HexLLLMathlib](https://github.com/leanprover/hex-lll-mathlib) |
 | Integer polynomial factorization | [HexBerlekampZassenhaus](https://github.com/leanprover/hex-berlekamp-zassenhaus) | [HexBerlekampZassenhausMathlib](https://github.com/leanprover/hex-berlekamp-zassenhaus-mathlib) |
+| Graph canonical labelling | [HexGraphIso](https://github.com/leanprover/hex-graph-iso) | [HexGraphIsoMathlib](https://github.com/leanprover/hex-graph-iso-mathlib) |
 <!-- LIBRARIES:END -->
 
 # Announcements
