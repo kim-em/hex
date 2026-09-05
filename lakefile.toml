@@ -105,5 +105,15 @@ name = "HexGFqMathlib"
 git = "https://github.com/leanprover/hex-gfq-mathlib.git"
 rev = "7748b7778171b1194b7fc58dc7dc98ec0424963e"
 
+[[require]]
+name = "HexGraphIso"
+git = "https://github.com/leanprover/hex-graph-iso.git"
+rev = "17e07ae91a9a660a12a4c173e916fc2386aa1ce6"
+
+[[require]]
+name = "HexGraphIsoMathlib"
+git = "https://github.com/leanprover/hex-graph-iso-mathlib.git"
+rev = "dc4bff47e72c859f9eaaaf2719a9a74ab4ad7571"
+
 [[lean_lib]]
 name = "Hex"

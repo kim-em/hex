@@ -20,6 +20,8 @@ public import HexGF2
 public import HexGF2Mathlib
 public import HexGFq
 public import HexGFqMathlib
+public import HexGraphIso
+public import HexGraphIsoMathlib
 
 public section
 
