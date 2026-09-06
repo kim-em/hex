@@ -233,12 +233,12 @@ rev = "4e959c0ae8e83316ec1038a3b1abbd5964a08c51"
 [[require]]
 name = "HexGraphIso"
 git = "https://github.com/leanprover/hex-graph-iso.git"
-rev = "6617ecbe4a73912db8bc255624299e9761c1d935"
+rev = "7a7ec786426bc11738eefeb6cb556fbc2ad1d5bb"
 
 [[require]]
 name = "HexGraphIsoMathlib"
 git = "https://github.com/leanprover/hex-graph-iso-mathlib.git"
-rev = "dc9d758c5e512b91284cf073b2d9d584e91921bb"
+rev = "8509f5c2667b9dfe1452a12be2f00c34fffee25a"
 
 [[require]]
 name = "HexResultant"
