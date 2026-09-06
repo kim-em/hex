@@ -9,9 +9,6 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      LAKE_ARTIFACT_CACHE: "true"
-      LAKE_CACHE_DIR: ${{ github.workspace }}/.lake/cache
     steps:
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
@@ -37,38 +34,6 @@ jobs:
           lake build 2>&1 | tee build.log
           if grep -qE 'Building Mathlib\b' build.log; then
             echo "ERROR: Mathlib rebuilt from source (cache miss)"; exit 1; fi
-      # Publish this library's oleans so consumers fetch them with `lake cache
-      # get` instead of recompiling. hex-dev publishes its own build the same
-      # way; this extends it to the released mirrors, which are what downstream
-      # users and the blog's examples actually depend on.
-      #
-      # Only from main, and only after every verification gate above: `lake
-      # cache put` re-uploads every artifact in the mappings file, so running it
-      # per pull request would burn the write budget. Ahead of the terminal
-      # cache save, which must stay last.
-      - name: Publish build outputs to the Lake cache (main only)
-        if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-        env:
-          LAKE_CACHE_KEY: ${{ secrets.HEX_LAKE_CACHE_KEY }}
-          S3_ARTIFACT_ENDPOINT: ${{ vars.HEX_LAKE_CACHE_ARTIFACT_ENDPOINT }}
-          S3_REVISION_ENDPOINT: ${{ vars.HEX_LAKE_CACHE_REVISION_ENDPOINT }}
-        run: |
-          if [ -z "$LAKE_CACHE_KEY" ] || [ -z "$S3_ARTIFACT_ENDPOINT" ] || [ -z "$S3_REVISION_ENDPOINT" ]; then
-            echo "::notice::upload not configured (LAKE_CACHE_KEY / endpoints); skipping publish"; exit 0
-          fi
-          CFG="$RUNNER_TEMP/lake-cache-upload.toml"
-          {
-            echo 'cache.defaultUploadService = "hex-r2"'
-            echo '[[cache.service]]'
-            echo 'name = "hex-r2"'
-            echo 'kind = "s3"'
-            echo "artifactEndpoint = \"$S3_ARTIFACT_ENDPOINT\""
-            echo "revisionEndpoint = \"$S3_REVISION_ENDPOINT\""
-          } > "$CFG"
-          export LAKE_CONFIG="$CFG"
-          lake build --no-build -o .lake/outputs.jsonl
-          echo "mapping entries: $(wc -l < .lake/outputs.jsonl)"
-          lake cache put .lake/outputs.jsonl --service hex-r2 --repo ${{ github.repository }}
       - name: Save Lake build outputs
         if: github.event_name == 'push' && github.ref == 'refs/heads/main' && success()
         uses: actions/cache/save@v4
